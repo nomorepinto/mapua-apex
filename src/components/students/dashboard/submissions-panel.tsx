@@ -1,0 +1,152 @@
+import { Link } from "react-router"
+
+import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { formatDocumentId } from "@/lib/dynamodb-adapters"
+import { layout } from "@/config"
+import { cn } from "@/lib/utils"
+
+function statusTextColor(status: string) {
+  switch (status.toLowerCase()) {
+    case "approved":
+    case "completed":
+      return "text-[#10B981] bg-emerald-50"
+    case "under review":
+      return "text-[#3B82F6] bg-blue-50"
+    case "submitted":
+    case "pending":
+      return "text-[#F59E0B] bg-amber-50"
+    case "denied":
+    case "rejected":
+      return "text-[#D9291C] bg-red-50"
+    case "returned":
+      return "text-[#F59E0B] bg-amber-50"
+    default:
+      return "text-[#64748B] bg-neutral-100"
+  }
+}
+
+export function SubmissionsPanel() {
+  const { state, actions } = useStudentDashboard()
+
+  return (
+    <div className={cn(layout.section, "overflow-hidden")}>
+      <div className="mb-5">
+        <h2 className="text-lg font-bold text-[#1E293B] sm:text-xl">
+          Project Status & Submissions
+        </h2>
+        <p className="text-xs text-neutral-600">
+          Track current signatory routing and approval statuses
+        </p>
+      </div>
+
+      <div className={layout.tableWrap}>
+        <Table className="w-full text-left">
+          <TableHeader>
+            <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-600 uppercase">
+              <TableHead className="pb-3 pr-4 font-bold">DOCUMENT ID</TableHead>
+              <TableHead className="pb-3 pr-6 font-bold">EVENT TITLE</TableHead>
+              <TableHead className="pb-3 pr-4 font-bold">CLASSIFICATION</TableHead>
+              <TableHead className="pb-3 pr-4 font-bold">CURRENT SIGNATORY</TableHead>
+              <TableHead className="pb-3 text-right font-bold">STATUS</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-neutral-50">
+            {state.submissionsLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="py-12 text-center text-sm font-semibold text-neutral-600"
+                >
+                  Loading submissions…
+                </TableCell>
+              </TableRow>
+            ) : state.submissionsError ? (
+              <TableRow>
+                <TableCell
+                  colSpan={5}
+                  className="py-12 text-center text-sm font-semibold text-rose-600"
+                >
+                  Could not load submissions.
+                </TableCell>
+              </TableRow>
+            ) : state.submissions.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-12 text-center">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <p className="text-sm font-bold text-[#1E293B]">
+                      No submissions yet
+                    </p>
+                    <p className="mb-2 text-xs text-neutral-600">
+                      Create your first activity proposal to start tracking
+                      approvals.
+                    </p>
+                    <Link
+                      to="/students/submissions"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-[#8B0000] px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-[#6B0000]"
+                    >
+                      <span>+ Create Project / Event</span>
+                    </Link>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              state.submissions.map((sub) => (
+                <TableRow
+                  key={`${sub.event_id}:${sub.submission_id}`}
+                  className="group cursor-pointer transition-colors hover:bg-neutral-50/80"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    actions.openTracker(sub.event_id, sub.submission_id)
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      actions.openTracker(sub.event_id, sub.submission_id)
+                    }
+                  }}
+                >
+                  <TableCell
+                    className="py-3.5 pr-4 font-mono text-xs font-bold whitespace-nowrap text-[#1E293B] group-hover:text-[#D9291C]"
+                    title={sub.submission_id}
+                  >
+                    {formatDocumentId(sub.submission_id)}
+                  </TableCell>
+                  <TableCell className="py-3.5 pr-6 text-xs font-semibold text-[#1E293B]">
+                    {sub.activity_details.title}
+                    {sub.requires_venue ? (
+                      <span className="ml-2 text-[10px] font-normal text-[#3B82F6]">
+                        ({sub.activity_details.venue})
+                      </span>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="py-3.5 pr-4 text-xs text-[#64748B] capitalize">
+                    {sub.activity_classification}
+                  </TableCell>
+                  <TableCell className="py-3.5 pr-4 text-xs font-medium text-[#475569]">
+                    {sub.current_signatory}
+                  </TableCell>
+                  <TableCell className="py-3.5 text-right whitespace-nowrap">
+                    <span
+                      className={`rounded-md px-2.5 py-1 text-xs font-bold ${statusTextColor(sub.status)}`}
+                    >
+                      {sub.status}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  )
+}
