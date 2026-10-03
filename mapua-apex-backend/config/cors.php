@@ -20,11 +20,15 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => array_values(array_filter(array_map(
-        trim(...),
+        fn (string $url): string => trim($url, " \t\n\r\0\x0B\"'"),
         explode(',', (string) env('CORS_ALLOWED_ORIGINS', env('FRONTEND_URL', 'http://localhost:3000'))),
     ))),
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '#^https://.*\.amplifyapp\.com$#',
+        '#^https://.*\.vercel\.app$#',
+        '#^http://localhost(:\d+)?$#',
+    ],
 
     'allowed_headers' => ['*'],
 
