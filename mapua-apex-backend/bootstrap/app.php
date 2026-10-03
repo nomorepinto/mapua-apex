@@ -7,7 +7,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\PrefersJsonResponses;
 use Illuminate\Http\Request;
 
-return Application::configure(basePath: dirname(__DIR__))
+$app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
@@ -25,3 +25,15 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request): bool => true,
         );
     })->create();
+
+// Master monorepo env: like the Vite frontend, this app reads the shared .env at
+// the repository root instead of its own copy. Only switch when that file exists so
+// containers that ship just this folder (env vars injected by the platform, no root
+// .env) keep booting with an empty environment file rather than a missing-path error.
+$masterEnvPath = dirname(__DIR__, 2);
+
+if (is_file($masterEnvPath.'/.env')) {
+    $app->useEnvironmentPath($masterEnvPath);
+}
+
+return $app;
