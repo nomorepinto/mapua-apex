@@ -1,4 +1,5 @@
 import { memo } from "react"
+import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -21,6 +22,9 @@ export interface ActivityDetailModalProps {
   onClose: () => void
   isActing?: boolean
   actionError?: string | null
+  isOsaar?: boolean
+  isUpdatingClassification?: boolean
+  onClassificationChange?: (nature: "major" | "minor") => void | Promise<void>
   onAction?: (
     action: "approve" | "return" | "reject" | "defer",
     activityId: string,
@@ -33,6 +37,9 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
   onClose,
   isActing = false,
   actionError,
+  isOsaar = false,
+  isUpdatingClassification = false,
+  onClassificationChange,
   onAction,
 }: ActivityDetailModalProps) {
   const {
@@ -46,6 +53,9 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
     handleDefer,
     handleCommentSubmit,
   } = useActivityDetail({ activity, onClose, onAction })
+
+  const isApproveDisabled =
+    isActing || (isOsaar && !activity?.nature)
 
   return (
     <>
@@ -75,6 +85,66 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
           <DialogPanel className="flex-1 overflow-y-auto bg-white px-4 py-6 text-neutral-800 sm:px-8">
             {activity && (
               <div className="space-y-6">
+                {isOsaar ? (
+                  <div className="flex flex-col items-center justify-center text-center gap-2.5 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-4">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                        Event Classification
+                      </h4>
+                      {isUpdatingClassification ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#8B0000]" />
+                      ) : null}
+                    </div>
+                    <div className="inline-flex items-center rounded-lg border border-neutral-200 bg-neutral-200/70 p-1">
+                      <button
+                        type="button"
+                        disabled={isUpdatingClassification || isActing}
+                        onClick={() => {
+                          if (activity.nature?.toLowerCase() !== "minor") {
+                            onClassificationChange?.("minor")
+                          }
+                        }}
+                        className={cn(
+                          "rounded-md px-4 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5",
+                          isUpdatingClassification || isActing
+                            ? "cursor-not-allowed opacity-60 pointer-events-none"
+                            : "cursor-pointer",
+                          activity.nature?.toLowerCase() === "minor"
+                            ? "bg-[#8B0000] text-white shadow-xs"
+                            : "text-neutral-700 hover:text-neutral-900"
+                        )}
+                      >
+                        Minor Event
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isUpdatingClassification || isActing}
+                        onClick={() => {
+                          if (activity.nature?.toLowerCase() !== "major") {
+                            onClassificationChange?.("major")
+                          }
+                        }}
+                        className={cn(
+                          "rounded-md px-4 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5",
+                          isUpdatingClassification || isActing
+                            ? "cursor-not-allowed opacity-60 pointer-events-none"
+                            : "cursor-pointer",
+                          activity.nature?.toLowerCase() === "major"
+                            ? "bg-[#8B0000] text-white shadow-xs"
+                            : "text-neutral-700 hover:text-neutral-900"
+                        )}
+                      >
+                        Major Event
+                      </button>
+                    </div>
+                    {!activity.nature ? (
+                      <p className="text-[11px] font-medium text-amber-700">
+                        Please select a classification before approving.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div className="space-y-3">
                   <h3 className="text-center text-xs font-bold text-neutral-500 uppercase tracking-widest">
                     Proponents
@@ -121,6 +191,25 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
                     <span className="font-bold text-neutral-900">Activity type</span>
                     <span className="font-medium text-neutral-600 sm:text-right capitalize">
                       {activity.type}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="font-bold text-neutral-900">Event Nature</span>
+                    <span className="font-medium sm:text-right">
+                      {activity.nature?.toLowerCase() === "major" ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider bg-red-100 text-[#8B0000] border border-red-200">
+                          Major Event
+                        </span>
+                      ) : activity.nature?.toLowerCase() === "minor" ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider bg-neutral-100 text-neutral-700 border border-neutral-200">
+                          Minor Event
+                        </span>
+                      ) : (
+                        <span className="text-neutral-400 text-xs italic">
+                          Pending classification
+                        </span>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -188,9 +277,15 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
               </Button>
               <Button
                 type="button"
-                disabled={isActing}
+                disabled={isApproveDisabled}
                 onClick={requestApprove}
-                className="min-h-11 rounded-xl bg-[#8B0000] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#6B0000]"
+                title={isOsaar && !activity?.nature ? "Select an event classification first" : undefined}
+                className={cn(
+                  "min-h-11 rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all",
+                  isApproveDisabled
+                    ? "bg-neutral-300 text-neutral-500 cursor-not-allowed hover:bg-neutral-300"
+                    : "bg-[#8B0000] text-white hover:bg-[#6B0000] cursor-pointer"
+                )}
               >
                 {isActing ? "Working…" : "Approve Proposal"}
               </Button>

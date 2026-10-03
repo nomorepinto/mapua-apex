@@ -25,6 +25,7 @@ export interface ApiSubmission {
   activity_classification?: {
     activity_type?: string
     total_org_members?: number
+    nature?: "major" | "minor" | string
   }
   proponents?: Array<{
     id: string
@@ -352,6 +353,8 @@ export interface DashboardSubmissionRow {
   organization_name: string
   id: string
   activity_classification: string
+  /** OSAAR-assigned event nature (major / minor). Undefined until OSAAR sets it. */
+  nature?: "major" | "minor"
   current_signatory: string
   target_date: string
   requires_venue: boolean
@@ -539,6 +542,17 @@ export function formatSignatoryRole(
     }
   }
 
+  // If orgSignatories is present and has an assigned adviser/dean but the current signatory
+  // is an unmapped ID, it has advanced to the campus-level review desk (OSAAR)
+  if (orgSignatories && orgSignatories.length > 0) {
+    const hasAdviserAssigned = orgSignatories.some(
+      (s) => s.role?.toLowerCase() === "adviser"
+    )
+    if (hasAdviserAssigned) {
+      return "OSAAR"
+    }
+  }
+
   // If it's a UUID and nothing matched, default to Adviser for index 0
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
     return "Signatory"
@@ -599,7 +613,7 @@ export function apiSubmissionToDashboardRow(
     currentSignatoryLabel = formatSignatoryRole(
       submission.current_signatory,
       orgSignatories,
-      0,
+      undefined,
       submission.activity_classification?.activity_type,
       Boolean(submission.venue_reservation?.has_reservation)
     )
@@ -616,6 +630,7 @@ export function apiSubmissionToDashboardRow(
       ),
     id: submission.submission_id,
     activity_classification: submission.activity_classification?.activity_type || "extra-curricular",
+    nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,
     current_signatory: currentSignatoryLabel,
     target_date: submission.activity_details?.date_of_event || submission.sent_at,
     requires_venue: Boolean(submission.venue_reservation?.has_reservation),
@@ -692,6 +707,7 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     submittedDate: formatDisplayDate(submission.sent_at),
     representative: formatProponentName(firstProponent) || "—",
     type: submission.activity_classification?.activity_type || "extra-curricular",
+    nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,
     decision,
     status,
     description: submission.activity_details?.description || "No description provided.",

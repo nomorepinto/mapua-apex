@@ -129,3 +129,41 @@ export function useDenySubmissionMutation() {
     },
   })
 }
+
+/**
+ * Update event classification (e.g., Major / Minor event nature) by authorized signatories (OSAAR)
+ */
+export function useUpdateEventClassificationMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      eventId,
+      submissionId,
+      nature,
+    }: {
+      eventId: string
+      submissionId: string
+      nature: "major" | "minor"
+    }) => {
+      const res = await apiClient.patch<{ data: ApiSubmission }>(
+        `/signatories/events/${eventId}/submissions/${submissionId}/classification`,
+        { nature }
+      )
+      return res.data
+    },
+    onSuccess: (data, variables) => {
+      if (data) {
+        queryClient.setQueryData(
+          SIGNATORY_KEYS.detail(variables.eventId, variables.submissionId),
+          data
+        )
+      }
+      queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.queue })
+      queryClient.invalidateQueries({
+        queryKey: SIGNATORY_KEYS.detail(variables.eventId, variables.submissionId),
+      })
+      queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
+    },
+  })
+}

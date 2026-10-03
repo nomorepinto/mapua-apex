@@ -60,6 +60,12 @@ export function SubmissionTrackerModal({
   )
   const canResubmit = submission?.api_status === "returned"
   const isDenied = submission?.api_status === "denied"
+  const currentSignatoryName =
+    submission?.status === "Approved" || submission?.api_status === "approved"
+      ? "Completed"
+      : stepper.assigneesList.find((a) => a.state === "current")?.name ||
+        submission?.current_signatory ||
+        "—"
 
   const handleResubmit = () => {
     useOrgStore.getState().setEditingSubmission(eventId, submissionId)
@@ -257,12 +263,24 @@ export function SubmissionTrackerModal({
                     <p className="text-xs text-[#64748B] mb-3">
                       Current signatory:{" "}
                       <span className="font-bold text-[#1E293B]">
-                        {submission.current_signatory}
+                        {currentSignatoryName}
                       </span>
                     </p>
-                    <span className="text-xs font-semibold text-[#475569] bg-neutral-100 px-3 py-1 rounded-lg border border-neutral-200/60">
-                      {submission.status}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`text-xs font-semibold px-3 py-1 rounded-lg border ${
+                          submission.nature === "major"
+                            ? "bg-emerald-100 text-[#065F46] border-emerald-300 ring-1 ring-emerald-400"
+                            : submission.nature === "minor"
+                            ? "bg-emerald-50 text-[#10B981] border-emerald-200"
+                            : "text-[#475569] bg-neutral-100 border-neutral-200/60"
+                        }`}
+                      >
+                        {submission.nature
+                          ? `${submission.status} (${submission.nature.charAt(0).toUpperCase() + submission.nature.slice(1)})`
+                          : submission.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

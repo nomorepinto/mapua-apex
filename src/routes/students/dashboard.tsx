@@ -222,9 +222,17 @@ export function OrgDashboard() {
                         </TableCell>
                         <TableCell className="py-3.5 text-right whitespace-nowrap">
                           <span
-                            className={`text-xs font-bold px-2.5 py-1 rounded-md ${getStatusTextColor(sub.status)}`}
+                            className={`text-xs font-bold px-2.5 py-1 rounded-md ${
+                              sub.nature === "major"
+                                ? "bg-emerald-100 text-[#065F46] ring-1 ring-emerald-400"
+                                : sub.nature === "minor"
+                                ? "text-[#10B981] bg-emerald-50"
+                                : getStatusTextColor(sub.status)
+                            }`}
                           >
-                            {sub.status}
+                            {sub.nature
+                              ? `${sub.status} (${sub.nature.charAt(0).toUpperCase() + sub.nature.slice(1)})`
+                              : sub.status}
                           </span>
                         </TableCell>
                       </TableRow>
