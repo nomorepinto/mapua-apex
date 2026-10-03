@@ -133,4 +133,11 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Rerun a test after each change to it.
 - Run `vendor/bin/phpunit` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
 
+=== project-specific rules ===
+
+# API Documentation & Schema Sync
+
+- Whenever you make a change to the API — add/remove/modify a route, controller, request/response shape, status code, or any part of the API contract — you must update both **`API_ROUTES.md`** (at the repository root) and **`DynamoDB Schema.txt`** (at the repository root) in the same change to keep them in sync with the code.
+- This applies even when the change was driven by frontend work: treat the docs/schema update as part of completing the API change, not a separate task.
+
 </laravel-boost-guidelines>
