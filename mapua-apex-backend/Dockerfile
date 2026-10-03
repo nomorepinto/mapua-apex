@@ -113,10 +113,22 @@ ErrorLog /proc/self/fd/2
 CustomLog /proc/self/fd/1 combined
 APPCONF
 
+# Own vhost for the Laravel front controller. We deliberately do NOT sed the
+# distro 000-default.conf's DocumentRoot — if that substitution ever no-ops
+# (stale build cache, differing base image), Apache silently keeps serving the
+# empty /var/www/html default and every route 404s before Laravel loads.
+# Instead we disable the default site and enable our own, whose DocumentRoot is
+# hard-coded to /var/www/public. The <VirtualHost *:PORT> tag is rendered from
+# $PORT at container start (see docker-entrypoint).
+COPY <<'VHOST' /etc/apache2/sites-available/mapua.conf
+<VirtualHost *:PORT_PLACEHOLDER>
+    DocumentRoot /var/www/public
+</VirtualHost>
+VHOST
+
 RUN a2enconf zz-app \
     && a2disconf other-vhosts-access-log \
-    && sed -i "s|DocumentRoot /var/www/html|DocumentRoot /var/www/public|g" \
-        /etc/apache2/sites-available/000-default.conf
+    && a2dissite 000-default.conf
 
 # ── Writable paths for Laravel runtime ───────────────────────────────────────
 RUN mkdir -p /var/www/storage/framework/{cache/data,sessions,testing,views} \
@@ -132,10 +144,12 @@ set -e
 cd /var/www
 
 # 1) Point Apache at Render-assigned $PORT (Render injects it at start).
-#    Ports template -> ports.conf; default vhost's *:80 rewritten to *:$PORT.
+#    Ports template -> ports.conf; our vhost template -> sites-enabled, with
+#    the *:$PORT tag substituted so it matches the Listen directive.
 PORT="${PORT:-10000}"
 sed "s|\${PORT}|${PORT}|g" /etc/apache2/ports.conf.template > /etc/apache2/ports.conf
-sed -i "s|\\*80|\\*:${PORT}|g" /etc/apache2/sites-enabled/000-default.conf
+sed "s|PORT_PLACEHOLDER|${PORT}|g" \
+    /etc/apache2/sites-available/mapua.conf > /etc/apache2/sites-enabled/mapua.conf
 
 # 2) Bake runtime env into Laravel config (idempotent; safe on every restart).
 php artisan config:cache >/dev/null || php artisan config:clear >/dev/null
