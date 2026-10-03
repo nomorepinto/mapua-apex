@@ -26,6 +26,7 @@ export interface Activity {
   representative: string
   decision: ActivityDecision
   type: string
+  nature?: "major" | "minor" | string
   status?: "Review" | "Returned" | "Rejected" | "Accepted" | "Pending Dean Approval"
   description: string
   venue: string

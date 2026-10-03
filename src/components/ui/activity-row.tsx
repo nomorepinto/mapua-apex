@@ -47,11 +47,22 @@ const ActivityRow = memo(function ActivityRow({ activity, onSelect }: ActivityRo
         {activity.submittedDate}
       </TableCell>
 
-      {/* 4. TYPE */}
+      {/* 4. TYPE & NATURE */}
       <TableCell className="py-4.5 px-6">
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-700">
-          {activity.type}
-        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-700">
+            {activity.type}
+          </span>
+          {activity.nature?.toLowerCase() === "major" ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-red-100 text-[#8B0000] border border-red-200/60">
+              Major
+            </span>
+          ) : activity.nature?.toLowerCase() === "minor" ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-neutral-100 text-neutral-700 border border-neutral-200/60">
+              Minor
+            </span>
+          ) : null}
+        </div>
       </TableCell>
 
       {/* 5. DECISION (Review, Return, Reject) */}

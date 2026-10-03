@@ -17,6 +17,7 @@ import {
   useReturnSubmissionMutation,
   useSignatoryQueueQuery,
   useSignatorySubmissionDetailQuery,
+  useUpdateEventClassificationMutation,
 } from "@/hooks/use-signatory"
 import { apiSubmissionToActivity } from "@/lib/dynamodb-adapters"
 
@@ -26,10 +27,12 @@ export function useReviewDashboard() {
   const meQuery = useCurrentSignatoryQuery()
   const role = meQuery.data?.role || roleFromCognitoGroups(groups)
   const roleLabel = role ? signatoryRoleLabel(role) : "Signatory"
+  const isOsaar = role?.toLowerCase() === "osaar"
   const queueQuery = useSignatoryQueueQuery()
   const approveMutation = useApproveSubmissionMutation()
   const returnMutation = useReturnSubmissionMutation()
   const denyMutation = useDenySubmissionMutation()
+  const updateClassificationMutation = useUpdateEventClassificationMutation()
 
   const [selectedDept, setSelectedDept] = useState<string | null>(null)
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null)
@@ -126,6 +129,26 @@ export function useReviewDashboard() {
     [activeKeys, approveMutation, denyMutation, handleModalClose, returnMutation]
   )
 
+  const handleClassificationChange = useCallback(
+    async (nature: "major" | "minor") => {
+      if (!activeKeys) return
+      if (activeActivity?.nature?.toLowerCase() === nature.toLowerCase()) return
+      setActionError(null)
+      try {
+        await updateClassificationMutation.mutateAsync({
+          eventId: activeKeys.eventId,
+          submissionId: activeKeys.submissionId,
+          nature,
+        })
+      } catch (error) {
+        setActionError(
+          error instanceof Error ? error.message : "Could not update event classification."
+        )
+      }
+    },
+    [activeActivity?.nature, activeKeys, updateClassificationMutation]
+  )
+
   const stats = useMemo(() => computeReviewStats(activitiesList), [activitiesList])
   const departmentOrgMap = useMemo(
     () => buildDepartmentOrgMap(activitiesList),
@@ -147,6 +170,7 @@ export function useReviewDashboard() {
 
   return {
     roleLabel,
+    isOsaar,
     stats,
     departments,
     departmentOrgMap,
@@ -158,11 +182,13 @@ export function useReviewDashboard() {
     isLoading: queueQuery.isLoading,
     isActing:
       approveMutation.isPending || returnMutation.isPending || denyMutation.isPending,
+    isUpdatingClassification: updateClassificationMutation.isPending,
     actionError,
     handleDeptSelect,
     handleOrgSelect,
     handleActivitySelect,
     handleModalClose,
     handleModalAction,
+    handleClassificationChange,
   }
 }
