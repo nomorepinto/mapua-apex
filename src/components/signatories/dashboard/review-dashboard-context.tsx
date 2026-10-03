@@ -12,15 +12,15 @@ type ReviewDashboardActionName =
   | "handleActivitySelect"
   | "handleModalClose"
   | "handleModalAction"
+  | "handleClassificationChange"
 
 export interface ReviewDashboardContextValue {
   state: Omit<ReviewDashboardModel, ReviewDashboardActionName>
   actions: Pick<ReviewDashboardModel, ReviewDashboardActionName>
 }
 
-const ReviewDashboardContext = createContext<ReviewDashboardContextValue | null>(
-  null
-)
+const ReviewDashboardContext =
+  createContext<ReviewDashboardContextValue | null>(null)
 
 export function useReviewDashboardContext() {
   const value = use(ReviewDashboardContext)
@@ -48,6 +48,8 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
         hasActivities: dashboard.hasActivities,
         isLoading: dashboard.isLoading,
         isActing: dashboard.isActing,
+        isOsaar: dashboard.isOsaar,
+        isUpdatingClassification: dashboard.isUpdatingClassification,
         actionError: dashboard.actionError,
       },
       actions: {
@@ -56,6 +58,7 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
         handleActivitySelect: dashboard.handleActivitySelect,
         handleModalClose: dashboard.handleModalClose,
         handleModalAction: dashboard.handleModalAction,
+        handleClassificationChange: dashboard.handleClassificationChange,
       },
     }),
     [dashboard]

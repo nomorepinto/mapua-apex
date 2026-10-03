@@ -17,17 +17,6 @@ export function Dashboard() {
         </div>
         <ReviewActivityDialog />
       </div>
-
-      <ActivityDetailModal
-        activity={dashboard.activeActivity}
-        onClose={dashboard.handleModalClose}
-        onAction={dashboard.handleModalAction}
-        isActing={dashboard.isActing}
-        isOsaar={dashboard.isOsaar}
-        isUpdatingClassification={dashboard.isUpdatingClassification}
-        onClassificationChange={dashboard.handleClassificationChange}
-        actionError={dashboard.actionError}
-      />
-    </div>
+    </ReviewDashboardProvider>
   )
 }

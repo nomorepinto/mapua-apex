@@ -33,6 +33,16 @@ function statusTextColor(status: string) {
   }
 }
 
+function natureBadgeClass(nature: string | undefined, status: string) {
+  if (nature === "major") {
+    return "bg-emerald-100 text-[#065F46] ring-1 ring-emerald-400"
+  }
+  if (nature === "minor") {
+    return "text-[#10B981] bg-emerald-50"
+  }
+  return statusTextColor(status)
+}
+
 export function SubmissionsPanel() {
   const { state, actions } = useStudentDashboard()
 
@@ -51,11 +61,17 @@ export function SubmissionsPanel() {
         <Table className="w-full text-left">
           <TableHeader>
             <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-600 uppercase">
-              <TableHead className="pb-3 pr-4 font-bold">DOCUMENT ID</TableHead>
-              <TableHead className="pb-3 pr-6 font-bold">EVENT TITLE</TableHead>
-              <TableHead className="pb-3 pr-4 font-bold">CLASSIFICATION</TableHead>
-              <TableHead className="pb-3 pr-4 font-bold">CURRENT SIGNATORY</TableHead>
-              <TableHead className="pb-3 text-right font-bold">STATUS</TableHead>
+              <TableHead className="pr-4 pb-3 font-bold">DOCUMENT ID</TableHead>
+              <TableHead className="pr-6 pb-3 font-bold">EVENT TITLE</TableHead>
+              <TableHead className="pr-4 pb-3 font-bold">
+                CLASSIFICATION
+              </TableHead>
+              <TableHead className="pr-4 pb-3 font-bold">
+                CURRENT SIGNATORY
+              </TableHead>
+              <TableHead className="pb-3 text-right font-bold">
+                STATUS
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="divide-y divide-neutral-50">
@@ -136,9 +152,11 @@ export function SubmissionsPanel() {
                   </TableCell>
                   <TableCell className="py-3.5 text-right whitespace-nowrap">
                     <span
-                      className={`rounded-md px-2.5 py-1 text-xs font-bold ${statusTextColor(sub.status)}`}
+                      className={`rounded-md px-2.5 py-1 text-xs font-bold ${natureBadgeClass(sub.nature, sub.status)}`}
                     >
-                      {sub.status}
+                      {sub.nature
+                        ? `${sub.status} (${sub.nature.charAt(0).toUpperCase() + sub.nature.slice(1)})`
+                        : sub.status}
                     </span>
                   </TableCell>
                 </TableRow>

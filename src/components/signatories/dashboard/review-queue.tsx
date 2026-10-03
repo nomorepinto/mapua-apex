@@ -83,6 +83,9 @@ export function ReviewActivityDialog() {
       onClose={actions.handleModalClose}
       onAction={actions.handleModalAction}
       isActing={state.isActing}
+      isOsaar={state.isOsaar}
+      isUpdatingClassification={state.isUpdatingClassification}
+      onClassificationChange={actions.handleClassificationChange}
       actionError={state.actionError}
     />
   )
