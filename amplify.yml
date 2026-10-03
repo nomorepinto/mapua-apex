@@ -1,0 +1,18 @@
+version: 1
+applications:
+  - appRoot: mapua-apex-frontend
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - mapua-apex-frontend/node_modules/**/*

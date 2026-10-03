@@ -1,0 +1,14 @@
+{
+  "rules": [
+    {
+      "source": "/api/<*>",
+      "target": "/api/<*>",
+      "status": "404"
+    },
+    {
+      "source": "/<*>",
+      "target": "/index.html",
+      "status": "200"
+    }
+  ]
+}
