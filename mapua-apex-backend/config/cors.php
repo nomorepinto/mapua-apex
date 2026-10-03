@@ -24,11 +24,7 @@ return [
         explode(',', (string) env('CORS_ALLOWED_ORIGINS', env('FRONTEND_URL', 'http://localhost:3000'))),
     ))),
 
-    'allowed_origins_patterns' => [
-        '#^https://.*\.amplifyapp\.com$#',
-        '#^https://.*\.vercel\.app$#',
-        '#^http://localhost(:\d+)?$#',
-    ],
+    'allowed_origins_patterns' => [],
 
     'allowed_headers' => ['*'],
 
