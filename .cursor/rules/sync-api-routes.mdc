@@ -1,0 +1,29 @@
+---
+description: Keep API_ROUTES.md in sync with Laravel backend API changes
+globs: mapua-apex-backend/**/*.php,API_ROUTES.md
+alwaysApply: false
+---
+
+# Sync API_ROUTES.md with the backend
+
+When you add, change, or remove anything that affects the HTTP API, update repo-root `API_ROUTES.md` and `DynamoDB Schema.txt` in the **same turn**. Do not leave the doc for a follow-up.
+
+Source of truth is `mapua-apex-backend/` (`routes/api.php`, controllers, FormRequests, resources, auth middleware, Dynamo write paths that set status codes or payloads). Do not copy the frontend.
+
+## Update the doc when
+
+- Routes, methods, prefixes, or path params change
+- Request bodies, validation, or query params change
+- Response JSON, status codes, or `data` wrapping change
+- Auth (JWT claims, groups, headers) or error behavior (`401` / `404` / `422` / `429` / `503`) changes
+
+```text
+❌ BAD
+Add POST /students/.../notifications in routes/api.php
+Leave API_ROUTES.md with GET only
+
+✅ GOOD
+Add the route, then add a POST row under Student routes with the real body, 201 shape, and 422 rules
+```
+
+Skip the doc only for private refactors that do not change URL, headers, body, or response.

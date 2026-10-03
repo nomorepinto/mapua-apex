@@ -1,5 +1,32 @@
-# Logs
-logs
+# ═══════════════════════════════════════════════════════════════════
+# Root .gitignore — mapua-apex monorepo
+# Merged from mapua-apex-backend/.gitignore and mapua-apex-frontend/.gitignore
+#
+# Rules that are safe to match at any depth live in the shared sections.
+# Tool-specific rules are scoped to their project folder (path prefix) so
+# they never leak between the Laravel backend and the Vite/React frontend.
+# ═══════════════════════════════════════════════════════════════════
+
+# ─── OS / editor cruft (any depth) ─────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+*.sw?
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.local
+
+# VS Code: ignore settings, but keep the shared extensions list
+.vscode/*
+!.vscode/extensions.json
+
+# ─── Logs (any depth) ──────────────────────────────────────────────
+# Note: we deliberately do NOT ignore a bare `logs/` directory here.
+# Laravel's mapua-apex-backend/storage/logs/ must stay trackable via
+# its own nested .gitignore; *.log and the *-debug.log* patterns
+# below cover everything the frontend's original `logs` rule caught.
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,26 +34,48 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Agent files and skills
-.agents/
-
-# Environment files
+# ─── Environment files ─────────────────────────────────────────────
+# Track the templates (.env.example); never the real values.
 .env
 .env.*
 !.env.example
+
+# ─── Node / Vite (frontend + any JS tooling anywhere) ──────────────
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.tsbuildinfo
+
+# ─── Agent / skill caches ──────────────────────────────────────────
+.agents/
+.expo/
+
+# ─── PHP / Laravel (scoped to the backend folder) ──────────────────
+# Laravel ships nested .gitignore files inside bootstrap/cache/,
+# storage/app/, storage/framework/ and storage/logs/ — those still
+# apply. The rules below cover the rest of the backend-only noise.
+mapua-apex-backend/vendor/
+mapua-apex-backend/public/build/
+mapua-apex-backend/public/hot
+mapua-apex-backend/public/storage
+mapua-apex-backend/public/fonts-manifest.dev.json
+mapua-apex-backend/storage/*.key
+mapua-apex-backend/storage/pail
+mapua-apex-backend/auth.json
+mapua-apex-backend/_ide_helper.php
+mapua-apex-backend/.phpactor.json
+mapua-apex-backend/.phpunit.result.cache
+mapua-apex-backend/.phpunit.cache/
+mapua-apex-backend/Homestead.json
+mapua-apex-backend/Homestead.yaml
+
+# Backend-local editor/agent dirs.
+# Note: the root .cursor/ and mapua-apex-frontend/.cursor/ are tracked
+# on purpose — do NOT widen these rules without checking.
+mapua-apex-backend/.cursor/
+mapua-apex-backend/.codex/
+mapua-apex-backend/.idea/
+mapua-apex-backend/.nova/
+mapua-apex-backend/.vscode/
+mapua-apex-backend/.zed/

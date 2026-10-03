@@ -1,0 +1,298 @@
+Reorganized schema
+
+ORGANIZATION
+PK: ORGANIZATION#uuid
+SK: ORGANIZATION#uuid
+name: string
+is_higher_council: boolean (default false)
+signatories: [
+  { role: "adviser", signatory_id: "adv001" },
+  { role: "dean",     signatory_id: "dean001" }
+]
+Desk directory for this org (one person per role).
+Allowed desk roles: adviser | dean | osaar | cdm | admin.
+Stored in that role order even if the write sent a different order.
+Not stored on SIGNATORY. Approval routing uses org desks for adviser
+and dean. If is_higher_council is true, Dean is skipped; Adviser still
+reviews first.
+OSAAR and CDM are campus-wide: OSAAR_SIGNATORY_ID and
+CDM_SIGNATORY_ID in the API env (plain uuid or SIGNATORY#uuid).
+Rename those people in place (PUT /signatories on the same id).
+admin may occupy a desk but is not in the approval sequence.
+
+EVENT
+PK: EVENT#uuid
+SK: EVENT#uuid
+sent_at: timestamp
+GSI1PK: ORGANIZATION#uuid
+GSI1SK: timestamp
+
+Org event list queries GSI1 (first 25 EVENT items), then each event's
+SUBMISSION# / DEADLINE# children. Student GET /organization reads this
+ORGANIZATION item directly.
+
+SUBMISSION
+PK: EVENT#uuid
+SK: SUBMISSION#uuid
+submission_type: string
+sent_at: timestamp
+status: "pending" | "approved" | "denied" | "returned"
+current_signatory: SIGNATORY#uuid
+GSI1PK: ORGANIZATION#uuid
+GSI1SK: SUBMISSION#uuid
+GSI2PK: SIGNATORY#uuid   (sparse: present while pending or returned on a desk)
+GSI2SK: timestamp
+
+activity_classification: {
+  activity_type: "co-curricular" | "extra-curricular"
+  total_org_members: number
+}
+proponents: [{
+  id, position_title, first_name, middle_name, last_name, suffix,
+  student_number, program_and_year, date_of_submission, department,
+  position_of_applicant, org_or_course_section, contact_number,
+  email_address, facebook_link
+}]
+activity_details: {
+  title_and_nature, description, objectives, venue,
+  date_of_event, day_of_event, time_of_event,
+  expected_participants, individual_contribution, proposed_budget
+}
+time_of_event is 24-hour "HH:MM - HH:MM" (start and end).
+The form lists hours 1–12 and minutes in 5-minute steps. Saved times must fall between 7:00 AM and 9:00 PM. End is not earlier than start, and start and end cannot be the same.
+institutional_alignment: {
+  mission_statements: { competitive, research, solutions }
+  core_values_explanation, peo_explanation, sdg_explanation
+}
+detailed_budget_proposal: {
+  items: [{ item_no, unit, quantity, price_per_unit, total }]
+  grand_total
+}
+venue_reservation: {
+  has_reservation: boolean
+  equipment_requested: { monoblock_chairs, whiteboards, tables, rostrum, flags_with_stand, panel_boards, others_specified }
+  general_facilities: { purpose, items: [{ item, date_of_use, time_of_use, location }] }
+  function_rooms: { purpose, items: [{ date_needed, time_needed, room_needed, remarks }] }
+  audiovisual_equipment: { purpose, items: [{ date_needed, time_needed, equipment_needed, remarks }] }
+}
+GSI1 on SUBMISSION is written on create/update (org + submission id).
+Admin GET /admins/submissions lists organizations, then queries GSI1 for each
+one with GSI1SK beginning SUBMISSION#. Event rows on the same partition are
+not included. organization_id is that GSI1PK without the prefix.
+organization_name is the name on that ORGANIZATION item.
+The student org list still walks EVENT GSI1, then queries each event
+partition. GSI2 is the signatory inbox. It stays on return (status
+"returned") so the same desk and the student both still see the paper.
+The student may edit a returned paper; PUT sets status back to "pending"
+and keeps current_signatory / GSI2 on that desk. Deny sets status
+"denied", drops GSI2, and the student cannot edit. GSI2 is also dropped
+on the last approve (status stays "approved" / "denied", current_signatory
+is left as the last desk).
+
+NOTIFICATION
+PK: SUBMISSION#uuid
+SK: NOTIFICATION#timestamp
+signatory: SIGNATORY#uuid
+notif_type: "approved" | "fully approved" | "denied" | "returned"
+comment: string (mandatory if denied or returned)
+
+Students GET / POST / PUT the timeline for their org's paper.
+Signatories POST a row on an open desk (does not change submission status)
+and PUT a row they authored. POST writes SK = now (UTC, second precision).
+PUT replaces notif_type / comment in place; SK does not change.
+Students may also change signatory on PUT. Signatory PUT keeps the author.
+Approve / return / deny still insert a NOTIFICATION row as a side effect.
+
+SIGNATORY
+PK: SIGNATORY#uuid
+SK: SIGNATORY#uuid
+name: string
+role: "adviser" | "cdm" | "dean" | "osaar" | "admin"
+department: string (deans only, e.g. SOIT)
+GSI4PK: ROLE#ADVISER | ROLE#CDM | ROLE#DEAN | ROLE#DEAN#{DEPARTMENT} | ROLE#OSAAR | ROLE#ADMIN
+GSI4SK: SIGNATORY#uuid
+
+A SIGNATORY item is the person. It has no organization_id.
+GET /signatories/me and admin list/show read this item.
+Who occupies a desk for an org is ORGANIZATION.signatories.
+GSI4 is the role index, not an org assignment. ROLE#{ROLE} for adviser, cdm, osaar, admin.
+Deans may add a department suffix: ROLE#DEAN#SOIT.
+
+Other items copy the signatory id; they do not join back to SIGNATORY:
+  ORGANIZATION.signatories[].signatory_id
+  SUBMISSION.current_signatory and GSI2PK (inbox)
+  NOTIFICATION.signatory (timeline snapshot)
+Deleting a SIGNATORY item does not rewrite those copies. Replace a person in
+place by keeping the same uuid (PUT name / role / department). A new uuid
+leaves in-flight papers, org desks, and Cognito custom:signatory_id
+pointing at the old id.
+
+DEADLINE REMINDER
+PK: EVENT#uuid
+SK: DEADLINE#uuid
+sent_at: timestamp
+deadline: timestamp
+
+ANNOUNCEMENT
+PK: ANNOUNCEMENT
+SK: timestamp
+content: string
+
+All announcements share one partition. List is Query PK = ANNOUNCEMENT
+(newest SK first). Show / PUT / DELETE use GetItem / PutItem / DeleteItem
+on that PK + SK. SK is the identity (`sent_at` in the API). POST writes
+SK = now (UTC, second precision). PUT replaces content in place; it does
+not change SK. Admin Cognito group only.
+
+________________
+
+
+Example items
+ORGANIZATION
+json
+{
+  "PK": "ORGANIZATION#a1b2",
+  "SK": "ORGANIZATION#a1b2",
+  "name": "Mapua Computing Society",
+  "signatories": [
+    { "role": "adviser", "signatory_id": "adv001" },
+    { "role": "dean", "signatory_id": "dean001" }
+  ],
+  "is_higher_council": false
+}
+EVENT
+json
+{
+  "PK": "EVENT#e001",
+  "SK": "EVENT#e001",
+  "sent_at": "2026-09-01T09:00:00Z",
+  "GSI1PK": "ORGANIZATION#a1b2",
+  "GSI1SK": "2026-09-01T09:00:00Z"
+}
+SUBMISSION (extra-curricular event that also needs a venue)
+json
+{
+  "PK": "EVENT#e001",
+  "SK": "SUBMISSION#s001",
+  "submission_type": "saaf",
+  "sent_at": "2026-09-10T14:00:00Z",
+  "status": "pending",
+  "current_signatory": "SIGNATORY#adv001",
+  "GSI1PK": "ORGANIZATION#a1b2",
+  "GSI1SK": "SUBMISSION#s001",
+  "GSI2PK": "SIGNATORY#adv001",
+  "GSI2SK": "2026-09-10T14:00:00Z",
+
+
+  "activity_classification": {
+    "activity_type": "extra-curricular",
+    "total_org_members": 42
+  },
+  "proponents": [{
+    "id": "p001",
+    "position_title": "President",
+    "first_name": "Nicole",
+    "middle_name": "R",
+    "last_name": "Santos",
+    "suffix": "",
+    "student_number": "2021-00123",
+    "program_and_year": "BSCS-3",
+    "date_of_submission": "2026-09-10",
+    "department": "CCIS",
+    "position_of_applicant": "President",
+    "org_or_course_section": "Mapua Computing Society",
+    "contact_number": "09171234567",
+    "email_address": "nsantos@mymail.mapua.edu.ph",
+    "facebook_link": "fb.com/nicole.santos"
+  }],
+  "activity_details": {
+    "title_and_nature": "Hack Night: Intro to Web Dev",
+    "description": "A beginner-friendly hackathon night.",
+    "objectives": "Introduce first-year students to web development.",
+    "venue": "MPH 2nd Floor",
+    "date_of_event": "2026-10-05",
+    "day_of_event": "Monday",
+    "time_of_event": "17:00 - 21:00",
+    "expected_participants": 60,
+    "individual_contribution": 0,
+    "proposed_budget": 5000
+  },
+  "institutional_alignment": {
+    "mission_statements": { "competitive": true, "research": false, "solutions": true },
+    "core_values_explanation": "Promotes collaboration and innovation.",
+    "peo_explanation": "Builds technical competency outside curriculum.",
+    "sdg_explanation": "Supports SDG 4: Quality Education."
+  },
+  "detailed_budget_proposal": {
+    "items": [{ "item_no": "1", "unit": 1, "quantity": 60, "price_per_unit": 50, "total": 3000 }],
+    "grand_total": 3000
+  },
+  "venue_reservation": {
+    "has_reservation": true,
+    "equipment_requested": {
+      "monoblock_chairs": true, "whiteboards": false, "tables": true,
+      "rostrum": false, "flags_with_stand": false, "panel_boards": false,
+      "others_specified": ""
+    },
+    "general_facilities": { "purpose": "Hackathon venue", "items": [{ "item": "MPH", "date_of_use": "2026-10-05", "time_of_use": "17:00", "location": "MPH 2F" }] },
+    "function_rooms": { "purpose": "", "items": [] },
+    "audiovisual_equipment": { "purpose": "Projector for demo", "items": [{ "date_needed": "2026-10-05", "time_needed": "17:00", "equipment_needed": "Projector", "remarks": "1 unit" }] }
+  }
+}
+Routing is application logic, not a field on SUBMISSION. Sequence starts at
+Adviser, then Dean when activity_type is co-curricular, then OSAAR, then CDM
+when has_reservation is true. If the submitting organization's
+is_higher_council is true, Dean is skipped (even for co-curricular);
+Adviser still reviews first, then OSAAR, then CDM when there is a
+reservation. Adviser and Dean
+come from ORGANIZATION.signatories. OSAAR and CDM come from OSAAR_SIGNATORY_ID
+and CDM_SIGNATORY_ID. admin is a valid desk role but is not in this
+sequence. current_signatory / GSI2PK hold whoever has the paper now. On approve, the resolver reads the org desk list (adviser, dean) and the campus env ids (OSAAR, CDM) again to pick the next id (or drop GSI2 when the sequence is done).
+Return keeps the paper on the current desk (status "returned"). Deny
+removes it from the queue (status "denied") and cannot be edited.
+
+NOTIFICATION
+json
+{
+  "PK": "SUBMISSION#s001",
+  "SK": "NOTIFICATION#2026-09-11T08:30:00Z",
+  "signatory": "SIGNATORY#adv001",
+  "notif_type": "approved",
+  "comment": ""
+}
+SIGNATORY (adviser)
+json
+{
+  "PK": "SIGNATORY#adv001",
+  "SK": "SIGNATORY#adv001",
+  "name": "Prof. Juan Dela Cruz",
+  "role": "adviser",
+  "GSI4PK": "ROLE#ADVISER",
+  "GSI4SK": "SIGNATORY#adv001"
+}
+SIGNATORY (dean, department-scoped)
+json
+{
+  "PK": "SIGNATORY#dean001",
+  "SK": "SIGNATORY#dean001",
+  "name": "Dean Maria Santos",
+  "role": "dean",
+  "department": "SOIT",
+  "GSI4PK": "ROLE#DEAN#SOIT",
+  "GSI4SK": "SIGNATORY#dean001"
+}
+DEADLINE REMINDER
+json
+{
+  "PK": "EVENT#e001",
+  "SK": "DEADLINE#d001",
+  "sent_at": "2026-09-01T09:00:00Z",
+  "deadline": "2026-09-20T23:59:59Z"
+}
+ANNOUNCEMENT
+json
+{
+  "PK": "ANNOUNCEMENT",
+  "SK": "2026-09-15T08:00:00Z",
+  "content": "OSAAR office hours are 9:00–17:00."
+}
