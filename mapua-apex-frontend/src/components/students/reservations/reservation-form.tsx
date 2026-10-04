@@ -32,7 +32,7 @@ export function ReservationIntro() {
 
 export function ReservationForm() {
   const { state, actions } = useReservationFormContext()
-  const { draft } = state
+  const { draft, schedule } = state
 
   return (
     <form
@@ -71,6 +71,7 @@ export function ReservationForm() {
         <FacilityTable
           purpose={draft.purpose}
           items={draft.facilityItems}
+          schedule={schedule}
           onPurposeChange={(value) => actions.updateField("purpose", value)}
           onUpdate={actions.handleUpdateFacilityItem}
           onRemove={actions.handleRemoveFacilityItem}
@@ -80,6 +81,7 @@ export function ReservationForm() {
         <RoomTable
           purpose={draft.functionRoomPurpose}
           items={draft.roomItems}
+          schedule={schedule}
           onPurposeChange={(value) =>
             actions.updateField("functionRoomPurpose", value)
           }
@@ -91,6 +93,7 @@ export function ReservationForm() {
         <AvTable
           purpose={draft.avPurpose}
           items={draft.avItems}
+          schedule={schedule}
           onPurposeChange={(value) => actions.updateField("avPurpose", value)}
           onUpdate={actions.handleUpdateAvItem}
           onRemove={actions.handleRemoveAvItem}

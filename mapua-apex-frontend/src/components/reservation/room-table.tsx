@@ -11,11 +11,13 @@ import type { RoomItem } from "@/components/reservation/types"
 import { DatePicker } from "@/components/ui/date-picker"
 import { TimePicker } from "@/components/ui/time-picker"
 import { layout } from "@/config"
+import type { EventSchedule } from "@/lib/event-schedule"
 import { cn } from "@/lib/utils"
 
 export function RoomTable({
   purpose = "",
   items = [],
+  schedule,
   onPurposeChange,
   onUpdate,
   onRemove,
@@ -23,6 +25,7 @@ export function RoomTable({
 }: {
   purpose: string
   items?: RoomItem[]
+  schedule: EventSchedule
   onPurposeChange: (value: string) => void
   onUpdate: (id: string, field: keyof RoomItem, value: string) => void
   onRemove: (id: string) => void
@@ -103,10 +106,9 @@ export function RoomTable({
                     <td className="border-r border-neutral-300 p-2">
                       <DatePicker
                         size="sm"
-                        value={item.dateNeeded}
-                        onChange={(next) =>
-                          onUpdate(item.id, "dateNeeded", next)
-                        }
+                        disabled
+                        value={schedule.startDate}
+                        onChange={() => {}}
                         placeholder="Date"
                         aria-label="Room start date"
                       />
@@ -114,11 +116,9 @@ export function RoomTable({
                     <td className="border-r border-neutral-300 p-2">
                       <DatePicker
                         size="sm"
-                        minDate={item.dateNeeded || undefined}
-                        value={item.endDateNeeded || ""}
-                        onChange={(next) =>
-                          onUpdate(item.id, "endDateNeeded", next)
-                        }
+                        disabled
+                        value={schedule.endDate}
+                        onChange={() => {}}
                         placeholder="Date"
                         aria-label="Room end date"
                       />
@@ -126,10 +126,9 @@ export function RoomTable({
                     <td className="border-r border-neutral-300 p-2">
                       <TimePicker
                         size="sm"
-                        value={item.timeNeeded}
-                        onChange={(next) =>
-                          onUpdate(item.id, "timeNeeded", next)
-                        }
+                        disabled
+                        value={schedule.startTime}
+                        onChange={() => {}}
                         placeholder="Time"
                         aria-label="Room start time"
                       />
@@ -137,10 +136,9 @@ export function RoomTable({
                     <td className="border-r border-neutral-300 p-2">
                       <TimePicker
                         size="sm"
-                        value={item.endTimeNeeded || ""}
-                        onChange={(next) =>
-                          onUpdate(item.id, "endTimeNeeded", next)
-                        }
+                        disabled
+                        value={schedule.endTime}
+                        onChange={() => {}}
                         placeholder="Time"
                         aria-label="Room end time"
                       />

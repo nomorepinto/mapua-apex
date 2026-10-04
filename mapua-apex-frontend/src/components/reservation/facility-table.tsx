@@ -8,6 +8,7 @@ import {
 } from "@/components/reservation/constants"
 import type { FacilityItem } from "@/components/reservation/types"
 import { layout } from "@/config"
+import type { EventSchedule } from "@/lib/event-schedule"
 import { cn } from "@/lib/utils"
 import { DatePicker } from "@/components/ui/date-picker"
 import { TimePicker } from "@/components/ui/time-picker"
@@ -15,6 +16,7 @@ import { TimePicker } from "@/components/ui/time-picker"
 export function FacilityTable({
   purpose = "",
   items = [],
+  schedule,
   onPurposeChange,
   onUpdate,
   onRemove,
@@ -22,6 +24,7 @@ export function FacilityTable({
 }: {
   purpose: string
   items?: FacilityItem[]
+  schedule: EventSchedule
   onPurposeChange: (value: string) => void
   onUpdate: (id: string, field: keyof FacilityItem, value: string) => void
   onRemove: (id: string) => void
@@ -89,10 +92,9 @@ export function FacilityTable({
                   <td className="border-r border-neutral-300 p-2">
                     <DatePicker
                       size="sm"
-                      value={item.dateOfUse}
-                      onChange={(next) =>
-                        onUpdate(item.id, "dateOfUse", next)
-                      }
+                      disabled
+                      value={schedule.startDate}
+                      onChange={() => {}}
                       placeholder="Date"
                       aria-label="Facility start date"
                     />
@@ -100,11 +102,9 @@ export function FacilityTable({
                   <td className="border-r border-neutral-300 p-2">
                     <DatePicker
                       size="sm"
-                      minDate={item.dateOfUse || undefined}
-                      value={item.endDateOfUse || ""}
-                      onChange={(next) =>
-                        onUpdate(item.id, "endDateOfUse", next)
-                      }
+                      disabled
+                      value={schedule.endDate}
+                      onChange={() => {}}
                       placeholder="Date"
                       aria-label="Facility end date"
                     />
@@ -112,10 +112,9 @@ export function FacilityTable({
                   <td className="border-r border-neutral-300 p-2">
                     <TimePicker
                       size="sm"
-                      value={item.timeOfUse}
-                      onChange={(next) =>
-                        onUpdate(item.id, "timeOfUse", next)
-                      }
+                      disabled
+                      value={schedule.startTime}
+                      onChange={() => {}}
                       placeholder="Time"
                       aria-label="Facility start time"
                     />
@@ -123,10 +122,9 @@ export function FacilityTable({
                   <td className="border-r border-neutral-300 p-2">
                     <TimePicker
                       size="sm"
-                      value={item.endTimeOfUse || ""}
-                      onChange={(next) =>
-                        onUpdate(item.id, "endTimeOfUse", next)
-                      }
+                      disabled
+                      value={schedule.endTime}
+                      onChange={() => {}}
                       placeholder="Time"
                       aria-label="Facility end time"
                     />

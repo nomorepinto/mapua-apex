@@ -3,12 +3,14 @@ import { createContext, type ReactNode } from "react"
 import { use } from "react"
 
 import type { ReservationDraft } from "@/components/reservation/types"
+import type { EventSchedule } from "@/lib/event-schedule"
 import { useReservationForm } from "@/hooks/use-reservation-form"
 
 type ReservationFormModel = ReturnType<typeof useReservationForm>
 
 interface ReservationFormState {
   draft: ReservationDraft
+  schedule: EventSchedule
   showErrors: boolean
   submitError: ReservationFormModel["submitError"]
   isSubmitting: boolean
@@ -64,6 +66,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
   const value: ReservationFormContextValue = {
     state: {
       draft: form.draft,
+      schedule: form.schedule,
       showErrors: form.showErrors,
       submitError: form.submitError,
       isSubmitting: form.isSubmitting,

@@ -95,7 +95,6 @@ export function saafHasUserInput(draft: SaafDraft): boolean {
       draft.totalOrgMembers,
       draft.expectedParticipants,
       draft.individualContribution,
-      draft.proposedBudget,
       draft.dayOfEvent,
       draft.activityTitle,
       draft.activityDescription,

@@ -191,6 +191,15 @@ export function useSaafForm() {
     0
   )
 
+  // Proposed Budget is locked to the itemized Detailed Budget grand total so the
+  // summary figure can never disagree with the line items entered later.
+  useEffect(() => {
+    const next = grandTotal.toFixed(2)
+    if ((useOrgStore.getState().saafDraft?.proposedBudget ?? "") !== next) {
+      useOrgStore.getState().patchSaafDraft({ proposedBudget: next })
+    }
+  }, [grandTotal])
+
   const revealInvalidFields = useCallback((root: ParentNode) => {
     setShowErrors(false)
     requestAnimationFrame(() => {

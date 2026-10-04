@@ -7,6 +7,7 @@ import {
 } from "@/components/submission/constants"
 import type { SaafDraft } from "@/components/submission/types"
 import type { Activity } from "@/components/ui/activity.types"
+import { getEventSchedule } from "@/lib/event-schedule"
 
 /**
  * Backend API Submission shape returned by Laravel DynamoDB routes
@@ -220,6 +221,15 @@ export function buildSaafApiPayload(
   existingEventId?: string
 ) {
   const event_id = existingEventId || crypto.randomUUID()
+  // Reservation date/time is locked to the event schedule so the stored
+  // facility/room/AV items can never disagree with the activity details.
+  const schedule = getEventSchedule(saafDraft)
+  // Proposed budget is locked to the itemized Detailed Budget grand total so the
+  // summary figure and the line-item sum can never disagree.
+  const grandTotal = (saafDraft.budgetItems || []).reduce(
+    (sum, b) => sum + (Number(b.quantity) || 0) * (Number(b.pricePerUnit) || 0),
+    0
+  )
   const hasReservation = Boolean(
     reservationDraft &&
     (reservationDraft.facilityItems?.length > 0 ||
@@ -266,7 +276,7 @@ export function buildSaafApiPayload(
       time_of_event: saafDraft.timeOfEvent || "",
       expected_participants: Number(saafDraft.expectedParticipants) || 0,
       individual_contribution: Number(saafDraft.individualContribution) || 0,
-      proposed_budget: Number(saafDraft.proposedBudget) || 0,
+      proposed_budget: grandTotal,
     },
     institutional_alignment: {
       mission_statements: {
@@ -286,10 +296,7 @@ export function buildSaafApiPayload(
         price_per_unit: Number(b.pricePerUnit) || 0,
         total: (Number(b.quantity) || 0) * (Number(b.pricePerUnit) || 0),
       })),
-      grand_total: (saafDraft.budgetItems || []).reduce(
-        (sum, b) => sum + (Number(b.quantity) || 0) * (Number(b.pricePerUnit) || 0),
-        0
-      ),
+      grand_total: grandTotal,
     },
     venue_reservation: {
       has_reservation: hasReservation,
@@ -306,20 +313,20 @@ export function buildSaafApiPayload(
         purpose: reservationDraft?.purpose || "",
         items: (reservationDraft?.facilityItems || []).map((f) => ({
           item: f.item,
-          date_of_use: f.dateOfUse,
-          end_date_of_use: f.endDateOfUse || f.dateOfUse,
-          time_of_use: f.timeOfUse,
-          end_time_of_use: f.endTimeOfUse || f.timeOfUse,
+          date_of_use: schedule.startDate,
+          end_date_of_use: schedule.endDate,
+          time_of_use: schedule.startTime,
+          end_time_of_use: schedule.endTime,
           location: f.location,
         })),
       },
       function_rooms: {
         purpose: reservationDraft?.functionRoomPurpose || "",
         items: (reservationDraft?.roomItems || []).map((r) => ({
-          date_needed: r.dateNeeded,
-          end_date_needed: r.endDateNeeded || r.dateNeeded,
-          time_needed: r.timeNeeded,
-          end_time_needed: r.endTimeNeeded || r.timeNeeded,
+          date_needed: schedule.startDate,
+          end_date_needed: schedule.endDate,
+          time_needed: schedule.startTime,
+          end_time_needed: schedule.endTime,
           room_needed: r.roomNeeded,
           remarks: r.remarks || "",
         })),
@@ -327,10 +334,10 @@ export function buildSaafApiPayload(
       audiovisual_equipment: {
         purpose: reservationDraft?.avPurpose || "",
         items: (reservationDraft?.avItems || []).map((a) => ({
-          date_needed: a.dateNeeded,
-          end_date_needed: a.endDateNeeded || a.dateNeeded,
-          time_needed: a.timeNeeded,
-          end_time_needed: a.endTimeNeeded || a.timeNeeded,
+          date_needed: schedule.startDate,
+          end_date_needed: schedule.endDate,
+          time_needed: schedule.startTime,
+          end_time_needed: schedule.endTime,
           equipment_needed: a.equipmentNeeded,
           remarks: a.remarks || "",
         })),

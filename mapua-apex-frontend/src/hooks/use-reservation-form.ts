@@ -14,6 +14,7 @@ import type {
 } from "@/components/reservation/types"
 import { buildSaafApiPayload, omitEventIdFromPayload } from "@/lib/dynamodb-adapters"
 import { useCreateSubmissionMutation, useUpdateSubmissionMutation } from "@/hooks/use-submissions"
+import { getEventSchedule, withEventSchedule } from "@/lib/event-schedule"
 import { saveProposalPdf } from "@/lib/save-proposal-pdf"
 import { useOrgStore } from "@/stores/org-store"
 
@@ -44,6 +45,11 @@ export function useReservationForm() {
   }
 
   useScrollToTop()
+
+  // Reservation date/time is always locked to the SAAF event schedule so it can
+  // never be entered inconsistently with the event details captured earlier.
+  const saafDraft = useOrgStore((state) => state.saafDraft)
+  const schedule = getEventSchedule(saafDraft)
 
   const updateField = useCallback(
     <K extends keyof ReservationDraft>(key: K, value: ReservationDraft[K]) => {
@@ -364,12 +370,13 @@ export function useReservationForm() {
         proponents: saafDraft.proponents || [],
         budgetItems: saafDraft.budgetItems || [],
       },
-      currentDraft
+      withEventSchedule(currentDraft, getEventSchedule(saafDraft))
     )
   }, [])
 
   return {
     draft,
+    schedule,
     showConfirmModal,
     showConfirmClearModal,
     showSuccessModal,
