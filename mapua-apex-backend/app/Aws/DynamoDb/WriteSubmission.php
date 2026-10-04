@@ -20,7 +20,8 @@ final class WriteSubmission
     public function create(string $organizationId, array $payload): array
     {
         $signatoryIds = $this->sequence->signatoryIds($organizationId, $payload);
-        $currentSignatory = DynamoKeys::signatory($signatoryIds[0]);
+        $sequence = $this->sequenceKeys($signatoryIds);
+        $currentSignatory = $sequence[0];
 
         $eventId = (string) $payload['event_id'];
         $this->ensureEvent($eventId, $organizationId);
@@ -28,7 +29,7 @@ final class WriteSubmission
         $sentAt = DynamoKeys::now();
         $submissionId = (string) Str::uuid();
 
-        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sentAt, 'pending');
+        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sequence, $sentAt, 'pending');
         $this->items->put($item, 'attribute_not_exists(PK)');
 
         return $item;
@@ -57,16 +58,29 @@ final class WriteSubmission
         }
 
         $signatoryIds = $this->sequence->signatoryIds($organizationId, $payload);
-        $keepDesk = $status === 'returned' && is_string($existing['current_signatory'] ?? null);
+        $sequence = $this->sequenceKeys($signatoryIds);
+        $existingDesk = $existing['current_signatory'] ?? null;
+        $keepDesk = $status === 'returned'
+            && is_string($existingDesk)
+            && in_array($existingDesk, $sequence, true);
         $currentSignatory = $keepDesk
-            ? (string) $existing['current_signatory']
-            : DynamoKeys::signatory($signatoryIds[0]);
+            ? (string) $existingDesk
+            : $sequence[0];
         $sentAt = DynamoKeys::now();
 
-        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sentAt, 'pending');
+        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sequence, $sentAt, 'pending');
         $this->items->put($item);
 
         return $item;
+    }
+
+    /**
+     * @param  list<string>  $signatoryIds
+     * @return list<string>
+     */
+    private function sequenceKeys(array $signatoryIds): array
+    {
+        return array_map(static fn (string $id): string => DynamoKeys::signatory($id), $signatoryIds);
     }
 
     private function ensureEvent(string $eventId, string $organizationId): void
@@ -95,6 +109,7 @@ final class WriteSubmission
 
     /**
      * @param  array<string, mixed>  $payload
+     * @param  list<string>  $signatorySequence
      * @return array<string, mixed>
      */
     private function submissionItem(
@@ -103,6 +118,7 @@ final class WriteSubmission
         string $submissionId,
         array $payload,
         string $currentSignatory,
+        array $signatorySequence,
         string $sentAt,
         string $status,
     ): array {
@@ -113,6 +129,7 @@ final class WriteSubmission
             'sent_at' => $sentAt,
             'status' => $status,
             'current_signatory' => $currentSignatory,
+            'signatory_sequence' => $signatorySequence,
             'GSI1PK' => DynamoKeys::organization($organizationId),
             'GSI1SK' => DynamoKeys::submission($submissionId),
             'GSI2PK' => $currentSignatory,

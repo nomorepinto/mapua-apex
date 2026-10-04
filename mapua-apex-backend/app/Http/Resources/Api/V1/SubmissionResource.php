@@ -28,6 +28,10 @@ class SubmissionResource extends JsonResource
             'sent_at' => $item['sent_at'] ?? null,
             'status' => $item['status'] ?? null,
             'current_signatory' => $this->idAfterPrefix($item['current_signatory'] ?? null, 'SIGNATORY#'),
+            'signatory_sequence' => array_values(array_filter(array_map(
+                fn ($id): ?string => $this->idAfterPrefix($id, 'SIGNATORY#'),
+                (array) ($item['signatory_sequence'] ?? []),
+            ))),
             'activity_classification' => $item['activity_classification'] ?? null,
             'proponents' => $item['proponents'] ?? [],
             'activity_details' => $item['activity_details'] ?? null,

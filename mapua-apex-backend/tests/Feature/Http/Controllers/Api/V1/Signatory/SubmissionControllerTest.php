@@ -226,4 +226,63 @@ class SubmissionControllerTest extends TestCase
         $stored = $db->find('EVENT#e001', 'SUBMISSION#s001');
         $this->assertSame('major', $stored['activity_classification']['nature'] ?? null);
     }
+
+    public function test_approve_walks_the_stored_signatory_sequence(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db);
+        // The stored list deliberately skips OSAAR, so advancing to CDM proves
+        // the hop reads signatory_sequence rather than recomputing it.
+        DynamoFixtures::submission($db, [
+            'current_signatory' => 'SIGNATORY#adv001',
+            'GSI2PK' => 'SIGNATORY#adv001',
+            'signatory_sequence' => ['SIGNATORY#adv001', 'SIGNATORY#cdm001'],
+        ]);
+
+        $response = $this->withSignatoryAuth()->postJson('/api/v1/signatories/events/e001/submissions/s001/approve');
+
+        $response->assertOk()
+            ->assertJsonPath('data.current_signatory', 'cdm001')
+            ->assertJsonPath('data.signatory_sequence', ['adv001', 'cdm001']);
+
+        $stored = $db->find('EVENT#e001', 'SUBMISSION#s001');
+        $this->assertSame('SIGNATORY#cdm001', $stored['GSI2PK'] ?? null);
+        $this->assertSame(['SIGNATORY#adv001', 'SIGNATORY#cdm001'], $stored['signatory_sequence'] ?? null);
+    }
+
+    public function test_approve_backfills_a_missing_signatory_sequence(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db);
+        DynamoFixtures::signatory($db, 'adv001', 'adviser');
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar');
+        DynamoFixtures::signatory($db, 'cdm001', 'cdm');
+        DynamoFixtures::submission($db); // legacy item: no signatory_sequence
+
+        $response = $this->withSignatoryAuth()->postJson('/api/v1/signatories/events/e001/submissions/s001/approve');
+
+        $response->assertOk()
+            ->assertJsonPath('data.current_signatory', 'osaar001');
+
+        $stored = $db->find('EVENT#e001', 'SUBMISSION#s001');
+        $this->assertSame(
+            ['SIGNATORY#adv001', 'SIGNATORY#osaar001', 'SIGNATORY#cdm001'],
+            $stored['signatory_sequence'] ?? null,
+        );
+    }
+
+    public function test_approve_returns_404_when_the_desk_is_not_in_the_stored_sequence(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db);
+        DynamoFixtures::submission($db, [
+            'current_signatory' => 'SIGNATORY#adv001',
+            'GSI2PK' => 'SIGNATORY#adv001',
+            'signatory_sequence' => ['SIGNATORY#osaar001', 'SIGNATORY#cdm001'],
+        ]);
+
+        $response = $this->withSignatoryAuth()->postJson('/api/v1/signatories/events/e001/submissions/s001/approve');
+
+        $response->assertNotFound();
+    }
 }

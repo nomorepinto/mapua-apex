@@ -188,6 +188,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       activityType: detailQuery.data?.activity_classification?.activity_type,
       hasVenue: Boolean(detailQuery.data?.venue_reservation?.has_reservation),
       orgSignatories: signatoriesQuery.data,
+      signatorySequence: detailQuery.data?.signatory_sequence,
     }
   )
 

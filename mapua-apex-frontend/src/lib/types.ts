@@ -157,6 +157,8 @@ export interface Submission {
   status: "pending" | "approved" | "denied" | "returned"
   /** UUID of the signatory who currently needs to act on this */
   current_signatory: string
+  /** Ordered snapshot of signatory UUIDs resolved at submit time (plain ids, no `SIGNATORY#` prefix) */
+  signatory_sequence?: string[]
   /** GSI2PK = `SIGNATORY#<uuid>` — present while pending or returned */
   GSI2PK?: string
   /** GSI2SK = timestamp */

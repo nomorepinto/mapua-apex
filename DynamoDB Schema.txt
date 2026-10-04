@@ -38,6 +38,7 @@ submission_type: string
 sent_at: timestamp
 status: "pending" | "approved" | "denied" | "returned"
 current_signatory: SIGNATORY#uuid
+signatory_sequence: [ SIGNATORY#uuid ]   (ordered routing snapshot, written at submit time)
 GSI1PK: ORGANIZATION#uuid
 GSI1SK: SUBMISSION#uuid
 GSI2PK: SIGNATORY#uuid   (sparse: present while pending or returned on a desk)
@@ -46,6 +47,7 @@ GSI2SK: timestamp
 activity_classification: {
   activity_type: "co-curricular" | "extra-curricular"
   total_org_members: number
+  nature: "major" | "minor"   (OSAAR-set via the signatory classification PATCH; not part of the student create body)
 }
 proponents: [{
   id, position_title, first_name, middle_name, last_name, suffix,
@@ -178,6 +180,7 @@ json
   "sent_at": "2026-09-10T14:00:00Z",
   "status": "pending",
   "current_signatory": "SIGNATORY#adv001",
+  "signatory_sequence": ["SIGNATORY#adv001", "SIGNATORY#osaar", "SIGNATORY#cdm"],
   "GSI1PK": "ORGANIZATION#a1b2",
   "GSI1SK": "SUBMISSION#s001",
   "GSI2PK": "SIGNATORY#adv001",
@@ -239,16 +242,26 @@ json
     "audiovisual_equipment": { "purpose": "Projector for demo", "items": [{ "date_needed": "2026-10-05", "time_needed": "17:00", "equipment_needed": "Projector", "remarks": "1 unit" }] }
   }
 }
-Routing is application logic, not a field on SUBMISSION. Sequence starts at
+Routing is snapshotted onto SUBMISSION at write time. On create (and on a
+student PUT that re-routes), the resolver builds an ordered signatory_sequence
+of SIGNATORY#uuid ids and stores it on the item. The sequence starts at
 Adviser, then Dean when activity_type is co-curricular, then OSAAR, then CDM
 when has_reservation is true. If the submitting organization's
 is_higher_council is true, Dean is skipped (even for co-curricular);
 Adviser still reviews first, then OSAAR, then CDM when there is a
-reservation. Adviser and Dean
-come from ORGANIZATION.signatories. OSAAR and CDM come from OSAAR_SIGNATORY_ID
-and CDM_SIGNATORY_ID. admin is a valid desk role but is not in this
-sequence. current_signatory / GSI2PK hold whoever has the paper now. On approve, the resolver reads the org desk list (adviser, dean) and the campus env ids (OSAAR, CDM) again to pick the next id (or drop GSI2 when the sequence is done).
-Return keeps the paper on the current desk (status "returned"). Deny
+reservation. Adviser and Dean come from ORGANIZATION.signatories. OSAAR and
+CDM come from OSAAR_SIGNATORY_ID and CDM_SIGNATORY_ID. admin is a valid desk
+role but is not in this sequence. current_signatory / GSI2PK hold whoever has
+the paper now; on a fresh submit current_signatory is signatory_sequence[0].
+On approve, ApproveSubmission reads the stored signatory_sequence, finds the
+current desk, and advances current_signatory / GSI2 to the next id (or drops
+GSI2 when the sequence is done) — it no longer re-reads the org desks or
+campus env ids. Items written before this field existed have no
+signatory_sequence; the first approve lazily resolves it (via the org desks
+and campus env ids) and persists it on the same write.
+Return keeps the paper on the current desk (status "returned"). A student PUT
+on a returned paper keeps that desk only if it is still in the recomputed
+sequence; otherwise routing restarts at signatory_sequence[0]. Deny
 removes it from the queue (status "denied") and cannot be edited.
 
 NOTIFICATION

@@ -246,6 +246,30 @@ class SubmissionControllerTest extends TestCase
         $this->assertSame('SIGNATORY#adv001', $stored['GSI2PK'] ?? null);
     }
 
+    public function test_creates_a_submission_and_stores_the_signatory_sequence(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db);
+        DynamoFixtures::signatory($db, 'adv001', 'adviser');
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar');
+        DynamoFixtures::signatory($db, 'cdm001', 'cdm');
+
+        $response = $this->withStudentAuth()->postJson('/api/v1/students/submissions', SaafPayload::valid());
+
+        $response->assertCreated()
+            ->assertJsonPath('data.current_signatory', 'adv001')
+            ->assertJsonPath('data.signatory_sequence', ['adv001', 'osaar001', 'cdm001']);
+
+        $submissionId = $response->json('data.submission_id');
+        $this->assertIsString($submissionId);
+        $stored = $db->find('EVENT#e001', 'SUBMISSION#'.$submissionId);
+        $this->assertSame(
+            ['SIGNATORY#adv001', 'SIGNATORY#osaar001', 'SIGNATORY#cdm001'],
+            $stored['signatory_sequence'] ?? null,
+        );
+        $this->assertSame($stored['signatory_sequence'][0] ?? null, $stored['current_signatory'] ?? null);
+    }
+
     public function test_creates_a_submission_when_osaar_and_cdm_are_only_in_env(): void
     {
         $db = InMemoryDynamoDb::bind($this);

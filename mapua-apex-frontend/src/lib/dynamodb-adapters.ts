@@ -22,6 +22,8 @@ export interface ApiSubmission {
   sent_at: string
   status: "pending" | "approved" | "denied" | "returned"
   current_signatory?: string
+  /** Ordered snapshot of signatory IDs (plain, no `SIGNATORY#` prefix) resolved at submit time. */
+  signatory_sequence?: string[]
   activity_classification?: {
     activity_type?: string
     total_org_members?: number
@@ -487,6 +489,33 @@ function expectedSignatoryRoles(options?: {
 }
 
 /**
+ * Prefers the authoritative signatory_sequence snapshot stored on the submission;
+ * falls back to deriving roles from classification flags for legacy items.
+ */
+function resolveExpectedRoles(options?: {
+  activityType?: string
+  hasVenue?: boolean
+  isHigherCouncil?: boolean
+  orgSignatories?: Array<{ role?: string; signatory_id?: string; name?: string }>
+  signatorySequence?: string[]
+}): string[] {
+  const sequence = options?.signatorySequence
+  if (sequence && sequence.length > 0) {
+    return sequence.map((id, index) =>
+      formatSignatoryRole(
+        id,
+        options?.orgSignatories,
+        index,
+        options?.activityType,
+        options?.hasVenue,
+        options?.isHigherCouncil
+      )
+    )
+  }
+  return expectedSignatoryRoles(options)
+}
+
+/**
  * Resolves a signatory ID / UUID / role string to a clean human-readable Role name
  */
 export function formatSignatoryRole(
@@ -735,13 +764,14 @@ export function apiNotificationsToStepper(
     hasVenue?: boolean
     isHigherCouncil?: boolean
     orgSignatories?: Array<{ role?: string; signatory_id?: string; name?: string }>
+    signatorySequence?: string[]
   }
 ): TrackerStepper {
   const sorted = [...notifications].sort((a, b) => a.sent_at.localeCompare(b.sent_at))
   const fullyApproved = sorted.some((item) => item.notif_type === "fully approved")
   const isAllApproved = fullyApproved || apiStatus === "approved"
 
-  const expectedRoles = expectedSignatoryRoles(options)
+  const expectedRoles = resolveExpectedRoles(options)
 
   // Map each notification to a resolved role
   const resolvedNotifs: Array<{

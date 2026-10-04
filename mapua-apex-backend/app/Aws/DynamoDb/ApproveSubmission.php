@@ -20,23 +20,22 @@ final class ApproveSubmission
         $submission = $this->submissions->require($eventId, $submissionId);
         SignatoryDesk::requireOpen($submission, $signatoryId);
 
-        $event = $this->events->handle($eventId);
-        $organizationId = DynamoKeys::strip($event['GSI1PK'] ?? null, 'ORGANIZATION#');
+        $stored = $submission['signatory_sequence'] ?? null;
+        $needsBackfill = ! is_array($stored) || $stored === [];
 
-        if ($event === null || $organizationId === null) {
-            abort(404);
-        }
+        $sequence = $needsBackfill
+            ? $this->resolveSequence($eventId, $submission)
+            : array_map(static fn ($id): string => DynamoKeys::signatory((string) $id), array_values($stored));
 
-        $sequence = $this->sequence->signatoryIds($organizationId, $submission);
-        $currentIndex = array_search($signatoryId, $sequence, true);
+        $currentIndex = array_search(DynamoKeys::signatory($signatoryId), $sequence, true);
 
         if ($currentIndex === false) {
             abort(404);
         }
 
-        $nextId = $sequence[$currentIndex + 1] ?? null;
+        $nextSignatory = $sequence[$currentIndex + 1] ?? null;
         $now = DynamoKeys::now();
-        $fullyApproved = $nextId === null;
+        $fullyApproved = $nextSignatory === null;
 
         $this->notifications->create(
             $submissionId,
@@ -46,32 +45,66 @@ final class ApproveSubmission
         );
 
         if ($fullyApproved) {
+            $set = ['status' => 'approved'];
+
+            if ($needsBackfill) {
+                $set['signatory_sequence'] = $sequence;
+            }
+
             $this->items->patch(
                 DynamoKeys::event($eventId),
                 DynamoKeys::submission($submissionId),
-                ['status' => 'approved'],
+                $set,
                 ['GSI2PK', 'GSI2SK'],
             );
 
             $submission['status'] = 'approved';
+            $submission['signatory_sequence'] = $sequence;
             unset($submission['GSI2PK'], $submission['GSI2SK']);
 
             return $submission;
         }
 
-        $nextSignatory = DynamoKeys::signatory($nextId);
-        $this->items->patch(DynamoKeys::event($eventId), DynamoKeys::submission($submissionId), [
+        $set = [
             'status' => 'pending',
             'current_signatory' => $nextSignatory,
             'GSI2PK' => $nextSignatory,
             'GSI2SK' => $now,
-        ]);
+        ];
+
+        if ($needsBackfill) {
+            $set['signatory_sequence'] = $sequence;
+        }
+
+        $this->items->patch(DynamoKeys::event($eventId), DynamoKeys::submission($submissionId), $set);
 
         $submission['status'] = 'pending';
         $submission['current_signatory'] = $nextSignatory;
+        $submission['signatory_sequence'] = $sequence;
         $submission['GSI2PK'] = $nextSignatory;
         $submission['GSI2SK'] = $now;
 
         return $submission;
+    }
+
+    /**
+     * Legacy items predate the stored sequence; resolve it once and persist on this approve.
+     *
+     * @param  array<string, mixed>  $submission
+     * @return list<string>
+     */
+    private function resolveSequence(string $eventId, array $submission): array
+    {
+        $event = $this->events->handle($eventId);
+        $organizationId = DynamoKeys::strip($event['GSI1PK'] ?? null, 'ORGANIZATION#');
+
+        if ($event === null || $organizationId === null) {
+            abort(404);
+        }
+
+        return array_map(
+            static fn (string $id): string => DynamoKeys::signatory($id),
+            $this->sequence->signatoryIds($organizationId, $submission),
+        );
     }
 }

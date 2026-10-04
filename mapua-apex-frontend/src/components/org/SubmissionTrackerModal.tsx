@@ -56,6 +56,7 @@ export function SubmissionTrackerModal({
       hasVenue: Boolean(detailQuery.data?.venue_reservation?.has_reservation),
       isHigherCouncil: Boolean(orgQuery.data?.is_higher_council),
       orgSignatories: orgQuery.data?.signatories,
+      signatorySequence: detailQuery.data?.signatory_sequence,
     }
   )
   const canResubmit = submission?.api_status === "returned"
