@@ -1,15 +1,23 @@
 import { useMemo } from "react"
 
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { layout } from "@/config"
 import {
   useAvailableOrganizationsQuery,
   useCurrentOrganizationQuery,
 } from "@/hooks/use-submissions"
+import { cn } from "@/lib/utils"
 
 /**
- * Multi-select of dependent organizations for a collaborative submission.
- * The proponent (current) organization is excluded; selection is optional —
- * an empty selection means the submission has no collaborators.
+ * Multi-select dropdown of dependent organizations for a collaborative
+ * submission. The proponent (current) organization is excluded; selection is
+ * optional — an empty selection means the submission has no collaborators.
  */
 export function CollaboratorsSection({
   value,
@@ -34,17 +42,23 @@ export function CollaboratorsSection({
       )
   }, [organizationsQuery.data, currentOrgId])
 
-  const toggle = (organizationId: string, checked: boolean) => {
-    if (checked) {
-      if (value.includes(organizationId)) return
-      onChange([...value, organizationId])
-      return
-    }
-    onChange(value.filter((id) => id !== organizationId))
+  const nameById = useMemo(() => {
+    const names = new Map<string, string>()
+    options.forEach((org) =>
+      names.set(org.organization_id, org.name || org.organization_id)
+    )
+    return names
+  }, [options])
+
+  // Compact trigger summary for the coss multi-select render function.
+  const renderValue = (selected: string[]) => {
+    if (selected.length === 0) return "Select collaborating organizations"
+    const first = nameById.get(selected[0] ?? "") ?? selected[0]
+    return selected.length > 1 ? `${first} (+${selected.length - 1} more)` : first
   }
 
   return (
-    <section className={layout.section}>
+    <section className={cn(layout.section, "mt-4")}>
       <div className="mb-3 space-y-1">
         <h3 className="text-base font-bold text-neutral-900">
           Collaborating Organizations
@@ -67,27 +81,23 @@ export function CollaboratorsSection({
           No other organizations are available to collaborate with.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
-          {options.map((org) => {
-            const checked = value.includes(org.organization_id)
-            return (
-              <label
-                key={org.organization_id}
-                className="flex cursor-pointer items-center gap-2.5 text-sm text-neutral-700 select-none"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(event) =>
-                    toggle(org.organization_id, event.target.checked)
-                  }
-                  className="h-4 w-4 cursor-pointer accent-red-700 focus:ring-red-700"
-                />
-                <span>{org.name || org.organization_id}</span>
-              </label>
-            )
-          })}
-        </div>
+        <Select
+          multiple
+          aria-label="Collaborating organizations"
+          value={value}
+          onValueChange={(next) => onChange(next as string[])}
+        >
+          <SelectTrigger>
+            <SelectValue>{renderValue}</SelectValue>
+          </SelectTrigger>
+          <SelectPopup alignItemWithTrigger={false}>
+            {options.map((org) => (
+              <SelectItem key={org.organization_id} value={org.organization_id}>
+                {org.name || org.organization_id}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
       )}
     </section>
   )
