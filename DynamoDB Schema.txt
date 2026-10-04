@@ -28,7 +28,7 @@ GSI1PK: ORGANIZATION#uuid
 GSI1SK: timestamp
 
 Org event list queries GSI1 (first 25 EVENT items), then each event's
-SUBMISSION# / DEADLINE# children. Student GET /organization reads this
+SUBMISSION# children. Student GET /organization reads this
 ORGANIZATION item directly.
 
 SUBMISSION
@@ -149,12 +149,6 @@ Deleting a SIGNATORY item does not rewrite those copies. Replace a person in
 place by keeping the same uuid (PUT name / role / department). A new uuid
 leaves in-flight papers, org desks, and Cognito custom:signatory_id
 pointing at the old id.
-
-DEADLINE REMINDER
-PK: EVENT#uuid
-SK: DEADLINE#uuid
-sent_at: timestamp
-deadline: timestamp
 
 ANNOUNCEMENT
 PK: ANNOUNCEMENT
@@ -332,14 +326,6 @@ json
   "GSI4PK": "ROLE#DEAN#SOIT",
   "GSI4SK": "SIGNATORY#dean001"
 }
-DEADLINE REMINDER
-json
-{
-  "PK": "EVENT#e001",
-  "SK": "DEADLINE#d001",
-  "sent_at": "2026-09-01T09:00:00Z",
-  "deadline": "2026-09-20T23:59:59Z"
-}
 ANNOUNCEMENT
 json
 {
@@ -347,3 +333,19 @@ json
   "SK": "2026-09-15T08:00:00Z",
   "content": "OSAAR office hours are 9:00–17:00."
 }
+
+________________
+
+
+Deprecated / removed objects
+
+DEADLINE REMINDER (removed)
+Was: PK = EVENT#uuid, SK = DEADLINE#uuid, sent_at, deadline.
+Reason: orphaned read path with no producer. DynamoKeys::deadline() is defined
+but never called, and no route, controller, or writer ever creates a DEADLINE
+item. The only read is GET /students/deadlines (ListOrgDeadlines), which walks
+each event partition for SK begins_with DEADLINE#. DEADLINE items exist solely
+in test fixtures (DeadlineControllerTest) and screenshot mocks
+(capture-screenshots.mjs), and delete_events.py only removes them. The object
+is therefore deprecated and no longer part of the modeled schema; the dangling
+read endpoint still exists in code but returns nothing in production.

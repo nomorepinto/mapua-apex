@@ -1,0 +1,32 @@
+%% mapua-apex - Conceptual ERD (DynamoDB single-table design)
+%% Laid out top-down (graph TD) so the diagram renders vertically and fits
+%% an 8.5x11 portrait page without horizontal cut-off.
+%% Relationships are LOGICAL only: DynamoDB stores no foreign keys, IDs are
+%% copied onto items and resolved at write time.
+%% DEADLINE REMINDER is intentionally omitted (deprecated: orphaned read path,
+%% no producer). See "DynamoDB Schema.txt" -> Deprecated / removed objects.
+graph TD
+    ORGANIZATION["<b>ORGANIZATION</b><br/>PK = ORGANIZATION#uuid<br/>SK = ORGANIZATION#uuid<br/>------------------<br/>name<br/>is_higher_council<br/>signatories[] : role -&gt; signatory_id"]
+
+    EVENT["<b>EVENT</b><br/>PK = EVENT#uuid<br/>SK = EVENT#uuid<br/>------------------<br/>sent_at<br/>GSI1PK = ORGANIZATION#uuid<br/>GSI1SK = sent_at"]
+
+    SUBMISSION["<b>SUBMISSION</b><br/>PK = EVENT#uuid<br/>SK = SUBMISSION#uuid<br/>------------------<br/>submission_type / status<br/>current_signatory<br/>signatory_sequence[]<br/>collaboration.dependent_organization_ids[]<br/>activity_classification<br/>activity_details / proponents[]<br/>detailed_budget_proposal<br/>venue_reservation<br/>GSI1PK = ORGANIZATION#uuid<br/>GSI2PK = SIGNATORY#uuid (sparse inbox)"]
+
+    NOTIFICATION["<b>NOTIFICATION</b><br/>PK = SUBMISSION#uuid<br/>SK = NOTIFICATION#timestamp<br/>------------------<br/>signatory<br/>notif_type<br/>comment"]
+
+    SIGNATORY["<b>SIGNATORY</b><br/>PK = SIGNATORY#uuid<br/>SK = SIGNATORY#uuid<br/>------------------<br/>name / role / department<br/>GSI4PK = ROLE#...<br/>GSI4SK = SIGNATORY#uuid"]
+
+    COLLAB["<b>COLLABORATION POINTER</b><br/>PK = ORGANIZATION#uuid (dependent)<br/>SK = COLLAB#EVENT#id#SUBMISSION#id<br/>------------------<br/>event_id / submission_id / sent_at<br/>index-only, carries no form content"]
+
+    ANNOUNCEMENT["<b>ANNOUNCEMENT</b><br/>PK = ANNOUNCEMENT<br/>SK = timestamp<br/>------------------<br/>content"]
+
+    ORGANIZATION -->|"1 : N &nbsp;(EVENT.GSI1PK)"| EVENT
+    EVENT -->|"1 : N &nbsp;(children share PK = EVENT#id)"| SUBMISSION
+    SUBMISSION -->|"1 : N &nbsp;(PK = SUBMISSION#id)"| NOTIFICATION
+    ORGANIZATION -->|"M : N &nbsp;desk assignment (signatories[])"| SIGNATORY
+    SUBMISSION -->|"M : N &nbsp;approval chain (signatory_sequence)"| SIGNATORY
+    ORGANIZATION -->|"1 : N &nbsp;dependent copies"| COLLAB
+    COLLAB -.->|"resolves to master"| SUBMISSION
+
+    classDef entity fill:#eef4ff,stroke:#3b5bdb,stroke-width:1px,color:#111111,text-align:left;
+    class ORGANIZATION,EVENT,SUBMISSION,NOTIFICATION,SIGNATORY,COLLAB,ANNOUNCEMENT entity;
