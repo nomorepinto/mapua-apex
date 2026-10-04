@@ -144,6 +144,7 @@ export function saafHasUserInput(draft: SaafDraft): boolean {
     return true
   }
   if (draft.budgetItems.length !== DEFAULT_BUDGET_ITEMS.length) return true
+  if (draft.dependentOrgs.length > 0) return true
   return draft.budgetItems.some(
     (item, index) =>
       filled(item.item) ||
@@ -176,4 +177,5 @@ export const DEFAULT_SAAF_DRAFT: SaafDraft = {
   sdgExplanation: "",
   proponents: [createEmptyProponent("1")],
   budgetItems: DEFAULT_BUDGET_ITEMS,
+  dependentOrgs: [],
 }

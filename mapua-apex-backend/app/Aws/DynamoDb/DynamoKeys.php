@@ -36,6 +36,14 @@ final class DynamoKeys
         return 'DEADLINE#'.self::strip($id, 'DEADLINE#');
     }
 
+    /**
+     * Index-only sort key for a collaboration pointer in a dependent's ORGANIZATION partition.
+     */
+    public static function collaboration(string $eventId, string $submissionId): string
+    {
+        return 'COLLAB#'.self::strip($eventId, 'EVENT#').'#'.self::strip($submissionId, 'SUBMISSION#');
+    }
+
     public static function announcement(): string
     {
         return 'ANNOUNCEMENT';

@@ -159,6 +159,12 @@ export interface Submission {
   current_signatory: string
   /** Ordered snapshot of signatory UUIDs resolved at submit time (plain ids, no `SIGNATORY#` prefix) */
   signatory_sequence?: string[]
+  /** Collaboration dependents chosen by the proponent (plain ids, no `ORGANIZATION#` prefix) */
+  collaboration?: {
+    dependent_organization_ids?: string[]
+  }
+  /** Proponent vs collaboration-dependent view for the caller. */
+  role?: "proponent" | "dependent"
   /** GSI2PK = `SIGNATORY#<uuid>` — present while pending or returned */
   GSI2PK?: string
   /** GSI2SK = timestamp */

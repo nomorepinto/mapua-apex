@@ -55,6 +55,8 @@ export interface SaafDraft {
   sdgExplanation: string
   proponents: Proponent[]
   budgetItems: BudgetItem[]
+  /** Dependent organization ids chosen for collaboration (empty = none). */
+  dependentOrgs: string[]
 }
 
 export type SubmissionActionData = {

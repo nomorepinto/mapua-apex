@@ -46,6 +46,7 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
             Route::get('deadlines', [DeadlineController::class, 'index'])->name('deadlines.index');
             Route::get('announcements', [StudentAnnouncementController::class, 'index'])->name('announcements.index');
             Route::get('organization', [StudentOrganizationController::class, 'show'])->name('organization.show');
+            Route::get('organizations', [StudentOrganizationController::class, 'index'])->name('organizations.index');
         });
 
     Route::middleware(['cognito.jwt:signatory', 'throttle:signatory'])

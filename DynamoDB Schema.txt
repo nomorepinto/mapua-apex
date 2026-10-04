@@ -39,6 +39,9 @@ sent_at: timestamp
 status: "pending" | "approved" | "denied" | "returned"
 current_signatory: SIGNATORY#uuid
 signatory_sequence: [ SIGNATORY#uuid ]   (ordered routing snapshot, written at submit time)
+collaboration: {
+  dependent_organization_ids: [ ORGANIZATION#uuid ]   (index-only collaboration dependents; empty/absent = no collaboration)
+}
 GSI1PK: ORGANIZATION#uuid
 GSI1SK: SUBMISSION#uuid
 GSI2PK: SIGNATORY#uuid   (sparse: present while pending or returned on a desk)
@@ -90,6 +93,24 @@ and keeps current_signatory / GSI2 on that desk. Deny sets status
 "denied", drops GSI2, and the student cannot edit. GSI2 is also dropped
 on the last approve (status stays "approved" / "denied", current_signatory
 is left as the last desk).
+
+COLLABORATION POINTER (index-only, one per dependent organization)
+PK: ORGANIZATION#uuid   (the dependent org, not the proponent)
+SK: COLLAB#EVENT#uuid#SUBMISSION#uuid
+event_id: EVENT#uuid
+submission_id: SUBMISSION#uuid
+sent_at: timestamp
+The master SUBMISSION item stays the single source of truth. This pointer only
+makes the proponent's submission discoverable in a dependent's dashboard: the
+student org list queries the base table on PK = ORGANIZATION#<dep> with SK
+beginning COLLAB# (no GSI is needed — DynamoDB cannot index the N values of an
+array), then resolves each pointer against the master SUBMISSION. The pointer
+carries NO form content. WriteSubmission maintains them: create puts one per
+dependent, update diffs the dependent set against the stored collaboration
+(adds new, deletes removed). A dependent reads the shared submission and its
+NOTIFICATION timeline through SubmissionAccess (requireProponent false) but
+cannot edit or resubmit — only the proponent (the event's GSI1PK org) may PUT.
+role on the API response is "dependent" for these rows, "proponent" otherwise.
 
 NOTIFICATION
 PK: SUBMISSION#uuid
@@ -181,6 +202,7 @@ json
   "status": "pending",
   "current_signatory": "SIGNATORY#adv001",
   "signatory_sequence": ["SIGNATORY#adv001", "SIGNATORY#osaar", "SIGNATORY#cdm"],
+  "collaboration": { "dependent_organization_ids": [] },
   "GSI1PK": "ORGANIZATION#a1b2",
   "GSI1SK": "SUBMISSION#s001",
   "GSI2PK": "SIGNATORY#adv001",
@@ -263,6 +285,22 @@ Return keeps the paper on the current desk (status "returned"). A student PUT
 on a returned paper keeps that desk only if it is still in the recomputed
 sequence; otherwise routing restarts at signatory_sequence[0]. Deny
 removes it from the queue (status "denied") and cannot be edited.
+
+When a submission has collaboration dependents, the adviser/dean stage expands
+across every organization. The chain is built over [proponent, ...dependents]
+in submitted order: first the Adviser of each organization, then the Dean of
+each organization (a Dean step for an org exists only when
+activity_classification.activity_type is co-curricular AND that org's
+is_higher_council is not true), then the campus desks (OSAAR, then CDM when
+venue_reservation.has_reservation is true). Signatory ids are de-duplicated
+across the whole chain preserving first occurrence, so a person who is adviser
+and dean (same or across orgs) signs once. Missing adviser / required dean /
+unconfigured campus desk throws UnresolvableSignatoryRoute (422). The rest of
+the walk (ApproveSubmission, GSI2 inbox, deny/return) is unchanged — a longer
+stored sequence simply means more desks. On a returned re-edit only the
+proponent edits and resubmits; the sequence is recomputed, and if the desk the
+paper was returned to is no longer in the new chain, routing restarts at
+signatory_sequence[0].
 
 NOTIFICATION
 json

@@ -19,6 +19,7 @@ export const SUBMISSION_KEYS = {
   deadlines: ["org-deadlines"] as const,
   organization: ["org-organization"] as const,
   announcements: ["org-announcements"] as const,
+  organizationDirectory: ["org-organization-directory"] as const,
 }
 
 /**
@@ -124,6 +125,23 @@ export function useCurrentOrganizationQuery() {
       const res = await apiClient.get<{ data: ApiOrganization }>("/students/organization")
       return res.data
     },
+  })
+}
+
+/**
+ * Directory of all organizations (id + name) for selecting collaboration
+ * dependents. The caller's own organization is filtered out by the consumer.
+ */
+export function useAvailableOrganizationsQuery(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: SUBMISSION_KEYS.organizationDirectory,
+    queryFn: async () => {
+      const res = await apiClient.get<{
+        data: Array<{ organization_id: string; name: string | null }>
+      }>("/students/organizations")
+      return res.data || []
+    },
+    enabled: options?.enabled ?? true,
   })
 }
 

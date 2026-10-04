@@ -250,6 +250,32 @@ class SubmissionControllerTest extends TestCase
         $this->assertSame(['SIGNATORY#adv001', 'SIGNATORY#cdm001'], $stored['signatory_sequence'] ?? null);
     }
 
+    public function test_approve_walks_a_longer_collaboration_sequence(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db);
+        // A collaboration chain: proponent adviser, dependent adviser, proponent dean,
+        // then OSAAR. Approving at the first adviser must hop to the dependent adviser.
+        DynamoFixtures::submission($db, [
+            'current_signatory' => 'SIGNATORY#adv001',
+            'GSI2PK' => 'SIGNATORY#adv001',
+            'signatory_sequence' => ['SIGNATORY#adv001', 'SIGNATORY#adv002', 'SIGNATORY#dean001', 'SIGNATORY#osaar001'],
+        ]);
+
+        $response = $this->withSignatoryAuth()->postJson('/api/v1/signatories/events/e001/submissions/s001/approve');
+
+        $response->assertOk()
+            ->assertJsonPath('data.current_signatory', 'adv002')
+            ->assertJsonPath('data.status', 'pending');
+
+        $stored = $db->find('EVENT#e001', 'SUBMISSION#s001');
+        $this->assertSame('SIGNATORY#adv002', $stored['GSI2PK'] ?? null);
+        $this->assertSame(
+            ['SIGNATORY#adv001', 'SIGNATORY#adv002', 'SIGNATORY#dean001', 'SIGNATORY#osaar001'],
+            $stored['signatory_sequence'] ?? null,
+        );
+    }
+
     public function test_approve_backfills_a_missing_signatory_sequence(): void
     {
         $db = InMemoryDynamoDb::bind($this);

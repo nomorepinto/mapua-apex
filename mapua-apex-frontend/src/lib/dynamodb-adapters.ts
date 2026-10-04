@@ -24,6 +24,12 @@ export interface ApiSubmission {
   current_signatory?: string
   /** Ordered snapshot of signatory IDs (plain, no `SIGNATORY#` prefix) resolved at submit time. */
   signatory_sequence?: string[]
+  /** Whether the caller's org is the proponent or a collaboration dependent. */
+  role?: "proponent" | "dependent"
+  /** Collaboration dependents chosen by the proponent (plain ids, no prefix). */
+  collaboration?: {
+    dependent_organization_ids?: string[]
+  }
   activity_classification?: {
     activity_type?: string
     total_org_members?: number
@@ -225,6 +231,9 @@ export function buildSaafApiPayload(
   return {
     event_id,
     submission_type: "saaf",
+    collaboration: {
+      dependent_organization_ids: saafDraft.dependentOrgs || [],
+    },
     activity_classification: {
       activity_type: saafDraft.activityType || "extra-curricular",
       total_org_members: Number(saafDraft.totalOrgMembers) || 0,
@@ -376,6 +385,8 @@ export interface DashboardSubmissionRow {
   }
   status: DashboardSubmissionStatus
   statusColor: string
+  /** Proponent vs collaboration-dependent view for the caller. */
+  role?: "proponent" | "dependent"
 }
 
 export interface TrackerAssignee {
@@ -682,6 +693,7 @@ export function apiSubmissionToDashboardRow(
     },
     status: meta.label as DashboardSubmissionStatus,
     statusColor: meta.color,
+    role: submission.role ?? "proponent",
   }
 }
 
@@ -1080,6 +1092,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
       sdgExplanation: submission.institutional_alignment?.sdg_explanation || "",
       proponents: proponents.length > 0 ? proponents : [createEmptyProponent("1")],
       budgetItems,
+      dependentOrgs: submission.collaboration?.dependent_organization_ids || [],
     },
     reservation,
     hasReservation: Boolean(reservationSource?.has_reservation),

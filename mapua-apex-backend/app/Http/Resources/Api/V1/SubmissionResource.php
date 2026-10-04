@@ -32,6 +32,13 @@ class SubmissionResource extends JsonResource
                 fn ($id): ?string => $this->idAfterPrefix($id, 'SIGNATORY#'),
                 (array) ($item['signatory_sequence'] ?? []),
             ))),
+            'role' => $this->stringAttribute($item['role'] ?? null) ?? 'proponent',
+            'collaboration' => [
+                'dependent_organization_ids' => array_values(array_filter(array_map(
+                    fn ($id): ?string => $this->idAfterPrefix($id, 'ORGANIZATION#'),
+                    (array) data_get($item, 'collaboration.dependent_organization_ids', []),
+                ))),
+            ],
             'activity_classification' => $item['activity_classification'] ?? null,
             'proponents' => $item['proponents'] ?? [],
             'activity_details' => $item['activity_details'] ?? null,

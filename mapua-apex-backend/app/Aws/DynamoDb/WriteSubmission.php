@@ -11,6 +11,8 @@ final class WriteSubmission
         private GetEvent $events,
         private GetSubmission $submissions,
         private SignatorySequenceResolver $sequence,
+        private OrganizationRecords $organizations,
+        private CollaborationRecords $collaborations,
     ) {}
 
     /**
@@ -19,7 +21,8 @@ final class WriteSubmission
      */
     public function create(string $organizationId, array $payload): array
     {
-        $signatoryIds = $this->sequence->signatoryIds($organizationId, $payload);
+        $dependents = $this->resolveDependents($organizationId, $payload);
+        $signatoryIds = $this->sequence->signatoryIdsForCollaboration($organizationId, $dependents, $payload);
         $sequence = $this->sequenceKeys($signatoryIds);
         $currentSignatory = $sequence[0];
 
@@ -29,8 +32,12 @@ final class WriteSubmission
         $sentAt = DynamoKeys::now();
         $submissionId = (string) Str::uuid();
 
-        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sequence, $sentAt, 'pending');
+        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sequence, $sentAt, 'pending', $dependents);
         $this->items->put($item, 'attribute_not_exists(PK)');
+
+        foreach ($dependents as $dependentId) {
+            $this->collaborations->put($dependentId, $eventId, $submissionId, $sentAt);
+        }
 
         return $item;
     }
@@ -57,7 +64,8 @@ final class WriteSubmission
             abort(422, 'This submission cannot be edited.');
         }
 
-        $signatoryIds = $this->sequence->signatoryIds($organizationId, $payload);
+        $dependents = $this->resolveDependents($organizationId, $payload);
+        $signatoryIds = $this->sequence->signatoryIdsForCollaboration($organizationId, $dependents, $payload);
         $sequence = $this->sequenceKeys($signatoryIds);
         $existingDesk = $existing['current_signatory'] ?? null;
         $keepDesk = $status === 'returned'
@@ -68,10 +76,84 @@ final class WriteSubmission
             : $sequence[0];
         $sentAt = DynamoKeys::now();
 
-        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sequence, $sentAt, 'pending');
+        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sequence, $sentAt, 'pending', $dependents);
         $this->items->put($item);
 
+        $this->reconcileCollaborators($eventId, $submissionId, $sentAt, $this->existingDependents($existing), $dependents);
+
         return $item;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<string>
+     */
+    private function resolveDependents(string $organizationId, array $payload): array
+    {
+        $requested = data_get($payload, 'collaboration.dependent_organization_ids', []);
+
+        if (! is_array($requested)) {
+            $requested = [];
+        }
+
+        $dependents = [];
+
+        foreach ($requested as $dependentId) {
+            $dependentId = DynamoKeys::strip(is_string($dependentId) ? $dependentId : '', 'ORGANIZATION#');
+
+            if ($dependentId === null || $dependentId === '' || $dependentId === $organizationId) {
+                continue;
+            }
+
+            $this->organizations->require($dependentId);
+            $dependents[$dependentId] = $dependentId;
+        }
+
+        return array_values($dependents);
+    }
+
+    /**
+     * @param  array<string, mixed>  $existing
+     * @return list<string>
+     */
+    private function existingDependents(array $existing): array
+    {
+        $stored = data_get($existing, 'collaboration.dependent_organization_ids', []);
+
+        if (! is_array($stored)) {
+            return [];
+        }
+
+        $dependents = [];
+
+        foreach ($stored as $dependentKey) {
+            $dependentId = DynamoKeys::strip(is_string($dependentKey) ? $dependentKey : '', 'ORGANIZATION#');
+
+            if ($dependentId !== null && $dependentId !== '') {
+                $dependents[$dependentId] = $dependentId;
+            }
+        }
+
+        return array_values($dependents);
+    }
+
+    /**
+     * @param  list<string>  $previous
+     * @param  list<string>  $current
+     */
+    private function reconcileCollaborators(string $eventId, string $submissionId, string $sentAt, array $previous, array $current): void
+    {
+        foreach ($current as $dependentId) {
+            if (! in_array($dependentId, $previous, true)) {
+                $this->collaborations->put($dependentId, $eventId, $submissionId, $sentAt);
+            }
+        }
+
+        foreach ($previous as $dependentId) {
+            if (! in_array($dependentId, $current, true)) {
+                $this->collaborations->remove($dependentId, $eventId, $submissionId);
+            }
+        }
     }
 
     /**
@@ -110,6 +192,7 @@ final class WriteSubmission
     /**
      * @param  array<string, mixed>  $payload
      * @param  list<string>  $signatorySequence
+     * @param  list<string>  $dependentOrgIds
      * @return array<string, mixed>
      */
     private function submissionItem(
@@ -121,6 +204,7 @@ final class WriteSubmission
         array $signatorySequence,
         string $sentAt,
         string $status,
+        array $dependentOrgIds,
     ): array {
         return [
             'PK' => DynamoKeys::event($eventId),
@@ -130,6 +214,12 @@ final class WriteSubmission
             'status' => $status,
             'current_signatory' => $currentSignatory,
             'signatory_sequence' => $signatorySequence,
+            'collaboration' => [
+                'dependent_organization_ids' => array_map(
+                    static fn (string $id): string => DynamoKeys::organization($id),
+                    $dependentOrgIds,
+                ),
+            ],
             'GSI1PK' => DynamoKeys::organization($organizationId),
             'GSI1SK' => DynamoKeys::submission($submissionId),
             'GSI2PK' => $currentSignatory,

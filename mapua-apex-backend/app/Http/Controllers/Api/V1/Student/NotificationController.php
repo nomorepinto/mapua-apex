@@ -6,6 +6,7 @@ use App\Aws\DynamoDb\GetEvent;
 use App\Aws\DynamoDb\GetSubmission;
 use App\Aws\DynamoDb\ListSubmissionNotifications;
 use App\Aws\DynamoDb\NotificationRecords;
+use App\Aws\DynamoDb\SubmissionAccess;
 use App\Http\CognitoIdentity;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\StoreNotificationRequest;
@@ -23,9 +24,11 @@ class NotificationController extends Controller
         string $submission,
         GetEvent $events,
         GetSubmission $submissions,
+        SubmissionAccess $access,
         ListSubmissionNotifications $notifications,
     ): AnonymousResourceCollection {
-        $this->submissionInOrganization($request, $event, $submission, $events, $submissions);
+        // Dependents receive a read-only copy of every notification as it is sent.
+        $this->authorize($request, $event, $submission, $events, $submissions, $access, requireProponent: false);
 
         return NotificationResource::collection($notifications->handle($submission));
     }
@@ -36,9 +39,10 @@ class NotificationController extends Controller
         string $submission,
         GetEvent $events,
         GetSubmission $submissions,
+        SubmissionAccess $access,
         NotificationRecords $notifications,
     ): JsonResponse {
-        $this->submissionInOrganization($request, $event, $submission, $events, $submissions);
+        $this->authorize($request, $event, $submission, $events, $submissions, $access, requireProponent: true);
 
         $item = $notifications->create(
             $submission,
@@ -57,9 +61,10 @@ class NotificationController extends Controller
         string $notification,
         GetEvent $events,
         GetSubmission $submissions,
+        SubmissionAccess $access,
         NotificationRecords $notifications,
     ): NotificationResource {
-        $this->submissionInOrganization($request, $event, $submission, $events, $submissions);
+        $this->authorize($request, $event, $submission, $events, $submissions, $access, requireProponent: true);
 
         return new NotificationResource($notifications->update(
             $submission,
@@ -73,15 +78,19 @@ class NotificationController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function submissionInOrganization(
+    private function authorize(
         Request $request,
         string $event,
         string $submission,
         GetEvent $events,
         GetSubmission $submissions,
+        SubmissionAccess $access,
+        bool $requireProponent,
     ): array {
-        $events->forOrganization($event, CognitoIdentity::organizationId($request));
+        $item = $submissions->require($event, $submission);
+        $proponentOrgKey = (string) ($events->handle($event)['GSI1PK'] ?? '');
+        $access->authorize($item, CognitoIdentity::organizationId($request), $proponentOrgKey, requireProponent: $requireProponent);
 
-        return $submissions->require($event, $submission);
+        return $item;
     }
 }

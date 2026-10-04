@@ -60,6 +60,7 @@ export function SubmissionTrackerModal({
     }
   )
   const canResubmit = submission?.api_status === "returned"
+  const isDependent = submission?.role === "dependent"
   const isDenied = submission?.api_status === "denied"
   const currentSignatoryName =
     submission?.status === "Approved" || submission?.api_status === "approved"
@@ -458,7 +459,7 @@ export function SubmissionTrackerModal({
             </div>
           )}
 
-          {canResubmit ? (
+          {canResubmit && !isDependent ? (
             <div className={cn(layout.section, "space-y-4")}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <p className="text-sm text-[#475569]">
@@ -472,6 +473,16 @@ export function SubmissionTrackerModal({
                   Edit and resubmit
                 </button>
               </div>
+            </div>
+          ) : null}
+
+          {isDependent ? (
+            <div className={cn(layout.section)}>
+              <p className="text-sm text-[#475569]">
+                You are a collaborating organization on this application. It is
+                read-only — the proponent organization manages edits and
+                resubmission.
+              </p>
             </div>
           ) : null}
 

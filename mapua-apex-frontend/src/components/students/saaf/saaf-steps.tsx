@@ -1,6 +1,7 @@
 import { ActivityClassificationSection } from "@/components/submission/activity-classification-section"
 import { ActivityDetailsSection } from "@/components/submission/activity-details-section"
 import { BudgetProposalSection } from "@/components/submission/budget-proposal-section"
+import { CollaboratorsSection } from "@/components/submission/collaborators-section"
 import { InstitutionalAlignmentSection } from "@/components/submission/institutional-alignment-section"
 import { ProponentsSection } from "@/components/submission/proponents-section"
 import { SubmissionActions } from "@/components/submission/submission-actions"
@@ -41,6 +42,10 @@ export function SaafPeopleStep() {
         onRemove={actions.handleRemoveProponent}
         onAdd={actions.handleAddProponent}
         onDepartmentChange={actions.handleDepartmentChange}
+      />
+      <CollaboratorsSection
+        value={draft.dependentOrgs}
+        onChange={(ids) => actions.updateField("dependentOrgs", ids)}
       />
     </SaafStepPanel>
   )
