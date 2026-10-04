@@ -57,6 +57,7 @@ export function SubmissionTrackerModal({
       isHigherCouncil: Boolean(orgQuery.data?.is_higher_council),
       orgSignatories: orgQuery.data?.signatories,
       signatorySequence: detailQuery.data?.signatory_sequence,
+      signatoryChain: detailQuery.data?.signatory_chain,
     }
   )
   const canResubmit = submission?.api_status === "returned"

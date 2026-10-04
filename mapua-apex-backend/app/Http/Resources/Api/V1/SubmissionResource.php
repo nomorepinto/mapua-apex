@@ -32,6 +32,13 @@ class SubmissionResource extends JsonResource
                 fn ($id): ?string => $this->idAfterPrefix($id, 'SIGNATORY#'),
                 (array) ($item['signatory_sequence'] ?? []),
             ))),
+            // Detail-only: the ordered, display-ready approval chain (each entry
+            // carries its role plus the organization that desk belongs to). Only
+            // present when a controller resolved it, so index payloads stay lean.
+            'signatory_chain' => $this->when(
+                array_key_exists('signatory_chain', $item),
+                fn () => $item['signatory_chain'] ?? [],
+            ),
             'role' => $this->stringAttribute($item['role'] ?? null) ?? 'proponent',
             'collaboration' => [
                 'dependent_organization_ids' => array_values(array_filter(array_map(

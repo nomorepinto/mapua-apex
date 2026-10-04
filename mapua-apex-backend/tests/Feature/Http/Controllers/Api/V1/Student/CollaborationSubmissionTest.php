@@ -162,6 +162,49 @@ class CollaborationSubmissionTest extends TestCase
             ->assertJsonPath('data.0.role', 'dependent');
     }
 
+    public function test_the_detail_exposes_an_org_qualified_signatory_chain(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::organization($db, 'a1b2', 'Proponent', [
+            ['role' => 'adviser', 'signatory_id' => 'adv001'],
+            ['role' => 'dean', 'signatory_id' => 'dean001'],
+        ]);
+        DynamoFixtures::organization($db, 'dep1', 'Dependent One', [
+            ['role' => 'adviser', 'signatory_id' => 'adv002'],
+        ]);
+        DynamoFixtures::event($db, org: 'a1b2');
+        DynamoFixtures::submission($db, [
+            'GSI1PK' => 'ORGANIZATION#a1b2',
+            'signatory_sequence' => ['SIGNATORY#adv001', 'SIGNATORY#adv002', 'SIGNATORY#dean001', 'SIGNATORY#osaar001'],
+            'collaboration' => ['dependent_organization_ids' => ['ORGANIZATION#dep1']],
+        ]);
+
+        $this->withStudentAuth()
+            ->getJson('/api/v1/students/events/e001/submissions/s001')
+            ->assertOk()
+            ->assertJsonPath('data.signatory_chain', [
+                ['signatory_id' => 'adv001', 'role' => 'adviser', 'organization_id' => 'a1b2', 'organization_name' => 'Proponent'],
+                ['signatory_id' => 'adv002', 'role' => 'adviser', 'organization_id' => 'dep1', 'organization_name' => 'Dependent One'],
+                ['signatory_id' => 'dean001', 'role' => 'dean', 'organization_id' => 'a1b2', 'organization_name' => 'Proponent'],
+                ['signatory_id' => 'osaar001', 'role' => 'osaar', 'organization_id' => null, 'organization_name' => null],
+            ]);
+    }
+
+    public function test_the_index_omits_the_signatory_chain(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db, org: 'a1b2');
+        DynamoFixtures::submission($db, [
+            'GSI1PK' => 'ORGANIZATION#a1b2',
+            'signatory_sequence' => ['SIGNATORY#adv001'],
+        ]);
+
+        $this->withStudentAuth()
+            ->getJson('/api/v1/students/submissions')
+            ->assertOk()
+            ->assertJsonMissingPath('data.0.signatory_chain');
+    }
+
     public function test_the_organization_directory_lists_id_and_name(): void
     {
         $db = InMemoryDynamoDb::bind($this);

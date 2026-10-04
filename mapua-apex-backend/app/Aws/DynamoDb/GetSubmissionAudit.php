@@ -8,6 +8,7 @@ final class GetSubmissionAudit
         private GetSubmission $submissions,
         private ListSubmissionNotifications $notifications,
         private OrganizationRecords $organizations,
+        private SignatoryChainResolver $chain,
     ) {}
 
     /**
@@ -26,6 +27,7 @@ final class GetSubmissionAudit
         }
 
         $submission['notifications'] = $this->notifications->handle($submissionId);
+        $submission['signatory_chain'] = $this->chain->handle($submission);
 
         return $submission;
     }

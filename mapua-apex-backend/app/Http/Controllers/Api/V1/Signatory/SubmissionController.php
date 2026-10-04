@@ -9,6 +9,7 @@ use App\Aws\DynamoDb\DynamoKeys;
 use App\Aws\DynamoDb\GetSubmission;
 use App\Aws\DynamoDb\ListSignatoryQueue;
 use App\Aws\DynamoDb\ReturnSubmission;
+use App\Aws\DynamoDb\SignatoryChainResolver;
 use App\Http\CognitoIdentity;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Signatory\DenySubmissionRequest;
@@ -23,7 +24,7 @@ class SubmissionController extends Controller
         return SubmissionResource::collection($queue->handle(CognitoIdentity::signatoryId($request)));
     }
 
-    public function show(Request $request, string $event, string $submission, GetSubmission $submissions): SubmissionResource
+    public function show(Request $request, string $event, string $submission, GetSubmission $submissions, SignatoryChainResolver $chain): SubmissionResource
     {
         $item = $submissions->require($event, $submission);
         $signatory = CognitoIdentity::signatoryId($request);
@@ -31,6 +32,8 @@ class SubmissionController extends Controller
         if (($item['current_signatory'] ?? null) !== 'SIGNATORY#'.$signatory) {
             abort(404);
         }
+
+        $item['signatory_chain'] = $chain->handle($item);
 
         return new SubmissionResource($item);
     }

@@ -38,7 +38,7 @@ submission_type: string
 sent_at: timestamp
 status: "pending" | "approved" | "denied" | "returned"
 current_signatory: SIGNATORY#uuid
-signatory_sequence: [ SIGNATORY#uuid ]   (ordered routing snapshot, written at submit time)
+signatory_sequence: [ SIGNATORY#uuid ]   (ordered routing snapshot, written at submit time; the ONLY stored form of the chain — signatory_chain is derived at read time, never persisted)
 collaboration: {
   dependent_organization_ids: [ ORGANIZATION#uuid ]   (index-only collaboration dependents; empty/absent = no collaboration)
 }
@@ -295,6 +295,19 @@ stored sequence simply means more desks. On a returned re-edit only the
 proponent edits and resubmits; the sequence is recomputed, and if the desk the
 paper was returned to is no longer in the new chain, routing restarts at
 signatory_sequence[0].
+
+signatory_sequence stores bare SIGNATORY#uuid ids in order, which is enough to
+route approvals but not to label each hop for a collaboration (two orgs can both
+contribute an "adviser"). Detail reads therefore project the stored sequence
+into a derived signatory_chain: an ordered array of
+{ signatory_id, role, organization_id, organization_name }. SignatoryChainResolver
+walks [proponent, ...dependents] org desks to map each id to the role and
+organization whose desk it is (first desk wins on a de-duplicated shared
+signatory); the campus desks (OSAAR, CDM, matched against the env ids) resolve
+to a null organization. signatory_chain is computed on read for the single-record
+GET endpoints (student / signatory / admin detail) and is NOT written to the item
+and NOT returned by list endpoints — the persisted source of truth stays
+signatory_sequence plus the ORGANIZATION.signatories desks.
 
 NOTIFICATION
 json

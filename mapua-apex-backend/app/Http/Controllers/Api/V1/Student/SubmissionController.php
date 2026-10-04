@@ -7,6 +7,7 @@ use App\Aws\DynamoDb\GetEvent;
 use App\Aws\DynamoDb\GetSubmission;
 use App\Aws\DynamoDb\ListCollaborationSubmissions;
 use App\Aws\DynamoDb\ListOrgSubmissions;
+use App\Aws\DynamoDb\SignatoryChainResolver;
 use App\Aws\DynamoDb\SubmissionAccess;
 use App\Aws\DynamoDb\WriteSubmission;
 use App\Http\CognitoIdentity;
@@ -67,6 +68,7 @@ class SubmissionController extends Controller
         GetEvent $events,
         GetSubmission $submissions,
         SubmissionAccess $access,
+        SignatoryChainResolver $chain,
     ): SubmissionResource {
         $item = $submissions->require($event, $submission);
         $organizationId = CognitoIdentity::organizationId($request);
@@ -77,6 +79,14 @@ class SubmissionController extends Controller
         $item['role'] = $proponentOrgKey !== '' && $proponentOrgKey === DynamoKeys::organization($organizationId)
             ? 'proponent'
             : 'dependent';
+
+        // The submission item carries the proponent org key on GSI1PK; fall back to
+        // the event's key for legacy rows written before that field was stored.
+        if (! isset($item['GSI1PK']) && $proponentOrgKey !== '') {
+            $item['GSI1PK'] = $proponentOrgKey;
+        }
+
+        $item['signatory_chain'] = $chain->handle($item);
 
         return new SubmissionResource($item);
     }

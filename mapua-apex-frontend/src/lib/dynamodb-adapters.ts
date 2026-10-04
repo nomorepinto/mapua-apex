@@ -25,6 +25,13 @@ export interface ApiSubmission {
   current_signatory?: string
   /** Ordered snapshot of signatory IDs (plain, no `SIGNATORY#` prefix) resolved at submit time. */
   signatory_sequence?: string[]
+  /**
+   * Detail-only: `signatory_sequence` expanded at read time so each hop carries
+   * its role plus the organization whose desk it is. Lets a collaboration label
+   * steps "{Org}'s Adviser", "{Org}'s Dean", "{Org 2}'s Adviser", … instead of
+   * ambiguous duplicate roles. Absent on list endpoints.
+   */
+  signatory_chain?: ApiSignatoryChainLink[]
   /** Whether the caller's org is the proponent or a collaboration dependent. */
   role?: "proponent" | "dependent"
   /** Collaboration dependents chosen by the proponent (plain ids, no prefix). */
@@ -139,6 +146,17 @@ export interface ApiNotification {
   signatory: string
   notif_type: "approved" | "fully approved" | "denied" | "returned"
   comment?: string
+}
+
+/**
+ * One hop of the derived approval chain. Campus desks (OSAAR, CDM) have a null
+ * organization; adviser/dean hops carry the organization whose desk it is.
+ */
+export interface ApiSignatoryChainLink {
+  signatory_id: string
+  role?: string | null
+  organization_id?: string | null
+  organization_name?: string | null
 }
 
 export interface ApiDeadline {
@@ -608,6 +626,19 @@ export function formatSignatoryRole(
   return signatoryIdOrRole.charAt(0).toUpperCase() + signatoryIdOrRole.slice(1)
 }
 
+/**
+ * Labels one derived chain hop. When `qualifyOrg` is set (a collaboration with
+ * more than one organization in the chain) an adviser/dean hop is qualified by
+ * its organization ("Mapua Computing Society's Adviser"); otherwise — and for
+ * the shared campus desks (OSAAR, CDM), which have no organization — it renders
+ * as the bare role.
+ */
+export function signatoryChainLabel(link: ApiSignatoryChainLink, qualifyOrg = true): string {
+  const role = formatSignatoryRole(link.role || link.signatory_id)
+  const org = qualifyOrg ? link.organization_name?.trim() : ""
+  return org ? `${org}'s ${role}` : role
+}
+
 export function announcementPath(sentAt: string): string {
   return `/admins/announcements/${encodeURIComponent(sentAt)}`
 }
@@ -784,97 +815,105 @@ export function apiNotificationsToStepper(
     isHigherCouncil?: boolean
     orgSignatories?: Array<{ role?: string; signatory_id?: string; name?: string }>
     signatorySequence?: string[]
+    signatoryChain?: ApiSignatoryChainLink[]
   }
 ): TrackerStepper {
   const sorted = [...notifications].sort((a, b) => a.sent_at.localeCompare(b.sent_at))
   const fullyApproved = sorted.some((item) => item.notif_type === "fully approved")
   const isAllApproved = fullyApproved || apiStatus === "approved"
 
-  const expectedRoles = resolveExpectedRoles(options)
+  const stripId = (value?: string | null): string =>
+    (value || "").replace(/^SIGNATORY#/i, "").trim()
 
-  // Map each notification to a resolved role
-  const resolvedNotifs: Array<{
-    role: string
-    sent_at: string
-    notif_type: ApiNotification["notif_type"]
-    comment?: string
-  }> = []
+  const chain = options?.signatoryChain
+  const useChain = Array.isArray(chain) && chain.length > 0
 
-  for (let i = 0; i < sorted.length; i++) {
-    const item = sorted[i]
-    const role = formatSignatoryRole(
-      item.signatory,
+  const roleForNotification = (signatory: string, index: number): string =>
+    formatSignatoryRole(
+      signatory,
       options?.orgSignatories,
-      i,
+      index,
       options?.activityType,
       options?.hasVenue,
       options?.isHigherCouncil
     )
-    resolvedNotifs.push({
-      role,
-      sent_at: item.sent_at,
-      notif_type: item.notif_type,
-      comment: item.comment,
-    })
-  }
 
-  // Ensure all expected roles are included in sequence
-  const roles = [...expectedRoles]
+  // Build the ordered steps. With the derived chain each step is keyed by its
+  // unique signatory id and labeled "{Org}'s {Role}", so duplicate roles across
+  // collaborating organizations stay distinct. Without it (legacy / list views)
+  // we fall back to bare role names keyed by the role string.
+  const distinctOrgs = useChain
+    ? new Set(chain!.map((link) => link.organization_id).filter(Boolean))
+    : new Set<string>()
+  // Only qualify steps with the organization name when more than one org is in
+  // the chain; a single-org paper keeps the clean bare role labels.
+  const qualifyOrg = distinctOrgs.size > 1
+  const steps: Array<{ key: string; label: string }> = useChain
+    ? chain!.map((link) => ({
+        key: stripId(link.signatory_id),
+        label: signatoryChainLabel(link, qualifyOrg),
+      }))
+    : resolveExpectedRoles(options).map((role) => ({ key: role, label: role }))
 
-  // Add any other recognized role if present
-  for (const n of resolvedNotifs) {
-    if (!roles.includes(n.role) && n.role !== "Signatory" && n.role !== "System") {
-      roles.push(n.role)
-    }
-  }
-
-  const fullSteps = [...roles, "Approved"]
-
-  const latestByRole = new Map<string, {
-    role: string
+  // Resolve each notification to the step key it belongs to.
+  const resolvedNotifs: Array<{
+    key: string
     sent_at: string
     notif_type: ApiNotification["notif_type"]
     comment?: string
-  }>()
-  for (const item of resolvedNotifs) {
-    latestByRole.set(item.role, item)
+  }> = sorted.map((item, i) => ({
+    key: useChain ? stripId(item.signatory) : roleForNotification(item.signatory, i),
+    sent_at: item.sent_at,
+    notif_type: item.notif_type,
+    comment: item.comment,
+  }))
+
+  // Fallback only: surface any recognized role present in the notifications but
+  // missing from the derived expectations (the chain path is already complete).
+  if (!useChain) {
+    for (const n of resolvedNotifs) {
+      if (n.key !== "Signatory" && n.key !== "System" && !steps.some((s) => s.key === n.key)) {
+        steps.push({ key: n.key, label: n.key })
+      }
+    }
   }
 
-  // Resolve current signatory role
-  let currentRole = currentSignatory
-    ? formatSignatoryRole(
-        currentSignatory,
-        options?.orgSignatories,
-        resolvedNotifs.length,
-        options?.activityType,
-        options?.hasVenue,
-        options?.isHigherCouncil
-      )
-    : undefined
+  const fullSteps = [...steps.map((step) => step.label), "Approved"]
+
+  const latestByKey = new Map<string, (typeof resolvedNotifs)[number]>()
+  for (const item of resolvedNotifs) {
+    latestByKey.set(item.key, item)
+  }
 
   let currentStepIdx = -1
   if (isAllApproved) {
-    currentStepIdx = roles.length
-  } else if (currentRole) {
-    currentStepIdx = roles.indexOf(currentRole)
+    currentStepIdx = steps.length
+  } else if (currentSignatory) {
+    const currentKey = useChain
+      ? stripId(currentSignatory)
+      : roleForNotification(currentSignatory, resolvedNotifs.length)
+    currentStepIdx = steps.findIndex((step) => step.key === currentKey)
   }
 
   if (!isAllApproved && currentStepIdx === -1) {
     // Check if there's a blocked (denied/returned) notification
-    const blocked = [...resolvedNotifs].reverse().find(
-      (item) => item.notif_type === "denied" || item.notif_type === "returned"
-    )
+    const blocked = [...resolvedNotifs]
+      .reverse()
+      .find((item) => item.notif_type === "denied" || item.notif_type === "returned")
     if (blocked) {
-      currentStepIdx = Math.max(0, roles.indexOf(blocked.role))
+      currentStepIdx = Math.max(
+        0,
+        steps.findIndex((step) => step.key === blocked.key)
+      )
     } else {
-      currentStepIdx = Math.min(resolvedNotifs.length, roles.length - 1)
+      currentStepIdx = Math.min(resolvedNotifs.length, steps.length - 1)
     }
   }
 
-  const assigneesList: TrackerAssignee[] = roles.map((role, idx) => {
-    const latest = latestByRole.get(role)
+  const assigneesList: TrackerAssignee[] = steps.map((step, idx) => {
+    const latest = latestByKey.get(step.key)
     let state: TrackerAssignee["state"] = "queued"
-    let statusText = idx === 0 ? "Queued" : `Queued (Awaiting ${roles[idx - 1]})`
+    let statusText = idx === 0 ? "Queued" : `Queued (Awaiting ${steps[idx - 1].label})`
 
     if (isAllApproved || idx < currentStepIdx) {
       state = "completed"
@@ -896,7 +935,7 @@ export function apiNotificationsToStepper(
       }
     }
 
-    return { role, name: role, statusText, state }
+    return { role: step.label, name: step.label, statusText, state }
   })
 
   assigneesList.push({
@@ -906,14 +945,14 @@ export function apiNotificationsToStepper(
     state: isAllApproved ? "completed" : "queued",
   })
 
-  const completedCount = isAllApproved ? roles.length : Math.max(0, currentStepIdx)
-  const remainingSteps = Math.max(0, roles.length - completedCount)
+  const completedCount = isAllApproved ? steps.length : Math.max(0, currentStepIdx)
+  const remainingSteps = Math.max(0, steps.length - completedCount)
 
   return {
     fullSteps,
-    currentStepIdx: isAllApproved ? roles.length : currentStepIdx,
+    currentStepIdx: isAllApproved ? steps.length : currentStepIdx,
     isAllApproved,
-    progressPercent: Math.round((completedCount / roles.length) * 100),
+    progressPercent: steps.length > 0 ? Math.round((completedCount / steps.length) * 100) : 0,
     remainingSteps,
     assigneesList,
   }
