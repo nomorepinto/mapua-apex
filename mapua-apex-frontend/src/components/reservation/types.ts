@@ -1,13 +1,3 @@
-export interface FacilityItem {
-  id: string
-  item: string
-  dateOfUse: string
-  endDateOfUse: string
-  timeOfUse: string
-  endTimeOfUse: string
-  location: string
-}
-
 export interface RoomItem {
   id: string
   dateNeeded: string
@@ -37,10 +27,6 @@ export interface EquipmentItem {
 
 export interface ReservationDraft {
   equipmentItems: EquipmentItem[]
-  purpose: string
-  functionRoomPurpose: string
-  avPurpose: string
-  facilityItems: FacilityItem[]
   roomItems: RoomItem[]
   avItems: AVItem[]
 }

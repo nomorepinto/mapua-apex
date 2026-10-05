@@ -67,7 +67,6 @@ final class SaafSubmissionRules
             'venue_reservation.equipment_requested' => ['required', 'array'],
             'venue_reservation.equipment_requested.items' => ['sometimes', 'array'],
             'venue_reservation.equipment_requested.items.*.name' => ['required', 'string', 'max:100'],
-            'venue_reservation.general_facilities' => ['required', 'array'],
             'venue_reservation.function_rooms' => ['required', 'array'],
             'venue_reservation.audiovisual_equipment' => ['required', 'array'],
         ];

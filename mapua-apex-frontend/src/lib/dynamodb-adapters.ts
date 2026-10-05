@@ -102,19 +102,7 @@ export interface ApiSubmission {
         remark?: string
       }>
     }
-    general_facilities?: {
-      purpose?: string
-      items?: Array<{
-        item: string
-        date_of_use: string
-        end_date_of_use?: string
-        time_of_use: string
-        end_time_of_use?: string
-        location: string
-      }>
-    }
     function_rooms?: {
-      purpose?: string
       items?: Array<{
         date_needed: string
         end_date_needed?: string
@@ -125,7 +113,6 @@ export interface ApiSubmission {
       }>
     }
     audiovisual_equipment?: {
-      purpose?: string
       items?: Array<{
         date_needed: string
         end_date_needed?: string
@@ -238,7 +225,7 @@ export function buildSaafApiPayload(
 ) {
   const event_id = existingEventId || crypto.randomUUID()
   // Reservation date/time is locked to the event schedule so the stored
-  // facility/room/AV items can never disagree with the activity details.
+  // room/AV items can never disagree with the activity details.
   const schedule = getEventSchedule(saafDraft)
   // Proposed budget is locked to the itemized Detailed Budget grand total so the
   // summary figure and the line-item sum can never disagree.
@@ -248,8 +235,7 @@ export function buildSaafApiPayload(
   )
   const hasReservation = Boolean(
     reservationDraft &&
-    (reservationDraft.facilityItems?.length > 0 ||
-      reservationDraft.roomItems?.length > 0 ||
+    (reservationDraft.roomItems?.length > 0 ||
       reservationDraft.avItems?.length > 0 ||
       reservationDraft.equipmentItems?.length > 0)
   )
@@ -323,19 +309,7 @@ export function buildSaafApiPayload(
           remark: e.remark || "",
         })),
       },
-      general_facilities: {
-        purpose: reservationDraft?.purpose || "",
-        items: (reservationDraft?.facilityItems || []).map((f) => ({
-          item: f.item,
-          date_of_use: schedule.startDate,
-          end_date_of_use: schedule.endDate,
-          time_of_use: schedule.startTime,
-          end_time_of_use: schedule.endTime,
-          location: f.location,
-        })),
-      },
       function_rooms: {
-        purpose: reservationDraft?.functionRoomPurpose || "",
         items: (reservationDraft?.roomItems || []).map((r) => ({
           date_needed: schedule.startDate,
           end_date_needed: schedule.endDate,
@@ -346,7 +320,6 @@ export function buildSaafApiPayload(
         })),
       },
       audiovisual_equipment: {
-        purpose: reservationDraft?.avPurpose || "",
         items: (reservationDraft?.avItems || []).map((a) => ({
           date_needed: schedule.startDate,
           end_date_needed: schedule.endDate,
@@ -1094,20 +1067,6 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
       }))
   const reservation: ReservationDraft = {
     equipmentItems,
-    purpose: reservationSource?.general_facilities?.purpose || "",
-    functionRoomPurpose: reservationSource?.function_rooms?.purpose || "",
-    avPurpose: reservationSource?.audiovisual_equipment?.purpose || "",
-    facilityItems: reservationSource?.general_facilities?.items?.length
-      ? reservationSource.general_facilities.items.map((item, index) => ({
-        id: String(index + 1),
-        item: item.item,
-        dateOfUse: item.date_of_use,
-        endDateOfUse: item.end_date_of_use || item.date_of_use,
-        timeOfUse: item.time_of_use,
-        endTimeOfUse: item.end_time_of_use || item.time_of_use,
-        location: item.location,
-      }))
-      : DEFAULT_RESERVATION_DRAFT.facilityItems,
     roomItems: reservationSource?.function_rooms?.items?.length
       ? reservationSource.function_rooms.items.map((item, index) => ({
         id: String(index + 1),

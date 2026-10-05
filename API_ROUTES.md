@@ -212,23 +212,10 @@ Use this as the **POST** `/api/v1/students/submissions` body. For **PUT**, copy 
         }
       ]
     },
-    "general_facilities": {
-      "purpose": "Hackathon venue",
-      "items": [
-        {
-          "item": "MPH",
-          "date_of_use": "2026-10-05",
-          "time_of_use": "17:00",
-          "location": "MPH 2F"
-        }
-      ]
-    },
     "function_rooms": {
-      "purpose": "",
       "items": []
     },
     "audiovisual_equipment": {
-      "purpose": "Projector for demo",
       "items": [
         {
           "date_needed": "2026-10-05",

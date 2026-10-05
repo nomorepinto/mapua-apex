@@ -76,9 +76,8 @@ detailed_budget_proposal: {
 venue_reservation: {
   has_reservation: boolean
   equipment_requested: { items: [{ name, purpose, remark }] }
-  general_facilities: { purpose, items: [{ item, date_of_use, time_of_use, location }] }
-  function_rooms: { purpose, items: [{ date_needed, time_needed, room_needed, remarks }] }
-  audiovisual_equipment: { purpose, items: [{ date_needed, time_needed, equipment_needed, remarks }] }
+  function_rooms: { items: [{ date_needed, time_needed, room_needed, remarks }] }
+  audiovisual_equipment: { items: [{ date_needed, time_needed, equipment_needed, remarks }] }
 }
 GSI1 on SUBMISSION is written on create/update (org + submission id).
 Admin GET /admins/submissions lists organizations, then queries GSI1 for each
@@ -254,9 +253,8 @@ json
         { "name": "Tables", "purpose": "Workshop tables", "remark": "" }
       ]
     },
-    "general_facilities": { "purpose": "Hackathon venue", "items": [{ "item": "MPH", "date_of_use": "2026-10-05", "time_of_use": "17:00", "location": "MPH 2F" }] },
-    "function_rooms": { "purpose": "", "items": [] },
-    "audiovisual_equipment": { "purpose": "Projector for demo", "items": [{ "date_needed": "2026-10-05", "time_needed": "17:00", "equipment_needed": "Projector", "remarks": "1 unit" }] }
+    "function_rooms": { "items": [] },
+    "audiovisual_equipment": { "items": [{ "date_needed": "2026-10-05", "time_needed": "17:00", "equipment_needed": "Projector", "remarks": "1 unit" }] }
   }
 }
 Routing is snapshotted onto SUBMISSION at write time. On create (and on a

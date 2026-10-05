@@ -8,7 +8,6 @@ import { DEFAULT_SAAF_DRAFT } from "@/components/submission/constants"
 import type {
   AVItem,
   EquipmentItem,
-  FacilityItem,
   ReservationDraft,
   RoomItem,
 } from "@/components/reservation/types"
@@ -32,73 +31,6 @@ export function useReservationForm() {
   // never be entered inconsistently with the event details captured earlier.
   const saafDraft = useOrgStore((state) => state.saafDraft)
   const schedule = getEventSchedule(saafDraft)
-
-  const updateField = useCallback(
-    <K extends keyof ReservationDraft>(key: K, value: ReservationDraft[K]) => {
-      let sanitizedValue = value
-      if (
-        (key === "purpose" ||
-          key === "functionRoomPurpose" ||
-          key === "avPurpose") &&
-        typeof value === "string"
-      ) {
-        sanitizedValue = value.slice(0, 100) as ReservationDraft[K]
-      }
-      useOrgStore.getState().patchReservationDraft({ [key]: sanitizedValue })
-    },
-    []
-  )
-
-  const handleAddFacilityItem = useCallback(() => {
-    const current =
-      useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-    const facilityItems =
-      current.facilityItems ?? DEFAULT_RESERVATION_DRAFT.facilityItems
-    useOrgStore.getState().patchReservationDraft({
-      facilityItems: [
-        ...facilityItems,
-        {
-          id: String(Date.now()),
-          item: "",
-          dateOfUse: "",
-          endDateOfUse: "",
-          timeOfUse: "",
-          endTimeOfUse: "",
-          location: "",
-        },
-      ],
-    })
-  }, [])
-
-  const handleRemoveFacilityItem = useCallback((id: string) => {
-    const current =
-      useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-    const facilityItems =
-      current.facilityItems ?? DEFAULT_RESERVATION_DRAFT.facilityItems
-    if (facilityItems.length <= 1) return
-    useOrgStore.getState().patchReservationDraft({
-      facilityItems: facilityItems.filter((i) => i.id !== id),
-    })
-  }, [])
-
-  const handleUpdateFacilityItem = useCallback(
-    (id: string, field: keyof FacilityItem, value: string) => {
-      let sanitized = value
-      if (field === "item" || field === "location") {
-        sanitized = value.slice(0, 40)
-      }
-      const current =
-        useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-      const facilityItems =
-        current.facilityItems ?? DEFAULT_RESERVATION_DRAFT.facilityItems
-      useOrgStore.getState().patchReservationDraft({
-        facilityItems: facilityItems.map((i) =>
-          i.id === id ? { ...i, [field]: sanitized } : i
-        ),
-      })
-    },
-    []
-  )
 
   const handleAddRoomItem = useCallback((roomNeeded: string) => {
     const current =
@@ -249,8 +181,6 @@ export function useReservationForm() {
       ...current,
       equipmentItems:
         current.equipmentItems ?? DEFAULT_RESERVATION_DRAFT.equipmentItems,
-      facilityItems:
-        current.facilityItems ?? DEFAULT_RESERVATION_DRAFT.facilityItems,
       roomItems: current.roomItems ?? DEFAULT_RESERVATION_DRAFT.roomItems,
       avItems: current.avItems ?? DEFAULT_RESERVATION_DRAFT.avItems,
     }
@@ -285,10 +215,6 @@ export function useReservationForm() {
   return {
     draft,
     schedule,
-    updateField,
-    handleAddFacilityItem,
-    handleRemoveFacilityItem,
-    handleUpdateFacilityItem,
     handleAddRoomItem,
     handleRemoveRoomItem,
     handleUpdateRoomItem,

@@ -106,9 +106,8 @@ and 9:00 PM, end not earlier than start, and start ≠ end.
 |---|---|---|
 | `has_reservation` | boolean | Drives whether the CDM desk joins the routing chain |
 | `equipment_requested` | object | `{ items[] { name, purpose, remark } }` |
-| `general_facilities` | object | `{ purpose, items[] { item, date_of_use, time_of_use, location } }` |
-| `function_rooms` | object | `{ purpose, items[] { date_needed, time_needed, room_needed, remarks } }` |
-| `audiovisual_equipment` | object | `{ purpose, items[] { date_needed, time_needed, equipment_needed, remarks } }` |
+| `function_rooms` | object | `{ items[] { date_needed, time_needed, room_needed, remarks } }` |
+| `audiovisual_equipment` | object | `{ items[] { date_needed, time_needed, equipment_needed, remarks } }` |
 
 ---
 

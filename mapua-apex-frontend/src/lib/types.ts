@@ -103,13 +103,6 @@ export interface EquipmentRequested {
   items: EquipmentRequestedItem[]
 }
 
-export interface GeneralFacilityItem {
-  item: string
-  date_of_use: string
-  time_of_use: string
-  location: string
-}
-
 export interface FunctionRoomItem {
   date_needed: string
   time_needed: string
@@ -127,16 +120,10 @@ export interface AudiovisualItem {
 export interface VenueReservation {
   has_reservation: boolean
   equipment_requested: EquipmentRequested
-  general_facilities: {
-    purpose: string
-    items: GeneralFacilityItem[]
-  }
   function_rooms: {
-    purpose: string
     items: FunctionRoomItem[]
   }
   audiovisual_equipment: {
-    purpose: string
     items: AudiovisualItem[]
   }
 }

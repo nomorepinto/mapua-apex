@@ -50,16 +50,6 @@ export interface ReservationPdfData {
         purpose?: string
         remark?: string
     }>
-    purpose?: string
-    facilityItems?: Array<{
-        item?: string
-        dateOfUse?: string
-        endDateOfUse?: string
-        timeOfUse?: string
-        endTimeOfUse?: string
-        location?: string
-    }>
-    functionRoomPurpose?: string
     roomItems?: Array<{
         dateNeeded?: string
         endDateNeeded?: string
@@ -68,7 +58,6 @@ export interface ReservationPdfData {
         roomNeeded?: string
         remarks?: string
     }>
-    avPurpose?: string
     avItems?: Array<{
         dateNeeded?: string
         endDateNeeded?: string
@@ -238,39 +227,6 @@ export function generateProposalPdf(
 
         ry = (doc as any).lastAutoTable.finalY + 4
 
-        // General Facilities Table
-        const facilityRows = (reservationData.facilityItems || []).map((f) => [
-            f.item || "",
-            f.dateOfUse || "",
-            f.endDateOfUse || f.dateOfUse || "",
-            f.timeOfUse || "",
-            f.endTimeOfUse || f.timeOfUse || "",
-            f.location || "",
-        ])
-
-        autoTable(doc, {
-            startY: ry,
-            head: [
-                [
-                    {
-                        content: `General Facilities (Purpose: ${reservationData.purpose || "N/A"})`,
-                        colSpan: 6,
-                        styles: { halign: "left" },
-                    },
-                ],
-                ["Item", "Start Date", "End Date", "Start Time", "End Time", "Location"],
-            ],
-            headStyles: { fillColor: primaryRed, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
-            body: facilityRows,
-            styles: { fontSize: 7, cellPadding: 1.5, halign: "center" },
-            columnStyles: {
-                0: { halign: "left" },
-                5: { halign: "left" },
-            },
-        })
-
-        ry = (doc as any).lastAutoTable.finalY + 4
-
         // Function Room Table
         const roomRows = (reservationData.roomItems || []).map((r) => [
             r.roomNeeded || "",
@@ -286,7 +242,7 @@ export function generateProposalPdf(
             head: [
                 [
                     {
-                        content: `Function Rooms (Purpose: ${reservationData.functionRoomPurpose || "N/A"})`,
+                        content: "Function Rooms",
                         colSpan: 6,
                         styles: { halign: "left" },
                     },
@@ -319,7 +275,7 @@ export function generateProposalPdf(
             head: [
                 [
                     {
-                        content: `Audiovisual Equipment (Purpose: ${reservationData.avPurpose || "N/A"})`,
+                        content: "Audiovisual Equipment",
                         colSpan: 6,
                         styles: { halign: "left" },
                     },

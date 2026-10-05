@@ -478,28 +478,18 @@ function saafDraft(eventName) {
 function reservationDraft() {
   const date = daysFromNow(21)
   return {
-    equipment: {
-      monoblock: true,
-      whiteboards: true,
-      tables: true,
-      rostrum: false,
-      flags: false,
-      panelBoards: false,
-      others: false,
-    },
-    otherEquipmentText: "",
-    purpose: "Tech Week opening exhibit",
-    functionRoomPurpose: "Keynote and workshops",
-    avPurpose: "Stage presentation support",
-    facilityItems: [
+    equipmentItems: [
       {
         id: "1",
-        item: "North Circle booths",
-        dateOfUse: date,
-        endDateOfUse: date,
-        timeOfUse: "08:00",
-        endTimeOfUse: "18:00",
-        location: "North Circle",
+        name: "Monoblock Chairs",
+        purpose: "Participant seating",
+        remark: "50 units",
+      },
+      {
+        id: "2",
+        name: "Tables",
+        purpose: "Workshop tables",
+        remark: "",
       },
     ],
     roomItems: [

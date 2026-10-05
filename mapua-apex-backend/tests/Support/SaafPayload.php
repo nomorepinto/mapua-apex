@@ -84,21 +84,10 @@ final class SaafPayload
                         ],
                     ],
                 ],
-                'general_facilities' => [
-                    'purpose' => 'Hackathon venue',
-                    'items' => [[
-                        'item' => 'MPH',
-                        'date_of_use' => $eventDate,
-                        'time_of_use' => '17:00',
-                        'location' => 'MPH 2F',
-                    ]],
-                ],
                 'function_rooms' => [
-                    'purpose' => '',
                     'items' => [],
                 ],
                 'audiovisual_equipment' => [
-                    'purpose' => 'Projector for demo',
                     'items' => [[
                         'date_needed' => $eventDate,
                         'time_needed' => '17:00',

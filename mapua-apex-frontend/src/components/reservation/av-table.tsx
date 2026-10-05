@@ -1,10 +1,7 @@
 import { Trash2Icon } from "lucide-react"
 
-import { FieldWarning } from "@/components/forms/field-warning"
-
 import {
   AV_EQUIPMENT_OPTIONS,
-  PURPOSE_INPUT_CLASS,
   TABLE_INPUT_CLASS,
 } from "@/components/reservation/constants"
 import type { AVItem } from "@/components/reservation/types"
@@ -19,16 +16,12 @@ import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
 export function AvTable({
-  purpose = "",
   items = [],
-  onPurposeChange,
   onUpdate,
   onRemove,
   onAdd,
 }: {
-  purpose: string
   items?: AVItem[]
-  onPurposeChange: (value: string) => void
   onUpdate: (id: string, field: keyof AVItem, value: string) => void
   onRemove: (id: string) => void
   onAdd: (value: string) => void
@@ -42,22 +35,6 @@ export function AvTable({
 
   return (
     <div className="space-y-3 pt-2">
-      <div className="space-y-1">
-        <label className="block text-xs font-semibold text-neutral-800">
-          Audiovisual Equipment <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={purpose}
-          onChange={(e) => onPurposeChange(e.target.value)}
-          placeholder="Write the title of Exhibit, Event, etc."
-          style={{ color: "#171717" }}
-          className={PURPOSE_INPUT_CLASS}
-          required
-        />
-        <FieldWarning name="avPurpose" />
-      </div>
-
       <div className={layout.sectionFlush}>
         <div className={layout.tableWrap}>
           <table

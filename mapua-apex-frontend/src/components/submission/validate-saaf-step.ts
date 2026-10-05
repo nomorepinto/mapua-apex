@@ -218,27 +218,22 @@ export function isSaafDraftComplete(draft: SaafDraft): boolean {
   return ([0, 1, 2, 3] as const).every((step) => isSaafStepComplete(step, draft))
 }
 
-/**
- * Inline warnings for the reservation step (the three required purposes). The
- * facility/room/AV/equipment rows themselves are optional, so only the purpose
- * headers gate advancement.
- */
-export function reservationFieldWarnings(
-  draft: ReservationDraft
-): Record<string, string> {
-  const warnings: Record<string, string> = {}
-  if (isBlank(draft.purpose)) warnings.purpose = REQUIRED
-  if (isBlank(draft.functionRoomPurpose)) {
-    warnings.functionRoomPurpose = REQUIRED
-  }
-  if (isBlank(draft.avPurpose)) warnings.avPurpose = REQUIRED
-  return warnings
-}
+const RESERVATION_EMPTY_MESSAGE =
+  "Add at least one equipment, room, or audiovisual item."
 
+/**
+ * The reservation step advances once the proponent has added at least one
+ * equipment, function room, or audiovisual row. Individual rows are optional,
+ * but an entirely empty reservation cannot continue.
+ */
 export function getReservationStepIssue(
   draft: ReservationDraft
 ): string | null {
-  return Object.values(reservationFieldWarnings(draft))[0] ?? null
+  const hasItems =
+    draft.equipmentItems.length > 0 ||
+    draft.roomItems.length > 0 ||
+    draft.avItems.length > 0
+  return hasItems ? null : RESERVATION_EMPTY_MESSAGE
 }
 
 export function isReservationStepComplete(draft: ReservationDraft): boolean {

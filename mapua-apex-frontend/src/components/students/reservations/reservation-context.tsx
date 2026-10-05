@@ -14,10 +14,6 @@ interface ReservationFormState {
 }
 
 interface ReservationFormActions {
-  updateField: ReservationFormModel["updateField"]
-  handleUpdateFacilityItem: ReservationFormModel["handleUpdateFacilityItem"]
-  handleRemoveFacilityItem: ReservationFormModel["handleRemoveFacilityItem"]
-  handleAddFacilityItem: ReservationFormModel["handleAddFacilityItem"]
   handleUpdateRoomItem: ReservationFormModel["handleUpdateRoomItem"]
   handleRemoveRoomItem: ReservationFormModel["handleRemoveRoomItem"]
   handleAddRoomItem: ReservationFormModel["handleAddRoomItem"]
@@ -59,10 +55,6 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
       schedule: form.schedule,
     },
     actions: {
-      updateField: form.updateField,
-      handleUpdateFacilityItem: form.handleUpdateFacilityItem,
-      handleRemoveFacilityItem: form.handleRemoveFacilityItem,
-      handleAddFacilityItem: form.handleAddFacilityItem,
       handleUpdateRoomItem: form.handleUpdateRoomItem,
       handleRemoveRoomItem: form.handleRemoveRoomItem,
       handleAddRoomItem: form.handleAddRoomItem,
