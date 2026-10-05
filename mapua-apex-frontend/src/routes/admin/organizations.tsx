@@ -1,4 +1,5 @@
 import { AddOrganizationCard } from "@/components/admin/organizations/add-organization-card"
+import { DeleteOrganizationDialog } from "@/components/admin/organizations/delete-organization-dialog"
 import { EditOrganizationDialog } from "@/components/admin/organizations/edit-organization-dialog"
 import { OrganizationsLoadAlert } from "@/components/admin/organizations/organizations-load-alert"
 import { OrganizationsProvider } from "@/components/admin/organizations/organizations-context"
@@ -28,6 +29,7 @@ export function AdminOrganizationsPage() {
           </div>
         </div>
         <EditOrganizationDialog />
+        <DeleteOrganizationDialog />
       </div>
     </OrganizationsProvider>
   )

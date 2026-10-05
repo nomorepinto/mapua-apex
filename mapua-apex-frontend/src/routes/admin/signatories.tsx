@@ -1,4 +1,5 @@
 import { AddSignatoryCard } from "@/components/admin/signatories/add-signatory-card"
+import { DeleteSignatoryDialog } from "@/components/admin/signatories/delete-signatory-dialog"
 import { EditSignatoryDialog } from "@/components/admin/signatories/edit-signatory-dialog"
 import { SignatoriesLoadAlert } from "@/components/admin/signatories/signatories-load-alert"
 import { SignatoriesProvider } from "@/components/admin/signatories/signatories-context"
@@ -28,6 +29,7 @@ export function AdminSignatoriesPage() {
           </div>
         </div>
         <EditSignatoryDialog />
+        <DeleteSignatoryDialog />
       </div>
     </SignatoriesProvider>
   )

@@ -9,6 +9,7 @@ use App\Http\Requests\Api\V1\Admin\UpdateOrganizationRequest;
 use App\Http\Resources\Api\V1\OrganizationResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 
 class OrganizationController extends Controller
 {
@@ -44,5 +45,12 @@ class OrganizationController extends Controller
                 ? (bool) $validated['is_higher_council']
                 : null,
         ));
+    }
+
+    public function destroy(string $organization, OrganizationRecords $organizations): Response
+    {
+        $organizations->delete($organization);
+
+        return response()->noContent();
     }
 }

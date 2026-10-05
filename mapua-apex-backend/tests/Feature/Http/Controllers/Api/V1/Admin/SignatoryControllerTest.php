@@ -166,4 +166,68 @@ class SignatoryControllerTest extends TestCase
             ])
             ->assertNotFound();
     }
+
+    public function test_deletes_a_signatory_that_is_not_referenced(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        $db->seed([
+            'PK' => 'SIGNATORY#adv999',
+            'SK' => 'SIGNATORY#adv999',
+            'name' => 'Former Adviser',
+            'role' => 'adviser',
+            'GSI4PK' => 'ROLE#ADVISER',
+            'GSI4SK' => 'SIGNATORY#adv999',
+        ]);
+
+        $this->withAdminAuth()
+            ->deleteJson('/api/v1/admins/signatories/adv999')
+            ->assertNoContent();
+
+        $this->assertNull($db->find('SIGNATORY#adv999', 'SIGNATORY#adv999'));
+    }
+
+    public function test_returns_404_when_deleting_a_missing_signatory(): void
+    {
+        InMemoryDynamoDb::bind($this);
+
+        $this->withAdminAuth()
+            ->deleteJson('/api/v1/admins/signatories/missing')
+            ->assertNotFound();
+    }
+
+    public function test_returns_409_when_the_signatory_still_occupies_a_desk(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::organization($db);
+        DynamoFixtures::signatory($db, 'adv001', 'adviser');
+
+        $this->withAdminAuth()
+            ->deleteJson('/api/v1/admins/signatories/adv001')
+            ->assertConflict();
+
+        $this->assertNotNull($db->find('SIGNATORY#adv001', 'SIGNATORY#adv001'));
+    }
+
+    public function test_returns_409_when_the_signatory_has_submissions_in_flight(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        $db->seed([
+            'PK' => 'SIGNATORY#adv999',
+            'SK' => 'SIGNATORY#adv999',
+            'name' => 'Former Adviser',
+            'role' => 'adviser',
+            'GSI4PK' => 'ROLE#ADVISER',
+            'GSI4SK' => 'SIGNATORY#adv999',
+        ]);
+        DynamoFixtures::submission($db, [
+            'current_signatory' => 'SIGNATORY#adv999',
+            'GSI2PK' => 'SIGNATORY#adv999',
+        ]);
+
+        $this->withAdminAuth()
+            ->deleteJson('/api/v1/admins/signatories/adv999')
+            ->assertConflict();
+
+        $this->assertNotNull($db->find('SIGNATORY#adv999', 'SIGNATORY#adv999'));
+    }
 }

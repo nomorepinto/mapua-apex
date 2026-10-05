@@ -39,8 +39,9 @@ const CLASSROOM_MAX_LENGTH = 6
 
 /**
  * Rooms the reservation step offers for the SAAF venue campus: that campus's
- * fixed rooms plus "Classroom". Returns nothing when no campus (or an
- * unrecognized one) is selected — the venue field on step 3 is the only source.
+ * fixed rooms plus "Classroom". Returns nothing when no campus is selected or
+ * the venue is not a physical campus (e.g. "Online") — the venue field on
+ * step 3 is the only source.
  */
 export function roomOptionsForCampus(campus: string): string[] {
   return isCampus(campus) ? [...FIXED_ROOMS[campus], CLASSROOM_ROOM] : []

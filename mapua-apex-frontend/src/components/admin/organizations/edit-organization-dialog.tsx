@@ -93,8 +93,22 @@ export function EditOrganizationDialog() {
                 <AlertDescription>{state.editError}</AlertDescription>
               </Alert>
             ) : null}
+            {state.deleteError ? (
+              <Alert variant="error">
+                <CircleAlertIcon />
+                <AlertTitle>Could not delete</AlertTitle>
+                <AlertDescription>{state.deleteError}</AlertDescription>
+              </Alert>
+            ) : null}
           </DialogPanel>
           <DialogFooter>
+            <Button
+              onClick={actions.openDelete}
+              type="button"
+              variant="destructive-outline"
+            >
+              Delete
+            </Button>
             <DialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
             </DialogClose>

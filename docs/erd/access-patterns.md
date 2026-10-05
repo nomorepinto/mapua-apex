@@ -36,6 +36,8 @@ Index summary:
 | 14 | Announcement show / edit / delete | GetItem / PutItem / DeleteItem | `PK = ANNOUNCEMENT`, `SK = timestamp` | Base |
 | 15 | Write submission (+ collab pointers) | PutItem | `PK = EVENT#id`, `SK = SUBMISSION#id`; maintain one COLLAB pointer per dependent | Base |
 | 16 | Approve / return / deny | UpdateItem | advance `current_signatory` / `GSI2PK` from stored `signatory_sequence`; write NOTIFICATION | Base |
+| 17 | Admin: delete organization (guarded) | Query → DeleteItem | block (**409**) if `GSI1PK = ORGANIZATION#id` has events/submissions or base `PK = ORGANIZATION#id`, `SK` begins `COLLAB#`; else DeleteItem `PK = SK = ORGANIZATION#id` | GSI1 + Base |
+| 18 | Admin: delete signatory (guarded) | Scan/Query → DeleteItem | block (**409**) if any `ORGANIZATION.signatories` desk holds the id or `GSI2PK = SIGNATORY#id` (open inbox); else DeleteItem `PK = SK = SIGNATORY#id` | GSI2 + Base |
 
 ---
 
@@ -49,6 +51,6 @@ Index summary:
 | Signatory desk (inbox) | SUBMISSION, SIGNATORY | 7, 9 |
 | Signatory review (approve/return/deny/classify) | SUBMISSION, NOTIFICATION | 6, 16 |
 | Admin dashboard (submissions) | ORGANIZATION, SUBMISSION | 10 |
-| Admin → Organizations | ORGANIZATION, SIGNATORY | 11, 12 |
-| Admin → Signatories | SIGNATORY | 8 |
+| Admin → Organizations | ORGANIZATION, SIGNATORY | 11, 12, 17 |
+| Admin → Signatories | SIGNATORY, ORGANIZATION (desk guard) | 8, 18 |
 | About / Announcements | ANNOUNCEMENT | 13, 14 |

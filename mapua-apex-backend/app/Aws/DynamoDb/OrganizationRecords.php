@@ -101,6 +101,49 @@ final class OrganizationRecords
         return $item;
     }
 
+    /**
+     * Permanently remove an organization, refusing when it still owns events,
+     * submissions, or collaboration pointers that would be left dangling.
+     */
+    public function delete(string $organizationId): void
+    {
+        $key = DynamoKeys::organization($organizationId);
+
+        if ($this->items->get($key, $key) === null) {
+            abort(404);
+        }
+
+        if ($this->hasEvents($key) || $this->hasCollaborationPointers($key)) {
+            abort(409, 'This organization still has submissions and cannot be deleted.');
+        }
+
+        $this->items->delete($key, $key);
+    }
+
+    private function hasEvents(string $organizationKey): bool
+    {
+        return $this->items->query([
+            'IndexName' => 'GSI1',
+            'KeyConditionExpression' => 'GSI1PK = :org',
+            'ExpressionAttributeValues' => [
+                ':org' => ['S' => $organizationKey],
+            ],
+            'Limit' => 1,
+        ], allPages: false) !== [];
+    }
+
+    private function hasCollaborationPointers(string $organizationKey): bool
+    {
+        return $this->items->query([
+            'KeyConditionExpression' => 'PK = :pk AND begins_with(SK, :sk)',
+            'ExpressionAttributeValues' => [
+                ':pk' => ['S' => $organizationKey],
+                ':sk' => ['S' => 'COLLAB#'],
+            ],
+            'Limit' => 1,
+        ], allPages: false) !== [];
+    }
+
     public function assign(string $organizationId, string $role, string $signatoryId): void
     {
         $organization = $this->require($organizationId);

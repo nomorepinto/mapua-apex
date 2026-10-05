@@ -107,6 +107,9 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
             Route::put('organizations/{organization}', [OrganizationController::class, 'update'])
                 ->middleware('throttle:admin-write')
                 ->name('organizations.update');
+            Route::delete('organizations/{organization}', [OrganizationController::class, 'destroy'])
+                ->middleware('throttle:admin-write')
+                ->name('organizations.destroy');
             Route::get('signatories', [SignatoryController::class, 'index'])->name('signatories.index');
             Route::post('signatories', [SignatoryController::class, 'store'])
                 ->middleware('throttle:admin-write')
@@ -114,5 +117,8 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
             Route::put('signatories/{signatory}', [SignatoryController::class, 'update'])
                 ->middleware('throttle:admin-write')
                 ->name('signatories.update');
+            Route::delete('signatories/{signatory}', [SignatoryController::class, 'destroy'])
+                ->middleware('throttle:admin-write')
+                ->name('signatories.destroy');
         });
 });

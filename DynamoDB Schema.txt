@@ -19,6 +19,11 @@ OSAAR and CDM are campus-wide: OSAAR_SIGNATORY_ID and
 CDM_SIGNATORY_ID in the API env (plain uuid or SIGNATORY#uuid).
 Rename those people in place (PUT /signatories on the same id).
 admin may occupy a desk but is not in the approval sequence.
+DELETE /admins/organizations/{id} is guarded: it removes the ORGANIZATION item
+only when the org owns no EVENT/SUBMISSION rows (GSI1PK = ORGANIZATION#id) and
+no COLLABORATION POINTER rows (PK = ORGANIZATION#id, SK begins COLLAB#);
+otherwise it returns 409 and leaves the item untouched. Delete does not rewrite
+student Cognito custom:organization_id.
 
 EVENT
 PK: EVENT#uuid
@@ -150,10 +155,12 @@ Other items copy the signatory id; they do not join back to SIGNATORY:
   ORGANIZATION.signatories[].signatory_id
   SUBMISSION.current_signatory and GSI2PK (inbox)
   NOTIFICATION.signatory (timeline snapshot)
-Deleting a SIGNATORY item does not rewrite those copies. Replace a person in
-place by keeping the same uuid (PUT name / role / department). A new uuid
-leaves in-flight papers, org desks, and Cognito custom:signatory_id
-pointing at the old id.
+DELETE /admins/signatories/{id} is guarded: it removes the item only when the
+person occupies no ORGANIZATION.signatories desk and has no in-flight GSI2
+inbox item; otherwise it returns 409 (leaving the item untouched). Delete does
+not rewrite the copies above, so prefer replacing a person in place by keeping
+the same uuid (PUT name / role / department). A new uuid leaves in-flight
+papers, org desks, and Cognito custom:signatory_id pointing at the old id.
 
 ANNOUNCEMENT
 PK: ANNOUNCEMENT

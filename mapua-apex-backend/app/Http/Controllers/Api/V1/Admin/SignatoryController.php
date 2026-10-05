@@ -9,6 +9,7 @@ use App\Http\Requests\Api\V1\Admin\UpdateSignatoryRequest;
 use App\Http\Resources\Api\V1\SignatoryResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 
 class SignatoryController extends Controller
 {
@@ -38,5 +39,12 @@ class SignatoryController extends Controller
             $validated['role'],
             $validated['department'] ?? null,
         ));
+    }
+
+    public function destroy(string $signatory, SignatoryRecords $signatories): Response
+    {
+        $signatories->delete($signatory);
+
+        return response()->noContent();
     }
 }

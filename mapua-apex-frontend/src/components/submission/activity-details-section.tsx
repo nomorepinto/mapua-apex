@@ -1,6 +1,6 @@
 import { FieldWarning } from "@/components/forms/field-warning"
 import { EventTimeFields } from "@/components/submission/event-time-fields"
-import { CAMPUSES } from "@/components/submission/constants"
+import { VENUES } from "@/components/submission/constants"
 import {
   clockFromDraft,
   combineEventTime,
@@ -206,18 +206,18 @@ export function ActivityDetailsSection({
             }
           >
             <SelectTrigger
-              aria-label="Venue campus"
+              aria-label="Venue"
               className={cn(
                 "h-10 w-full truncate rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900",
                 !values.activityVenue && "saaf-glow-invalid"
               )}
             >
-              <SelectValue placeholder="Select campus" />
+              <SelectValue placeholder="Select venue" />
             </SelectTrigger>
             <SelectPopup>
-              {CAMPUSES.map((campus) => (
-                <SelectItem key={campus} value={campus}>
-                  {campus}
+              {VENUES.map((venue) => (
+                <SelectItem key={venue} value={venue}>
+                  {venue}
                 </SelectItem>
               ))}
             </SelectPopup>

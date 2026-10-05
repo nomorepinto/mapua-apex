@@ -23,13 +23,31 @@ export const DAYS_OF_WEEK = [
   "Sunday",
 ] as const
 
-/** Campuses an activity can be held at; the SAAF venue is one of these. */
+/**
+ * Physical campuses an activity can be held at. Each lends out rooms, so this
+ * list also drives the reservation room catalog (see `lib/campus-rooms.ts`).
+ */
 export const CAMPUSES = ["Makati Campus", "Intramuros Campus"] as const
 
 export type Campus = (typeof CAMPUSES)[number]
 
 export function isCampus(value: string): value is Campus {
   return (CAMPUSES as readonly string[]).includes(value)
+}
+
+/** Venue for an activity held digitally instead of at a physical campus. */
+export const ONLINE_VENUE = "Online"
+
+/**
+ * Every venue the SAAF offers: the physical campuses plus "Online". "Online" is
+ * a valid venue but not a campus, so it lends out no rooms to reserve.
+ */
+export const VENUES = [...CAMPUSES, ONLINE_VENUE] as const
+
+export type Venue = (typeof VENUES)[number]
+
+export function isVenue(value: string): value is Venue {
+  return isCampus(value) || value === ONLINE_VENUE
 }
 
 export const MISSION_STATEMENTS = [
