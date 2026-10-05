@@ -145,7 +145,7 @@ function makeSubmission({
         "A week-long co-curricular program of workshops, talks, and showcases that help student organizations prepare official activity proposals and campus events.",
       objectives:
         "Skill building: Train officers on SAAF filing.\nCommunity: Increase cross-org collaboration.",
-      venue: "Mapúa Intramuros Gym",
+      venue: "Intramuros Campus",
       date_of_event: daysFromNow(21),
       end_date_of_event: daysFromNow(23),
       day_of_event: "Monday",
@@ -435,7 +435,7 @@ function saafDraft(eventName) {
       "A week-long co-curricular program of workshops, talks, and showcases that help student organizations prepare official activity proposals and campus events for Mapúa University.",
     activityObjectives:
       "Train officers on SAAF filing and raise cross-organization collaboration during the academic term.",
-    activityVenue: "Mapúa Intramuros Gym",
+    activityVenue: "Intramuros Campus",
     dateOfEvent: eventDate,
     endDateOfEvent: endDate,
     timeOfEvent: "09:00 - 17:00",

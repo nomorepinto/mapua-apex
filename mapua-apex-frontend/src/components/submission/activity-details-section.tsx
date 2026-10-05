@@ -1,5 +1,6 @@
 import { FieldWarning } from "@/components/forms/field-warning"
 import { EventTimeFields } from "@/components/submission/event-time-fields"
+import { CAMPUSES } from "@/components/submission/constants"
 import {
   clockFromDraft,
   combineEventTime,
@@ -12,6 +13,13 @@ import {
 import type { SaafDraft } from "@/components/submission/types"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
   minEventDateKey,
@@ -23,6 +31,7 @@ import {
   sanitizeDecimalInput,
   sanitizeIntegerInput,
 } from "@/lib/numeric-input"
+import { cn } from "@/lib/utils"
 
 type DetailsFields = Pick<
   SaafDraft,
@@ -187,23 +196,36 @@ export function ActivityDetailsSection({
         </div>
 
         <div className="space-y-1.5">
-          <div className="flex justify-between items-center">
-            <label className="block text-xs font-semibold text-neutral-800">
-              Venue <span className="text-red-500">*</span>
-            </label>
-            <span className="text-[11px] text-neutral-400">
-              {values.activityVenue.length}/40 (min 5)
-            </span>
-          </div>
-          <Input
+          <label className="block text-xs font-semibold text-neutral-800">
+            Venue <span className="text-red-500">*</span>
+          </label>
+          <Select
+            value={values.activityVenue || null}
+            onValueChange={(value: string | null) =>
+              onChange("activityVenue", value ?? "")
+            }
+          >
+            <SelectTrigger
+              aria-label="Venue campus"
+              className={cn(
+                "h-10 w-full truncate rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900",
+                !values.activityVenue && "saaf-glow-invalid"
+              )}
+            >
+              <SelectValue placeholder="Select campus" />
+            </SelectTrigger>
+            <SelectPopup>
+              {CAMPUSES.map((campus) => (
+                <SelectItem key={campus} value={campus}>
+                  {campus}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+          <input
+            type="hidden"
             name="activityVenue"
             value={values.activityVenue}
-            minLength={5}
-            maxLength={40}
-            onChange={(e) => onChange("activityVenue", e.target.value)}
-            placeholder="Complete room number or address (5 to 40 characters)"
-            style={{ color: "#171717" }}
-            className="h-10 rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900 placeholder:text-neutral-400"
             required
           />
           <FieldWarning name="activityVenue" />

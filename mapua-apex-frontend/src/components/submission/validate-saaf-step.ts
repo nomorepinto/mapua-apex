@@ -7,6 +7,7 @@ import {
   SAME_EVENT_TIME_MESSAGE,
   splitEventTime,
 } from "@/components/submission/event-time"
+import { isCampus } from "@/components/submission/constants"
 import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
@@ -121,9 +122,10 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
     warnings.activityObjectives = "Must be at least 50 characters."
   }
   if (isBlank(draft.activityVenue)) {
-    warnings.activityVenue = REQUIRED
-  } else if (draft.activityVenue.trim().length < 5) {
-    warnings.activityVenue = "Must be at least 5 characters."
+    warnings.activityVenue = "Select a campus."
+  } else if (!isCampus(draft.activityVenue)) {
+    // Drafts saved before the venue became a campus selector hold free text.
+    warnings.activityVenue = "Select a campus from the list."
   }
 
   const startDate = draft.dateOfEvent

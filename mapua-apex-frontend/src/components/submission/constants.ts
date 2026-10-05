@@ -23,6 +23,17 @@ export const DAYS_OF_WEEK = [
   "Sunday",
 ] as const
 
+/** Campuses an activity can be held at; the SAAF venue is one of these. */
+export const CAMPUSES = [
+  "Makati Campus",
+  "Intramuros Campus",
+  "SEDA Campus",
+] as const
+
+export function isCampus(value: string): boolean {
+  return (CAMPUSES as readonly string[]).includes(value)
+}
+
 export const MISSION_STATEMENTS = [
   {
     key: "mission1",

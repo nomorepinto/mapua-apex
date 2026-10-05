@@ -321,12 +321,6 @@ export function useSaafForm() {
         return false
       }
 
-      if (draft.activityVenue && draft.activityVenue.trim().length < 5) {
-        setShowErrors(true)
-        alert("Activity Venue must be at least 5 characters.")
-        return false
-      }
-
       // 5. Institutional alignment minimum length validations
       if (
         draft.coreValuesExplanation &&
@@ -373,7 +367,6 @@ export function useSaafForm() {
       draft.dateOfEvent,
       draft.activityDescription,
       draft.activityObjectives,
-      draft.activityVenue,
       draft.coreValuesExplanation,
       draft.peoExplanation,
       draft.sdgExplanation,

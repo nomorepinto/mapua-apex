@@ -32,6 +32,9 @@ export function SaafStepper({
   const steps = includeReservation
     ? [...SAAF_STEPS, RESERVATION_STEP]
     : [...SAAF_STEPS]
+  // The list shrinks when the reservation step is dropped, so an out-of-range
+  // index must clamp instead of reading past the end.
+  const activeStep = Math.min(step, steps.length - 1)
 
   return (
     <div className="space-y-3">
@@ -45,7 +48,7 @@ export function SaafStepper({
         )}
       >
         {steps.map((item, index) => {
-          const active = index === step
+          const active = index === activeStep
           const reached = index <= farthestStep
           const done = reached && !active
           const clickable = done
@@ -89,7 +92,7 @@ export function SaafStepper({
         })}
       </ol>
       <p className={layout.pageSubtitle}>
-        Step {step + 1} of {steps.length} · {steps[step].label}
+        Step {activeStep + 1} of {steps.length} · {steps[activeStep].label}
       </p>
     </div>
   )

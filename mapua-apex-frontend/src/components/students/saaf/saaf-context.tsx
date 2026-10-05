@@ -114,7 +114,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const form = useSaafForm()
   const { draft } = form
-  const [step, setStep] = useState<WizardStepIndex>(0)
+  const [requestedStep, setStep] = useState<WizardStepIndex>(0)
   // Highest step reached by clicking Continue. Saved answers unlock steps on
   // their own (see `farthestStep` below), so the wizard allows whichever of the
   // two reaches further.
@@ -128,12 +128,17 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   const storedReservationDraft = useOrgStore((state) => state.reservationDraft)
   const reservationDraft = withReservationDefaults(storedReservationDraft)
 
+  // Step 5 vanishes whenever `reserveFacilities` resets — notably when the store
+  // is cleared right after a successful submit — so the position is clamped to
+  // the steps that still exist instead of pointing past the end of the list.
+  const step = Math.min(requestedStep, finalStep) as WizardStepIndex
+
   // The drafts persist in the org store (sessionStorage) but the wizard position
   // does not, so on a reload or an edit-hydration the steps already satisfied by
   // the saved answers stay clickable instead of collapsing back to step 1.
-  const farthestStep = Math.max(
-    advancedStep,
-    earnedStepFromDraft(draft, finalStep)
+  const farthestStep = Math.min(
+    Math.max(advancedStep, earnedStepFromDraft(draft, finalStep)),
+    finalStep
   ) as WizardStepIndex
 
   const goToStep = (next: WizardStepIndex) => {
