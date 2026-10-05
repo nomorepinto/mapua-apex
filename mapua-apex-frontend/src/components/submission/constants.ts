@@ -23,10 +23,14 @@ export const DAYS_OF_WEEK = [
   "Sunday",
 ] as const
 
+<<<<<<< HEAD
 /**
  * Physical campuses an activity can be held at. Each lends out rooms, so this
  * list also drives the reservation room catalog (see `lib/campus-rooms.ts`).
  */
+=======
+/** Campuses an activity can be held at; the SAAF venue is one of these. */
+>>>>>>> 53d37c2ba39433d50ddbee7d6416d3d2fb75347e
 export const CAMPUSES = ["Makati Campus", "Intramuros Campus"] as const
 
 export type Campus = (typeof CAMPUSES)[number]
