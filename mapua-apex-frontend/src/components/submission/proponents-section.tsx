@@ -2,6 +2,7 @@ import { PlusIcon } from "lucide-react"
 
 import { ProponentCard } from "@/components/submission/proponent-card"
 import type { Proponent } from "@/components/submission/types"
+import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import { layout } from "@/config"
 
 export function ProponentsSection({
@@ -20,6 +21,10 @@ export function ProponentsSection({
   onDepartmentChange: (id: string, value: string) => void
 }) {
   const canRemove = proponents.length > 1
+  // Every proponent belongs to the applying organization, so its name is
+  // auto-filled rather than typed.
+  const currentOrgQuery = useCurrentOrganizationQuery()
+  const organizationName = currentOrgQuery.data?.name || ""
 
   return (
     <div className={layout.stack}>
@@ -30,6 +35,7 @@ export function ProponentsSection({
           index={index}
           canRemove={canRemove}
           departmentValue={departmentValues[proponent.id] ?? ""}
+          organizationName={organizationName}
           onUpdate={onUpdate}
           onRemove={onRemove}
           onDepartmentChange={onDepartmentChange}

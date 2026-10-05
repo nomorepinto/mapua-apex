@@ -80,12 +80,14 @@ export function DatePicker({
             />
           }
         >
-          <CalendarIcon />
-          {selected ? (
-            formatDisplayDate(selected, displayStyle)
-          ) : (
-            <span className="text-muted-foreground/72">{placeholder}</span>
-          )}
+          <span className="inline-flex items-center gap-2">
+            <CalendarIcon />
+            {selected ? (
+              formatDisplayDate(selected, displayStyle)
+            ) : (
+              <span className="text-muted-foreground/72">{placeholder}</span>
+            )}
+          </span>
         </PopoverTrigger>
         <PopoverPopup align="start" className="w-auto">
           <Calendar

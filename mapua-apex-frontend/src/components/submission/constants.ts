@@ -134,7 +134,8 @@ export function saafHasUserInput(draft: SaafDraft): boolean {
       proponent.programAndYear,
       proponent.department,
       proponent.positionOfApplicant,
-      proponent.orgOrCourseSection,
+      // orgOrCourseSection is derived from the applying organization, so it is
+      // filled without user input and must not mark a fresh form as dirty.
       proponent.contactNumber,
       proponent.emailAddress,
       proponent.facebookLink,

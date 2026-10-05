@@ -84,6 +84,23 @@ export interface SaafFormContextValue {
 
 const SaafFormContext = createContext<SaafFormContextValue | null>(null)
 
+/**
+ * Highest wizard step the saved answers already unlock: the first incomplete
+ * SAAF step caps progress, so a restored draft re-earns every step it satisfies
+ * instead of leaving the user stranded on step 1.
+ */
+function earnedStepFromDraft(
+  draft: SaafDraft,
+  finalStep: WizardStepIndex
+): WizardStepIndex {
+  let earned: WizardStepIndex = 0
+  for (const index of [0, 1, 2, 3] as const) {
+    if (!isSaafStepComplete(index, draft)) break
+    earned = Math.min(index + 1, finalStep) as WizardStepIndex
+  }
+  return earned
+}
+
 export function useSaafFormContext() {
   const value = use(SaafFormContext)
   if (!value) {
@@ -98,7 +115,10 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   const form = useSaafForm()
   const { draft } = form
   const [step, setStep] = useState<WizardStepIndex>(0)
-  const [farthestStep, setFarthestStep] = useState<WizardStepIndex>(0)
+  // Highest step reached by clicking Continue. Saved answers unlock steps on
+  // their own (see `farthestStep` below), so the wizard allows whichever of the
+  // two reaches further.
+  const [advancedStep, setAdvancedStep] = useState<WizardStepIndex>(0)
 
   // The reservation step is present only when the start page chose to reserve
   // facilities. Its draft lives in the same store so the wizard (the parent of
@@ -107,6 +127,14 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   const finalStep: WizardStepIndex = includeReservation ? 4 : 3
   const storedReservationDraft = useOrgStore((state) => state.reservationDraft)
   const reservationDraft = withReservationDefaults(storedReservationDraft)
+
+  // The drafts persist in the org store (sessionStorage) but the wizard position
+  // does not, so on a reload or an edit-hydration the steps already satisfied by
+  // the saved answers stay clickable instead of collapsing back to step 1.
+  const farthestStep = Math.max(
+    advancedStep,
+    earnedStepFromDraft(draft, finalStep)
+  ) as WizardStepIndex
 
   const goToStep = (next: WizardStepIndex) => {
     if (next === step || next > farthestStep) return
@@ -123,7 +151,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
     if (!form.validateStep(step, formRef.current)) return
     if (step >= finalStep) return
     const next = (step + 1) as WizardStepIndex
-    setFarthestStep((current) => (next > current ? next : current))
+    setAdvancedStep((current) => (next > current ? next : current))
     setStep(next)
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
@@ -187,7 +215,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
         } else {
           form.handleClearForm()
           setStep(0)
-          setFarthestStep(0)
+          setAdvancedStep(0)
         }
         form.setShowConfirmClearModal(false)
       },

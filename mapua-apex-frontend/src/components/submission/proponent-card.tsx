@@ -27,6 +27,8 @@ interface ProponentCardProps {
   index: number
   canRemove: boolean
   departmentValue: string
+  /** Name of the applying organization; locks the "Name of Organization" field. */
+  organizationName: string
   onUpdate: (id: string, field: keyof Proponent, value: string) => void
   onRemove: (id: string) => void
   onDepartmentChange: (id: string, value: string) => void
@@ -37,12 +39,15 @@ export const ProponentCard = memo(function ProponentCard({
   index,
   canRemove,
   departmentValue,
+  organizationName,
   onUpdate,
   onRemove,
   onDepartmentChange,
 }: ProponentCardProps) {
   const today = new Date().toISOString().split("T")[0]
   const submissionDate = proponent.dateOfSubmission || today
+  // Derived from the applying organization, so it can never disagree with it.
+  const organizationValue = organizationName || proponent.orgOrCourseSection
 
   return (
     <div className={cn(layout.section, "space-y-6")}>
@@ -257,18 +262,16 @@ export const ProponentCard = memo(function ProponentCard({
 
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-neutral-700">
-            Name of Organization / Course and Section{" "}
-            <span className="text-red-500">*</span>
+            Name of Organization <span className="text-red-500">*</span>
           </label>
           <Input
             name={`proponent_${index}_orgOrCourseSection`}
-            value={proponent.orgOrCourseSection}
-            onChange={(e) =>
-              onUpdate(proponent.id, "orgOrCourseSection", e.target.value)
-            }
+            value={organizationValue}
+            readOnly
+            tabIndex={-1}
             placeholder="Organization Name"
             style={{ color: "#171717" }}
-            className={FIELD_INPUT_CLASS}
+            className={`${FIELD_INPUT_CLASS} cursor-not-allowed bg-neutral-100/70 select-none px-3`}
             required
           />
           <FieldWarning name={`proponent.${proponent.id}.orgOrCourseSection`} />

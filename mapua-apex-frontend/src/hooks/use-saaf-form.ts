@@ -3,6 +3,7 @@ import { useFetcher, useNavigation } from "react-router"
 
 import { useScrollToTop } from "@/hooks/use-scroll-to-top"
 import { useHydrateEditingSubmission } from "@/hooks/use-hydrate-editing-submission"
+import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import {
   createEmptyProponent,
   DEFAULT_SAAF_DRAFT,
@@ -68,6 +69,9 @@ export function useSaafForm() {
 
   useScrollToTop()
 
+  const currentOrgQuery = useCurrentOrganizationQuery()
+  const organizationName = currentOrgQuery.data?.name || ""
+
   // Ensure submission date is always locked to today's date upon opening
   useEffect(() => {
     const today = new Date().toISOString().split("T")[0]
@@ -89,6 +93,24 @@ export function useSaafForm() {
       })
     }
   }, [])
+
+  // "Name of Organization" is derived from the applying organization rather
+  // than typed, so every proponent row is stamped with it. This keeps the
+  // payload and PDF correct even for drafts restored from an older session.
+  useEffect(() => {
+    if (!organizationName) return
+    const proponents = draft.proponents
+    if (proponents.every((p) => p.orgOrCourseSection === organizationName)) {
+      return
+    }
+
+    useOrgStore.getState().patchSaafDraft({
+      proponents: proponents.map((p) => ({
+        ...p,
+        orgOrCourseSection: organizationName,
+      })),
+    })
+  }, [organizationName, draft.proponents])
 
   // Reset drafts on successful submission
   useEffect(() => {

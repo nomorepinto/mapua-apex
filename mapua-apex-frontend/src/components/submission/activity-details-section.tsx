@@ -315,23 +315,6 @@ export function ActivityDetailsSection({
             />
             <FieldWarning name="individualContribution" />
           </div>
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-neutral-800">
-              Proposed Budget for the Activity{" "}
-              <span className="text-red-500">*</span>
-            </label>
-            <Input
-              type="text"
-              name="proposedBudget"
-              value={values.proposedBudget}
-              readOnly
-              style={{ color: "#171717" }}
-              className="no-spinner h-9.5 rounded-lg border-neutral-300 bg-neutral-100 text-center !text-neutral-900"
-            />
-            <span className="block text-[10px] text-neutral-500">
-              Auto-calculated from the Detailed Budget Proposal
-            </span>
-          </div>
         </div>
       </div>
     </div>
