@@ -11,6 +11,7 @@ import type {
   ReservationDraft,
   RoomItem,
 } from "@/components/reservation/types"
+import { sanitizeClassroomName } from "@/lib/campus-rooms"
 import { getEventSchedule, withEventSchedule } from "@/lib/event-schedule"
 import { saveProposalPdf } from "@/lib/save-proposal-pdf"
 import { useOrgStore } from "@/stores/org-store"
@@ -32,6 +33,10 @@ export function useReservationForm() {
   const saafDraft = useOrgStore((state) => state.saafDraft)
   const schedule = getEventSchedule(saafDraft)
 
+  // Rooms are campus-specific, so the reservation step reads the campus from the
+  // same draft that owns the venue field instead of asking for it again.
+  const campus = saafDraft?.activityVenue ?? ""
+
   const handleAddRoomItem = useCallback((roomNeeded: string) => {
     const current =
       useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
@@ -46,6 +51,7 @@ export function useReservationForm() {
           timeNeeded: "",
           endTimeNeeded: "",
           roomNeeded,
+          classroomName: "",
           remarks: "",
         },
       ],
@@ -64,7 +70,11 @@ export function useReservationForm() {
   const handleUpdateRoomItem = useCallback(
     (id: string, field: keyof RoomItem, value: string) => {
       let sanitized = value
-      if (field === "roomNeeded" || field === "remarks") {
+      if (field === "classroomName") {
+        // Classroom codes are uppercase alphanumerics, normalized as typed so
+        // the campus regex only ever sees a canonical value.
+        sanitized = sanitizeClassroomName(value)
+      } else if (field === "roomNeeded" || field === "remarks") {
         sanitized = value.slice(0, 40)
       }
       const current =
@@ -176,14 +186,7 @@ export function useReservationForm() {
     const saafDraft = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
     const current =
       useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-    const currentDraft: ReservationDraft = {
-      ...DEFAULT_RESERVATION_DRAFT,
-      ...current,
-      equipmentItems:
-        current.equipmentItems ?? DEFAULT_RESERVATION_DRAFT.equipmentItems,
-      roomItems: current.roomItems ?? DEFAULT_RESERVATION_DRAFT.roomItems,
-      avItems: current.avItems ?? DEFAULT_RESERVATION_DRAFT.avItems,
-    }
+    const currentDraft: ReservationDraft = withReservationDefaults(current)
 
     void saveProposalPdf(
       {
@@ -215,6 +218,7 @@ export function useReservationForm() {
   return {
     draft,
     schedule,
+    campus,
     handleAddRoomItem,
     handleRemoveRoomItem,
     handleUpdateRoomItem,

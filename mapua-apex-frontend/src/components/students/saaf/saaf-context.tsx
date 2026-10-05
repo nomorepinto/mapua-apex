@@ -168,12 +168,13 @@ export function SaafProvider({ children }: { children: ReactNode }) {
 
   const currentStepComplete =
     step === 4
-      ? isReservationStepComplete(reservationDraft)
+      ? isReservationStepComplete(reservationDraft, draft.activityVenue)
       : isSaafStepComplete(step as SaafStepIndex, draft)
 
   const formComplete =
     isSaafDraftComplete(draft) &&
-    (!includeReservation || isReservationStepComplete(reservationDraft))
+    (!includeReservation ||
+      isReservationStepComplete(reservationDraft, draft.activityVenue))
 
   const canClear =
     step === 4 ? reservationHasUserInput(reservationDraft) : saafHasUserInput(draft)

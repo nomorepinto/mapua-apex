@@ -7,6 +7,7 @@ import type {
 
 // Ordered catalogs used by the dropdown-to-add selectors. Each table offers the
 // catalog minus the rows already added, so an option can never be picked twice.
+// The room catalog is campus-specific and lives in `@/lib/campus-rooms`.
 export const EQUIPMENT_OPTIONS: string[] = [
   "Monoblock Chairs",
   "White Boards",
@@ -30,8 +31,6 @@ export const AV_EQUIPMENT_OPTIONS: string[] = [
   "Speakers",
   "Microphone",
 ]
-
-export const ROOM_OPTIONS: string[] = ["AV Room", "Seminar Room"]
 
 export const TABLE_INPUT_CLASS =
   "w-full text-center bg-transparent py-1 px-2 !text-neutral-900 focus:outline-none focus:bg-white rounded border border-transparent focus:border-neutral-300 placeholder:text-neutral-400"
@@ -71,7 +70,10 @@ export function withReservationDefaults(
     ...(stored ?? {}),
     equipmentItems:
       stored?.equipmentItems ?? DEFAULT_RESERVATION_DRAFT.equipmentItems,
-    roomItems: stored?.roomItems ?? DEFAULT_RESERVATION_DRAFT.roomItems,
+    roomItems: (stored?.roomItems ?? DEFAULT_RESERVATION_DRAFT.roomItems).map(
+      // Room drafts saved before classroom codes existed have no classroomName.
+      (item) => ({ ...item, classroomName: item.classroomName ?? "" })
+    ),
     avItems: stored?.avItems ?? DEFAULT_RESERVATION_DRAFT.avItems,
   }
 }

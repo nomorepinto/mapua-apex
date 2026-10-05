@@ -500,6 +500,7 @@ function reservationDraft() {
         timeNeeded: "09:00",
         endTimeNeeded: "12:00",
         roomNeeded: "AV Room",
+        classroomName: "",
         remarks: "Keynote",
       },
       {
@@ -509,7 +510,18 @@ function reservationDraft() {
         timeNeeded: "13:00",
         endTimeNeeded: "17:00",
         roomNeeded: "Seminar Room",
+        classroomName: "",
         remarks: "Breakout",
+      },
+      {
+        id: "3",
+        dateNeeded: date,
+        endDateNeeded: date,
+        timeNeeded: "13:00",
+        endTimeNeeded: "17:00",
+        roomNeeded: "Classroom",
+        classroomName: "N101",
+        remarks: "Workshop",
       },
     ],
     avItems: [

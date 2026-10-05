@@ -131,6 +131,8 @@ Use this as the **POST** `/api/v1/students/submissions` body. For **PUT**, copy 
 
 `activity_type` is `co-curricular` or `extra-curricular`. `end_date_of_event` is optional. `date_of_event` must be `YYYY-MM-DD` and at least 10 days from today; otherwise **422**. `collaboration` is optional; `collaboration.dependent_organization_ids` is an array of plain org uuids (each must exist, cannot be the JWT org), and empty/absent means no collaborators.
 
+`activity_details.venue` is stored as sent; the student form offers `Makati Campus` and `Intramuros Campus`. Each `venue_reservation.function_rooms.items[].room_needed` is one of that campus's fixed rooms or `Classroom`. `classroom_name` is sent on a `Classroom` row only and holds that campus's room code — Makati `MPO` + 3 digits (`MPO101`), Intramuros a direction `N`/`W`/`S`/`E`/`NW`/`NE`/`SW`/`SE` + 3 digits (`N101`, `SW204`). The wizard refuses to submit while a `Classroom` row has a missing or off-format code, or a room the venue campus does not offer.
+
 ```json
 {
   "event_id": "e001",
@@ -165,7 +167,7 @@ Use this as the **POST** `/api/v1/students/submissions` body. For **PUT**, copy 
     "title_and_nature": "Hack Night: Intro to Web Dev",
     "description": "A beginner-friendly hackathon night.",
     "objectives": "Introduce first-year students to web development.",
-    "venue": "MPH 2nd Floor",
+    "venue": "Intramuros Campus",
     "date_of_event": "2026-10-05",
     "end_date_of_event": "2026-10-05",
     "day_of_event": "Monday",
@@ -213,13 +215,25 @@ Use this as the **POST** `/api/v1/students/submissions` body. For **PUT**, copy 
       ]
     },
     "function_rooms": {
-      "items": []
+      "items": [
+        {
+          "date_needed": "2026-10-05",
+          "end_date_needed": "2026-10-05",
+          "time_needed": "17:00",
+          "end_time_needed": "21:00",
+          "room_needed": "Classroom",
+          "classroom_name": "N101",
+          "remarks": "Workshop room"
+        }
+      ]
     },
     "audiovisual_equipment": {
       "items": [
         {
           "date_needed": "2026-10-05",
+          "end_date_needed": "2026-10-05",
           "time_needed": "17:00",
+          "end_time_needed": "21:00",
           "equipment_needed": "Projector",
           "remarks": "1 unit"
         }

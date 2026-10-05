@@ -12,6 +12,12 @@ import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
 import {
+  CLASSROOM_ROOM,
+  classroomFormatFor,
+  isRoomOfferedAtCampus,
+  isValidClassroomName,
+} from "@/lib/campus-rooms"
+import {
   EVENT_DATE_TOO_SOON_MESSAGE,
   minEventDateKey,
 } from "@/lib/date-key"
@@ -225,21 +231,47 @@ const RESERVATION_EMPTY_MESSAGE =
 
 /**
  * The reservation step advances once the proponent has added at least one
- * equipment, function room, or audiovisual row. Individual rows are optional,
- * but an entirely empty reservation cannot continue.
+ * equipment, function room, or audiovisual row. Rooms must also fit the venue
+ * campus: only that campus's rooms can be booked, and every "Classroom" row
+ * needs a code matching the campus format, so a wrong code stops submission.
  */
 export function getReservationStepIssue(
-  draft: ReservationDraft
+  draft: ReservationDraft,
+  campus: string
 ): string | null {
   const hasItems =
     draft.equipmentItems.length > 0 ||
     draft.roomItems.length > 0 ||
     draft.avItems.length > 0
-  return hasItems ? null : RESERVATION_EMPTY_MESSAGE
+  if (!hasItems) return RESERVATION_EMPTY_MESSAGE
+
+  const offCampus = draft.roomItems.find(
+    (item) => !isRoomOfferedAtCampus(campus, item.roomNeeded)
+  )
+  if (offCampus) {
+    return `Remove "${offCampus.roomNeeded}" — it is not offered at ${campus || "the selected campus"}.`
+  }
+
+  const classroom = draft.roomItems.find(
+    (item) =>
+      item.roomNeeded === CLASSROOM_ROOM &&
+      !isValidClassroomName(campus, item.classroomName)
+  )
+  if (classroom) {
+    const format = classroomFormatFor(campus)
+    return isBlank(classroom.classroomName)
+      ? `Enter the classroom name (format: ${format}).`
+      : `Fix the classroom name — format: ${format}.`
+  }
+
+  return null
 }
 
-export function isReservationStepComplete(draft: ReservationDraft): boolean {
-  return getReservationStepIssue(draft) === null
+export function isReservationStepComplete(
+  draft: ReservationDraft,
+  campus: string
+): boolean {
+  return getReservationStepIssue(draft, campus) === null
 }
 
 export function isStepHtmlValid(panel: HTMLElement): boolean {

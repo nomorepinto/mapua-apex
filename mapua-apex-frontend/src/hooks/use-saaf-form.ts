@@ -253,7 +253,8 @@ export function useSaafForm() {
           ? getReservationStepIssue(
               withReservationDefaults(
                 useOrgStore.getState().reservationDraft
-              )
+              ),
+              draft.activityVenue
             )
           : getSaafStepIssue(step as SaafStepIndex, draft)
 
@@ -281,12 +282,14 @@ export function useSaafForm() {
         .map((step) => getSaafStepIssue(step, draft))
         .filter((issue): issue is string => Boolean(issue))
 
-      // When the wizard includes the reservation step, its three required
-      // purposes must also be filled before the unified submit is allowed.
+      // When the wizard includes the reservation step, it must hold at least one
+      // item and every room row must fit the venue campus before submit is
+      // allowed.
       const reservationIssues = includeReservation
         ? [
             getReservationStepIssue(
-              withReservationDefaults(useOrgStore.getState().reservationDraft)
+              withReservationDefaults(useOrgStore.getState().reservationDraft),
+              draft.activityVenue
             ),
           ].filter((issue): issue is string => Boolean(issue))
         : []
@@ -367,6 +370,8 @@ export function useSaafForm() {
       draft.dateOfEvent,
       draft.activityDescription,
       draft.activityObjectives,
+      // The venue campus decides which rooms and classroom codes are valid.
+      draft.activityVenue,
       draft.coreValuesExplanation,
       draft.peoExplanation,
       draft.sdgExplanation,
