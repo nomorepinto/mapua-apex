@@ -1,13 +1,10 @@
 import { Trash2Icon } from "lucide-react"
 
-import { FieldWarning } from "@/components/forms/field-warning"
-
 import {
-  AV_EQUIPMENT_OPTIONS,
-  PURPOSE_INPUT_CLASS,
+  EQUIPMENT_OPTIONS,
   TABLE_INPUT_CLASS,
 } from "@/components/reservation/constants"
-import type { AVItem } from "@/components/reservation/types"
+import type { EquipmentItem } from "@/components/reservation/types"
 import {
   Select,
   SelectItem,
@@ -18,45 +15,27 @@ import {
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
-export function AvTable({
-  purpose = "",
+export function EquipmentTable({
   items = [],
-  onPurposeChange,
   onUpdate,
   onRemove,
   onAdd,
 }: {
-  purpose: string
-  items?: AVItem[]
-  onPurposeChange: (value: string) => void
-  onUpdate: (id: string, field: keyof AVItem, value: string) => void
+  items?: EquipmentItem[]
+  onUpdate: (id: string, field: keyof EquipmentItem, value: string) => void
   onRemove: (id: string) => void
-  onAdd: (value: string) => void
+  onAdd: (name: string) => void
 }) {
   const safeItems = items ?? []
   const canRemove = safeItems.length > 0
-  const available = AV_EQUIPMENT_OPTIONS.filter(
-    (option) => !safeItems.some((item) => item.equipmentNeeded === option)
+  const available = EQUIPMENT_OPTIONS.filter(
+    (option) => !safeItems.some((item) => item.name === option)
   )
   const exhausted = available.length === 0
 
   return (
-    <div className="space-y-3 pt-2">
-      <div className="space-y-1">
-        <label className="block text-xs font-semibold text-neutral-800">
-          Audiovisual Equipment <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={purpose}
-          onChange={(e) => onPurposeChange(e.target.value)}
-          placeholder="Write the title of Exhibit, Event, etc."
-          style={{ color: "#171717" }}
-          className={PURPOSE_INPUT_CLASS}
-          required
-        />
-        <FieldWarning name="avPurpose" />
-      </div>
+    <div className="space-y-3">
+      <p className="text-xs font-bold text-neutral-900">Equipment Requested:</p>
 
       <div className={layout.sectionFlush}>
         <div className={layout.tableWrap}>
@@ -68,10 +47,13 @@ export function AvTable({
           >
             <thead>
               <tr className="border-b border-neutral-300 bg-neutral-50/80 text-xs font-semibold tracking-wider text-neutral-700 uppercase">
-                <th className="w-52 border-r border-neutral-300 px-4 py-3 text-center">
-                  Equipment Needed
+                <th className="w-56 border-r border-neutral-300 px-4 py-3 text-center">
+                  Item Name
                 </th>
-                <th className="px-4 py-3 text-center">Remarks</th>
+                <th className="border-r border-neutral-300 px-4 py-3 text-center">
+                  Item Purpose
+                </th>
+                <th className="px-4 py-3 text-center">Remark</th>
                 {canRemove ? (
                   <th className="w-10 px-2 py-3 text-center" />
                 ) : null}
@@ -81,7 +63,7 @@ export function AvTable({
               {safeItems.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={canRemove ? 3 : 2}
+                    colSpan={canRemove ? 4 : 3}
                     className="px-4 py-6 text-center text-xs text-neutral-500 italic"
                   >
                     No equipment added yet. Use the selector below to add a row.
@@ -91,16 +73,29 @@ export function AvTable({
               {safeItems.map((item) => (
                 <tr key={item.id} className="hover:bg-neutral-50/60">
                   <td className="border-r border-neutral-300 p-2 text-center text-sm font-medium !text-neutral-900">
-                    {item.equipmentNeeded}
+                    {item.name}
+                  </td>
+                  <td className="border-r border-neutral-300 p-2">
+                    <input
+                      type="text"
+                      maxLength={40}
+                      value={item.purpose}
+                      placeholder="Enter item purpose..."
+                      onChange={(e) =>
+                        onUpdate(item.id, "purpose", e.target.value)
+                      }
+                      style={{ color: "#171717" }}
+                      className={`${TABLE_INPUT_CLASS} placeholder:text-neutral-400`}
+                    />
                   </td>
                   <td className="p-2">
                     <input
                       type="text"
                       maxLength={40}
-                      value={item.remarks}
-                      placeholder="Enter remarks..."
+                      value={item.remark}
+                      placeholder="Enter remark..."
                       onChange={(e) =>
-                        onUpdate(item.id, "remarks", e.target.value)
+                        onUpdate(item.id, "remark", e.target.value)
                       }
                       style={{ color: "#171717" }}
                       className={`${TABLE_INPUT_CLASS} placeholder:text-neutral-400`}
@@ -134,7 +129,7 @@ export function AvTable({
         <SelectTrigger className="w-full">
           <SelectValue
             placeholder={
-              exhausted ? "All equipment added" : "Add audiovisual equipment…"
+              exhausted ? "All equipment added" : "Add equipment requested…"
             }
           />
         </SelectTrigger>

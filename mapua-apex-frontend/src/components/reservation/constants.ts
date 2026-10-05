@@ -1,22 +1,23 @@
 import type {
   AVItem,
-  EquipmentFlags,
+  EquipmentItem,
   FacilityItem,
   ReservationDraft,
   RoomItem,
 } from "@/components/reservation/types"
 
-export const EQUIPMENT_OPTIONS: { key: keyof Omit<EquipmentFlags, "others">; label: string }[] =
-  [
-    { key: "monoblock", label: "Monoblock Chairs" },
-    { key: "whiteboards", label: "White Boards" },
-    { key: "tables", label: "Tables" },
-    { key: "rostrum", label: "Rostrum" },
-    { key: "flags", label: "Flags (w/ Poles & Stand)" },
-    { key: "panelBoards", label: "Panel Boards" },
-  ]
+// Ordered catalogs used by the dropdown-to-add selectors. Each table offers the
+// catalog minus the rows already added, so an option can never be picked twice.
+export const EQUIPMENT_OPTIONS: string[] = [
+  "Monoblock Chairs",
+  "White Boards",
+  "Tables",
+  "Rostrum",
+  "Flags (w/ Poles & Stand)",
+  "Panel Boards",
+]
 
-export const FIXED_AV_EQUIPMENT = new Set([
+export const AV_EQUIPMENT_OPTIONS: string[] = [
   "LCD",
   "CPU",
   "Laptop",
@@ -29,9 +30,9 @@ export const FIXED_AV_EQUIPMENT = new Set([
   "Mixer",
   "Speakers",
   "Microphone",
-])
+]
 
-export const PRESET_ROOMS = new Set(["AV Room", "Seminar Room"])
+export const ROOM_OPTIONS: string[] = ["AV Room", "Seminar Room"]
 
 export const TABLE_INPUT_CLASS =
   "w-full text-center bg-transparent py-1 px-2 !text-neutral-900 focus:outline-none focus:bg-white rounded border border-transparent focus:border-neutral-300 placeholder:text-neutral-400"
@@ -39,15 +40,13 @@ export const TABLE_INPUT_CLASS =
 export const PURPOSE_INPUT_CLASS =
   "w-full bg-white border border-neutral-300 rounded-lg px-3.5 py-2 text-xs !text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-red-700"
 
-export const DEFAULT_EQUIPMENT: EquipmentFlags = {
-  monoblock: false,
-  whiteboards: false,
-  tables: false,
-  rostrum: false,
-  flags: false,
-  panelBoards: false,
-  others: false,
-}
+export const ADD_BUTTON_CLASS =
+  "flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white/40 py-3 text-sm font-medium text-neutral-700 shadow-xs transition-all hover:border-neutral-400 hover:bg-neutral-100/50"
+
+// AV, room, and equipment rows are added on demand, so they start empty.
+export const DEFAULT_EQUIPMENT_ITEMS: EquipmentItem[] = []
+export const DEFAULT_ROOM_ITEMS: RoomItem[] = []
+export const DEFAULT_AV_ITEMS: AVItem[] = []
 
 // Exactly 1 row with item: "" so the placeholder shows
 export const DEFAULT_FACILITY_ITEMS: FacilityItem[] = [
@@ -62,85 +61,56 @@ export const DEFAULT_FACILITY_ITEMS: FacilityItem[] = [
   },
 ]
 
-// Exactly 2 preset rooms; "Others" rows removed
-export const DEFAULT_ROOM_ITEMS: RoomItem[] = [
-  {
-    id: "1",
-    dateNeeded: "",
-    endDateNeeded: "",
-    timeNeeded: "",
-    endTimeNeeded: "",
-    roomNeeded: "AV Room",
-    remarks: "",
-  },
-  {
-    id: "2",
-    dateNeeded: "",
-    endDateNeeded: "",
-    timeNeeded: "",
-    endTimeNeeded: "",
-    roomNeeded: "Seminar Room",
-    remarks: "",
-  },
-]
-
-// 12 standard items; static "Others" row removed
-export const DEFAULT_AV_ITEMS: AVItem[] = [
-  { id: "1", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "LCD", remarks: "" },
-  { id: "2", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "CPU", remarks: "" },
-  { id: "3", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "Laptop", remarks: "" },
-  { id: "4", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "Computer Speaker", remarks: "" },
-  { id: "5", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "Laser Pointer", remarks: "" },
-  { id: "6", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "Television", remarks: "" },
-  { id: "7", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "DVD", remarks: "" },
-  { id: "8", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "Doc. Cam", remarks: "" },
-  { id: "9", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "Amplifier", remarks: "" },
-  { id: "10", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "Mixer", remarks: "" },
-  { id: "11", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "Speakers", remarks: "" },
-  { id: "12", dateNeeded: "", endDateNeeded: "", timeNeeded: "", endTimeNeeded: "", equipmentNeeded: "Microphone", remarks: "" },
-]
-
 function filled(value: string | undefined): boolean {
   return Boolean(value && value.trim())
 }
 
 export function reservationHasUserInput(draft: ReservationDraft): boolean {
-  if (Object.values(draft.equipment).some(Boolean)) return true
-  if (filled(draft.otherEquipmentText) || filled(draft.purpose)) return true
-  if (filled(draft.functionRoomPurpose) || filled(draft.avPurpose)) return true
+  if (draft.equipmentItems.length > 0) return true
+  if (
+    filled(draft.purpose) ||
+    filled(draft.functionRoomPurpose) ||
+    filled(draft.avPurpose)
+  ) {
+    return true
+  }
   if (draft.facilityItems.length !== DEFAULT_FACILITY_ITEMS.length) return true
   if (
-    draft.facilityItems.some((item) =>
-      [item.item, item.dateOfUse, item.endDateOfUse, item.timeOfUse, item.endTimeOfUse, item.location].some(filled)
-    )
+    draft.facilityItems.some((item) => [item.item, item.location].some(filled))
   ) {
     return true
   }
-  if (draft.roomItems.length !== DEFAULT_ROOM_ITEMS.length) return true
-  if (
-    draft.roomItems.some(
-      (item, index) =>
-        item.roomNeeded !== DEFAULT_ROOM_ITEMS[index]?.roomNeeded ||
-        [item.dateNeeded, item.endDateNeeded, item.timeNeeded, item.endTimeNeeded, item.remarks].some(filled)
-    )
-  ) {
-    return true
-  }
-  if (draft.avItems.length !== DEFAULT_AV_ITEMS.length) return true
-  return draft.avItems.some(
-    (item, index) =>
-      item.equipmentNeeded !== DEFAULT_AV_ITEMS[index]?.equipmentNeeded ||
-      [item.dateNeeded, item.endDateNeeded, item.timeNeeded, item.endTimeNeeded, item.remarks].some(filled)
-  )
+  if (draft.roomItems.length > 0) return true
+  if (draft.avItems.length > 0) return true
+  return false
 }
 
 export const DEFAULT_RESERVATION_DRAFT: ReservationDraft = {
-  equipment: DEFAULT_EQUIPMENT,
-  otherEquipmentText: "",
+  equipmentItems: DEFAULT_EQUIPMENT_ITEMS,
   purpose: "",
   functionRoomPurpose: "",
   avPurpose: "",
   facilityItems: DEFAULT_FACILITY_ITEMS,
   roomItems: DEFAULT_ROOM_ITEMS,
   avItems: DEFAULT_AV_ITEMS,
+}
+
+/**
+ * Normalizes a possibly-partial stored reservation draft so every nested array
+ * always falls back to its default. Shared by the reservation hook and the SAAF
+ * wizard (which validates the reservation step straight from the store).
+ */
+export function withReservationDefaults(
+  stored?: ReservationDraft | null
+): ReservationDraft {
+  return {
+    ...DEFAULT_RESERVATION_DRAFT,
+    ...(stored ?? {}),
+    equipmentItems:
+      stored?.equipmentItems ?? DEFAULT_RESERVATION_DRAFT.equipmentItems,
+    facilityItems:
+      stored?.facilityItems ?? DEFAULT_RESERVATION_DRAFT.facilityItems,
+    roomItems: stored?.roomItems ?? DEFAULT_RESERVATION_DRAFT.roomItems,
+    avItems: stored?.avItems ?? DEFAULT_RESERVATION_DRAFT.avItems,
+  }
 }

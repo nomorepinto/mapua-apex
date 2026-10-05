@@ -75,7 +75,7 @@ detailed_budget_proposal: {
 }
 venue_reservation: {
   has_reservation: boolean
-  equipment_requested: { monoblock_chairs, whiteboards, tables, rostrum, flags_with_stand, panel_boards, others_specified }
+  equipment_requested: { items: [{ name, purpose, remark }] }
   general_facilities: { purpose, items: [{ item, date_of_use, time_of_use, location }] }
   function_rooms: { purpose, items: [{ date_needed, time_needed, room_needed, remarks }] }
   audiovisual_equipment: { purpose, items: [{ date_needed, time_needed, equipment_needed, remarks }] }
@@ -249,9 +249,10 @@ json
   "venue_reservation": {
     "has_reservation": true,
     "equipment_requested": {
-      "monoblock_chairs": true, "whiteboards": false, "tables": true,
-      "rostrum": false, "flags_with_stand": false, "panel_boards": false,
-      "others_specified": ""
+      "items": [
+        { "name": "Monoblock Chairs", "purpose": "Participant seating", "remark": "60 units" },
+        { "name": "Tables", "purpose": "Workshop tables", "remark": "" }
+      ]
     },
     "general_facilities": { "purpose": "Hackathon venue", "items": [{ "item": "MPH", "date_of_use": "2026-10-05", "time_of_use": "17:00", "location": "MPH 2F" }] },
     "function_rooms": { "purpose": "", "items": [] },

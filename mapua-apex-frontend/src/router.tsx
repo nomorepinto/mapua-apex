@@ -69,30 +69,14 @@ export const router = createBrowserRouter([
           },
           {
             path: "saaf",
-            Component: PassThroughLayout,
-            children: [
-              {
-                index: true,
-                HydrateFallback: RouteFallback,
-                lazy: async () => {
-                  const [{ Submission }, { action }] = await Promise.all([
-                    import("@/routes/students/saaf"),
-                    import("@/routes/students/saaf.action"),
-                  ])
-                  return { Component: Submission, action }
-                },
-              },
-              {
-                path: "reservations",
-                HydrateFallback: RouteFallback,
-                lazy: async () => {
-                  const { Reservation } = await import(
-                    "@/routes/students/reservations"
-                  )
-                  return { Component: Reservation }
-                },
-              },
-            ],
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const [{ Submission }, { action }] = await Promise.all([
+                import("@/routes/students/saaf"),
+                import("@/routes/students/saaf.action"),
+              ])
+              return { Component: Submission, action }
+            },
           },
         ],
       },

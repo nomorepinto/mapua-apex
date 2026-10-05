@@ -7,23 +7,36 @@ import {
   type ReactNode,
 } from "react"
 import { use } from "react"
+import { useNavigate } from "react-router"
 
+import {
+  reservationHasUserInput,
+  withReservationDefaults,
+} from "@/components/reservation/constants"
 import { saafHasUserInput } from "@/components/submission/constants"
-import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
+import type {
+  SaafStepIndex,
+  WizardStepIndex,
+} from "@/components/submission/saaf-stepper"
 import type { SaafDraft } from "@/components/submission/types"
 import {
+  isReservationStepComplete,
   isSaafDraftComplete,
   isSaafStepComplete,
 } from "@/components/submission/validate-saaf-step"
 import { useSaafForm } from "@/hooks/use-saaf-form"
+import { useOrgStore } from "@/stores/org-store"
 
 type SaafFormModel = ReturnType<typeof useSaafForm>
 
 interface SaafFormState {
   draft: SaafDraft
-  step: SaafStepIndex
-  farthestStep: SaafStepIndex
+  step: WizardStepIndex
+  farthestStep: WizardStepIndex
+  finalStep: WizardStepIndex
+  includeReservation: boolean
   showErrors: boolean
+  stepError: string | null
   submitError: string | null
   isSubmitting: boolean
   reserveFacilities: SaafFormModel["reserveFacilities"]
@@ -37,7 +50,7 @@ interface SaafFormState {
 }
 
 interface SaafFormActions {
-  goToStep: (next: SaafStepIndex) => void
+  goToStep: (next: WizardStepIndex) => void
   goNext: () => void
   goBack: () => void
   updateField: SaafFormModel["updateField"]
@@ -54,7 +67,6 @@ interface SaafFormActions {
   closeConfirm: () => void
   initiateSubmit: (event: MouseEvent) => void
   confirmProceed: () => void
-  goToReservation: () => void
   savePdf: SaafFormModel["handleSavePdf"]
   dismissSuccess: () => void
   attachForm: (node: HTMLFormElement | null) => void
@@ -82,12 +94,21 @@ export function useSaafFormContext() {
 
 export function SaafProvider({ children }: { children: ReactNode }) {
   const formRef = useRef<HTMLFormElement>(null)
+  const navigate = useNavigate()
   const form = useSaafForm()
   const { draft } = form
-  const [step, setStep] = useState<SaafStepIndex>(0)
-  const [farthestStep, setFarthestStep] = useState<SaafStepIndex>(0)
+  const [step, setStep] = useState<WizardStepIndex>(0)
+  const [farthestStep, setFarthestStep] = useState<WizardStepIndex>(0)
 
-  const goToStep = (next: SaafStepIndex) => {
+  // The reservation step is present only when the start page chose to reserve
+  // facilities. Its draft lives in the same store so the wizard (the parent of
+  // ReservationProvider) can gate advancement/submission on it.
+  const includeReservation = form.reserveFacilities === "yes"
+  const finalStep: WizardStepIndex = includeReservation ? 4 : 3
+  const storedReservationDraft = useOrgStore((state) => state.reservationDraft)
+  const reservationDraft = withReservationDefaults(storedReservationDraft)
+
+  const goToStep = (next: WizardStepIndex) => {
     if (next === step || next > farthestStep) return
     if (next > step && !form.validateStep(step, formRef.current)) return
     if (next < step) {
@@ -100,8 +121,8 @@ export function SaafProvider({ children }: { children: ReactNode }) {
 
   const goNext = () => {
     if (!form.validateStep(step, formRef.current)) return
-    if (step >= 3) return
-    const next = (step + 1) as SaafStepIndex
+    if (step >= finalStep) return
+    const next = (step + 1) as WizardStepIndex
     setFarthestStep((current) => (next > current ? next : current))
     setStep(next)
     window.scrollTo({ top: 0, behavior: "smooth" })
@@ -109,24 +130,39 @@ export function SaafProvider({ children }: { children: ReactNode }) {
 
   const goBack = () => {
     if (step === 0) return
-    goToStep((step - 1) as SaafStepIndex)
+    goToStep((step - 1) as WizardStepIndex)
   }
+
+  const currentStepComplete =
+    step === 4
+      ? isReservationStepComplete(reservationDraft)
+      : isSaafStepComplete(step as SaafStepIndex, draft)
+
+  const formComplete =
+    isSaafDraftComplete(draft) &&
+    (!includeReservation || isReservationStepComplete(reservationDraft))
+
+  const canClear =
+    step === 4 ? reservationHasUserInput(reservationDraft) : saafHasUserInput(draft)
 
   const value: SaafFormContextValue = {
     state: {
       draft,
       step,
       farthestStep,
+      finalStep,
+      includeReservation,
       showErrors: form.showErrors,
+      stepError: form.stepError,
       submitError: form.submitError,
       isSubmitting: form.isSubmitting,
       reserveFacilities: form.reserveFacilities,
       showConfirmClearModal: form.showConfirmClearModal,
       showConfirmModal: form.showConfirmModal,
       showSuccessModal: form.showSuccessModal,
-      currentStepComplete: isSaafStepComplete(step, draft),
-      formComplete: isSaafDraftComplete(draft),
-      canClear: saafHasUserInput(draft),
+      currentStepComplete,
+      formComplete,
+      canClear,
       grandTotal: form.grandTotal,
     },
     actions: {
@@ -144,19 +180,25 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       openClear: () => form.setShowConfirmClearModal(true),
       closeClear: () => form.setShowConfirmClearModal(false),
       confirmClear: () => {
-        form.handleClearForm()
-        setStep(0)
-        setFarthestStep(0)
+        if (step === 4) {
+          // On the reservation step, Clear only wipes the reservation draft and
+          // stays put; the SAAF answers captured earlier are preserved.
+          useOrgStore.getState().clearReservationDraft()
+        } else {
+          form.handleClearForm()
+          setStep(0)
+          setFarthestStep(0)
+        }
+        form.setShowConfirmClearModal(false)
       },
       closeConfirm: () => form.setShowConfirmModal(false),
       initiateSubmit: (event) =>
         form.handleInitiateSubmit(event, formRef.current),
       confirmProceed: () => form.handleConfirmProceed(formRef.current),
-      goToReservation: () => form.handleGoToReservation(formRef.current),
       savePdf: form.handleSavePdf,
       dismissSuccess: () => {
         form.setSuccessDismissed(true)
-        window.location.reload()
+        navigate("/students/dashboard")
       },
       attachForm: (node) => {
         formRef.current = node

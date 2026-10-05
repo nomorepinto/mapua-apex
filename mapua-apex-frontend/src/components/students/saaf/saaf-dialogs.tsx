@@ -27,7 +27,7 @@ export function SaafDialogs() {
       <SuccessModal
         open={state.showSuccessModal}
         title="Activity Application Submitted!"
-        actionLabel="Close"
+        actionLabel="Back to Dashboard"
         onAction={actions.dismissSuccess}
       />
     </>

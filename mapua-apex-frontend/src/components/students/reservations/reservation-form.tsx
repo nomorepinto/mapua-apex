@@ -1,23 +1,25 @@
 import { AvTable } from "@/components/reservation/av-table"
-import { EquipmentSection } from "@/components/reservation/equipment-section"
+import { EquipmentTable } from "@/components/reservation/equipment-table"
 import { FacilityTable } from "@/components/reservation/facility-table"
-import { ReservationActions } from "@/components/reservation/reservation-actions"
 import { RoomTable } from "@/components/reservation/room-table"
-import { reservationHasUserInput } from "@/components/reservation/constants"
+import { ScheduleSummary } from "@/components/reservation/schedule-summary"
+import { reservationFieldWarnings } from "@/components/submission/validate-saaf-step"
 import { useReservationFormContext } from "@/components/students/reservations/reservation-context"
 import { FieldWarnings } from "@/components/forms/field-warning"
-import { FormPageHeader } from "@/components/forms/form-page-header"
-import { SubmissionErrorAlert } from "@/components/forms/submission-error-alert"
-import { cn } from "@/lib/utils"
+import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
 
-export function ReservationIntro() {
+/**
+ * The reservation fields rendered as step 5 of the SAAF wizard. This is form-less
+ * (no nested `<form>`) because the wizard already wraps every step in a single
+ * `fetcher.Form`; submission, dialogs, and navigation are owned by the wizard.
+ */
+export function ReservationFields() {
+  const { state, actions } = useReservationFormContext()
+  const { draft, schedule } = state
+  const { state: saafState } = useSaafFormContext()
+
   return (
-    <>
-      <FormPageHeader
-        title="Reservation of Facilities"
-        subtitle="Academic Term: 2026 - 2027 • Unified Activity Proposal Application"
-      />
-
+    <div className="space-y-8">
       <div className="space-y-0.5">
         <h2 className="text-sm font-bold tracking-wide text-neutral-900 uppercase">
           APPLICATION FORM ON USE OF FACILITIES
@@ -26,95 +28,52 @@ export function ReservationIntro() {
           (North &amp; South Circle, Hallways, Pavilions, Ground, etc.)
         </p>
       </div>
-    </>
-  )
-}
 
-export function ReservationForm() {
-  const { state, actions } = useReservationFormContext()
-  const { draft, schedule } = state
-
-  return (
-    <form
-      noValidate
-      onSubmit={(event) =>
-        actions.handleInitiateSubmit(event, event.currentTarget)
-      }
-      className={cn("space-y-8", state.showErrors && "saaf-show-errors")}
-    >
       <FieldWarnings
         warnings={
-          state.showErrors
-            ? {
-                ...(draft.purpose.trim()
-                  ? {}
-                  : { purpose: "This field is required." }),
-                ...(draft.functionRoomPurpose.trim()
-                  ? {}
-                  : { functionRoomPurpose: "This field is required." }),
-                ...(draft.avPurpose.trim()
-                  ? {}
-                  : { avPurpose: "This field is required." }),
-              }
-            : {}
+          saafState.showErrors ? reservationFieldWarnings(draft) : {}
         }
       >
-        <EquipmentSection
-          equipment={draft.equipment}
-          otherEquipmentText={draft.otherEquipmentText}
-          onToggle={actions.toggleEquipment}
-          onOtherTextChange={(value) =>
-            actions.updateField("otherEquipmentText", value)
-          }
-        />
+        <div className="space-y-8">
+          <ScheduleSummary schedule={schedule} />
 
-        <FacilityTable
-          purpose={draft.purpose}
-          items={draft.facilityItems}
-          schedule={schedule}
-          onPurposeChange={(value) => actions.updateField("purpose", value)}
-          onUpdate={actions.handleUpdateFacilityItem}
-          onRemove={actions.handleRemoveFacilityItem}
-          onAdd={actions.handleAddFacilityItem}
-        />
+          <EquipmentTable
+            items={draft.equipmentItems}
+            onUpdate={actions.handleUpdateEquipmentItem}
+            onRemove={actions.handleRemoveEquipmentItem}
+            onAdd={actions.handleAddEquipmentItem}
+          />
 
-        <RoomTable
-          purpose={draft.functionRoomPurpose}
-          items={draft.roomItems}
-          schedule={schedule}
-          onPurposeChange={(value) =>
-            actions.updateField("functionRoomPurpose", value)
-          }
-          onUpdate={actions.handleUpdateRoomItem}
-          onRemove={actions.handleRemoveRoomItem}
-          onAdd={actions.handleAddRoomItem}
-        />
+          <FacilityTable
+            purpose={draft.purpose}
+            items={draft.facilityItems}
+            onPurposeChange={(value) => actions.updateField("purpose", value)}
+            onUpdate={actions.handleUpdateFacilityItem}
+            onRemove={actions.handleRemoveFacilityItem}
+            onAdd={actions.handleAddFacilityItem}
+          />
 
-        <AvTable
-          purpose={draft.avPurpose}
-          items={draft.avItems}
-          schedule={schedule}
-          onPurposeChange={(value) => actions.updateField("avPurpose", value)}
-          onUpdate={actions.handleUpdateAvItem}
-          onRemove={actions.handleRemoveAvItem}
-          onAdd={actions.handleAddAvItem}
-        />
+          <RoomTable
+            purpose={draft.functionRoomPurpose}
+            items={draft.roomItems}
+            onPurposeChange={(value) =>
+              actions.updateField("functionRoomPurpose", value)
+            }
+            onUpdate={actions.handleUpdateRoomItem}
+            onRemove={actions.handleRemoveRoomItem}
+            onAdd={actions.handleAddRoomItem}
+          />
+
+          <AvTable
+            purpose={draft.avPurpose}
+            items={draft.avItems}
+            onPurposeChange={(value) => actions.updateField("avPurpose", value)}
+            onUpdate={actions.handleUpdateAvItem}
+            onRemove={actions.handleRemoveAvItem}
+            onAdd={actions.handleAddAvItem}
+          />
+        </div>
       </FieldWarnings>
-
-      <SubmissionErrorAlert message={state.submitError} />
-
-      <ReservationActions
-        isSubmitting={state.isSubmitting}
-        inactive={
-          !draft.purpose.trim() ||
-          !draft.functionRoomPurpose.trim() ||
-          !draft.avPurpose.trim()
-        }
-        onSavePdf={actions.handleSavePdf}
-        onGoBack={actions.handleGoBack}
-        clearDisabled={!reservationHasUserInput(draft)}
-        onClear={() => actions.setShowConfirmClearModal(true)}
-      />
-    </form>
+    </div>
   )
 }

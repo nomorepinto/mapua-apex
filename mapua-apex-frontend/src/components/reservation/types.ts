@@ -28,19 +28,15 @@ export interface AVItem {
   remarks: string
 }
 
-export interface EquipmentFlags {
-  monoblock: boolean
-  whiteboards: boolean
-  tables: boolean
-  rostrum: boolean
-  flags: boolean
-  panelBoards: boolean
-  others: boolean
+export interface EquipmentItem {
+  id: string
+  name: string
+  purpose: string
+  remark: string
 }
 
 export interface ReservationDraft {
-  equipment: EquipmentFlags
-  otherEquipmentText: string
+  equipmentItems: EquipmentItem[]
   purpose: string
   functionRoomPurpose: string
   avPurpose: string

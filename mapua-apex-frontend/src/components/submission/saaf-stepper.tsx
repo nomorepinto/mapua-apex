@@ -8,28 +8,43 @@ export const SAAF_STEPS = [
   { id: "alignment", label: "Alignment & budget" },
 ] as const
 
+export const RESERVATION_STEP = { id: "reservation", label: "Reservation" }
+
+/** Step indices for the four SAAF panels (used by the SAAF validation maps). */
 export type SaafStepIndex = 0 | 1 | 2 | 3
+
+/** Step indices for the whole wizard, including the optional reservation step. */
+export type WizardStepIndex = 0 | 1 | 2 | 3 | 4
 
 export function SaafStepper({
   step,
   farthestStep,
   eventTitle,
+  includeReservation,
   onStepSelect,
 }: {
-  step: SaafStepIndex
-  farthestStep: SaafStepIndex
+  step: WizardStepIndex
+  farthestStep: WizardStepIndex
   eventTitle?: string
-  onStepSelect: (step: SaafStepIndex) => void
+  includeReservation: boolean
+  onStepSelect: (step: WizardStepIndex) => void
 }) {
+  const steps = includeReservation
+    ? [...SAAF_STEPS, RESERVATION_STEP]
+    : [...SAAF_STEPS]
+
   return (
     <div className="space-y-3">
       {eventTitle ? (
-        <p className="text-sm font-semibold text-neutral-800">
-          {eventTitle}
-        </p>
+        <p className="text-sm font-semibold text-neutral-800">{eventTitle}</p>
       ) : null}
-      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {SAAF_STEPS.map((item, index) => {
+      <ol
+        className={cn(
+          "grid grid-cols-2 gap-2",
+          includeReservation ? "sm:grid-cols-5" : "sm:grid-cols-4"
+        )}
+      >
+        {steps.map((item, index) => {
           const active = index === step
           const reached = index <= farthestStep
           const done = reached && !active
@@ -41,7 +56,7 @@ export function SaafStepper({
               "cursor-pointer border-[#8B0000]/30 bg-[#8B0000]/5 text-[#8B0000] transition-colors hover:border-[#8B0000]/50 hover:bg-[#8B0000]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B0000]/40",
             !active &&
               !done &&
-              "cursor-default border-neutral-200 bg-white text-neutral-600",
+              "cursor-default border-neutral-200 bg-white text-neutral-600"
           )
 
           return (
@@ -50,7 +65,7 @@ export function SaafStepper({
                 <button
                   type="button"
                   className={className}
-                  onClick={() => onStepSelect(index as SaafStepIndex)}
+                  onClick={() => onStepSelect(index as WizardStepIndex)}
                   aria-label={`Go to ${item.label}`}
                 >
                   <StepMarker index={index} active={active} done={done} />
@@ -74,7 +89,7 @@ export function SaafStepper({
         })}
       </ol>
       <p className={layout.pageSubtitle}>
-        Step {step + 1} of {SAAF_STEPS.length} · {SAAF_STEPS[step].label}
+        Step {step + 1} of {steps.length} · {steps[step].label}
       </p>
     </div>
   )
@@ -95,7 +110,7 @@ function StepMarker({
         "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
         active && "bg-white text-[#8B0000]",
         done && "bg-[#8B0000] text-white",
-        !active && !done && "bg-neutral-100 text-neutral-600",
+        !active && !done && "bg-neutral-100 text-neutral-600"
       )}
     >
       {index + 1}

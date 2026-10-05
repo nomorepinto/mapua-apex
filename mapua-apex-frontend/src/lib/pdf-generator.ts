@@ -45,16 +45,11 @@ export interface SAAFPdfData {
 }
 
 export interface ReservationPdfData {
-    equipment?: {
-        monoblock?: boolean
-        whiteboards?: boolean
-        tables?: boolean
-        rostrum?: boolean
-        flags?: boolean
-        panelBoards?: boolean
-        others?: boolean
-    }
-    otherEquipmentText?: string
+    equipmentItems?: Array<{
+        name?: string
+        purpose?: string
+        remark?: string
+    }>
     purpose?: string
     facilityItems?: Array<{
         item?: string
@@ -213,25 +208,32 @@ export function generateProposalPdf(
         let ry = 26
 
         // Equipment Requested
-        const requestedEquip: string[] = []
-        if (reservationData.equipment?.monoblock) requestedEquip.push("Monoblock Chairs")
-        if (reservationData.equipment?.whiteboards) requestedEquip.push("White Boards")
-        if (reservationData.equipment?.tables) requestedEquip.push("Tables")
-        if (reservationData.equipment?.rostrum) requestedEquip.push("Rostrum")
-        if (reservationData.equipment?.flags) requestedEquip.push("Flags (w/ Poles & Stand)")
-        if (reservationData.equipment?.panelBoards) requestedEquip.push("Panel Boards")
-        if (reservationData.equipment?.others && reservationData.otherEquipmentText) {
-            requestedEquip.push(`Others: ${reservationData.otherEquipmentText}`)
-        }
+        const equipmentRows = (reservationData.equipmentItems || []).map((e) => [
+            e.name || "",
+            e.purpose || "",
+            e.remark || "",
+        ])
 
         autoTable(doc, {
             startY: ry,
-            theme: "plain",
-            styles: { fontSize: 8.5, cellPadding: 1 },
-            body: [
-                [{ content: "Equipment Requested:", styles: { fontStyle: "bold" } }],
-                [requestedEquip.length > 0 ? requestedEquip.join("  •  ") : "None requested"],
+            head: [
+                [
+                    {
+                        content: "Equipment Requested",
+                        colSpan: 3,
+                        styles: { halign: "left" },
+                    },
+                ],
+                ["Item Name", "Item Purpose", "Remark"],
             ],
+            headStyles: { fillColor: primaryRed, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
+            body: equipmentRows.length > 0 ? equipmentRows : [["None requested", "", ""]],
+            styles: { fontSize: 7, cellPadding: 1.5, halign: "center" },
+            columnStyles: {
+                0: { halign: "left" },
+                1: { halign: "left" },
+                2: { halign: "left" },
+            },
         })
 
         ry = (doc as any).lastAutoTable.finalY + 4

@@ -1,5 +1,5 @@
 import { DEFAULT_RESERVATION_DRAFT } from "@/components/reservation/constants"
-import type { ReservationDraft } from "@/components/reservation/types"
+import type { EquipmentItem, ReservationDraft } from "@/components/reservation/types"
 import {
   createEmptyProponent,
   DEFAULT_BUDGET_ITEMS,
@@ -96,13 +96,11 @@ export interface ApiSubmission {
   venue_reservation?: {
     has_reservation: boolean
     equipment_requested?: {
-      monoblock_chairs?: boolean
-      whiteboards?: boolean
-      tables?: boolean
-      rostrum?: boolean
-      flags_with_stand?: boolean
-      panel_boards?: boolean
-      others_specified?: string
+      items?: Array<{
+        name: string
+        purpose?: string
+        remark?: string
+      }>
     }
     general_facilities?: {
       purpose?: string
@@ -253,7 +251,7 @@ export function buildSaafApiPayload(
     (reservationDraft.facilityItems?.length > 0 ||
       reservationDraft.roomItems?.length > 0 ||
       reservationDraft.avItems?.length > 0 ||
-      Object.values(reservationDraft.equipment || {}).some(Boolean))
+      reservationDraft.equipmentItems?.length > 0)
   )
 
   return {
@@ -319,13 +317,11 @@ export function buildSaafApiPayload(
     venue_reservation: {
       has_reservation: hasReservation,
       equipment_requested: {
-        monoblock_chairs: Boolean(reservationDraft?.equipment?.monoblock),
-        whiteboards: Boolean(reservationDraft?.equipment?.whiteboards),
-        tables: Boolean(reservationDraft?.equipment?.tables),
-        rostrum: Boolean(reservationDraft?.equipment?.rostrum),
-        flags_with_stand: Boolean(reservationDraft?.equipment?.flags),
-        panel_boards: Boolean(reservationDraft?.equipment?.panelBoards),
-        others_specified: reservationDraft?.otherEquipmentText || "",
+        items: (reservationDraft?.equipmentItems || []).map((e) => ({
+          name: e.name,
+          purpose: e.purpose || "",
+          remark: e.remark || "",
+        })),
       },
       general_facilities: {
         purpose: reservationDraft?.purpose || "",
@@ -1061,17 +1057,43 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
 
   const reservationSource = submission.venue_reservation
   const equipment = reservationSource?.equipment_requested
+  // Legacy submissions stored `equipment_requested` as a flat boolean record;
+  // newer ones store `{ items: [{ name, purpose, remark }] }`. Rehydrate both,
+  // mapping legacy flags to name-only rows (empty purpose/remark).
+  const legacyEquipmentLabels: Record<string, string> = {
+    monoblock_chairs: "Monoblock Chairs",
+    whiteboards: "White Boards",
+    tables: "Tables",
+    rostrum: "Rostrum",
+    flags_with_stand: "Flags (w/ Poles & Stand)",
+    panel_boards: "Panel Boards",
+  }
+  const legacyEquipment = (equipment ?? {}) as Record<string, unknown>
+  const legacyOthers =
+    typeof legacyEquipment.others_specified === "string"
+      ? legacyEquipment.others_specified.trim()
+      : ""
+  const legacyNames = [
+    ...Object.keys(legacyEquipmentLabels)
+      .filter((key) => Boolean(legacyEquipment[key]))
+      .map((key) => legacyEquipmentLabels[key]),
+    ...(legacyOthers ? [legacyOthers] : []),
+  ]
+  const equipmentItems: EquipmentItem[] = Array.isArray(equipment?.items)
+    ? (equipment?.items ?? []).map((item, index) => ({
+        id: String(index + 1),
+        name: item.name || "",
+        purpose: item.purpose || "",
+        remark: item.remark || "",
+      }))
+    : legacyNames.map((name, index) => ({
+        id: String(index + 1),
+        name,
+        purpose: "",
+        remark: "",
+      }))
   const reservation: ReservationDraft = {
-    equipment: {
-      monoblock: Boolean(equipment?.monoblock_chairs),
-      whiteboards: Boolean(equipment?.whiteboards),
-      tables: Boolean(equipment?.tables),
-      rostrum: Boolean(equipment?.rostrum),
-      flags: Boolean(equipment?.flags_with_stand),
-      panelBoards: Boolean(equipment?.panel_boards),
-      others: Boolean(equipment?.others_specified),
-    },
-    otherEquipmentText: equipment?.others_specified || "",
+    equipmentItems,
     purpose: reservationSource?.general_facilities?.purpose || "",
     functionRoomPurpose: reservationSource?.function_rooms?.purpose || "",
     avPurpose: reservationSource?.audiovisual_equipment?.purpose || "",

@@ -5,11 +5,13 @@ import {
   SaafStepperControl,
 } from "@/components/students/saaf/saaf-form"
 import { SaafProvider } from "@/components/students/saaf/saaf-context"
+import { ReservationProvider } from "@/components/students/reservations/reservation-context"
 import {
   SaafActivityStep,
   SaafAlignmentStep,
   SaafClassificationStep,
   SaafPeopleStep,
+  SaafReservationStep,
   SaafStepActions,
   SaafSubmitError,
 } from "@/components/students/saaf/saaf-steps"
@@ -19,21 +21,24 @@ import { cn } from "@/lib/utils"
 export function Submission() {
   return (
     <SaafProvider>
-      <div className={cn("relative", layout.page)}>
-        <div className={layout.container}>
-          <SaafForm>
-            <SaafHeader />
-            <SaafStepperControl />
-            <SaafClassificationStep />
-            <SaafPeopleStep />
-            <SaafActivityStep />
-            <SaafAlignmentStep />
-            <SaafSubmitError />
-            <SaafStepActions />
-          </SaafForm>
+      <ReservationProvider>
+        <div className={cn("relative", layout.page)}>
+          <div className={layout.container}>
+            <SaafForm>
+              <SaafHeader />
+              <SaafStepperControl />
+              <SaafClassificationStep />
+              <SaafPeopleStep />
+              <SaafActivityStep />
+              <SaafAlignmentStep />
+              <SaafReservationStep />
+              <SaafSubmitError />
+              <SaafStepActions />
+            </SaafForm>
+          </div>
+          <SaafDialogs />
         </div>
-        <SaafDialogs />
-      </div>
+      </ReservationProvider>
     </SaafProvider>
   )
 }

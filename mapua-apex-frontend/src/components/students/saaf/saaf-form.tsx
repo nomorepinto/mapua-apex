@@ -4,7 +4,7 @@ import { FieldWarnings } from "@/components/forms/field-warning"
 import { FormPageHeader } from "@/components/forms/form-page-header"
 import {
   SaafStepper,
-  type SaafStepIndex,
+  type WizardStepIndex,
 } from "@/components/submission/saaf-stepper"
 import { saafFieldWarnings } from "@/components/submission/validate-saaf-step"
 import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
@@ -59,6 +59,7 @@ export function SaafStepperControl() {
       step={state.step}
       farthestStep={state.farthestStep}
       eventTitle={state.draft.activityTitle}
+      includeReservation={state.includeReservation}
       onStepSelect={actions.goToStep}
     />
   )
@@ -68,7 +69,7 @@ export function SaafStepPanel({
   index,
   children,
 }: {
-  index: SaafStepIndex
+  index: WizardStepIndex
   children: ReactNode
 }) {
   const { state } = useSaafFormContext()

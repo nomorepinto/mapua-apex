@@ -1,3 +1,5 @@
+import { CircleAlertIcon } from "lucide-react"
+
 import { ActivityClassificationSection } from "@/components/submission/activity-classification-section"
 import { ActivityDetailsSection } from "@/components/submission/activity-details-section"
 import { BudgetProposalSection } from "@/components/submission/budget-proposal-section"
@@ -6,6 +8,9 @@ import { InstitutionalAlignmentSection } from "@/components/submission/instituti
 import { ProponentsSection } from "@/components/submission/proponents-section"
 import { SubmissionActions } from "@/components/submission/submission-actions"
 import { SubmissionErrorAlert } from "@/components/forms/submission-error-alert"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ReservationFields } from "@/components/students/reservations/reservation-form"
+import { useReservationFormContext } from "@/components/students/reservations/reservation-context"
 import { SaafStepPanel } from "@/components/students/saaf/saaf-form"
 import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
 import { brand } from "@/config"
@@ -81,10 +86,33 @@ export function SaafAlignmentStep() {
   )
 }
 
+export function SaafReservationStep() {
+  const { state } = useSaafFormContext()
+  if (!state.includeReservation) return null
+
+  return (
+    <SaafStepPanel index={4}>
+      <ReservationFields />
+    </SaafStepPanel>
+  )
+}
+
 export function SaafSubmitError() {
   const { state } = useSaafFormContext()
-  if (state.step !== 3) return null
+  if (state.step !== state.finalStep) return null
   return <SubmissionErrorAlert message={state.submitError} />
+}
+
+function SaafStepError() {
+  const { state } = useSaafFormContext()
+  if (!state.stepError) return null
+
+  return (
+    <Alert variant="error">
+      <CircleAlertIcon />
+      <AlertDescription>{state.stepError}</AlertDescription>
+    </Alert>
+  )
 }
 
 function SaafBackButton() {
@@ -119,7 +147,7 @@ function SaafClearButton() {
 
 function SaafContinueActions() {
   const { state, actions } = useSaafFormContext()
-  if (state.step >= 3) return null
+  if (state.step >= state.finalStep) return null
 
   return (
     <div className="flex flex-col-reverse gap-3 border-t border-neutral-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
@@ -144,7 +172,14 @@ function SaafContinueActions() {
 
 function SaafReviewActions() {
   const { state, actions } = useSaafFormContext()
-  if (state.step < 3) return null
+  const { actions: reservationActions } = useReservationFormContext()
+  if (state.step !== state.finalStep) return null
+
+  // On the reservation step the full-proposal PDF (SAAF + reservation) is the
+  // meaningful export; otherwise the SAAF-only variant is used.
+  const onSavePdf = state.includeReservation
+    ? reservationActions.handleSavePdf
+    : actions.savePdf
 
   return (
     <div className="space-y-3">
@@ -157,9 +192,7 @@ function SaafReviewActions() {
       <SubmissionActions
         isSubmitting={state.isSubmitting}
         inactive={!state.formComplete}
-        showNextPage={state.reserveFacilities === "yes"}
-        onNextPage={actions.goToReservation}
-        onSavePdf={actions.savePdf}
+        onSavePdf={onSavePdf}
         onSubmit={actions.initiateSubmit}
       />
     </div>
@@ -169,6 +202,7 @@ function SaafReviewActions() {
 export function SaafStepActions() {
   return (
     <>
+      <SaafStepError />
       <SaafContinueActions />
       <SaafReviewActions />
     </>

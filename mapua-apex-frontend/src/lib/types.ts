@@ -93,14 +93,14 @@ export interface DetailedBudgetProposal {
   grand_total: number
 }
 
+export interface EquipmentRequestedItem {
+  name: string
+  purpose?: string
+  remark?: string
+}
+
 export interface EquipmentRequested {
-  monoblock_chairs: boolean
-  whiteboards: boolean
-  tables: boolean
-  rostrum: boolean
-  flags_with_stand: boolean
-  panel_boards: boolean
-  others_specified: string
+  items: EquipmentRequestedItem[]
 }
 
 export interface GeneralFacilityItem {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type MouseEvent } from "react"
-import { useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router"
+import { useFetcher, useNavigation } from "react-router"
 
 import { useScrollToTop } from "@/hooks/use-scroll-to-top"
 import { useHydrateEditingSubmission } from "@/hooks/use-hydrate-editing-submission"
@@ -7,7 +7,11 @@ import {
   createEmptyProponent,
   DEFAULT_SAAF_DRAFT,
 } from "@/components/submission/constants"
-import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
+import { withReservationDefaults } from "@/components/reservation/constants"
+import type {
+  SaafStepIndex,
+  WizardStepIndex,
+} from "@/components/submission/saaf-stepper"
 import type {
   BudgetItem,
   Proponent,
@@ -15,6 +19,7 @@ import type {
   SubmissionActionData,
 } from "@/components/submission/types"
 import {
+  getReservationStepIssue,
   getSaafStepIssue,
   isStepHtmlValid,
   STEP_INVALID_FOCUS_SELECTOR,
@@ -29,11 +34,10 @@ import { EVENT_DATE_TOO_SOON_MESSAGE, minEventDateKey } from "@/lib/date-key"
 import { useOrgStore } from "@/stores/org-store"
 
 export function useSaafForm() {
-  const navigate = useNavigate()
   const navigation = useNavigation()
-  const [searchParams] = useSearchParams()
   const fetcher = useFetcher<SubmissionActionData>()
   const reserveFacilities = useOrgStore((state) => state.reserveFacilities)
+  const includeReservation = reserveFacilities === "yes"
   useHydrateEditingSubmission()
   const isSubmitting =
     navigation.state === "submitting" || fetcher.state === "submitting"
@@ -217,12 +221,19 @@ export function useSaafForm() {
   }, [])
 
   const validateStep = useCallback(
-    (step: SaafStepIndex, form: HTMLFormElement | null): boolean => {
+    (step: WizardStepIndex, form: HTMLFormElement | null): boolean => {
       if (!form) return false
 
       const panel = form.querySelector<HTMLElement>(`[data-saaf-step="${step}"]`)
       const htmlValid = panel ? isStepHtmlValid(panel) : false
-      const issue = getSaafStepIssue(step, draft)
+      const issue =
+        step === 4
+          ? getReservationStepIssue(
+              withReservationDefaults(
+                useOrgStore.getState().reservationDraft
+              )
+            )
+          : getSaafStepIssue(step as SaafStepIndex, draft)
 
       if (!htmlValid || issue) {
         revealInvalidFields(panel ?? form)
@@ -248,9 +259,22 @@ export function useSaafForm() {
         .map((step) => getSaafStepIssue(step, draft))
         .filter((issue): issue is string => Boolean(issue))
 
-      if (!isHtmlValid || issues.length > 0) {
+      // When the wizard includes the reservation step, its three required
+      // purposes must also be filled before the unified submit is allowed.
+      const reservationIssues = includeReservation
+        ? [
+            getReservationStepIssue(
+              withReservationDefaults(useOrgStore.getState().reservationDraft)
+            ),
+          ].filter((issue): issue is string => Boolean(issue))
+        : []
+
+      if (!isHtmlValid || issues.length > 0 || reservationIssues.length > 0) {
         revealInvalidFields(form)
-        setStepError(issues.join(" ") || "Fill in every required field before submitting.")
+        setStepError(
+          [...issues, ...reservationIssues].join(" ") ||
+            "Fill in every required field before submitting."
+        )
         return false
       }
 
@@ -352,17 +376,6 @@ export function useSaafForm() {
     setShowConfirmClearModal(false)
   }, [])
 
-  const handleGoToReservation = useCallback(
-    (form: HTMLFormElement | null) => {
-      if (!validateForm(form)) return
-      setShowErrors(false)
-      useOrgStore.getState().setSaafValidated(true)
-      const query = searchParams.toString()
-      navigate(`/students/submissions/saaf/reservations${query ? `?${query}` : ""}`)
-    },
-    [navigate, searchParams, validateForm]
-  )
-
   const handleInitiateSubmit = useCallback(
     (e: MouseEvent, form: HTMLFormElement | null) => {
       e.preventDefault()
@@ -413,7 +426,6 @@ export function useSaafForm() {
     handleRemoveBudgetItem,
     handleUpdateBudgetItem,
     handleClearForm,
-    handleGoToReservation,
     handleInitiateSubmit,
     handleConfirmProceed,
     handleSavePdf,

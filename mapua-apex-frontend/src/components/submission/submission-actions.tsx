@@ -6,16 +6,12 @@ import { Button } from "@/components/ui/button"
 export function SubmissionActions({
   isSubmitting,
   inactive = false,
-  showNextPage,
-  onNextPage,
   onSavePdf,
   onSubmit,
   onClear,
 }: {
   isSubmitting: boolean
   inactive?: boolean
-  showNextPage: boolean
-  onNextPage: () => void
   onSavePdf: () => void
   onSubmit: (e: MouseEvent) => void
   onClear?: () => void
@@ -36,7 +32,7 @@ export function SubmissionActions({
         )}
       </div>
 
-      {/* Right Actions: PDF & Submit / Next Page */}
+      {/* Right Actions: PDF & Submit */}
       <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
         <button
           type="button"
@@ -46,27 +42,15 @@ export function SubmissionActions({
           <DownloadIcon className="h-3.5 w-3.5" />
           Save as PDF
         </button>
-        {showNextPage ? (
-          <Button
-            type="button"
-            onClick={onNextPage}
-            disabled={isSubmitting}
-            aria-disabled={inactive || isSubmitting}
-            className={`h-11 w-full min-w-36 cursor-pointer rounded-lg bg-[#8B0000] px-10 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#6B0000] disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-auto ${inactive ? "cursor-not-allowed opacity-40" : ""}`}
-          >
-            Next page
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            onClick={onSubmit}
-            disabled={isSubmitting}
-            aria-disabled={inactive || isSubmitting}
-            className={`h-11 w-full min-w-36 cursor-pointer rounded-lg bg-[#8B0000] px-10 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#6B0000] disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-auto ${inactive ? "cursor-not-allowed opacity-40" : ""}`}
-          >
-            {isSubmitting ? "Submitting..." : "Submit"}
-          </Button>
-        )}
+        <Button
+          type="button"
+          onClick={onSubmit}
+          disabled={isSubmitting}
+          aria-disabled={inactive || isSubmitting}
+          className={`h-11 w-full min-w-36 cursor-pointer rounded-lg bg-[#8B0000] px-10 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#6B0000] disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-auto ${inactive ? "cursor-not-allowed opacity-40" : ""}`}
+        >
+          {isSubmitting ? "Submitting..." : "Submit"}
+        </Button>
       </div>
     </div>
   )

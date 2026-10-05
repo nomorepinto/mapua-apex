@@ -11,16 +11,9 @@ type ReservationFormModel = ReturnType<typeof useReservationForm>
 interface ReservationFormState {
   draft: ReservationDraft
   schedule: EventSchedule
-  showErrors: boolean
-  submitError: ReservationFormModel["submitError"]
-  isSubmitting: boolean
-  showConfirmClearModal: boolean
-  showConfirmModal: boolean
-  showSuccessModal: boolean
 }
 
 interface ReservationFormActions {
-  toggleEquipment: ReservationFormModel["toggleEquipment"]
   updateField: ReservationFormModel["updateField"]
   handleUpdateFacilityItem: ReservationFormModel["handleUpdateFacilityItem"]
   handleRemoveFacilityItem: ReservationFormModel["handleRemoveFacilityItem"]
@@ -31,14 +24,11 @@ interface ReservationFormActions {
   handleUpdateAvItem: ReservationFormModel["handleUpdateAvItem"]
   handleRemoveAvItem: ReservationFormModel["handleRemoveAvItem"]
   handleAddAvItem: ReservationFormModel["handleAddAvItem"]
-  handleInitiateSubmit: ReservationFormModel["handleInitiateSubmit"]
+  handleUpdateEquipmentItem: ReservationFormModel["handleUpdateEquipmentItem"]
+  handleRemoveEquipmentItem: ReservationFormModel["handleRemoveEquipmentItem"]
+  handleAddEquipmentItem: ReservationFormModel["handleAddEquipmentItem"]
   handleSavePdf: ReservationFormModel["handleSavePdf"]
-  handleGoBack: ReservationFormModel["handleGoBack"]
   handleClearForm: ReservationFormModel["handleClearForm"]
-  handleConfirmProceed: ReservationFormModel["handleConfirmProceed"]
-  handleSuccessAction: ReservationFormModel["handleSuccessAction"]
-  setShowConfirmClearModal: ReservationFormModel["setShowConfirmClearModal"]
-  setShowConfirmModal: ReservationFormModel["setShowConfirmModal"]
 }
 
 interface ReservationFormContextValue {
@@ -67,15 +57,8 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
     state: {
       draft: form.draft,
       schedule: form.schedule,
-      showErrors: form.showErrors,
-      submitError: form.submitError,
-      isSubmitting: form.isSubmitting,
-      showConfirmClearModal: form.showConfirmClearModal,
-      showConfirmModal: form.showConfirmModal,
-      showSuccessModal: form.showSuccessModal,
     },
     actions: {
-      toggleEquipment: form.toggleEquipment,
       updateField: form.updateField,
       handleUpdateFacilityItem: form.handleUpdateFacilityItem,
       handleRemoveFacilityItem: form.handleRemoveFacilityItem,
@@ -86,14 +69,11 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
       handleUpdateAvItem: form.handleUpdateAvItem,
       handleRemoveAvItem: form.handleRemoveAvItem,
       handleAddAvItem: form.handleAddAvItem,
-      handleInitiateSubmit: form.handleInitiateSubmit,
+      handleUpdateEquipmentItem: form.handleUpdateEquipmentItem,
+      handleRemoveEquipmentItem: form.handleRemoveEquipmentItem,
+      handleAddEquipmentItem: form.handleAddEquipmentItem,
       handleSavePdf: form.handleSavePdf,
-      handleGoBack: form.handleGoBack,
       handleClearForm: form.handleClearForm,
-      handleConfirmProceed: form.handleConfirmProceed,
-      handleSuccessAction: form.handleSuccessAction,
-      setShowConfirmClearModal: form.setShowConfirmClearModal,
-      setShowConfirmModal: form.setShowConfirmModal,
     },
   }
 

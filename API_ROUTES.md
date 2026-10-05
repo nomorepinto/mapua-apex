@@ -199,13 +199,18 @@ Use this as the **POST** `/api/v1/students/submissions` body. For **PUT**, copy 
   "venue_reservation": {
     "has_reservation": true,
     "equipment_requested": {
-      "monoblock_chairs": true,
-      "whiteboards": false,
-      "tables": true,
-      "rostrum": false,
-      "flags_with_stand": false,
-      "panel_boards": false,
-      "others_specified": ""
+      "items": [
+        {
+          "name": "Monoblock Chairs",
+          "purpose": "Participant seating",
+          "remark": "60 units"
+        },
+        {
+          "name": "Tables",
+          "purpose": "Workshop tables",
+          "remark": ""
+        }
+      ]
     },
     "general_facilities": {
       "purpose": "Hackathon venue",
