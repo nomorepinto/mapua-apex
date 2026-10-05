@@ -11,7 +11,7 @@ import { useReservationFormContext } from "@/components/students/reservations/re
  */
 export function ReservationFields() {
   const { state, actions } = useReservationFormContext()
-  const { draft, schedule } = state
+  const { draft, schedule, campus } = state
 
   return (
     <div className="space-y-8">
@@ -36,6 +36,7 @@ export function ReservationFields() {
 
         <RoomTable
           items={draft.roomItems}
+          campus={campus}
           onUpdate={actions.handleUpdateRoomItem}
           onRemove={actions.handleRemoveRoomItem}
           onAdd={actions.handleAddRoomItem}

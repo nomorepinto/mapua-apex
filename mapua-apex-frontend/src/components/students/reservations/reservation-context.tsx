@@ -11,6 +11,8 @@ type ReservationFormModel = ReturnType<typeof useReservationForm>
 interface ReservationFormState {
   draft: ReservationDraft
   schedule: EventSchedule
+  /** Venue campus from the SAAF draft; drives the room catalog and code format. */
+  campus: string
 }
 
 interface ReservationFormActions {
@@ -53,6 +55,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
     state: {
       draft: form.draft,
       schedule: form.schedule,
+      campus: form.campus,
     },
     actions: {
       handleUpdateRoomItem: form.handleUpdateRoomItem,

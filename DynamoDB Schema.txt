@@ -76,9 +76,15 @@ detailed_budget_proposal: {
 venue_reservation: {
   has_reservation: boolean
   equipment_requested: { items: [{ name, purpose, remark }] }
-  function_rooms: { items: [{ date_needed, time_needed, room_needed, remarks }] }
-  audiovisual_equipment: { items: [{ date_needed, time_needed, equipment_needed, remarks }] }
+  function_rooms: { items: [{ date_needed, end_date_needed, time_needed, end_time_needed, room_needed, classroom_name, remarks }] }
+  audiovisual_equipment: { items: [{ date_needed, end_date_needed, time_needed, end_time_needed, equipment_needed, remarks }] }
 }
+room_needed is either a fixed room of the venue campus or "Classroom".
+classroom_name is only sent on a "Classroom" row and holds that campus's room
+code: Makati is "MPO" + 3 digits (MPO101), Intramuros is a direction
+(N, W, S, E, NW, NE, SW, SE) + 3 digits (N101, SW204). The room list follows
+activity_details.venue, which the student form offers as "Makati Campus" or
+"Intramuros Campus" only; the API stores venue as sent.
 GSI1 on SUBMISSION is written on create/update (org + submission id).
 Admin GET /admins/submissions lists organizations, then queries GSI1 for each
 one with GSI1SK beginning SUBMISSION#. Event rows on the same partition are
@@ -253,8 +259,8 @@ json
         { "name": "Tables", "purpose": "Workshop tables", "remark": "" }
       ]
     },
-    "function_rooms": { "items": [] },
-    "audiovisual_equipment": { "items": [{ "date_needed": "2026-10-05", "time_needed": "17:00", "equipment_needed": "Projector", "remarks": "1 unit" }] }
+    "function_rooms": { "items": [{ "date_needed": "2026-10-05", "end_date_needed": "2026-10-05", "time_needed": "17:00", "end_time_needed": "21:00", "room_needed": "Classroom", "classroom_name": "N101", "remarks": "Workshop room" }] },
+    "audiovisual_equipment": { "items": [{ "date_needed": "2026-10-05", "end_date_needed": "2026-10-05", "time_needed": "17:00", "end_time_needed": "21:00", "equipment_needed": "Projector", "remarks": "1 unit" }] }
   }
 }
 Routing is snapshotted onto SUBMISSION at write time. On create (and on a

@@ -109,6 +109,8 @@ export interface ApiSubmission {
         time_needed: string
         end_time_needed?: string
         room_needed: string
+        /** Classroom code; present only on a `room_needed: "Classroom"` row. */
+        classroom_name?: string
         remarks?: string
       }>
     }
@@ -316,6 +318,8 @@ export function buildSaafApiPayload(
           time_needed: schedule.startTime,
           end_time_needed: schedule.endTime,
           room_needed: r.roomNeeded,
+          // Only "Classroom" rows carry a code; fixed rooms are named already.
+          ...(r.classroomName ? { classroom_name: r.classroomName } : {}),
           remarks: r.remarks || "",
         })),
       },
@@ -1075,6 +1079,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
         timeNeeded: item.time_needed,
         endTimeNeeded: item.end_time_needed || item.time_needed,
         roomNeeded: item.room_needed,
+        classroomName: item.classroom_name || "",
         remarks: item.remarks || "",
       }))
       : DEFAULT_RESERVATION_DRAFT.roomItems,

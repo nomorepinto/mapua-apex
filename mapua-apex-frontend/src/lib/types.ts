@@ -107,6 +107,8 @@ export interface FunctionRoomItem {
   date_needed: string
   time_needed: string
   room_needed: string
+  /** Classroom code; only present when `room_needed` is "Classroom". */
+  classroom_name?: string
   remarks: string
 }
 

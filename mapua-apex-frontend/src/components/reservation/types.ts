@@ -5,6 +5,11 @@ export interface RoomItem {
   timeNeeded: string
   endTimeNeeded: string
   roomNeeded: string
+  /**
+   * Classroom code typed by the proponent; only meaningful on a "Classroom"
+   * row and validated against the venue campus format.
+   */
+  classroomName: string
   remarks: string
 }
 

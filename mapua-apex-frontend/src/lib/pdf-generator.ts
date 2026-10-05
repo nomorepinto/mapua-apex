@@ -56,6 +56,7 @@ export interface ReservationPdfData {
         timeNeeded?: string
         endTimeNeeded?: string
         roomNeeded?: string
+        classroomName?: string
         remarks?: string
     }>
     avItems?: Array<{
@@ -229,7 +230,10 @@ export function generateProposalPdf(
 
         // Function Room Table
         const roomRows = (reservationData.roomItems || []).map((r) => [
-            r.roomNeeded || "",
+            // A "Classroom" row is only identifiable by its campus-specific code.
+            r.classroomName
+                ? `${r.roomNeeded || ""} (${r.classroomName})`
+                : r.roomNeeded || "",
             r.dateNeeded || "",
             r.endDateNeeded || r.dateNeeded || "",
             r.timeNeeded || "",
