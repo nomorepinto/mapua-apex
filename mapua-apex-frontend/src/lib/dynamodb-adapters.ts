@@ -484,11 +484,12 @@ export function formatDisplayDateTime(value?: string | null): string {
 export function formatDocumentId(id?: string | null, prefix = "SAAF"): string {
   if (!id || id === "—") return "—"
   const cleaned = id.replace(/^(SUBMISSION#|EVENT#)/i, "")
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleaned)
+  const targetId = cleaned.includes(":") ? cleaned.split(":").pop()! : cleaned
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId)
   if (isUuid) {
-    return `${prefix}-${cleaned.slice(0, 8).toUpperCase()}`
+    return `${prefix}-${targetId.slice(0, 8).toUpperCase()}`
   }
-  return cleaned
+  return targetId
 }
 
 function expectedSignatoryRoles(options?: {

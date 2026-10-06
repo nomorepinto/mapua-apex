@@ -19,8 +19,10 @@ import {
   useSignatoriesQuery,
   useUpdateAnnouncementMutation,
 } from "@/hooks/use-admin"
+import type { Activity } from "@/components/ui/activity.types"
 import {
   apiNotificationsToStepper,
+  apiSubmissionToActivity,
   apiSubmissionToDashboardRow,
   formatDisplayDateTime,
   submissionOrganizationId,
@@ -59,6 +61,7 @@ interface AdminDashboardState {
   announcementsError: boolean
   selectedKeys: { eventId: string; submissionId: string } | null
   selectedRow: DashboardSubmissionRow | null
+  selectedActivity: Activity | null
   stepper: ReturnType<typeof apiNotificationsToStepper>
   detailLoading: boolean
   detailError: boolean
@@ -179,6 +182,9 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
         organizations
       )
     : null
+  const selectedActivity = detailQuery.data
+    ? apiSubmissionToActivity(detailQuery.data)
+    : null
   const stepper = apiNotificationsToStepper(
     detailQuery.data?.notifications || [],
     detailQuery.data?.current_signatory,
@@ -295,6 +301,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       announcementsError: announcementsQuery.isError,
       selectedKeys,
       selectedRow,
+      selectedActivity,
       stepper,
       detailLoading: detailQuery.isLoading,
       detailError: detailQuery.isError,

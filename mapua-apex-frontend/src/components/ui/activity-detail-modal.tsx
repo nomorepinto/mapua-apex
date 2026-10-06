@@ -1,5 +1,5 @@
-import { memo } from "react"
-import { Loader2 } from "lucide-react"
+import { memo, useState } from "react"
+import { DownloadIcon, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -16,6 +16,7 @@ import { ActivityBudgetTable } from "./activity-budget-table"
 import { ActivityReservationDetails } from "./activity-reservation-details"
 import type { Activity } from "./activity.types"
 import { useActivityDetail } from "@/hooks/use-activity-detail"
+import { saveActivityAsPdf } from "@/lib/save-proposal-pdf"
 import { brand, modal } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -58,6 +59,20 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
 
   const isApproveDisabled =
     isActing || (isOsaar && !activity?.nature)
+
+  const [isSavingPdf, setIsSavingPdf] = useState(false)
+
+  const handleSavePdf = async () => {
+    if (!activity) return
+    try {
+      setIsSavingPdf(true)
+      await saveActivityAsPdf(activity)
+    } catch (err) {
+      console.error("Failed to generate proposal PDF:", err)
+    } finally {
+      setIsSavingPdf(false)
+    }
+  }
 
   return (
     <>
@@ -261,6 +276,20 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
               {actionError ? (
                 <p className="mr-auto text-xs font-semibold text-rose-600">{actionError}</p>
               ) : null}
+              <Button
+                type="button"
+                disabled={isSavingPdf}
+                onClick={handleSavePdf}
+                variant="outline"
+                className="min-h-11 rounded-xl px-5 py-2.5 text-sm font-bold gap-2 text-neutral-800"
+              >
+                {isSavingPdf ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-[#8B0000]" />
+                ) : (
+                  <DownloadIcon className="h-4 w-4 text-[#8B0000]" />
+                )}
+                Save as PDF
+              </Button>
               <Button
                 type="button"
                 disabled={isActing}
