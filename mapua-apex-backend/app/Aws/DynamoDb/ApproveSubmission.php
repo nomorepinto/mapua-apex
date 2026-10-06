@@ -37,13 +37,6 @@ final class ApproveSubmission
         $now = DynamoKeys::now();
         $fullyApproved = $nextSignatory === null;
 
-        $this->notifications->create(
-            $submissionId,
-            $signatoryId,
-            $fullyApproved ? 'fully approved' : 'approved',
-            sentAt: $now,
-        );
-
         if ($fullyApproved) {
             $set = ['status' => 'approved'];
 
@@ -61,6 +54,14 @@ final class ApproveSubmission
             $submission['status'] = 'approved';
             $submission['signatory_sequence'] = $sequence;
             unset($submission['GSI2PK'], $submission['GSI2SK']);
+
+            $this->notifications->create(
+                $submissionId,
+                $signatoryId,
+                'fully approved',
+                sentAt: $now,
+                submission: $submission,
+            );
 
             return $submission;
         }
@@ -83,6 +84,14 @@ final class ApproveSubmission
         $submission['signatory_sequence'] = $sequence;
         $submission['GSI2PK'] = $nextSignatory;
         $submission['GSI2SK'] = $now;
+
+        $this->notifications->create(
+            $submissionId,
+            $signatoryId,
+            'approved',
+            sentAt: $now,
+            submission: $submission,
+        );
 
         return $submission;
     }

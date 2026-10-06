@@ -57,6 +57,22 @@ Rename campus people with `PUT /admins/signatories/{id}` on the same uuid. If yo
 
 ---
 
+## Transactional emails (SES)
+
+Every NOTIFICATION write also fires best-effort emails via SES (`Aws\Ses\SesClient` directly; no Laravel Mail). Sends never fail the API response — an unresolvable address or SES outage is logged and skipped. The student address is `proponents[0].email_address` on the submission; a signatory address is resolved from the Cognito user whose `custom:signatory_id` attribute equals the signatory uuid (`AdminListUsers` on the pool in `AWS_COGNITO_REGION` / `AWS_DEFAULT_REGION`). `Source` is `MAIL_FROM_ADDRESS` (must be a verified SES identity); sending is skipped entirely while it is unconfigured.
+
+| Trigger | Emails sent |
+| :---- | :---- |
+| Student POST `/students/submissions` | First desk in `signatory_sequence`: "new event submission from {org name}" |
+| Student PUT a **returned** paper | The desk it now sits on (kept desk or sequence[0]): "resubmitted for your review". Plain edits of `pending` papers send nothing |
+| Approve (mid-chain) | Student: "{approver} approved" **and** next desk: "new event submission from {org name}" |
+| Approve (final hop) | Student: "fully approved" |
+| Deny / Return | Student: "denied" / "returned for revision", including the signatory comment |
+| Signatory or student POST notifications | Student: the row's `notif_type` + comment |
+| PUT notifications (edit a row) | Nothing |
+
+---
+
 ## Student routes
 
 `Authorization: Bearer <student ID token>`

@@ -15,6 +15,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Student\StoreSubmissionRequest;
 use App\Http\Requests\Api\V1\Student\UpdateSubmissionRequest;
 use App\Http\Resources\Api\V1\SubmissionResource;
+use App\Support\Email\SubmissionEmailer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -54,9 +55,12 @@ class SubmissionController extends Controller
         return SubmissionResource::collection(array_values($unique));
     }
 
-    public function store(StoreSubmissionRequest $request, WriteSubmission $write): JsonResponse
+    public function store(StoreSubmissionRequest $request, WriteSubmission $write, SubmissionEmailer $emailer): JsonResponse
     {
         $item = $write->create(CognitoIdentity::organizationId($request), $request->validated());
+
+        // Create writes no NOTIFICATION row, so the desk-1 routing email is fired here.
+        $emailer->submitted($item);
 
         return (new SubmissionResource($item))->response()->setStatusCode(201);
     }
@@ -96,10 +100,18 @@ class SubmissionController extends Controller
         string $event,
         string $submission,
         WriteSubmission $write,
+        GetSubmission $submissions,
+        SubmissionEmailer $emailer,
     ): SubmissionResource {
         // WriteSubmission::update enforces proponent ownership via the event's org
         // and rejects approved/denied papers, so dependents cannot edit or resubmit.
+        $wasReturned = ($submissions->handle($event, $submission)['status'] ?? null) === 'returned';
         $item = $write->update(CognitoIdentity::organizationId($request), $event, $submission, $request->validated());
+
+        // Only a resubmitted returned paper notifies its desk; plain edits of pending papers stay silent.
+        if ($wasReturned) {
+            $emailer->resubmitted($item);
+        }
 
         return new SubmissionResource($item);
     }

@@ -20,8 +20,6 @@ final class DenySubmission
         $submission = $this->submissions->require($eventId, $submissionId);
         SignatoryDesk::requireOpen($submission, $signatoryId);
 
-        $this->notifications->create($submissionId, $signatoryId, 'denied', $comment);
-
         $this->items->patch(
             DynamoKeys::event($eventId),
             DynamoKeys::submission($submissionId),
@@ -31,6 +29,8 @@ final class DenySubmission
 
         $submission['status'] = 'denied';
         unset($submission['GSI2PK'], $submission['GSI2SK']);
+
+        $this->notifications->create($submissionId, $signatoryId, 'denied', $comment, submission: $submission);
 
         return $submission;
     }
