@@ -42,7 +42,6 @@ export const TYPE_FILTERS = [
   { value: "", label: "All types" },
   { value: "extra-curricular", label: "Extra-curricular" },
   { value: "co-curricular", label: "Co-curricular" },
-  { value: "curricular", label: "Curricular" },
 ] as const
 
 type SubmissionStatus = "" | "pending" | "approved" | "denied" | "returned"
