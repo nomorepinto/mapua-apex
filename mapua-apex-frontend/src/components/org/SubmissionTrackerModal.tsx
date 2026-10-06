@@ -1,6 +1,14 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router"
-import { Check, CheckCircle2, DownloadIcon, FileText, Loader2 } from "lucide-react"
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  DownloadIcon,
+  FileText,
+  Loader2,
+  MessageSquare,
+} from "lucide-react"
 
 import {
   useCurrentOrganizationQuery,
@@ -10,7 +18,10 @@ import {
 import {
   apiNotificationsToStepper,
   apiSubmissionToActivity,
+  formatDisplayDateTime,
   formatDocumentId,
+  formatSignatoryRole,
+  signatoryChainLabel,
 } from "@/lib/dynamodb-adapters"
 import { brand, modal } from "@/config"
 import { cn } from "@/lib/utils"
@@ -53,8 +64,6 @@ export function SubmissionTrackerModal({
     isOpen ? submissionId || undefined : undefined
   )
 
-  if (!isOpen || !eventId || !submissionId) return null
-
   const activity = detailQuery.data
     ? apiSubmissionToActivity(detailQuery.data)
     : null
@@ -77,6 +86,43 @@ export function SubmissionTrackerModal({
   const isDependent = detailQuery.data?.role === "dependent"
   const isDenied = detailQuery.data?.status === "denied"
 
+  const returnNotifications = useMemo(() => {
+    if (!notificationsQuery.data || notificationsQuery.data.length === 0) return []
+    return notificationsQuery.data
+      .filter((item) => item.notif_type === "returned")
+      .sort((a, b) => (b.sent_at || "").localeCompare(a.sent_at || ""))
+  }, [notificationsQuery.data])
+
+  const latestReturnNotification = returnNotifications[0] || null
+
+  const returnSignatoryLabel = useMemo(() => {
+    if (!latestReturnNotification) return null
+    const chain = detailQuery.data?.signatory_chain
+    if (Array.isArray(chain) && chain.length > 0) {
+      const stripId = (val?: string | null) => (val || "").replace(/^SIGNATORY#/i, "").trim()
+      const link = chain.find(
+        (c) => stripId(c.signatory_id) === stripId(latestReturnNotification.signatory)
+      )
+      if (link) {
+        const distinctOrgs = new Set(chain.map((c) => c.organization_id).filter(Boolean))
+        return signatoryChainLabel(link, distinctOrgs.size > 1)
+      }
+    }
+    return formatSignatoryRole(
+      latestReturnNotification.signatory,
+      orgQuery.data?.signatories
+    )
+  }, [latestReturnNotification, detailQuery.data?.signatory_chain, orgQuery.data?.signatories])
+
+  const latestDeniedNotification = useMemo(() => {
+    if (!notificationsQuery.data || notificationsQuery.data.length === 0) return null
+    return (
+      notificationsQuery.data
+        .filter((n) => n.notif_type === "denied")
+        .sort((a, b) => (b.sent_at || "").localeCompare(a.sent_at || ""))[0] || null
+    )
+  }, [notificationsQuery.data])
+
   const handleSavePdf = async () => {
     try {
       setIsSavingPdf(true)
@@ -93,6 +139,7 @@ export function SubmissionTrackerModal({
   }
 
   const handleResubmit = () => {
+    if (!eventId || !submissionId) return
     onClose()
     navigate(
       `/students/submissions/saaf?event=${encodeURIComponent(eventId)}&submission=${encodeURIComponent(submissionId)}`
@@ -102,6 +149,8 @@ export function SubmissionTrackerModal({
   const handleOpenChange = (open: boolean) => {
     if (!open) onClose()
   }
+
+  if (!isOpen || !eventId || !submissionId) return null
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -185,6 +234,177 @@ export function SubmissionTrackerModal({
             <p className="text-sm font-semibold text-rose-600">
               Could not load this submission. Try again from the dashboard.
             </p>
+          ) : null}
+
+          {canResubmit && !isDependent ? (
+            <div className="mb-6 rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50 to-amber-50/60 p-4 sm:p-5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                    <AlertCircle className="size-5 text-amber-800" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-base font-bold text-amber-950">Application Returned</span>
+                      <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-900">
+                        Action Required
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-800/90 mt-0.5">
+                      Update this application and resubmit it to the current signatory.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResubmit}
+                  className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#8B0000] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#700000] transition-colors shrink-0"
+                >
+                  Edit and resubmit
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-amber-200/90 bg-white/95 p-4 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="size-3.5 text-amber-700" />
+                    <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                      Reason for Return
+                    </span>
+                  </div>
+                  {(returnSignatoryLabel || latestReturnNotification?.sent_at) && (
+                    <span className="text-xs font-medium text-neutral-500">
+                      {returnSignatoryLabel ? `Returned by ${returnSignatoryLabel}` : ""}
+                      {returnSignatoryLabel && latestReturnNotification?.sent_at ? " • " : ""}
+                      {latestReturnNotification?.sent_at
+                        ? formatDisplayDateTime(latestReturnNotification.sent_at)
+                        : ""}
+                    </span>
+                  )}
+                </div>
+
+                <div className="pt-2.5">
+                  {notificationsQuery.isLoading ? (
+                    <div className="flex items-center gap-2 py-2 text-xs text-neutral-500">
+                      <Loader2 className="size-3.5 animate-spin text-amber-700" />
+                      <span>Loading reviewer feedback…</span>
+                    </div>
+                  ) : latestReturnNotification?.comment ? (
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium text-neutral-800">
+                      {latestReturnNotification.comment}
+                    </p>
+                  ) : (
+                    <p className="text-xs italic text-neutral-500">
+                      No specific remarks were provided by the reviewer.
+                    </p>
+                  )}
+                </div>
+
+                {returnNotifications.length > 1 && (
+                  <details className="mt-3 border-t border-amber-100/80 pt-2.5 text-xs">
+                    <summary className="cursor-pointer font-semibold text-amber-900 hover:text-amber-950 select-none">
+                      Previous Return Feedback ({returnNotifications.length - 1} earlier)
+                    </summary>
+                    <div className="mt-2 space-y-2.5 pl-2 border-l-2 border-amber-200">
+                      {returnNotifications.slice(1).map((item, idx) => (
+                        <div key={`${item.sent_at}-${idx}`} className="text-xs">
+                          <div className="font-semibold text-neutral-600">
+                            {formatSignatoryRole(item.signatory, orgQuery.data?.signatories)} •{" "}
+                            {formatDisplayDateTime(item.sent_at)}
+                          </div>
+                          <p className="mt-0.5 whitespace-pre-wrap text-neutral-700">
+                            {item.comment || "No comment"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {isDependent && canResubmit ? (
+            <div className="mb-6 rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50 to-amber-50/60 p-4 sm:p-5 shadow-xs">
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                  <AlertCircle className="size-5 text-amber-800" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-base font-bold text-amber-950">Application Returned</span>
+                    <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-900">
+                      Collaborator View
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-800/90 mt-0.5">
+                    This application was returned for revision. As a collaborating organization, this view is read-only — the proponent organization manages edits and resubmission.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-amber-200/90 bg-white/95 p-4 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="size-3.5 text-amber-700" />
+                    <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                      Reason for Return
+                    </span>
+                  </div>
+                  {(returnSignatoryLabel || latestReturnNotification?.sent_at) && (
+                    <span className="text-xs font-medium text-neutral-500">
+                      {returnSignatoryLabel ? `Returned by ${returnSignatoryLabel}` : ""}
+                      {returnSignatoryLabel && latestReturnNotification?.sent_at ? " • " : ""}
+                      {latestReturnNotification?.sent_at
+                        ? formatDisplayDateTime(latestReturnNotification.sent_at)
+                        : ""}
+                    </span>
+                  )}
+                </div>
+
+                <div className="pt-2.5">
+                  {notificationsQuery.isLoading ? (
+                    <div className="flex items-center gap-2 py-2 text-xs text-neutral-500">
+                      <Loader2 className="size-3.5 animate-spin text-amber-700" />
+                      <span>Loading reviewer feedback…</span>
+                    </div>
+                  ) : latestReturnNotification?.comment ? (
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium text-neutral-800">
+                      {latestReturnNotification.comment}
+                    </p>
+                  ) : (
+                    <p className="text-xs italic text-neutral-500">
+                      No specific remarks were provided by the reviewer.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : isDependent ? (
+            <div className="mb-6 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-600">
+              You are a collaborating organization on this application. It is read-only — the proponent organization manages edits and resubmission.
+            </div>
+          ) : null}
+
+          {isDenied ? (
+            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 sm:p-5 text-rose-900 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="size-4 shrink-0 text-rose-600" />
+                <p className="text-sm font-bold text-rose-900">
+                  This submission was denied and cannot be edited.
+                </p>
+              </div>
+              {latestDeniedNotification?.comment ? (
+                <div className="mt-3 rounded-xl border border-rose-200/80 bg-white/90 p-3.5 shadow-2xs">
+                  <span className="text-[11px] font-bold text-rose-900 uppercase tracking-wider block mb-1">
+                    Reason for Rejection
+                  </span>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-800">
+                    {latestDeniedNotification.comment}
+                  </p>
+                </div>
+              ) : null}
+            </div>
           ) : null}
 
           {activity && activeTab === "details" && (
@@ -467,48 +687,24 @@ export function SubmissionTrackerModal({
             </div>
           )}
 
-          {canResubmit && !isDependent ? (
-            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-amber-900">Application Returned</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    Update this application and resubmit it to the current signatory.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleResubmit}
-                  className="cursor-pointer rounded-xl bg-[#8B0000] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#700000] transition-colors shrink-0"
-                >
-                  Edit and resubmit
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {isDependent ? (
-            <div className="mt-6 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-600">
-              You are a collaborating organization on this application. It is
-              read-only — the proponent organization manages edits and
-              resubmission.
-            </div>
-          ) : null}
-
-          {isDenied ? (
-            <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 font-medium">
-              This submission was denied and cannot be edited.
-            </div>
-          ) : null}
         </DialogPanel>
 
         <div className="flex shrink-0 justify-end gap-3 rounded-b-2xl border-t border-neutral-200 bg-white px-4 py-4 sm:px-8">
+          {canResubmit && !isDependent ? (
+            <Button
+              type="button"
+              onClick={handleResubmit}
+              className="bg-[#8B0000] text-white hover:bg-[#700000] font-bold shadow-xs cursor-pointer"
+            >
+              Edit and resubmit
+            </Button>
+          ) : null}
           <Button
             type="button"
             disabled={isSavingPdf || !activity}
             onClick={handleSavePdf}
             variant="outline"
-            className="gap-2 text-neutral-800"
+            className="gap-2 text-neutral-800 cursor-pointer"
           >
             {isSavingPdf ? (
               <Loader2 className="h-4 w-4 animate-spin text-[#8B0000]" />
@@ -517,7 +713,7 @@ export function SubmissionTrackerModal({
             )}
             Save as PDF
           </Button>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose} className="cursor-pointer">
             Close
           </Button>
         </div>
