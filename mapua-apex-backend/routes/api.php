@@ -55,6 +55,7 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
         ->group(function (): void {
             Route::get('me', [SignatoryProfileController::class, 'show'])->name('me.show');
             Route::get('submissions', [SignatorySubmissionController::class, 'index'])->name('submissions.index');
+            Route::get('submissions/history', [SignatorySubmissionController::class, 'history'])->name('submissions.history');
             Route::get('events/{event}/submissions/{submission}', [SignatorySubmissionController::class, 'show'])
                 ->name('submissions.show');
             Route::post('events/{event}/submissions/{submission}/approve', [SignatorySubmissionController::class, 'approve'])
