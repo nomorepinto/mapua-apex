@@ -12,7 +12,7 @@ export function OrgDashboard() {
     <StudentDashboardProvider>
       <div className={cn(layout.page, layout.stack)}>
         <StudentDashboardHeader />
-        <div className={cn(layout.grid4, layout.gap)}>
+        <div className={cn(layout.grid3, layout.gap)}>
           <div className={cn("xl:col-span-3", layout.stack)}>
             <SubmissionsPanel />
             <AnnouncementsPanel />

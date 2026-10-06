@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
-import { formatDocumentId } from "@/lib/dynamodb-adapters"
+import { formatDocumentId, type DashboardSubmissionRow } from "@/lib/dynamodb-adapters"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -47,6 +47,19 @@ function natureBadgeClass(nature: string | undefined, status: string) {
   return statusTextColor(status)
 }
 
+/** Pill combining the submission status with its major/minor nature. */
+function StatusBadge({ sub }: { sub: DashboardSubmissionRow }) {
+  return (
+    <span
+      className={`rounded-md px-2.5 py-1 text-xs font-bold ${natureBadgeClass(sub.nature, sub.status)}`}
+    >
+      {sub.nature
+        ? `${sub.status} (${sub.nature.charAt(0).toUpperCase() + sub.nature.slice(1)})`
+        : sub.status}
+    </span>
+  )
+}
+
 export function SubmissionsPanel() {
   const { state, actions } = useStudentDashboard()
 
@@ -72,7 +85,7 @@ export function SubmissionsPanel() {
       </div>
 
       <div className={layout.tableWrap}>
-        <Table className="w-full text-left">
+        <Table className={cn(layout.table, "min-w-0 sm:min-w-[36rem] text-left")}>
           <TableHeader>
             <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-600 uppercase">
               <TableHead className="pr-4 pb-3 font-bold">DOCUMENT ID</TableHead>
@@ -92,7 +105,7 @@ export function SubmissionsPanel() {
                 selected={state.columnFilters.venue}
                 onToggle={actions.toggleColumnFilter}
                 onClear={actions.clearColumnFilter}
-                className="pr-4"
+                className="hidden pr-4 sm:table-cell"
               />
               <SubmissionsFilterHeader
                 label="Classification"
@@ -102,13 +115,13 @@ export function SubmissionsPanel() {
                 onToggle={actions.toggleColumnFilter}
                 onClear={actions.clearColumnFilter}
                 capitalize
-                className="pr-4"
+                className="hidden pr-4 sm:table-cell"
               />
               <SubmissionsSortHeader
                 label="Date Applied"
                 direction={state.dateSortDirection}
                 onSort={actions.toggleDateSort}
-                className="pr-4"
+                className="hidden pr-4 sm:table-cell"
               />
               <SubmissionsFilterHeader
                 label="Current Signatory"
@@ -117,7 +130,7 @@ export function SubmissionsPanel() {
                 selected={state.columnFilters.signatory}
                 onToggle={actions.toggleColumnFilter}
                 onClear={actions.clearColumnFilter}
-                className="pr-4"
+                className="hidden pr-4 sm:table-cell"
               />
               <SubmissionsFilterHeader
                 label="Status"
@@ -127,7 +140,7 @@ export function SubmissionsPanel() {
                 onToggle={actions.toggleColumnFilter}
                 onClear={actions.clearColumnFilter}
                 align="right"
-                className="text-right"
+                className="hidden pl-2 text-right sm:table-cell"
               />
             </TableRow>
           </TableHeader>
@@ -204,32 +217,31 @@ export function SubmissionsPanel() {
                   >
                     {formatDocumentId(sub.submission_id)}
                   </TableCell>
-                  <TableCell className="py-3.5 pr-6 text-xs font-semibold text-[#1E293B]">
+                  <TableCell className="py-3.5 pr-6 text-xs font-semibold break-words text-[#1E293B]">
                     {sub.activity_details.title}
                     {sub.is_collaboration ? (
                       <CollabBadge role={sub.role ?? "proponent"} />
                     ) : null}
+                    {/* Mobile: the STATUS column is hidden, so the badge rides
+                        under the title instead of forcing a horizontal scroll. */}
+                    <span className="mt-1 block w-fit sm:hidden">
+                      <StatusBadge sub={sub} />
+                    </span>
                   </TableCell>
-                  <TableCell className="py-3.5 pr-4 text-xs text-[#64748B]">
+                  <TableCell className="hidden py-3.5 pr-4 text-xs text-[#64748B] sm:table-cell">
                     {sub.activity_details.venue || "—"}
                   </TableCell>
-                  <TableCell className="py-3.5 pr-4 text-xs text-[#64748B] capitalize">
+                  <TableCell className="hidden py-3.5 pr-4 text-xs text-[#64748B] capitalize sm:table-cell">
                     {sub.activity_classification}
                   </TableCell>
-                  <TableCell className="py-3.5 pr-4 text-xs whitespace-nowrap text-[#64748B]">
+                  <TableCell className="hidden py-3.5 pr-4 text-xs whitespace-nowrap text-[#64748B] sm:table-cell">
                     {sub.submitted_date}
                   </TableCell>
-                  <TableCell className="py-3.5 pr-4 text-xs font-medium text-[#475569]">
+                  <TableCell className="hidden py-3.5 pr-4 text-xs font-medium text-[#475569] sm:table-cell">
                     {sub.current_signatory}
                   </TableCell>
-                  <TableCell className="py-3.5 text-right whitespace-nowrap">
-                    <span
-                      className={`rounded-md px-2.5 py-1 text-xs font-bold ${natureBadgeClass(sub.nature, sub.status)}`}
-                    >
-                      {sub.nature
-                        ? `${sub.status} (${sub.nature.charAt(0).toUpperCase() + sub.nature.slice(1)})`
-                        : sub.status}
-                    </span>
+                  <TableCell className="hidden py-3.5 text-right whitespace-nowrap sm:table-cell">
+                    <StatusBadge sub={sub} />
                   </TableCell>
                 </TableRow>
               ))

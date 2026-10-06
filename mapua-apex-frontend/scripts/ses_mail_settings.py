@@ -25,8 +25,12 @@ IMPORTANT for this repo: the backend sends mail through the SES *API*
 at runtime it only reads `MAIL_FROM_ADDRESS`. The full SMTP set above is what
 you would need if the transport were switched to the SES SMTP interface.
 
-The password is masked in the printed output unless `--reveal` is passed, and
-nothing is written to any `.env` file.
+The password is masked in the printed output unless `--reveal` is passed. With
+`--write-env` the resolved keys are rewritten in place in the target `.env`
+(default: the repo-root master `.env`); only the MAIL_* lines already present or
+newly appended change, every other line is preserved byte-for-byte, empty-valued
+keys are skipped so existing entries are never blanked, and no secret value is
+ever printed back - the run reports only which keys were updated.
 
 Examples:
 
@@ -38,6 +42,9 @@ Examples:
 
     # Machine-readable:
     python scripts/ses_mail_settings.py --json
+
+    # Write the MAIL_* block into the repo-root .env in place (values not shown):
+    python scripts/ses_mail_settings.py --write-env --from-address mapuaapex@gmail.com
 
     from ses_mail_settings import gather_mail_settings
     settings = gather_mail_settings(port=465, reveal=True)
@@ -195,6 +202,9 @@ def gather_mail_settings(
         "MAIL_PASSWORD": password if reveal else _mask(password),
         "MAIL_FROM_ADDRESS": sender,
         "MAIL_FROM_NAME": from_name or os.environ.get("APP_NAME") or "",
+        # The real (unmasked) SMTP password, kept private so --write-env can use
+        # it without it ever reaching the printed/stdout representation above.
+        "_smtp_password": password or "",
         "_notes": notes,
         "_verified_identities": verified,
     }
@@ -203,24 +213,98 @@ def gather_mail_settings(
 def _mask(value: str | None) -> str:
     return "******** (hidden; pass --reveal to show)" if value else ""
 
+# The eight keys that make up the MAIL_* block, in canonical order.
+MAIL_KEYS = [
+    "MAIL_MAILER",
+    "MAIL_SCHEME",
+    "MAIL_HOST",
+    "MAIL_PORT",
+    "MAIL_USERNAME",
+    "MAIL_PASSWORD",
+    "MAIL_FROM_ADDRESS",
+    "MAIL_FROM_NAME",
+]
+
+
+def _env_line(key: str, value: str) -> str:
+    """Render one `KEY=value` line, quoting anything phpdotenv would reject.
+
+    The root `.env` is parsed by vlucas/phpdotenv (via Laravel), which aborts on
+    unquoted values with internal spaces, so space-bearing values are wrapped in
+    double quotes (Vite transparently strips them again).
+    """
+    if value == "" or " " in value or "#" in value:
+        return f'{key}="{value}"'
+    return f"{key}={value}"
+
 
 def _to_env_lines(settings: dict[str, Any]) -> str:
-    keys = [
-        "MAIL_MAILER",
-        "MAIL_SCHEME",
-        "MAIL_HOST",
-        "MAIL_PORT",
-        "MAIL_USERNAME",
-        "MAIL_PASSWORD",
-        "MAIL_FROM_ADDRESS",
-        "MAIL_FROM_NAME",
-    ]
-    lines = []
-    for key in keys:
-        value = settings[key]
-        needs_quotes = value == "" or (" " in value) or value.startswith("-")
-        lines.append(f'{key}="{value}"' if needs_quotes else f"{key}={value}")
-    return "\n".join(lines)
+    return "\n".join(_env_line(key, settings[key]) for key in MAIL_KEYS)
+
+
+def repo_root_env_path() -> str:
+    """Absolute path to the monorepo master `.env` (two levels above scripts/)."""
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.dirname(os.path.dirname(scripts_dir))
+    return os.path.join(root, ".env")
+
+
+def write_env_file(settings: dict[str, Any], path: str) -> dict[str, list[str]]:
+    """Rewrite the MAIL_* keys in `.env` in place; return key names only.
+
+    Only lines for the MAIL_* keys are touched - every other line (APP_KEY, AWS
+    credentials, comments, blanks) is preserved verbatim. Keys with an empty
+    resolved value are skipped so existing entries are never blanked. The real
+    SMTP password (from the private `_smtp_password`) is written to
+    MAIL_PASSWORD. No value is returned or printed, only which keys changed.
+    """
+    with open(path, "r", encoding="utf-8") as handle:
+        original = handle.read()
+
+    trailing_newline = original.endswith("\n")
+    lines = original.split("\n")
+    if trailing_newline:
+        lines = lines[:-1]  # drop the empty element created by the final newline
+
+    # Values to write; MAIL_PASSWORD uses the real password, not the mask.
+    to_write = {key: settings.get(key, "") for key in MAIL_KEYS}
+    to_write["MAIL_PASSWORD"] = settings.get("_smtp_password", "")
+    to_write = {key: value for key, value in to_write.items() if value != ""}
+
+    seen: set[str] = set()
+    updated: list[str] = []
+    output: list[str] = []
+    for line in lines:
+        key = _match_key(line)
+        if key and key in to_write:
+            output.append(_env_line(key, to_write[key]))
+            seen.add(key)
+            updated.append(key)
+        else:
+            output.append(line)
+
+    appended = [key for key in MAIL_KEYS if key in to_write and key not in seen]
+    output.extend(_env_line(key, to_write[key]) for key in appended)
+
+    text = "\n".join(output)
+    if trailing_newline or appended:
+        text += "\n"
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+    return {"updated": updated, "appended": appended, "skipped_empty": [k for k in MAIL_KEYS if k not in to_write]}
+
+
+def _match_key(line: str) -> str | None:
+    """Return the MAIL_* key this line assigns (handles `export KEY=`), else None."""
+    stripped = line.lstrip()
+    if stripped.startswith("export "):
+        stripped = stripped[len("export "):].lstrip()
+    name, sep, _ = stripped.partition("=")
+    if not sep:
+        return None
+    name = name.strip()
+    return name if name in MAIL_KEYS else None
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -234,6 +318,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--profile", help="Named AWS profile to use instead of the default chain.")
     parser.add_argument("--reveal", action="store_true", help="Print the real SMTP password (masked by default).")
     parser.add_argument("--skip-aws-lookup", action="store_true", help="Do not call SES APIs (only derive SMTP credentials).")
+    parser.add_argument(
+        "--write-env",
+        nargs="?",
+        const="__REPO_ROOT__",
+        default=None,
+        metavar="PATH",
+        help="Rewrite the MAIL_* keys in the given .env in place (default: the repo-root master .env). Values are not printed.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit the settings as JSON instead of .env lines.")
     return parser.parse_args(argv)
 
@@ -256,8 +348,28 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {error}", file=sys.stderr)
         return 1
 
+    if args.write_env:
+        path = repo_root_env_path() if args.write_env == "__REPO_ROOT__" else args.write_env
+        try:
+            summary = write_env_file(settings, path)
+        except OSError as error:
+            print(f"error: could not write {path}: {error}", file=sys.stderr)
+            return 1
+        # Report only key NAMES - never the values written into the file.
+        print(f"Wrote MAIL_* keys to {path}")
+        if summary["updated"]:
+            print(f"  updated : {', '.join(summary['updated'])}")
+        if summary["appended"]:
+            print(f"  appended: {', '.join(summary['appended'])}")
+        if summary["skipped_empty"]:
+            print(f"  skipped (empty value, existing entry left untouched): {', '.join(summary['skipped_empty'])}")
+        for note in settings.get("_notes", []):
+            print(f"# note: {note}", file=sys.stderr)
+        return 0
+
     if args.json:
-        print(json.dumps(settings, indent=2))
+        # Never serialize the private real-password field.
+        print(json.dumps({key: value for key, value in settings.items() if key != "_smtp_password"}, indent=2))
     else:
         print(_to_env_lines(settings))
 

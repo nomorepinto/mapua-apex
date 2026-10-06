@@ -77,6 +77,11 @@ function AddOrganizationForm() {
               key={item.value}
               label={item.label}
               onValueChange={(value) => actions.changeDesk(item.value, value)}
+              optionalLabel={
+                item.value === "dean" && state.isHigherCouncil
+                  ? "Not required — higher councils skip the dean desk."
+                  : undefined
+              }
               placeholder={`Search ${item.label.toLowerCase()}`}
               value={state.desks[item.value]}
             />
@@ -102,7 +107,9 @@ function AddOrganizationForm() {
           ) : null}
 
           {state.sharedAccountsReady &&
-          state.missingAssignable.length > 0 &&
+          state.missingAssignable.some(
+            (item) => !(item.value === "dean" && state.isHigherCouncil)
+          ) &&
           !state.signatoriesLoading ? (
             <Alert variant="warning">
               <AlertTitle>Dean and adviser required</AlertTitle>
@@ -147,8 +154,9 @@ function ImportOrganizationsCsv() {
       <CardHeader>
         <CardTitle>Import CSV</CardTitle>
         <CardDescription>
-          Four columns: organization name, dean, adviser, is_higher_council.
-          Shared admin and CDM are attached automatically.
+          Four columns: organization name, dean, adviser, is_higher_council. The
+          dean may be left empty for higher councils. Shared admin and CDM are
+          attached automatically.
         </CardDescription>
       </CardHeader>
       <CardPanel className="flex flex-col gap-4">

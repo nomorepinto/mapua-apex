@@ -14,7 +14,7 @@ export function AdminOrganizationsPage() {
       <div className={layout.page}>
         <div className={cn(layout.container, layout.stack)}>
           <FormPageHeader
-            subtitle="Assign a dean and adviser to each organization. Admin, CDM, and OSAAR are shared accounts used by every organization."
+            subtitle="Assign a dean and adviser to each organization. Higher councils skip the dean — an adviser is enough. Admin, CDM, and OSAAR are shared accounts used by every organization."
             title="Organizations"
           />
           <OrganizationsLoadAlert />

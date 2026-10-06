@@ -195,6 +195,10 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       const selected: Partial<AssignableDesks> = {}
 
       for (const item of ORGANIZATION_ASSIGNABLE_DESK_ITEMS) {
+        // Higher-council rows skip the dean desk — an empty dean column is valid.
+        if (item.value === "dean" && row.is_higher_council && !row.desks.dean) {
+          continue
+        }
         const { match, ambiguous } = resolveSignatoryByRole(
           signatories,
           item.value,
@@ -220,12 +224,12 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (rowFailed || !selected.dean || !selected.adviser) {
+      if (rowFailed || !selected.adviser) {
         continue
       }
 
       const assignments = withSharedDesks(
-        selected.dean,
+        selected.dean ?? null,
         selected.adviser,
         signatories
       )
@@ -296,7 +300,11 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       setFormError("Register shared admin, CDM, and OSAAR accounts first.")
       return
     }
-    if (!desks.dean || !desks.adviser) {
+    if (!desks.adviser) {
+      setFormError("Select an adviser.")
+      return
+    }
+    if (!isHigherCouncil && !desks.dean) {
       setFormError("Select a dean and an adviser.")
       return
     }
@@ -383,7 +391,11 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       setEditError("That organization is already registered.")
       return
     }
-    if (!editDesks.dean || !editDesks.adviser) {
+    if (!editDesks.adviser) {
+      setEditError("Select an adviser.")
+      return
+    }
+    if (!editIsHigherCouncil && !editDesks.dean) {
       setEditError("Select a dean and an adviser.")
       return
     }
@@ -499,7 +511,15 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         setDesks((current) => ({ ...current, [role]: next }))
         if (formError) setFormError("")
       },
-      setIsHigherCouncil,
+      setIsHigherCouncil: (checked) => {
+        setIsHigherCouncil(checked)
+        // A higher council skips the dean desk, so drop any dean selection made
+        // while the flag was off.
+        if (checked) {
+          setDesks((current) => ({ ...current, dean: null }))
+        }
+        if (formError) setFormError("")
+      },
       handleAddOne,
       chooseCsv: (file, text) => {
         if (!file) {
@@ -532,7 +552,13 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         setEditDesks((current) => ({ ...current, [role]: next }))
         if (editError) setEditError("")
       },
-      setEditIsHigherCouncil,
+      setEditIsHigherCouncil: (checked) => {
+        setEditIsHigherCouncil(checked)
+        if (checked) {
+          setEditDesks((current) => ({ ...current, dean: null }))
+        }
+        if (editError) setEditError("")
+      },
       handleEditSave,
       setDeleteOpen: (open) => {
         setDeleteOpen(open)

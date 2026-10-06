@@ -77,6 +77,11 @@ export function EditOrganizationDialog() {
                 key={item.value}
                 label={item.label}
                 onValueChange={(value) => actions.changeEditDesk(item.value, value)}
+                optionalLabel={
+                  item.value === "dean" && state.editIsHigherCouncil
+                    ? "Not required — higher councils skip the dean desk."
+                    : undefined
+                }
                 placeholder={`Search ${item.label.toLowerCase()}`}
                 value={state.editDesks[item.value]}
               />

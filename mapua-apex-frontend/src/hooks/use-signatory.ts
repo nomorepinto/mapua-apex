@@ -91,6 +91,7 @@ export function useApproveSubmissionMutation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.queue })
+      queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.history })
       queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
       queryClient.invalidateQueries({ queryKey: ["submission-notifications"] })
     },
@@ -125,6 +126,7 @@ export function useReturnSubmissionMutation() {
     mutationFn: commentMutation("return"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.queue })
+      queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.history })
       queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
       queryClient.invalidateQueries({ queryKey: ["submission-notifications"] })
     },
@@ -141,6 +143,7 @@ export function useDenySubmissionMutation() {
     mutationFn: commentMutation("deny"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.queue })
+      queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.history })
       queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
       queryClient.invalidateQueries({ queryKey: ["submission-notifications"] })
     },

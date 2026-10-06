@@ -65,6 +65,7 @@ export function SignatoryDeskCombobox({
   items,
   label,
   onValueChange,
+  optionalLabel,
   placeholder,
   value,
 }: {
@@ -72,6 +73,7 @@ export function SignatoryDeskCombobox({
   items: SignatoryOption[]
   label: string
   onValueChange: (value: SignatoryOption | null) => void
+  optionalLabel?: string
   placeholder: string
   value: SignatoryOption | null
 }) {
@@ -101,6 +103,7 @@ export function SignatoryDeskCombobox({
           </ComboboxList>
         </ComboboxPopup>
       </Combobox>
+      {optionalLabel ? <FieldDescription>{optionalLabel}</FieldDescription> : null}
     </Field>
   )
 }
