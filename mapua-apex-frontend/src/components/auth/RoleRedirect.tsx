@@ -35,14 +35,19 @@ export function RoleRedirect() {
     return <Navigate to="/admin/dashboard" replace />
   }
 
-  // CDM Reviewer → signatories panel
+  // CDM Reviewer → own panel
   if (hasGroup(userGroups, "cdm_reviewer")) {
-    return <Navigate to="/signatories/dashboard" replace />
+    return <Navigate to="/cdm-reviewer/dashboard" replace />
   }
 
-  // Org Adviser & Dean → signatories panel
-  if (hasGroup(userGroups, "org_adviser") || hasGroup(userGroups, "dean")) {
-    return <Navigate to="/signatories/dashboard" replace />
+  // Dean → own panel
+  if (hasGroup(userGroups, "dean")) {
+    return <Navigate to="/dean/dashboard" replace />
+  }
+
+  // Org Adviser → own panel
+  if (hasGroup(userGroups, "org_adviser")) {
+    return <Navigate to="/org-adviser/dashboard" replace />
   }
 
   // Org Submitter (student orgs) → student panel

@@ -5,25 +5,20 @@ import { AppSidebar } from "@/components/layout/app-sidebar"
 import { AuthGuard } from "@/components/auth/AuthGuard"
 import { layout } from "@/config"
 
-const SIGNATORY_NAV = [
+const CDM_REVIEWER_NAV = [
   {
     label: "Dashboard",
-    to: "/signatories/dashboard",
+    to: "/cdm-reviewer/dashboard",
     icon: HomeIcon,
     end: true,
   },
 ]
 
-export function SignatoriesLayout() {
+export function CdmReviewerLayout() {
   return (
-    <AuthGuard allowedGroups={["admin", "osaar", "cdm_reviewer", "org_adviser", "dean"]}>
+    <AuthGuard allowedGroups={["admin", "cdm_reviewer"]}>
       <div className={layout.frame}>
-        <AppSidebar
-          homeTo="/signatories/dashboard"
-          items={SIGNATORY_NAV}
-          switchPanelLabel="Admin Dashboard"
-          switchPanelTo="/admin/dashboard"
-        />
+        <AppSidebar homeTo="/cdm-reviewer/dashboard" items={CDM_REVIEWER_NAV} />
         <main className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto">
           <Outlet />
         </main>

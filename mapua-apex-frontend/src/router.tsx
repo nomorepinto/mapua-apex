@@ -2,7 +2,9 @@ import { createBrowserRouter, Navigate, Outlet } from "react-router"
 
 import { layout } from "@/config"
 import { AdminLayout } from "@/routes/layouts/admin-layout"
-import { SignatoriesLayout } from "@/routes/layouts/signatories-layout"
+import { CdmReviewerLayout } from "@/routes/layouts/cdm-reviewer-layout"
+import { DeanLayout } from "@/routes/layouts/dean-layout"
+import { OrgAdviserLayout } from "@/routes/layouts/org-adviser-layout"
 import { StudentsLayout } from "@/routes/layouts/students-layout"
 
 function RouteFallback() {
@@ -83,8 +85,8 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "signatories",
-    Component: SignatoriesLayout,
+    path: "cdm-reviewer",
+    Component: CdmReviewerLayout,
     children: [
       {
         index: true,
@@ -94,8 +96,64 @@ export const router = createBrowserRouter([
         path: "dashboard",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { Dashboard } = await import("@/routes/signatories/dashboard")
-          return { Component: Dashboard }
+          const { CdmReviewerDashboard } = await import(
+            "@/routes/cdm-reviewer/dashboard"
+          )
+          return { Component: CdmReviewerDashboard }
+        },
+      },
+      {
+        path: "about",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { About } = await import("@/routes/about")
+          return { Component: About }
+        },
+      },
+    ],
+  },
+  {
+    path: "dean",
+    Component: DeanLayout,
+    children: [
+      {
+        index: true,
+        Component: () => <Navigate to="dashboard" replace />,
+      },
+      {
+        path: "dashboard",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { DeanDashboard } = await import("@/routes/dean/dashboard")
+          return { Component: DeanDashboard }
+        },
+      },
+      {
+        path: "about",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { About } = await import("@/routes/about")
+          return { Component: About }
+        },
+      },
+    ],
+  },
+  {
+    path: "org-adviser",
+    Component: OrgAdviserLayout,
+    children: [
+      {
+        index: true,
+        Component: () => <Navigate to="dashboard" replace />,
+      },
+      {
+        path: "dashboard",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { OrgAdviserDashboard } = await import(
+            "@/routes/org-adviser/dashboard"
+          )
+          return { Component: OrgAdviserDashboard }
         },
       },
       {
@@ -143,6 +201,26 @@ export const router = createBrowserRouter([
           )
           return { Component: AdminSignatoriesPage }
         },
+      },
+      {
+        path: "review",
+        Component: PassThroughLayout,
+        children: [
+          {
+            index: true,
+            Component: () => <Navigate to="dashboard" replace />,
+          },
+          {
+            path: "dashboard",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminReviewDashboard } = await import(
+                "@/routes/admin/review-dashboard"
+              )
+              return { Component: AdminReviewDashboard }
+            },
+          },
+        ],
       },
       {
         path: "about",

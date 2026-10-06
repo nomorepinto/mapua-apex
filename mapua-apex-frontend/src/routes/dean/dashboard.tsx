@@ -6,7 +6,7 @@ import { SubmissionHistorySection } from "@/components/signatories/dashboard/sub
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
-export function Dashboard() {
+export function DeanDashboard() {
   return (
     <ReviewDashboardProvider>
       <div className={layout.page}>
