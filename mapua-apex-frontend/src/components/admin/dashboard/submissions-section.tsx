@@ -1,12 +1,9 @@
-import {
-  FILTER_LABEL_CLASS,
-  FilterSelect,
-} from "@/components/admin/dashboard/filter-select"
-import {
-  STATUS_FILTERS,
-  TYPE_FILTERS,
-  useAdminDashboard,
-} from "@/components/admin/dashboard/admin-dashboard-context"
+import { SearchIcon } from "lucide-react"
+
+import { useAdminDashboard } from "@/components/admin/dashboard/admin-dashboard-context"
+import { SubmissionsFilterHeader } from "@/components/admin/dashboard/submissions-filter-header"
+import { SubmissionsSortHeader } from "@/components/admin/dashboard/submissions-sort-header"
+import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -27,48 +24,20 @@ export function AdminSubmissionsSection() {
         <div className="min-w-0 sm:max-w-sm">
           <h2 className="text-lg font-extrabold text-neutral-900">Submissions</h2>
           <p className="text-xs text-neutral-500">
-            Filter by organization, status, or activity type, then open a row
+            Search every column or filter by a column header, then open a row
             for the full SAAF record.
           </p>
         </div>
-        <div className="flex flex-col gap-3 sm:items-end">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className={FILTER_LABEL_CLASS}>
-              <label htmlFor="status-filter">Status</label>
-              <FilterSelect
-                id="status-filter"
-                items={STATUS_FILTERS}
-                value={state.status}
-                onValueChange={(next) =>
-                  actions.setStatus(
-                    next as "" | "pending" | "approved" | "denied" | "returned"
-                  )
-                }
-              />
-            </div>
-            <div className={FILTER_LABEL_CLASS}>
-              <label htmlFor="activity-type-filter">Activity type</label>
-              <FilterSelect
-                id="activity-type-filter"
-                items={TYPE_FILTERS}
-                value={state.activityType}
-                onValueChange={actions.setActivityType}
-              />
-            </div>
-          </div>
-          <div className={cn(FILTER_LABEL_CLASS, "sm:w-auto sm:self-stretch")}>
-            <label htmlFor="organization-filter">Organization</label>
-            <FilterSelect
-              id="organization-filter"
-              items={[
-                { value: "", label: "All organizations" },
-                ...state.organizations.map((organization) => ({
-                  value: organization.organization_id,
-                  label: organization.name,
-                })),
-              ]}
-              value={state.organizationId}
-              onValueChange={actions.setOrganizationId}
+        <div className="w-full sm:max-w-xs sm:w-auto">
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
+            <Input
+              aria-label="Search submissions"
+              className="pl-9"
+              onChange={(event) => actions.setSearch(event.currentTarget.value)}
+              placeholder="Search all columns"
+              type="search"
+              value={state.search}
             />
           </div>
         </div>
@@ -79,23 +48,53 @@ export function AdminSubmissionsSection() {
           <TableHeader>
             <TableRow className="border-b border-neutral-200 text-neutral-500">
               <TableHead className="text-xs font-bold uppercase">Event</TableHead>
-              <TableHead className="text-xs font-bold uppercase">
-                Organization
-              </TableHead>
-              <TableHead className="text-xs font-bold uppercase">Type</TableHead>
-              <TableHead className="text-xs font-bold uppercase">
-                Submitted
-              </TableHead>
-              <TableHead className="text-right text-xs font-bold uppercase">
-                Status
-              </TableHead>
+              <SubmissionsFilterHeader
+                label="Organization"
+                column="organization"
+                options={state.filterOptions.organization}
+                selected={state.columnFilters.organization}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+              />
+              <SubmissionsFilterHeader
+                label="Department"
+                column="department"
+                options={state.filterOptions.department}
+                selected={state.columnFilters.department}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+              />
+              <SubmissionsFilterHeader
+                label="Type"
+                column="type"
+                capitalize
+                options={state.filterOptions.type}
+                selected={state.columnFilters.type}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+              />
+              <SubmissionsSortHeader
+                label="Submitted"
+                direction={state.dateSortDirection}
+                onSort={actions.toggleDateSort}
+              />
+              <SubmissionsFilterHeader
+                label="Status"
+                column="status"
+                align="right"
+                className="text-right"
+                options={state.filterOptions.status}
+                selected={state.columnFilters.status}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+              />
             </TableRow>
           </TableHeader>
           <TableBody>
             {state.submissionsLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-12 text-center text-sm text-neutral-400"
                 >
                   Loading submissions…
@@ -104,23 +103,27 @@ export function AdminSubmissionsSection() {
             ) : state.submissionsError ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-12 text-center text-sm text-rose-600"
                 >
                   Could not load submissions.
                 </TableCell>
               </TableRow>
-            ) : state.rows.length === 0 ? (
+            ) : state.filteredRows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-12 text-center text-sm text-neutral-400"
                 >
-                  No submissions match these filters.
+                  {state.rows.length === 0
+                    ? "No submissions to review yet."
+                    : state.search.trim()
+                      ? `No submissions match “${state.search.trim()}”.`
+                      : "No submissions match the selected filters."}
                 </TableCell>
               </TableRow>
             ) : (
-              state.rows.map((row) => (
+              state.filteredRows.map((row) => (
                 <TableRow
                   key={`${row.event_id}:${row.submission_id}`}
                   className="cursor-pointer hover:bg-neutral-50"
@@ -141,6 +144,9 @@ export function AdminSubmissionsSection() {
                   </TableCell>
                   <TableCell className="text-sm text-neutral-700">
                     {row.organization_name}
+                  </TableCell>
+                  <TableCell className="text-sm text-neutral-700">
+                    {row.department}
                   </TableCell>
                   <TableCell className="text-xs text-neutral-500 capitalize">
                     {row.activity_classification}

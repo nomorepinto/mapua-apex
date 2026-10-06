@@ -16,6 +16,7 @@ import {
 import type { SaafDraft } from "@/components/submission/types"
 import type { Activity } from "@/components/ui/activity.types"
 import { getEventSchedule } from "@/lib/event-schedule"
+import { departmentAbbreviation } from "@/lib/departments"
 
 /**
  * Backend API Submission shape returned by Laravel DynamoDB routes
@@ -370,6 +371,8 @@ export interface DashboardSubmissionRow {
   event_id: string
   submission_id: string
   organization_name: string
+  /** Abbreviation/code of the lead proponent's department (e.g. "SOIT"; "—" when unavailable). */
+  department: string
   id: string
   activity_classification: string
   /** OSAAR-assigned event nature (major / minor). Undefined until OSAAR sets it. */
@@ -694,6 +697,7 @@ export function apiSubmissionToDashboardRow(
         submissionOrganizationId(submission),
         organizations || []
       ),
+    department: departmentAbbreviation(firstProponent?.department),
     id: submission.submission_id,
     activity_classification: submission.activity_classification?.activity_type || "extra-curricular",
     nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,

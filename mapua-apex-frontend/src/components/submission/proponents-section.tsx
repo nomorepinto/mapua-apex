@@ -1,6 +1,7 @@
 import { PlusIcon } from "lucide-react"
 
 import { ProponentCard } from "@/components/submission/proponent-card"
+import { MAX_PROPONENTS } from "@/components/submission/constants"
 import type { Proponent } from "@/components/submission/types"
 import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import { layout } from "@/config"
@@ -21,6 +22,7 @@ export function ProponentsSection({
   onDepartmentChange: (id: string, value: string) => void
 }) {
   const canRemove = proponents.length > 1
+  const atMax = proponents.length >= MAX_PROPONENTS
   // Every proponent belongs to the applying organization, so its name is
   // auto-filled rather than typed.
   const currentOrgQuery = useCurrentOrganizationQuery()
@@ -42,14 +44,20 @@ export function ProponentsSection({
         />
       ))}
 
-      <button
-        type="button"
-        onClick={onAdd}
-        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white/40 py-3.5 text-sm font-medium text-neutral-700 shadow-xs transition-all hover:border-red-600 hover:bg-red-50/30 hover:text-red-700"
-      >
-        <PlusIcon className="h-4 w-4 text-neutral-600" />
-        <span>Add Proponent</span>
-      </button>
+      {atMax ? (
+        <p className="text-center text-xs text-neutral-500" role="note">
+          Maximum of {MAX_PROPONENTS} proponents reached.
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white/40 py-3.5 text-sm font-medium text-neutral-700 shadow-xs transition-all hover:border-red-600 hover:bg-red-50/30 hover:text-red-700"
+        >
+          <PlusIcon className="h-4 w-4 text-neutral-600" />
+          <span>Add Proponent</span>
+        </button>
+      )}
     </div>
   )
 }

@@ -41,3 +41,20 @@ export function resolveDepartment(value: string): string | null {
   )
   return match?.code ?? needle
 }
+
+/**
+ * Reduces a department value to just its abbreviation/code. The SAAF proponent
+ * picker stores the full label with the code in trailing parentheses (e.g.
+ * "School of Information Technology (SOIT)"), so that code is extracted when
+ * present; otherwise a bare code or full school name is resolved through
+ * resolveDepartment. Empty or placeholder values yield "—".
+ */
+export function departmentAbbreviation(
+  value: string | null | undefined
+): string {
+  const trimmed = (value ?? "").trim()
+  if (!trimmed || trimmed === "—") return "—"
+  const parenthesized = trimmed.match(/\(([^)]+)\)\s*$/)
+  if (parenthesized) return parenthesized[1].trim().toUpperCase()
+  return resolveDepartment(trimmed) || trimmed.toUpperCase()
+}
