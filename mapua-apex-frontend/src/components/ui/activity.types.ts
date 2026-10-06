@@ -49,9 +49,13 @@ export interface Activity {
   title: string
   org: string
   department: string
+  /** Abbreviation/code of the lead proponent's department (e.g. "SOIT"; "—" when unavailable). */
+  departmentCode: string
   date: string
   time?: string
   submittedDate: string
+  /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
+  submittedAt: string
   representative: string
   decision: ActivityDecision
   type: string

@@ -773,12 +773,14 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     title,
     org: submission.organization_name || firstProponent?.org_or_course_section || "Organization",
     department: firstProponent?.department || "—",
+    departmentCode: departmentAbbreviation(firstProponent?.department),
     date: formatDisplayDateRange(
       submission.activity_details?.date_of_event,
       submission.activity_details?.end_date_of_event
     ),
     time: submission.activity_details?.time_of_event || "",
     submittedDate: formatDisplayDate(submission.sent_at),
+    submittedAt: submission.sent_at || "",
     representative: formatProponentName(firstProponent) || "—",
     type: submission.activity_classification?.activity_type || "extra-curricular",
     nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,
