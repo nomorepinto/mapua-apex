@@ -1,6 +1,5 @@
 import { ActivityDetailModal } from "@/components/ui/activity-detail-modal"
 import { ActivityRow } from "@/components/ui/activity-row"
-import { ReviewDashboardSearch } from "@/components/signatories/dashboard/review-dashboard-search"
 import {
   Table,
   TableBody,
