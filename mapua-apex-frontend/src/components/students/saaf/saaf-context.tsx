@@ -216,7 +216,17 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       goNext,
       goBack,
       markTouched,
-      updateField: form.updateField,
+      updateField: <K extends keyof SaafDraft>(key: K, value: SaafDraft[K]) => {
+        form.updateField(key, value)
+        // "Time of event" is a single warning (`timeOfEvent`) but is edited
+        // through several nameless selects (start/end hour, minute, period), so
+        // the form's blur delegation can't map them to it. Touch the composite
+        // key on any of those edits so an out-of-window (7AM–9PM) or mis-ordered
+        // time surfaces the moment it is picked, not only after Continue/Submit.
+        if (typeof key === "string" && key.startsWith("timeOfEvent")) {
+          markTouched("timeOfEvent")
+        }
+      },
       handleUpdateProponent: form.handleUpdateProponent,
       handleRemoveProponent: form.handleRemoveProponent,
       handleAddProponent: form.handleAddProponent,

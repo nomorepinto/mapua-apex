@@ -36,22 +36,60 @@ export function SaafStepper({
   // index must clamp instead of reading past the end.
   const activeStep = Math.min(step, steps.length - 1)
 
+  // Per-step display state, shared by the mobile ball rail and the desktop
+  // cards so the two layouts stay in lockstep.
+  const stepStates = steps.map((item, index) => {
+    const active = index === activeStep
+    const reached = index <= farthestStep
+    const done = reached && !active
+    return { item, index, active, done, clickable: done }
+  })
+
   return (
     <div className="space-y-3">
       {eventTitle ? (
         <p className="text-sm font-semibold text-neutral-800">{eventTitle}</p>
       ) : null}
+
+      {/* Mobile: a centered progress rail of numbered balls joined by a line
+          that fills as steps are reached. The step name lives in the caption
+          below, so the balls stay compact while keeping the same tap-to-jump
+          behavior as the desktop cards. */}
+      <ol className="flex items-center sm:hidden">
+        {stepStates.map(({ item, index, active, done, clickable }) => (
+          <li
+            key={item.id}
+            className={cn("flex items-center", index > 0 && "flex-1")}
+          >
+            {index > 0 && (
+              <span
+                aria-hidden
+                className={cn(
+                  "h-0.5 flex-1 rounded-full",
+                  index <= farthestStep ? "bg-[#8B0000]" : "bg-neutral-200"
+                )}
+              />
+            )}
+            <StepBall
+              index={index}
+              active={active}
+              done={done}
+              clickable={clickable}
+              label={item.label}
+              onSelect={onStepSelect}
+            />
+          </li>
+        ))}
+      </ol>
+
+      {/* From `sm` up: the labelled cards. */}
       <ol
         className={cn(
-          "grid grid-cols-2 gap-2",
+          "hidden gap-2 sm:grid",
           includeReservation ? "sm:grid-cols-5" : "sm:grid-cols-4"
         )}
       >
-        {steps.map((item, index) => {
-          const active = index === activeStep
-          const reached = index <= farthestStep
-          const done = reached && !active
-          const clickable = done
+        {stepStates.map(({ item, index, active, done, clickable }) => {
           const className = cn(
             "flex min-h-11 w-full items-center gap-2 rounded-xl border px-3 py-2 text-left",
             active && "border-[#8B0000] bg-[#8B0000] text-white",
@@ -118,5 +156,49 @@ function StepMarker({
     >
       {index + 1}
     </span>
+  )
+}
+
+/**
+ * Mobile step marker: a numbered ball on the progress rail. Completed steps
+ * stay clickable (mirroring the desktop cards), the active step is solid, and
+ * steps not yet reached are muted.
+ */
+function StepBall({
+  index,
+  active,
+  done,
+  clickable,
+  label,
+  onSelect,
+}: {
+  index: number
+  active: boolean
+  done: boolean
+  clickable: boolean
+  label: string
+  onSelect: (step: WizardStepIndex) => void
+}) {
+  const className = cn(
+    "flex size-10 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B0000]/40",
+    active && "border-[#8B0000] bg-[#8B0000] text-white",
+    done &&
+      "cursor-pointer border-[#8B0000] bg-white text-[#8B0000] hover:bg-[#8B0000] hover:text-white",
+    !active && !done && "border-neutral-200 bg-white text-neutral-400"
+  )
+
+  return clickable ? (
+    <button
+      type="button"
+      className={className}
+      onClick={() => onSelect(index as WizardStepIndex)}
+      aria-label={`Go to ${label}`}
+    >
+      {index + 1}
+    </button>
+  ) : (
+    <div className={className} aria-current={active ? "step" : undefined}>
+      {index + 1}
+    </div>
   )
 }
