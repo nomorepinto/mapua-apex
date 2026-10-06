@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog"
 import { ConfirmSubmitModal } from "@/components/forms/confirm-submit-modal"
 import { ReturnProposalModal } from "./return-proposal-modal"
+import { ActivityBudgetTable } from "./activity-budget-table"
+import { ActivityReservationDetails } from "./activity-reservation-details"
 import type { Activity } from "./activity.types"
 import { useActivityDetail } from "@/hooks/use-activity-detail"
 import { brand, modal } from "@/config"
@@ -239,6 +241,17 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
                     ))}
                   </ul>
                 </div>
+
+                <ActivityBudgetTable
+                  items={activity.budgetItems}
+                  grandTotal={activity.budgetGrandTotal}
+                />
+
+                <ActivityReservationDetails
+                  equipmentRequested={activity.equipmentRequested}
+                  roomsRequested={activity.roomsRequested}
+                  avEquipmentRequested={activity.avEquipmentRequested}
+                />
               </div>
             )}
           </DialogPanel>
