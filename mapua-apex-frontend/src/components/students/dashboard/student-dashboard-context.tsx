@@ -12,6 +12,7 @@ import {
 import {
   apiDeadlinesToReminders,
   apiSubmissionToDashboardRow,
+  formatDocumentId,
   type ApiAnnouncement,
   type DashboardSubmissionRow,
   type DeadlineReminder,
@@ -21,6 +22,9 @@ import {
 interface StudentDashboardState {
   organizationName: string
   submissions: DashboardSubmissionRow[]
+  /** Submissions filtered by the table search box across all visible columns. */
+  filteredSubmissions: DashboardSubmissionRow[]
+  search: string
   submissionsLoading: boolean
   submissionsError: boolean
   announcements: ApiAnnouncement[]
@@ -40,6 +44,7 @@ interface StudentDashboardState {
 }
 
 interface StudentDashboardActions {
+  setSearch: (value: string) => void
   openTracker: (eventId: string, submissionId: string) => void
   closeTracker: () => void
   toggleReminders: () => void
@@ -73,6 +78,7 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
     submissionId: string
   } | null>(null)
   const [remindersExpanded, setRemindersExpanded] = useState(true)
+  const [search, setSearch] = useState("")
   const [dismissedReminderIds, setDismissedReminderIds] = useState<string[]>([])
   const [selectedNotice, setSelectedNotice] = useState<ReviewNotice | null>(null)
 
@@ -93,6 +99,30 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
       return true
     })
   }, [submissionsQuery.data, organizationQuery.data?.signatories])
+
+  const filteredSubmissions = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) {
+      return submissions
+    }
+    return submissions.filter((row) => {
+      const haystack = [
+        formatDocumentId(row.submission_id),
+        row.submission_id,
+        row.activity_details.title,
+        row.activity_details.venue,
+        row.activity_classification,
+        row.current_signatory,
+        row.submitted_date,
+        row.status,
+        row.nature ?? "",
+        row.organization_name,
+      ]
+        .join(" ")
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [search, submissions])
 
   const announcements = announcementsQuery.data || []
   const reviewNoticesQuery = useOrgReviewNoticesQuery(
@@ -119,6 +149,8 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
     state: {
       organizationName: organizationQuery.data?.name || "Organization",
       submissions,
+      filteredSubmissions,
+      search,
       submissionsLoading: submissionsQuery.isLoading,
       submissionsError: submissionsQuery.isError,
       announcements,
@@ -137,6 +169,7 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
       selectedNotice,
     },
     actions: {
+      setSearch,
       openTracker: (eventId, submissionId) => {
         setSelectedKeys({ eventId, submissionId })
         setTrackerOpen(true)

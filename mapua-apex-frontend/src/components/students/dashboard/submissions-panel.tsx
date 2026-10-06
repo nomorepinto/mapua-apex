@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
 import { formatDocumentId } from "@/lib/dynamodb-adapters"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
@@ -49,13 +50,23 @@ export function SubmissionsPanel() {
 
   return (
     <div className={cn(layout.section, "overflow-hidden")}>
-      <div className="mb-5">
-        <h2 className="text-lg font-bold text-[#1E293B] sm:text-xl">
-          Project Status & Submissions
-        </h2>
-        <p className="text-xs text-neutral-600">
-          Track current signatory routing and approval statuses
-        </p>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-[#1E293B] sm:text-xl">
+            Project Status & Submissions
+          </h2>
+          <p className="text-xs text-neutral-600">
+            Track current signatory routing and approval statuses
+          </p>
+        </div>
+        <Input
+          aria-label="Search submissions"
+          className="w-full min-w-0 sm:w-64"
+          onChange={(event) => actions.setSearch(event.currentTarget.value)}
+          placeholder="Search all columns"
+          type="search"
+          value={state.search}
+        />
       </div>
 
       <div className={layout.tableWrap}>
@@ -68,6 +79,7 @@ export function SubmissionsPanel() {
               <TableHead className="pr-4 pb-3 font-bold">
                 CLASSIFICATION
               </TableHead>
+              <TableHead className="pr-4 pb-3 font-bold">DATE APPLIED</TableHead>
               <TableHead className="pr-4 pb-3 font-bold">
                 CURRENT SIGNATORY
               </TableHead>
@@ -80,7 +92,7 @@ export function SubmissionsPanel() {
             {state.submissionsLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="py-12 text-center text-sm font-semibold text-neutral-600"
                 >
                   Loading submissions…
@@ -89,7 +101,7 @@ export function SubmissionsPanel() {
             ) : state.submissionsError ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={7}
                   className="py-12 text-center text-sm font-semibold text-rose-600"
                 >
                   Could not load submissions.
@@ -97,7 +109,7 @@ export function SubmissionsPanel() {
               </TableRow>
             ) : state.submissions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center">
+                <TableCell colSpan={7} className="py-12 text-center">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <p className="text-sm font-bold text-[#1E293B]">
                       No submissions yet
@@ -115,8 +127,17 @@ export function SubmissionsPanel() {
                   </div>
                 </TableCell>
               </TableRow>
+            ) : state.filteredSubmissions.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="py-12 text-center text-sm font-semibold text-neutral-600"
+                >
+                  No submissions match “{state.search}”.
+                </TableCell>
+              </TableRow>
             ) : (
-              state.submissions.map((sub) => (
+              state.filteredSubmissions.map((sub) => (
                 <TableRow
                   key={`${sub.event_id}:${sub.submission_id}`}
                   className="group cursor-pointer transition-colors hover:bg-neutral-50/80"
@@ -149,6 +170,9 @@ export function SubmissionsPanel() {
                   </TableCell>
                   <TableCell className="py-3.5 pr-4 text-xs text-[#64748B] capitalize">
                     {sub.activity_classification}
+                  </TableCell>
+                  <TableCell className="py-3.5 pr-4 text-xs whitespace-nowrap text-[#64748B]">
+                    {sub.submitted_date}
                   </TableCell>
                   <TableCell className="py-3.5 pr-4 text-xs font-medium text-[#475569]">
                     {sub.current_signatory}

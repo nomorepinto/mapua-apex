@@ -1,5 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useMemo, useState, type FormEvent, type ReactNode } from "react"
+import {
+  createContext,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react"
 import { use } from "react"
 
 import {
@@ -24,7 +30,11 @@ import {
   useUpdateSignatoryMutation,
 } from "@/hooks/use-admin"
 import { departmentLabel } from "@/lib/departments"
-import { buildSignatoryPayload, type ApiSignatory } from "@/lib/dynamodb-adapters"
+import {
+  buildSignatoryPayload,
+  formatDocumentId,
+  type ApiSignatory,
+} from "@/lib/dynamodb-adapters"
 import { parseSignatoryCsv, type SignatoryCsvRow } from "@/lib/parse-csv"
 
 const EMPTY_SIGNATORIES: ApiSignatory[] = []
@@ -95,7 +105,9 @@ const SignatoriesContext = createContext<SignatoriesContextValue | null>(null)
 export function useSignatoriesPage() {
   const value = use(SignatoriesContext)
   if (!value) {
-    throw new Error("useSignatoriesPage must be used within SignatoriesProvider")
+    throw new Error(
+      "useSignatoriesPage must be used within SignatoriesProvider"
+    )
   }
   return value
 }
@@ -176,6 +188,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       const haystack = [
         person.name,
         person.signatory_id,
+        formatDocumentId(person.signatory_id, "SIG"),
         person.role,
         signatoryRoleLabel(person.role),
         person.department ?? "",
@@ -323,7 +336,11 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
     try {
       await updateSignatory.mutateAsync({
         signatoryId: editing.signatory_id,
-        ...buildSignatoryPayload(editName.trim(), editRole, editDepartment?.value),
+        ...buildSignatoryPayload(
+          editName.trim(),
+          editRole,
+          editDepartment?.value
+        ),
       })
       setEditing(null)
       toastManager.add({
@@ -360,7 +377,9 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setDeleteOpen(false)
       setDeleteError(
-        error instanceof Error ? error.message : "Could not delete this signatory."
+        error instanceof Error
+          ? error.message
+          : "Could not delete this signatory."
       )
     }
   }
