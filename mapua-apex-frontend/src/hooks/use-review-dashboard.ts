@@ -19,7 +19,7 @@ import {
   useSignatorySubmissionDetailQuery,
   useUpdateEventClassificationMutation,
 } from "@/hooks/use-signatory"
-import { apiSubmissionToActivity } from "@/lib/dynamodb-adapters"
+import { apiSubmissionToActivity, formatDocumentId } from "@/lib/dynamodb-adapters"
 
 export function useReviewDashboard() {
   const auth = useAuth()
@@ -36,6 +36,7 @@ export function useReviewDashboard() {
 
   const [selectedDept, setSelectedDept] = useState<string | null>(null)
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
   const [activeKeys, setActiveKeys] = useState<{
     eventId: string
     submissionId: string
@@ -71,6 +72,10 @@ export function useReviewDashboard() {
 
   const handleOrgSelect = useCallback((org: string | null) => {
     setSelectedOrg(org)
+  }, [])
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value)
   }, [])
 
   const handleActivitySelect = useCallback((activity: Activity) => {
@@ -159,14 +164,29 @@ export function useReviewDashboard() {
     [departmentOrgMap]
   )
 
-  const filteredActivities =
-    !selectedDept && !selectedOrg
-      ? activitiesList
-      : activitiesList.filter((activity) => {
-          const deptMatch = !selectedDept || activity.department === selectedDept
-          const orgMatch = !selectedOrg || activity.org === selectedOrg
-          return deptMatch && orgMatch
-        })
+  const filteredActivities = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return activitiesList.filter((activity) => {
+      const deptMatch = !selectedDept || activity.department === selectedDept
+      const orgMatch = !selectedOrg || activity.org === selectedOrg
+      if (!deptMatch || !orgMatch) return false
+      if (!query) return true
+      const haystack = [
+        activity.org,
+        activity.title,
+        activity.submittedDate,
+        activity.type,
+        activity.nature ?? "",
+        activity.decision,
+        activity.department,
+        activity.submissionId,
+        formatDocumentId(activity.submissionId),
+      ]
+        .join(" ")
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [activitiesList, search, selectedDept, selectedOrg])
 
   return {
     roleLabel,
@@ -176,6 +196,7 @@ export function useReviewDashboard() {
     departmentOrgMap,
     selectedDept,
     selectedOrg,
+    search,
     activeActivity,
     filteredActivities,
     hasActivities: activitiesList.length > 0,
@@ -186,6 +207,7 @@ export function useReviewDashboard() {
     actionError,
     handleDeptSelect,
     handleOrgSelect,
+    handleSearchChange,
     handleActivitySelect,
     handleModalClose,
     handleModalAction,

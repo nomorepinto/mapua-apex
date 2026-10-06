@@ -1,6 +1,8 @@
 import { Link } from "react-router"
 
 import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
+import { SubmissionsFilterHeader } from "@/components/students/dashboard/submissions-filter-header"
+import { SubmissionsSortHeader } from "@/components/students/dashboard/submissions-sort-header"
 import { CollabBadge } from "@/components/students/dashboard/collab-badge"
 import {
   Table,
@@ -74,18 +76,59 @@ export function SubmissionsPanel() {
           <TableHeader>
             <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-600 uppercase">
               <TableHead className="pr-4 pb-3 font-bold">DOCUMENT ID</TableHead>
-              <TableHead className="pr-6 pb-3 font-bold">EVENT TITLE</TableHead>
-              <TableHead className="pr-4 pb-3 font-bold">VENUE</TableHead>
-              <TableHead className="pr-4 pb-3 font-bold">
-                CLASSIFICATION
-              </TableHead>
-              <TableHead className="pr-4 pb-3 font-bold">DATE APPLIED</TableHead>
-              <TableHead className="pr-4 pb-3 font-bold">
-                CURRENT SIGNATORY
-              </TableHead>
-              <TableHead className="pb-3 text-right font-bold">
-                STATUS
-              </TableHead>
+              <SubmissionsFilterHeader
+                label="Event Title"
+                column="collab"
+                className="pr-6"
+                options={state.filterOptions.collab}
+                selected={state.columnFilters.collab}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+              />
+              <SubmissionsFilterHeader
+                label="Venue"
+                column="venue"
+                options={state.filterOptions.venue}
+                selected={state.columnFilters.venue}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                className="pr-4"
+              />
+              <SubmissionsFilterHeader
+                label="Classification"
+                column="classification"
+                options={state.filterOptions.classification}
+                selected={state.columnFilters.classification}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                capitalize
+                className="pr-4"
+              />
+              <SubmissionsSortHeader
+                label="Date Applied"
+                direction={state.dateSortDirection}
+                onSort={actions.toggleDateSort}
+                className="pr-4"
+              />
+              <SubmissionsFilterHeader
+                label="Current Signatory"
+                column="signatory"
+                options={state.filterOptions.signatory}
+                selected={state.columnFilters.signatory}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                className="pr-4"
+              />
+              <SubmissionsFilterHeader
+                label="Status"
+                column="status"
+                options={state.filterOptions.status}
+                selected={state.columnFilters.status}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                align="right"
+                className="text-right"
+              />
             </TableRow>
           </TableHeader>
           <TableBody className="divide-y divide-neutral-50">
@@ -133,7 +176,9 @@ export function SubmissionsPanel() {
                   colSpan={7}
                   className="py-12 text-center text-sm font-semibold text-neutral-600"
                 >
-                  No submissions match “{state.search}”.
+                  {state.search.trim()
+                    ? `No submissions match “${state.search.trim()}”.`
+                    : "No submissions match the selected column filters."}
                 </TableCell>
               </TableRow>
             ) : (

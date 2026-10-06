@@ -378,6 +378,8 @@ export interface DashboardSubmissionRow {
   target_date: string
   requires_venue: boolean
   submitted_date: string
+  /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
+  sent_at: string
   api_status: "pending" | "approved" | "denied" | "returned"
   activity_details: {
     title: string
@@ -699,6 +701,7 @@ export function apiSubmissionToDashboardRow(
     target_date: submission.activity_details?.date_of_event || submission.sent_at,
     requires_venue: Boolean(submission.venue_reservation?.has_reservation),
     submitted_date: formatDisplayDate(submission.sent_at),
+    sent_at: submission.sent_at || "",
     api_status: submission.status,
     activity_details: {
       title,

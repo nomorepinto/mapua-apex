@@ -2,6 +2,7 @@ import { memo, useCallback } from "react"
 import type React from "react"
 
 import { TableCell, TableRow } from "@/components/ui/table"
+import { formatDocumentId } from "@/lib/dynamodb-adapters"
 import type { Activity } from "./activity.types"
 
 // ─── ActivityRow ──────────────────────────────────────────────────────────────
@@ -32,22 +33,30 @@ const ActivityRow = memo(function ActivityRow({ activity, onSelect }: ActivityRo
       aria-label={`View details for ${activity.title}`}
       onKeyDown={handleKeyDown}
     >
-      {/* 1. ORGANIZATION */}
+      {/* 1. DOCUMENT ID */}
+      <TableCell
+        className="py-4.5 px-6 font-mono text-xs font-bold whitespace-nowrap text-neutral-900"
+        title={activity.submissionId}
+      >
+        {formatDocumentId(activity.submissionId)}
+      </TableCell>
+
+      {/* 2. ORGANIZATION */}
       <TableCell className="py-4.5 px-6 font-bold text-neutral-900 text-sm whitespace-nowrap">
         {activity.org}
       </TableCell>
 
-      {/* 2. ACTIVITY NAME */}
+      {/* 3. ACTIVITY NAME */}
       <TableCell className="py-4.5 px-6 text-neutral-700 text-sm font-medium">
         <span className="line-clamp-1">{activity.title}</span>
       </TableCell>
 
-      {/* 3. SUBMITTED */}
+      {/* 4. SUBMITTED */}
       <TableCell className="py-4.5 px-6 text-neutral-500 text-xs sm:text-sm whitespace-nowrap">
         {activity.submittedDate}
       </TableCell>
 
-      {/* 4. TYPE & NATURE */}
+      {/* 5. TYPE & NATURE */}
       <TableCell className="py-4.5 px-6">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-700">
@@ -65,7 +74,7 @@ const ActivityRow = memo(function ActivityRow({ activity, onSelect }: ActivityRo
         </div>
       </TableCell>
 
-      {/* 5. DECISION (Review, Return, Reject) */}
+      {/* 6. DECISION (Review, Return, Reject) */}
       <TableCell className="py-4.5 px-6 text-right">
         {activity.decision === "Review" ? (
           <span className="inline-flex items-center text-xs font-semibold text-neutral-800 group-hover:text-black py-1 px-3 rounded-lg hover:bg-neutral-200/60 transition-colors">

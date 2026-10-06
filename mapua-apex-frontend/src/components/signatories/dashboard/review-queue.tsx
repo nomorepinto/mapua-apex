@@ -1,5 +1,6 @@
 import { ActivityDetailModal } from "@/components/ui/activity-detail-modal"
 import { ActivityRow } from "@/components/ui/activity-row"
+import { ReviewDashboardSearch } from "@/components/signatories/dashboard/review-dashboard-search"
 import {
   Table,
   TableBody,
@@ -16,10 +17,14 @@ export function ReviewQueue() {
 
   return (
     <div className={layout.sectionFlush}>
+      <ReviewDashboardSearch />
       <div className={layout.tableWrap}>
         <Table className={layout.table}>
           <TableHeader>
             <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-500 uppercase hover:bg-transparent!">
+              <TableHead className="px-6 py-4 font-bold text-neutral-500">
+                DOCUMENT ID
+              </TableHead>
               <TableHead className="px-6 py-4 font-bold text-neutral-500">
                 ORGANIZATION
               </TableHead>
@@ -41,7 +46,7 @@ export function ReviewQueue() {
             {state.isLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-14 text-center text-sm text-neutral-400"
                 >
                   Loading your review queue…
@@ -50,7 +55,7 @@ export function ReviewQueue() {
             ) : state.filteredActivities.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-14 text-center text-sm text-neutral-400"
                 >
                   {state.hasActivities
