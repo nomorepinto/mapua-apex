@@ -7,6 +7,11 @@ These rules apply across the entire repository (both `mapua-apex-frontend` and `
 - This repository spans two independent systems: a frontend and a backend. When a change you are making in one system requires a corresponding change in the other (for example, an API route/contract change driven by a UI need, or a UI change driven by a backend response change), **stop and consult the user before modifying the second system.**
 - Do not assume it is okay to edit the other system just to make your current change work. Surface the required cross-system edit, describe its scope, and wait for approval before touching files outside the system you were asked to work in.
 
+## Reuse Before Rebuilding
+
+- **Check for an existing implementation first.** Before writing a feature, always search the codebase for anything already implementing it — even partially. Look for existing routes, controllers, components, hooks, helpers, data-model fields, and backend endpoints that cover (or nearly cover) the requested behavior.
+- **Partial implementations count.** If a partial implementation exists, surface it, describe what it already does and what it is missing, and extend or wire it up rather than starting a fresh full implementation. Do not silently duplicate working code.
+
 ## Documentation Sync
 
 - **API routes edited → update the API contract docs.** Whenever you change an API route, controller, request/response shape, status code, or backend data model, update both `API_ROUTES.md` and `DynamoDB Schema.txt` (at the repository root) in the same change. Do not leave them describing the pre-change behavior.
