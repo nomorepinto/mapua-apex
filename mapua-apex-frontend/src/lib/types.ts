@@ -76,7 +76,7 @@ export interface MissionStatements {
 export interface InstitutionalAlignment {
   mission_statements: MissionStatements
   core_values_explanation: string
-  peo_explanation: string
+  peo_explanation?: string | null
   sdg_explanation: string
 }
 
