@@ -52,7 +52,7 @@ final class SaafSubmissionRules
             'institutional_alignment.mission_statements.research' => ['required', 'boolean'],
             'institutional_alignment.mission_statements.solutions' => ['required', 'boolean'],
             'institutional_alignment.core_values_explanation' => ['required', 'string'],
-            'institutional_alignment.peo_explanation' => ['required', 'string'],
+            'institutional_alignment.peo_explanation' => ['nullable', 'string'],
             'institutional_alignment.sdg_explanation' => ['required', 'string'],
             'detailed_budget_proposal' => ['required', 'array'],
             'detailed_budget_proposal.items' => ['required', 'array', 'min:1'],
