@@ -33,6 +33,7 @@ export interface ActivityDetailModalProps {
     activityId: string,
     details?: { comment: string }
   ) => void | Promise<void>
+  readOnly?: boolean
 }
 
 const ActivityDetailModal = memo(function ActivityDetailModal({
@@ -44,6 +45,7 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
   isUpdatingClassification = false,
   onClassificationChange,
   onAction,
+  readOnly = false,
 }: ActivityDetailModalProps) {
   const {
     commentAction,
@@ -103,63 +105,76 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
             {activity && (
               <div className="space-y-6">
                 {isOsaar ? (
-                  <div className="flex flex-col items-center justify-center text-center gap-2.5 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
-                        Event Classification
-                      </h4>
-                      {isUpdatingClassification ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#8B0000]" />
+                  readOnly ? (
+                    activity.nature ? (
+                      <div className="flex flex-col items-center justify-center text-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                        <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                          Event Classification
+                        </h4>
+                        <span className="inline-flex items-center rounded-full bg-[#8B0000]/10 border border-[#8B0000]/20 px-3 py-1 text-xs font-bold text-[#8B0000] capitalize">
+                          {activity.nature} Event
+                        </span>
+                      </div>
+                    ) : null
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-center gap-2.5 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-4">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                          Event Classification
+                        </h4>
+                        {isUpdatingClassification ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-[#8B0000]" />
+                        ) : null}
+                      </div>
+                      <div className="inline-flex items-center rounded-lg border border-neutral-200 bg-neutral-200/70 p-1">
+                        <button
+                          type="button"
+                          disabled={isUpdatingClassification || isActing}
+                          onClick={() => {
+                            if (activity.nature?.toLowerCase() !== "minor") {
+                              onClassificationChange?.("minor")
+                            }
+                          }}
+                          className={cn(
+                            "rounded-md px-4 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5",
+                            isUpdatingClassification || isActing
+                              ? "cursor-not-allowed opacity-60 pointer-events-none"
+                              : "cursor-pointer",
+                            activity.nature?.toLowerCase() === "minor"
+                              ? "bg-[#8B0000] text-white shadow-xs"
+                              : "text-neutral-700 hover:text-neutral-900"
+                          )}
+                        >
+                          Minor Event
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isUpdatingClassification || isActing}
+                          onClick={() => {
+                            if (activity.nature?.toLowerCase() !== "major") {
+                              onClassificationChange?.("major")
+                            }
+                          }}
+                          className={cn(
+                            "rounded-md px-4 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5",
+                            isUpdatingClassification || isActing
+                              ? "cursor-not-allowed opacity-60 pointer-events-none"
+                              : "cursor-pointer",
+                            activity.nature?.toLowerCase() === "major"
+                              ? "bg-[#8B0000] text-white shadow-xs"
+                              : "text-neutral-700 hover:text-neutral-900"
+                          )}
+                        >
+                          Major Event
+                        </button>
+                      </div>
+                      {!activity.nature ? (
+                        <p className="text-[11px] font-medium text-amber-700">
+                          Please select a classification before approving.
+                        </p>
                       ) : null}
                     </div>
-                    <div className="inline-flex items-center rounded-lg border border-neutral-200 bg-neutral-200/70 p-1">
-                      <button
-                        type="button"
-                        disabled={isUpdatingClassification || isActing}
-                        onClick={() => {
-                          if (activity.nature?.toLowerCase() !== "minor") {
-                            onClassificationChange?.("minor")
-                          }
-                        }}
-                        className={cn(
-                          "rounded-md px-4 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5",
-                          isUpdatingClassification || isActing
-                            ? "cursor-not-allowed opacity-60 pointer-events-none"
-                            : "cursor-pointer",
-                          activity.nature?.toLowerCase() === "minor"
-                            ? "bg-[#8B0000] text-white shadow-xs"
-                            : "text-neutral-700 hover:text-neutral-900"
-                        )}
-                      >
-                        Minor Event
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isUpdatingClassification || isActing}
-                        onClick={() => {
-                          if (activity.nature?.toLowerCase() !== "major") {
-                            onClassificationChange?.("major")
-                          }
-                        }}
-                        className={cn(
-                          "rounded-md px-4 py-1.5 text-xs font-bold transition-all flex items-center gap-1.5",
-                          isUpdatingClassification || isActing
-                            ? "cursor-not-allowed opacity-60 pointer-events-none"
-                            : "cursor-pointer",
-                          activity.nature?.toLowerCase() === "major"
-                            ? "bg-[#8B0000] text-white shadow-xs"
-                            : "text-neutral-700 hover:text-neutral-900"
-                        )}
-                      >
-                        Major Event
-                      </button>
-                    </div>
-                    {!activity.nature ? (
-                      <p className="text-[11px] font-medium text-amber-700">
-                        Please select a classification before approving.
-                      </p>
-                    ) : null}
-                  </div>
+                  )
                 ) : null}
 
                 <div className="space-y-3">
@@ -299,38 +314,42 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
               >
                 Close
               </Button>
-              <Button
-                type="button"
-                disabled={isActing}
-                onClick={() => setCommentAction("return")}
-                variant="outline"
-                className="min-h-11 rounded-xl px-6 py-2.5 text-sm font-bold"
-              >
-                Return Proposal
-              </Button>
-              <Button
-                type="button"
-                disabled={isActing}
-                onClick={() => setCommentAction("reject")}
-                variant="destructive"
-                className="min-h-11 rounded-xl px-6 py-2.5 text-sm font-bold"
-              >
-                Reject Proposal
-              </Button>
-              <Button
-                type="button"
-                disabled={isApproveDisabled}
-                onClick={requestApprove}
-                title={isOsaar && !activity?.nature ? "Select an event classification first" : undefined}
-                className={cn(
-                  "min-h-11 rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all",
-                  isApproveDisabled
-                    ? "bg-neutral-300 text-neutral-500 cursor-not-allowed hover:bg-neutral-300"
-                    : "bg-[#8B0000] text-white hover:bg-[#6B0000] cursor-pointer"
-                )}
-              >
-                {isActing ? "Working…" : "Approve Proposal"}
-              </Button>
+              {!readOnly ? (
+                <>
+                  <Button
+                    type="button"
+                    disabled={isActing}
+                    onClick={() => setCommentAction("return")}
+                    variant="outline"
+                    className="min-h-11 rounded-xl px-6 py-2.5 text-sm font-bold"
+                  >
+                    Return Proposal
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={isActing}
+                    onClick={() => setCommentAction("reject")}
+                    variant="destructive"
+                    className="min-h-11 rounded-xl px-6 py-2.5 text-sm font-bold"
+                  >
+                    Reject Proposal
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={isApproveDisabled}
+                    onClick={requestApprove}
+                    title={isOsaar && !activity?.nature ? "Select an event classification first" : undefined}
+                    className={cn(
+                      "min-h-11 rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all",
+                      isApproveDisabled
+                        ? "bg-neutral-300 text-neutral-500 cursor-not-allowed hover:bg-neutral-300"
+                        : "bg-[#8B0000] text-white hover:bg-[#6B0000] cursor-pointer"
+                    )}
+                  >
+                    {isActing ? "Working…" : "Approve Proposal"}
+                  </Button>
+                </>
+              ) : null}
             </div>
           </DialogFooter>
         </DialogPopup>

@@ -760,7 +760,7 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     eventId: submission.event_id,
     submissionId: submission.submission_id,
     title,
-    org: firstProponent?.org_or_course_section || "Organization",
+    org: submission.organization_name || firstProponent?.org_or_course_section || "Organization",
     department: firstProponent?.department || "—",
     date: formatDisplayDateRange(
       submission.activity_details?.date_of_event,

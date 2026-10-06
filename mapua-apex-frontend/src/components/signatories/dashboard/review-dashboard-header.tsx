@@ -6,9 +6,9 @@ export function ReviewDashboardHeader() {
 
   return (
     <div className="space-y-1">
-      <h1 className={layout.pageTitle}>{state.roleLabel} Review Dashboard</h1>
+      <h1 className={layout.pageTitle}>{state.roleLabel} Dashboard</h1>
       <p className={layout.pageSubtitle}>
-        Academic Term: 2026-2027 • Pending institutional approvals for student
+        Academic Term: 2026-2027 • Institutional submissions and approvals for student
         activities.
       </p>
     </div>

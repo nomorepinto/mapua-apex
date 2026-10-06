@@ -37,6 +37,7 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ReviewDashboardContextValue>(
     () => ({
       state: {
+        role: dashboard.role,
         roleLabel: dashboard.roleLabel,
         stats: dashboard.stats,
         departments: dashboard.departments,
@@ -44,12 +45,20 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
         selectedDept: dashboard.selectedDept,
         selectedOrg: dashboard.selectedOrg,
         activeActivity: dashboard.activeActivity,
-        filteredActivities: dashboard.filteredActivities,
+        allActivities: dashboard.allActivities,
+        reviewActivities: dashboard.reviewActivities,
+        historyActivities: dashboard.historyActivities,
         hasActivities: dashboard.hasActivities,
         isLoading: dashboard.isLoading,
+        isHistoryLoading: dashboard.isHistoryLoading,
         isActing: dashboard.isActing,
         isOsaar: dashboard.isOsaar,
+        isCdm: dashboard.isCdm,
+        isAdviser: dashboard.isAdviser,
+        isDean: dashboard.isDean,
+        isCampusDesk: dashboard.isCampusDesk,
         isUpdatingClassification: dashboard.isUpdatingClassification,
+        isReadOnly: dashboard.isReadOnly,
         actionError: dashboard.actionError,
       },
       actions: {

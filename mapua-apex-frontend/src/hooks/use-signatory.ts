@@ -6,6 +6,7 @@ import { SUBMISSION_KEYS } from "@/hooks/use-submissions"
 export const SIGNATORY_KEYS = {
   me: ["signatory-me"] as const,
   queue: ["signatory-queue"] as const,
+  history: ["signatory-history"] as const,
   detail: (eventId: string, submissionId: string) =>
     ["signatory-submission-detail", eventId, submissionId] as const,
 }
@@ -31,6 +32,22 @@ export function useSignatoryQueueQuery() {
     queryKey: SIGNATORY_KEYS.queue,
     queryFn: async () => {
       const res = await apiClient.get<{ data: ApiSubmission[] }>("/signatories/submissions")
+      return res.data || []
+    },
+  })
+}
+
+/**
+ * Fetch all submissions that have passed through this signatory's desk
+ * (approved, denied — no longer on the active queue).
+ */
+export function useSignatoryHistoryQuery() {
+  return useQuery({
+    queryKey: SIGNATORY_KEYS.history,
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: ApiSubmission[] }>(
+        "/signatories/submissions/history"
+      )
       return res.data || []
     },
   })
