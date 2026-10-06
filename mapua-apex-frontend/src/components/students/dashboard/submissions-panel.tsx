@@ -1,6 +1,7 @@
 import { Link } from "react-router"
 
 import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
+import { CollabBadge } from "@/components/students/dashboard/collab-badge"
 import {
   Table,
   TableBody,
@@ -63,6 +64,7 @@ export function SubmissionsPanel() {
             <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-600 uppercase">
               <TableHead className="pr-4 pb-3 font-bold">DOCUMENT ID</TableHead>
               <TableHead className="pr-6 pb-3 font-bold">EVENT TITLE</TableHead>
+              <TableHead className="pr-4 pb-3 font-bold">VENUE</TableHead>
               <TableHead className="pr-4 pb-3 font-bold">
                 CLASSIFICATION
               </TableHead>
@@ -78,7 +80,7 @@ export function SubmissionsPanel() {
             {state.submissionsLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-12 text-center text-sm font-semibold text-neutral-600"
                 >
                   Loading submissions…
@@ -87,7 +89,7 @@ export function SubmissionsPanel() {
             ) : state.submissionsError ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-12 text-center text-sm font-semibold text-rose-600"
                 >
                   Could not load submissions.
@@ -138,11 +140,12 @@ export function SubmissionsPanel() {
                   </TableCell>
                   <TableCell className="py-3.5 pr-6 text-xs font-semibold text-[#1E293B]">
                     {sub.activity_details.title}
-                    {sub.requires_venue ? (
-                      <span className="ml-2 text-[10px] font-normal text-[#3B82F6]">
-                        ({sub.activity_details.venue})
-                      </span>
+                    {sub.is_collaboration ? (
+                      <CollabBadge role={sub.role ?? "proponent"} />
                     ) : null}
+                  </TableCell>
+                  <TableCell className="py-3.5 pr-4 text-xs text-[#64748B]">
+                    {sub.activity_details.venue || "—"}
                   </TableCell>
                   <TableCell className="py-3.5 pr-4 text-xs text-[#64748B] capitalize">
                     {sub.activity_classification}

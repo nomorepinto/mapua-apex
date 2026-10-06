@@ -395,6 +395,8 @@ export interface DashboardSubmissionRow {
   statusColor: string
   /** Proponent vs collaboration-dependent view for the caller. */
   role?: "proponent" | "dependent"
+  /** True when this submission involves collaborating organizations. */
+  is_collaboration: boolean
 }
 
 export interface TrackerAssignee {
@@ -716,6 +718,8 @@ export function apiSubmissionToDashboardRow(
     status: meta.label as DashboardSubmissionStatus,
     statusColor: meta.color,
     role: submission.role ?? "proponent",
+    is_collaboration:
+      (submission.collaboration?.dependent_organization_ids?.length ?? 0) > 0,
   }
 }
 
