@@ -785,6 +785,54 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
       objectives.length > 0
         ? objectives
         : [{ title: "Objective", description: "No objectives listed." }],
+    equipmentRequested: (submission.venue_reservation?.equipment_requested?.items || []).map(
+      (item) => ({
+        name: item.name,
+        purpose: item.purpose || "",
+        remark: item.remark || "",
+      })
+    ),
+    roomsRequested: (submission.venue_reservation?.function_rooms?.items || []).map((item) => ({
+      roomNeeded: item.room_needed,
+      classroomName: item.classroom_name,
+      remarks: item.remarks || "",
+      dateNeeded: item.date_needed,
+      timeNeeded: item.time_needed,
+    })),
+    avEquipmentRequested: (
+      submission.venue_reservation?.audiovisual_equipment?.items || []
+    ).map((item) => ({
+      equipmentNeeded: item.equipment_needed,
+      remarks: item.remarks || "",
+      dateNeeded: item.date_needed,
+      timeNeeded: item.time_needed,
+    })),
+    budgetItems: (submission.detailed_budget_proposal?.items || []).map(
+      (item, idx) => {
+        const qty = Number(item.quantity) || 0
+        const price = Number(item.price_per_unit) || 0
+        const total =
+          typeof item.total === "number" ? item.total : qty * price
+        return {
+          item: item.item_no || `Item ${idx + 1}`,
+          unit: item.unit ?? 1,
+          quantity: qty,
+          pricePerUnit: price,
+          total,
+        }
+      }
+    ),
+    budgetGrandTotal:
+      typeof submission.detailed_budget_proposal?.grand_total === "number"
+        ? submission.detailed_budget_proposal.grand_total
+        : (submission.detailed_budget_proposal?.items || []).reduce(
+            (acc, curr) =>
+              acc +
+              (typeof curr.total === "number"
+                ? curr.total
+                : (Number(curr.quantity) || 0) * (Number(curr.price_per_unit) || 0)),
+            0
+          ),
   }
 }
 
