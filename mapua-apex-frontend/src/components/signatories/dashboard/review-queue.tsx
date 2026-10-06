@@ -37,14 +37,10 @@ export function ReviewQueue() {
       </div>
 
       <div className={layout.sectionFlush}>
-        <ReviewDashboardSearch />
         <div className={layout.tableWrap}>
           <Table className={layout.table}>
             <TableHeader>
               <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-500 uppercase hover:bg-transparent!">
-                <TableHead className="px-6 py-4 font-bold text-neutral-500">
-                  DOCUMENT ID
-                </TableHead>
                 <TableHead className="px-6 py-4 font-bold text-neutral-500">
                   ORGANIZATION
                 </TableHead>
@@ -66,7 +62,7 @@ export function ReviewQueue() {
               {state.isLoading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={5}
                     className="py-14 text-center text-sm text-neutral-400"
                   >
                     Loading your review queue…
@@ -75,7 +71,7 @@ export function ReviewQueue() {
               ) : state.reviewActivities.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={5}
                     className="py-14 text-center text-sm text-neutral-400"
                   >
                     {state.hasActivities
