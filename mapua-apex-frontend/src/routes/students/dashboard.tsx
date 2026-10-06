@@ -13,12 +13,14 @@ export function OrgDashboard() {
       <div className={cn(layout.page, layout.stack)}>
         <StudentDashboardHeader />
         <div className={cn(layout.grid3, layout.gap)}>
-          <div className={cn("xl:col-span-3", layout.stack)}>
+          <div className={cn("xl:col-span-2", layout.stack)}>
             <SubmissionsPanel />
-            <AnnouncementsPanel />
           </div>
           <div className={cn("xl:col-span-1", layout.stack)}>
             <RemindersPanel />
+          </div>
+          <div className={cn("xl:col-span-3", layout.stack)}>
+            <AnnouncementsPanel />
           </div>
         </div>
         <StudentDashboardDialogs />
