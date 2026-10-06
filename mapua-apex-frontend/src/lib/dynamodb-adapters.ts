@@ -433,7 +433,7 @@ export interface ReviewNotice {
   sentAt: string
   dateStr: string
   title: string
-  notifType: "denied" | "returned"
+  notifType: "denied" | "returned" | "approved" | "fully approved"
   comment: string
   signatoryLabel: string
 }
@@ -1037,9 +1037,9 @@ export function apiNotificationsToReviewNotices(
       submission.activity_details?.title_and_nature || submission.submission_id
 
     for (const item of notifications) {
-      if (item.notif_type !== "denied" && item.notif_type !== "returned") continue
       const comment = (item.comment || "").trim()
-      if (!comment) continue
+      // Denied/returned notices require a reason; approvals are recorded without one.
+      if (!comment && (item.notif_type === "denied" || item.notif_type === "returned")) continue
 
       notices.push({
         id: `${submission.submission_id}:${item.sent_at}`,
