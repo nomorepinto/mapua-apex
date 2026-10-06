@@ -70,6 +70,49 @@ function isValidAbsoluteUrl(value: string): boolean {
 
 const REQUIRED = "This field is required."
 
+/**
+ * Proponent details that must be unique across every proponent in Section 2.
+ * Two rows sharing a non-blank value for any of these are a data-entry clash,
+ * so the duplicated rows are flagged and the wizard refuses to advance.
+ */
+const UNIQUE_PROPONENT_FIELDS: Array<{
+  field: keyof Proponent
+  label: string
+}> = [
+  { field: "studentNumber", label: "student number" },
+  { field: "contactNumber", label: "mobile number" },
+  { field: "positionOfApplicant", label: "position of the applicant" },
+  { field: "facebookLink", label: "Facebook link" },
+]
+
+/**
+ * Flags every proponent row whose unique-required detail repeats another row's.
+ * Comparison is trimmed and case-insensitive; blank values are skipped so the
+ * per-field "required" warning stays the actionable message. A duplicate never
+ * overwrites an existing format error already recorded for that field.
+ */
+function markDuplicateProponents(
+  proponents: Proponent[],
+  warnings: Record<string, string>
+): void {
+  for (const { field, label } of UNIQUE_PROPONENT_FIELDS) {
+    const counts = new Map<string, number>()
+    for (const proponent of proponents) {
+      const value = String(proponent[field] ?? "").trim().toLowerCase()
+      if (!value) continue
+      counts.set(value, (counts.get(value) ?? 0) + 1)
+    }
+    for (const proponent of proponents) {
+      const value = String(proponent[field] ?? "").trim().toLowerCase()
+      if (!value || (counts.get(value) ?? 0) < 2) continue
+      const key = `proponent.${proponent.id}.${field}`
+      if (!warnings[key]) {
+        warnings[key] = `This ${label} is the same as another proponent's.`
+      }
+    }
+  }
+}
+
 function proponentWarnings(
   proponent: Proponent,
   department: string,
@@ -131,6 +174,8 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
       warnings
     )
   }
+
+  markDuplicateProponents(draft.proponents, warnings)
 
   if (isBlank(draft.activityTitle)) warnings.activityTitle = REQUIRED
   if (isBlank(draft.activityDescription)) {
