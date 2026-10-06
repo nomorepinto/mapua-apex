@@ -7,7 +7,7 @@ import {
   SAME_EVENT_TIME_MESSAGE,
   splitEventTime,
 } from "@/components/submission/event-time"
-import { isVenue, MOBILE_NUMBER_LENGTH, STUDENT_NUMBER_LENGTH } from "@/components/submission/constants"
+import { isVenue, MAX_PROPONENTS, MOBILE_NUMBER_LENGTH, STUDENT_NUMBER_LENGTH } from "@/components/submission/constants"
 import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
@@ -116,6 +116,12 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
     warnings.totalOrgMembers = REQUIRED
   } else if (draft.totalOrgMembers.length > 5) {
     warnings.totalOrgMembers = "Cannot exceed 5 digits."
+  }
+
+  if (draft.proponents.length > MAX_PROPONENTS) {
+    // Reachable only from a legacy draft (restored paper or saved session) —
+    // the wizard hides "Add Proponent" once the cap is hit.
+    warnings["proponent.max"] = `A maximum of ${MAX_PROPONENTS} proponents is allowed. Remove ${draft.proponents.length - MAX_PROPONENTS} to continue.`
   }
 
   for (const proponent of draft.proponents) {

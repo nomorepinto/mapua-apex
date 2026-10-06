@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   Bell,
+  CheckCircle,
   CheckSquare,
   ChevronDown,
   ChevronUp,
@@ -75,6 +76,7 @@ function RemindersBody() {
         <>
           <DeniedNoticeList />
           <ReturnedNoticeList />
+          <ApprovedNoticeList />
           <ImportantReminderList />
           <UpcomingReminderList />
         </>
@@ -161,6 +163,59 @@ function ReturnedNoticeList() {
               <p className="mt-1 line-clamp-2 text-sm leading-snug font-semibold text-amber-800">
                 {notice.comment}
               </p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ApprovedNoticeList() {
+  const { state, actions } = useStudentDashboard()
+  if (state.approvedNotices.length === 0) return null
+
+  const showTopSpacing =
+    state.deniedNotices.length + state.returnedNotices.length > 0
+
+  return (
+    <div className={showTopSpacing ? "pt-4" : undefined}>
+      <div className="mb-4 flex items-center gap-2">
+        <div className="flex h-3 w-3 items-center justify-center rounded-full border-2 border-emerald-500 bg-white">
+          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
+        </div>
+        <h3 className="font-sans text-lg font-light tracking-wide text-emerald-700">
+          Approved
+        </h3>
+      </div>
+      <div className="ml-1.5 space-y-4 border-l-2 border-emerald-300 pl-4">
+        {state.approvedNotices.map((notice) => (
+          <button
+            key={notice.id}
+            type="button"
+            onClick={() => actions.selectNotice(notice)}
+            className="relative flex min-h-11 w-full items-start gap-3 rounded-xl p-1 text-left transition-colors hover:bg-emerald-50/60"
+          >
+            <div className="absolute top-0.5 -left-[27px] flex h-6 w-6 items-center justify-center rounded-md border border-emerald-300 bg-white text-emerald-600 shadow-2xs">
+              <CheckCircle className="h-3.5 w-3.5" />
+            </div>
+            <div className="min-w-0 flex-1 pl-1">
+              <span className="mb-0.5 block text-sm text-neutral-500">
+                {notice.dateStr}
+              </span>
+              <h4 className="text-sm font-bold tracking-tight text-[#1E293B] uppercase">
+                {notice.title}
+              </h4>
+              <p className="mt-1 line-clamp-2 text-sm leading-snug font-semibold text-emerald-700">
+                {notice.notifType === "fully approved"
+                  ? `Fully approved · ${notice.signatoryLabel}`
+                  : `Approved · ${notice.signatoryLabel}`}
+              </p>
+              {notice.comment ? (
+                <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-neutral-600">
+                  {notice.comment}
+                </p>
+              ) : null}
             </div>
           </button>
         ))}

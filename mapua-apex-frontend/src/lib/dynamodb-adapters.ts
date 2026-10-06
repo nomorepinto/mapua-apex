@@ -16,6 +16,7 @@ import {
 import type { SaafDraft } from "@/components/submission/types"
 import type { Activity } from "@/components/ui/activity.types"
 import { getEventSchedule } from "@/lib/event-schedule"
+import { departmentAbbreviation } from "@/lib/departments"
 
 /**
  * Backend API Submission shape returned by Laravel DynamoDB routes
@@ -370,6 +371,8 @@ export interface DashboardSubmissionRow {
   event_id: string
   submission_id: string
   organization_name: string
+  /** Abbreviation/code of the lead proponent's department (e.g. "SOIT"; "—" when unavailable). */
+  department: string
   id: string
   activity_classification: string
   /** OSAAR-assigned event nature (major / minor). Undefined until OSAAR sets it. */
@@ -378,6 +381,8 @@ export interface DashboardSubmissionRow {
   target_date: string
   requires_venue: boolean
   submitted_date: string
+  /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
+  sent_at: string
   api_status: "pending" | "approved" | "denied" | "returned"
   activity_details: {
     title: string
@@ -395,6 +400,8 @@ export interface DashboardSubmissionRow {
   statusColor: string
   /** Proponent vs collaboration-dependent view for the caller. */
   role?: "proponent" | "dependent"
+  /** True when this submission involves collaborating organizations. */
+  is_collaboration: boolean
 }
 
 export interface TrackerAssignee {
@@ -431,7 +438,7 @@ export interface ReviewNotice {
   sentAt: string
   dateStr: string
   title: string
-  notifType: "denied" | "returned"
+  notifType: "denied" | "returned" | "approved" | "fully approved"
   comment: string
   signatoryLabel: string
 }
@@ -690,6 +697,7 @@ export function apiSubmissionToDashboardRow(
         submissionOrganizationId(submission),
         organizations || []
       ),
+    department: departmentAbbreviation(firstProponent?.department),
     id: submission.submission_id,
     activity_classification: submission.activity_classification?.activity_type || "extra-curricular",
     nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,
@@ -697,6 +705,7 @@ export function apiSubmissionToDashboardRow(
     target_date: submission.activity_details?.date_of_event || submission.sent_at,
     requires_venue: Boolean(submission.venue_reservation?.has_reservation),
     submitted_date: formatDisplayDate(submission.sent_at),
+    sent_at: submission.sent_at || "",
     api_status: submission.status,
     activity_details: {
       title,
@@ -716,6 +725,8 @@ export function apiSubmissionToDashboardRow(
     status: meta.label as DashboardSubmissionStatus,
     statusColor: meta.color,
     role: submission.role ?? "proponent",
+    is_collaboration:
+      (submission.collaboration?.dependent_organization_ids?.length ?? 0) > 0,
   }
 }
 
@@ -1033,9 +1044,9 @@ export function apiNotificationsToReviewNotices(
       submission.activity_details?.title_and_nature || submission.submission_id
 
     for (const item of notifications) {
-      if (item.notif_type !== "denied" && item.notif_type !== "returned") continue
       const comment = (item.comment || "").trim()
-      if (!comment) continue
+      // Denied/returned notices require a reason; approvals are recorded without one.
+      if (!comment && (item.notif_type === "denied" || item.notif_type === "returned")) continue
 
       notices.push({
         id: `${submission.submission_id}:${item.sent_at}`,

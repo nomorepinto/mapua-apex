@@ -71,19 +71,15 @@ export function useSubmissionNotificationsQuery(eventId?: string, submissionId?:
 }
 
 /**
- * Denied and returned review comments for papers in the org's submission list.
+ * Denied, returned, and approval notices for papers in the org's submission list.
+ * Notifications are fetched for every submission because intermediate approval hops
+ * live on still-pending papers while the final sign-off lives on approved ones.
  */
 export function useOrgReviewNoticesQuery(
   submissions: ApiSubmission[],
   orgSignatories?: Array<{ role?: string; signatory_id?: string; name?: string }>
 ) {
-  const reviewPapers = useMemo(
-    () =>
-      submissions.filter(
-        (submission) => submission.status === "denied" || submission.status === "returned"
-      ),
-    [submissions]
-  )
+  const reviewPapers = submissions
 
   const queries = useQueries({
     queries: reviewPapers.map((submission) => ({

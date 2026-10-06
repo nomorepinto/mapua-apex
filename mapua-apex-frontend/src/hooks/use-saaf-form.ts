@@ -7,6 +7,7 @@ import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import {
   createEmptyProponent,
   DEFAULT_SAAF_DRAFT,
+  MAX_PROPONENTS,
   ONLINE_VENUE,
 } from "@/components/submission/constants"
 import { withReservationDefaults } from "@/components/reservation/constants"
@@ -143,6 +144,9 @@ export function useSaafForm() {
 
   const handleAddProponent = useCallback(() => {
     const current = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
+    // Section 2 caps the application at MAX_PROPONENTS proponents; the button
+    // is hidden at the limit, so this guard also covers stale callers.
+    if (current.proponents.length >= MAX_PROPONENTS) return
     const today = new Date().toISOString().split("T")[0]
     const newProponent = createEmptyProponent(String(Date.now()))
     newProponent.dateOfSubmission = today

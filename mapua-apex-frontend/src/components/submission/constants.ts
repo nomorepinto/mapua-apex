@@ -50,6 +50,9 @@ export function isVenue(value: string): value is Venue {
 /** Fixed digit-length for the proponent's institutional student number. */
 export const STUDENT_NUMBER_LENGTH = 10
 
+/** Upper bound on proponents a single SAAF application may list (Section 2). */
+export const MAX_PROPONENTS = 5
+
 /**
  * Fixed digit-length for a Philippine mobile number (09XXXXXXXXX). Enforcing the
  * full length is what keeps landlines (shorter, area-coded) out of the field.

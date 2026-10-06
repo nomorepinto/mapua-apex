@@ -20,11 +20,49 @@ export interface ReviewNoticeModalProps {
   onClose: () => void
 }
 
+interface NoticeVariant {
+  badge: string
+  badgeClass: string
+  heading: string
+  /** Shown when an approval was recorded without a comment. */
+  fallback: string
+}
+
+const VARIANTS: Record<ReviewNotice["notifType"], NoticeVariant> = {
+  denied: {
+    badge: "Denied",
+    badgeClass: "bg-red-50 text-[#D9291C]",
+    heading: "Reason for rejection",
+    fallback: "",
+  },
+  returned: {
+    badge: "Returned",
+    badgeClass: "bg-amber-50 text-amber-800",
+    heading: "Reason for return",
+    fallback: "",
+  },
+  approved: {
+    badge: "Approved",
+    badgeClass: "bg-emerald-50 text-emerald-700",
+    heading: "Approval note",
+    fallback: "Approved and forwarded to the next signatory.",
+  },
+  "fully approved": {
+    badge: "Fully Approved",
+    badgeClass: "bg-emerald-50 text-emerald-700",
+    heading: "Approval note",
+    fallback: "All signatories have approved this submission.",
+  },
+}
+
 const ReviewNoticeModal = memo(function ReviewNoticeModal({
   notice,
   onClose,
 }: ReviewNoticeModalProps) {
-  const isDenied = notice?.notifType === "denied"
+  const variant = notice ? VARIANTS[notice.notifType] : VARIANTS.returned
+  const body = notice?.comment?.trim()
+    ? notice.comment
+    : variant.fallback || notice?.comment
 
   return (
     <Dialog
@@ -39,10 +77,10 @@ const ReviewNoticeModal = memo(function ReviewNoticeModal({
             <span
               className={cn(
                 "rounded-md px-2 py-0.5 text-xs font-bold uppercase tracking-wide",
-                isDenied ? "bg-red-50 text-[#D9291C]" : "bg-amber-50 text-amber-800",
+                variant.badgeClass,
               )}
             >
-              {isDenied ? "Denied" : "Returned"}
+              {variant.badge}
             </span>
           </div>
           <DialogTitle className="text-xl font-bold text-neutral-900">
@@ -55,10 +93,10 @@ const ReviewNoticeModal = memo(function ReviewNoticeModal({
 
         <DialogPanel className="space-y-3 p-6 pt-2">
           <p className="text-sm font-semibold text-neutral-700">
-            {isDenied ? "Reason for rejection" : "Reason for return"}
+            {variant.heading}
           </p>
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-800">
-            {notice?.comment}
+            {body}
           </p>
         </DialogPanel>
 

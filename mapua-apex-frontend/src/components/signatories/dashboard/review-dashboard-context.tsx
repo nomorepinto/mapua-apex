@@ -9,6 +9,7 @@ type ReviewDashboardModel = ReturnType<typeof useReviewDashboard>
 type ReviewDashboardActionName =
   | "handleDeptSelect"
   | "handleOrgSelect"
+  | "handleSearchChange"
   | "handleActivitySelect"
   | "handleModalClose"
   | "handleModalAction"
@@ -44,6 +45,7 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
         departmentOrgMap: dashboard.departmentOrgMap,
         selectedDept: dashboard.selectedDept,
         selectedOrg: dashboard.selectedOrg,
+        search: dashboard.search,
         activeActivity: dashboard.activeActivity,
         allActivities: dashboard.allActivities,
         reviewActivities: dashboard.reviewActivities,
@@ -64,6 +66,7 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
       actions: {
         handleDeptSelect: dashboard.handleDeptSelect,
         handleOrgSelect: dashboard.handleOrgSelect,
+        handleSearchChange: dashboard.handleSearchChange,
         handleActivitySelect: dashboard.handleActivitySelect,
         handleModalClose: dashboard.handleModalClose,
         handleModalAction: dashboard.handleModalAction,

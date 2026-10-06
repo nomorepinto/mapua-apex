@@ -1,6 +1,9 @@
 import { Link } from "react-router"
 
 import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
+import { SubmissionsFilterHeader } from "@/components/students/dashboard/submissions-filter-header"
+import { SubmissionsSortHeader } from "@/components/students/dashboard/submissions-sort-header"
+import { CollabBadge } from "@/components/students/dashboard/collab-badge"
 import {
   Table,
   TableBody,
@@ -9,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
 import { formatDocumentId } from "@/lib/dynamodb-adapters"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
@@ -48,13 +52,23 @@ export function SubmissionsPanel() {
 
   return (
     <div className={cn(layout.section, "overflow-hidden")}>
-      <div className="mb-5">
-        <h2 className="text-lg font-bold text-[#1E293B] sm:text-xl">
-          Project Status & Submissions
-        </h2>
-        <p className="text-xs text-neutral-600">
-          Track current signatory routing and approval statuses
-        </p>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-[#1E293B] sm:text-xl">
+            Project Status & Submissions
+          </h2>
+          <p className="text-xs text-neutral-600">
+            Track current signatory routing and approval statuses
+          </p>
+        </div>
+        <Input
+          aria-label="Search submissions"
+          className="w-full min-w-0 sm:w-64"
+          onChange={(event) => actions.setSearch(event.currentTarget.value)}
+          placeholder="Search all columns"
+          type="search"
+          value={state.search}
+        />
       </div>
 
       <div className={layout.tableWrap}>
@@ -62,23 +76,66 @@ export function SubmissionsPanel() {
           <TableHeader>
             <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-600 uppercase">
               <TableHead className="pr-4 pb-3 font-bold">DOCUMENT ID</TableHead>
-              <TableHead className="pr-6 pb-3 font-bold">EVENT TITLE</TableHead>
-              <TableHead className="pr-4 pb-3 font-bold">
-                CLASSIFICATION
-              </TableHead>
-              <TableHead className="pr-4 pb-3 font-bold">
-                CURRENT SIGNATORY
-              </TableHead>
-              <TableHead className="pb-3 text-right font-bold">
-                STATUS
-              </TableHead>
+              <SubmissionsFilterHeader
+                label="Event Title"
+                column="collab"
+                className="pr-6"
+                options={state.filterOptions.collab}
+                selected={state.columnFilters.collab}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+              />
+              <SubmissionsFilterHeader
+                label="Venue"
+                column="venue"
+                options={state.filterOptions.venue}
+                selected={state.columnFilters.venue}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                className="pr-4"
+              />
+              <SubmissionsFilterHeader
+                label="Classification"
+                column="classification"
+                options={state.filterOptions.classification}
+                selected={state.columnFilters.classification}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                capitalize
+                className="pr-4"
+              />
+              <SubmissionsSortHeader
+                label="Date Applied"
+                direction={state.dateSortDirection}
+                onSort={actions.toggleDateSort}
+                className="pr-4"
+              />
+              <SubmissionsFilterHeader
+                label="Current Signatory"
+                column="signatory"
+                options={state.filterOptions.signatory}
+                selected={state.columnFilters.signatory}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                className="pr-4"
+              />
+              <SubmissionsFilterHeader
+                label="Status"
+                column="status"
+                options={state.filterOptions.status}
+                selected={state.columnFilters.status}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                align="right"
+                className="text-right"
+              />
             </TableRow>
           </TableHeader>
           <TableBody className="divide-y divide-neutral-50">
             {state.submissionsLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={7}
                   className="py-12 text-center text-sm font-semibold text-neutral-600"
                 >
                   Loading submissions…
@@ -87,7 +144,7 @@ export function SubmissionsPanel() {
             ) : state.submissionsError ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={7}
                   className="py-12 text-center text-sm font-semibold text-rose-600"
                 >
                   Could not load submissions.
@@ -95,7 +152,7 @@ export function SubmissionsPanel() {
               </TableRow>
             ) : state.submissions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center">
+                <TableCell colSpan={7} className="py-12 text-center">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <p className="text-sm font-bold text-[#1E293B]">
                       No submissions yet
@@ -113,8 +170,19 @@ export function SubmissionsPanel() {
                   </div>
                 </TableCell>
               </TableRow>
+            ) : state.filteredSubmissions.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="py-12 text-center text-sm font-semibold text-neutral-600"
+                >
+                  {state.search.trim()
+                    ? `No submissions match “${state.search.trim()}”.`
+                    : "No submissions match the selected column filters."}
+                </TableCell>
+              </TableRow>
             ) : (
-              state.submissions.map((sub) => (
+              state.filteredSubmissions.map((sub) => (
                 <TableRow
                   key={`${sub.event_id}:${sub.submission_id}`}
                   className="group cursor-pointer transition-colors hover:bg-neutral-50/80"
@@ -138,14 +206,18 @@ export function SubmissionsPanel() {
                   </TableCell>
                   <TableCell className="py-3.5 pr-6 text-xs font-semibold text-[#1E293B]">
                     {sub.activity_details.title}
-                    {sub.requires_venue ? (
-                      <span className="ml-2 text-[10px] font-normal text-[#3B82F6]">
-                        ({sub.activity_details.venue})
-                      </span>
+                    {sub.is_collaboration ? (
+                      <CollabBadge role={sub.role ?? "proponent"} />
                     ) : null}
+                  </TableCell>
+                  <TableCell className="py-3.5 pr-4 text-xs text-[#64748B]">
+                    {sub.activity_details.venue || "—"}
                   </TableCell>
                   <TableCell className="py-3.5 pr-4 text-xs text-[#64748B] capitalize">
                     {sub.activity_classification}
+                  </TableCell>
+                  <TableCell className="py-3.5 pr-4 text-xs whitespace-nowrap text-[#64748B]">
+                    {sub.submitted_date}
                   </TableCell>
                   <TableCell className="py-3.5 pr-4 text-xs font-medium text-[#475569]">
                     {sub.current_signatory}
