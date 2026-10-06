@@ -1,6 +1,6 @@
 import { FieldWarning } from "@/components/forms/field-warning"
 import { EventTimeFields } from "@/components/submission/event-time-fields"
-import { VENUES } from "@/components/submission/constants"
+import { CAMPUSES, VENUES } from "@/components/submission/constants"
 import {
   clockFromDraft,
   combineEventTime,
@@ -60,9 +60,11 @@ type DetailsFields = Pick<
 export function ActivityDetailsSection({
   values,
   onChange,
+  includeReservation = false,
 }: {
   values: DetailsFields
   onChange: (key: any, value: any) => void
+  includeReservation?: boolean
 }) {
   const minStartDate = minEventDateKey()
   const minEndDate =
@@ -116,6 +118,12 @@ export function ActivityDetailsSection({
   const updateEnd = (next: ClockParts) => {
     commitTimes(startParts, next)
   }
+
+  // Reserving facilities books a physical room, so "Online" is not a valid venue
+  // in that flow: it lends out no rooms, which would leave the CDM room catalog
+  // empty and block every room row. Without a reservation, "Online" stays an
+  // option. See the matching guard in `useSaafForm` that clears a stale value.
+  const venueOptions = includeReservation ? CAMPUSES : VENUES
 
   return (
     <div className="space-y-6 pt-4">
@@ -215,7 +223,7 @@ export function ActivityDetailsSection({
               <SelectValue placeholder="Select venue" />
             </SelectTrigger>
             <SelectPopup>
-              {VENUES.map((venue) => (
+              {venueOptions.map((venue) => (
                 <SelectItem key={venue} value={venue}>
                   {venue}
                 </SelectItem>

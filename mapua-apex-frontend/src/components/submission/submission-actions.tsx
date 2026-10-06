@@ -45,9 +45,8 @@ export function SubmissionActions({
         <Button
           type="button"
           onClick={onSubmit}
-          disabled={isSubmitting}
-          aria-disabled={inactive || isSubmitting}
-          className={`h-11 w-full min-w-36 cursor-pointer rounded-lg bg-[#8B0000] px-10 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#6B0000] disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-auto ${inactive ? "cursor-not-allowed opacity-40" : ""}`}
+          disabled={inactive || isSubmitting}
+          className="h-11 w-full min-w-36 rounded-lg bg-[#8B0000] px-10 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#6B0000] disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-auto"
         >
           {isSubmitting ? "Submitting..." : "Submit"}
         </Button>

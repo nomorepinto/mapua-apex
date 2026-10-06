@@ -7,6 +7,7 @@ import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import {
   createEmptyProponent,
   DEFAULT_SAAF_DRAFT,
+  ONLINE_VENUE,
 } from "@/components/submission/constants"
 import { withReservationDefaults } from "@/components/reservation/constants"
 import type {
@@ -122,6 +123,17 @@ export function useSaafForm() {
     }
   }, [fetcher.data?.success])
 
+  // A physical room reservation cannot happen at an "Online" venue, so when the
+  // proponent opted to reserve facilities the venue must be a campus. Clear a
+  // stale "Online" value (e.g. chosen before switching to reserve, or restored
+  // from a returned paper) so the CDM room catalog is not left empty; the venue
+  // selector hides "Online" in this flow too.
+  useEffect(() => {
+    if (includeReservation && draft.activityVenue === ONLINE_VENUE) {
+      useOrgStore.getState().patchSaafDraft({ activityVenue: "" })
+    }
+  }, [includeReservation, draft.activityVenue])
+
   const updateField = useCallback(
     <K extends keyof SaafDraft>(key: K, value: SaafDraft[K]) => {
       useOrgStore.getState().patchSaafDraft({ [key]: value })
@@ -175,7 +187,7 @@ export function useSaafForm() {
         {
           id: String(Date.now()),
           item: "",
-          unit: "1",
+          unit: "pc",
           quantity: "1",
           pricePerUnit: "0",
         },
@@ -194,10 +206,13 @@ export function useSaafForm() {
   const handleUpdateBudgetItem = useCallback(
     (id: string, field: keyof BudgetItem, value: string) => {
       let sanitized = value
-      if (field === "unit" || field === "quantity") {
+      if (field === "quantity") {
         sanitized = sanitizeIntegerInput(value).slice(0, 7)
       } else if (field === "pricePerUnit") {
         sanitized = sanitizeDecimalInput(value).slice(0, 8)
+      } else if (field === "unit") {
+        // Unit is a free-text label ("pc", "box", "kg", …), not a number.
+        sanitized = value.slice(0, 12)
       } else if (field === "item") {
         sanitized = value.slice(0, 40)
       }

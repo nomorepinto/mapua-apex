@@ -1,5 +1,13 @@
-import { DEFAULT_RESERVATION_DRAFT } from "@/components/reservation/constants"
+import {
+  AV_EQUIPMENT_OPTIONS,
+  DEFAULT_RESERVATION_DRAFT,
+  EQUIPMENT_OPTIONS,
+} from "@/components/reservation/constants"
 import type { EquipmentItem, ReservationDraft } from "@/components/reservation/types"
+import {
+  CLASSROOM_ROOM,
+  isRoomOfferedAtCampus,
+} from "@/lib/campus-rooms"
 import {
   createEmptyProponent,
   DEFAULT_BUDGET_ITEMS,
@@ -86,7 +94,8 @@ export interface ApiSubmission {
   detailed_budget_proposal?: {
     items?: Array<{
       item_no: string
-      unit: number
+      /** Free-text measuring unit ("pc", "box", …); legacy rows stored a number. */
+      unit: number | string
       quantity: number
       price_per_unit: number
       total: number
@@ -295,7 +304,8 @@ export function buildSaafApiPayload(
     detailed_budget_proposal: {
       items: (saafDraft.budgetItems || []).map((b, idx) => ({
         item_no: b.item || String(idx + 1),
-        unit: Number(b.unit) || 1,
+        // Unit is a free-text label ("pc", "box", …), sent as typed.
+        unit: (b.unit || "").trim() || "pc",
         quantity: Number(b.quantity) || 0,
         price_per_unit: Number(b.pricePerUnit) || 0,
         total: (Number(b.quantity) || 0) * (Number(b.pricePerUnit) || 0),
@@ -1027,7 +1037,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
     submission.detailed_budget_proposal?.items?.map((item, index) => ({
       id: String(index + 1),
       item: item.item_no || String(index + 1),
-      unit: String(item.unit ?? 1),
+      unit: String(item.unit || "pc"),
       quantity: String(item.quantity ?? 0),
       pricePerUnit: String(item.price_per_unit ?? 0),
     })) || DEFAULT_BUDGET_ITEMS
@@ -1062,13 +1072,18 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
         name: item.name || "",
         purpose: item.purpose || "",
         remark: item.remark || "",
+        // A stored name outside the fixed catalog was typed via "Others", so it
+        // reopens as an editable custom row.
+        isOther: !EQUIPMENT_OPTIONS.includes(item.name || ""),
       }))
     : legacyNames.map((name, index) => ({
         id: String(index + 1),
         name,
         purpose: "",
         remark: "",
+        isOther: !EQUIPMENT_OPTIONS.includes(name),
       }))
+  const roomCampus = submission.activity_details?.venue || ""
   const reservation: ReservationDraft = {
     equipmentItems,
     roomItems: reservationSource?.function_rooms?.items?.length
@@ -1081,6 +1096,10 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
         roomNeeded: item.room_needed,
         classroomName: item.classroom_name || "",
         remarks: item.remarks || "",
+        // Neither a fixed campus room nor "Classroom" => a custom "Others" row.
+        isOther:
+          item.room_needed !== CLASSROOM_ROOM &&
+          !isRoomOfferedAtCampus(roomCampus, item.room_needed),
       }))
       : DEFAULT_RESERVATION_DRAFT.roomItems,
     avItems: reservationSource?.audiovisual_equipment?.items?.length
@@ -1092,6 +1111,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
         endTimeNeeded: item.end_time_needed || item.time_needed,
         equipmentNeeded: item.equipment_needed,
         remarks: item.remarks || "",
+        isOther: !AV_EQUIPMENT_OPTIONS.includes(item.equipment_needed || ""),
       }))
       : DEFAULT_RESERVATION_DRAFT.avItems,
   }

@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
+  useCallback,
   useRef,
   useState,
   type MouseEvent,
@@ -36,6 +37,7 @@ interface SaafFormState {
   finalStep: WizardStepIndex
   includeReservation: boolean
   showErrors: boolean
+  touched: Record<string, boolean>
   stepError: string | null
   submitError: string | null
   isSubmitting: boolean
@@ -53,6 +55,7 @@ interface SaafFormActions {
   goToStep: (next: WizardStepIndex) => void
   goNext: () => void
   goBack: () => void
+  markTouched: (key: string) => void
   updateField: SaafFormModel["updateField"]
   handleUpdateProponent: SaafFormModel["handleUpdateProponent"]
   handleRemoveProponent: SaafFormModel["handleRemoveProponent"]
@@ -119,6 +122,14 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   // their own (see `farthestStep` below), so the wizard allows whichever of the
   // two reaches further.
   const [advancedStep, setAdvancedStep] = useState<WizardStepIndex>(0)
+
+  // Fields the user has left (blurred). A field's inline warning surfaces as
+  // soon as an invalid value is in the box, instead of only after a
+  // Continue/Submit press. Reset on Clear so a wiped form shows no stale errors.
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const markTouched = useCallback((key: string) => {
+    setTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }))
+  }, [])
 
   // The reservation step is present only when the start page chose to reserve
   // facilities. Its draft lives in the same store so the wizard (the parent of
@@ -187,6 +198,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       finalStep,
       includeReservation,
       showErrors: form.showErrors,
+      touched,
       stepError: form.stepError,
       submitError: form.submitError,
       isSubmitting: form.isSubmitting,
@@ -203,6 +215,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       goToStep,
       goNext,
       goBack,
+      markTouched,
       updateField: form.updateField,
       handleUpdateProponent: form.handleUpdateProponent,
       handleRemoveProponent: form.handleRemoveProponent,
@@ -223,6 +236,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
           setStep(0)
           setAdvancedStep(0)
         }
+        setTouched({})
         form.setShowConfirmClearModal(false)
       },
       closeConfirm: () => form.setShowConfirmModal(false),

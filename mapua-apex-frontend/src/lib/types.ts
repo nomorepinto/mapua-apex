@@ -82,7 +82,8 @@ export interface InstitutionalAlignment {
 
 export interface BudgetItem {
   item_no: string
-  unit: number
+  /** Free-text measuring unit ("pc", "box", …); legacy rows stored a number. */
+  unit: number | string
   quantity: number
   price_per_unit: number
   total: number

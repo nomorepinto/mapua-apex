@@ -7,7 +7,7 @@ import {
   SAME_EVENT_TIME_MESSAGE,
   splitEventTime,
 } from "@/components/submission/event-time"
-import { isVenue } from "@/components/submission/constants"
+import { isVenue, MOBILE_NUMBER_LENGTH, STUDENT_NUMBER_LENGTH } from "@/components/submission/constants"
 import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
@@ -78,11 +78,21 @@ function proponentWarnings(
   const key = (field: string) => `proponent.${proponent.id}.${field}`
   if (isBlank(proponent.firstName)) warnings[key("firstName")] = REQUIRED
   if (isBlank(proponent.lastName)) warnings[key("lastName")] = REQUIRED
-  if (isBlank(proponent.studentNumber)) warnings[key("studentNumber")] = REQUIRED
+  if (isBlank(proponent.studentNumber)) {
+    warnings[key("studentNumber")] = REQUIRED
+  } else if (proponent.studentNumber.trim().length < STUDENT_NUMBER_LENGTH) {
+    warnings[key("studentNumber")] =
+      `Student number must be ${STUDENT_NUMBER_LENGTH} digits.`
+  }
   if (isBlank(proponent.programAndYear)) warnings[key("programAndYear")] = REQUIRED
   if (isBlank(proponent.positionOfApplicant)) warnings[key("positionOfApplicant")] = REQUIRED
   if (isBlank(proponent.orgOrCourseSection)) warnings[key("orgOrCourseSection")] = REQUIRED
-  if (isBlank(proponent.contactNumber)) warnings[key("contactNumber")] = REQUIRED
+  if (isBlank(proponent.contactNumber)) {
+    warnings[key("contactNumber")] = REQUIRED
+  } else if (proponent.contactNumber.trim().length < MOBILE_NUMBER_LENGTH) {
+    warnings[key("contactNumber")] =
+      `Mobile number must be ${MOBILE_NUMBER_LENGTH} digits.`
+  }
   if (isBlank(department)) warnings[key("department")] = REQUIRED
 
   if (isBlank(proponent.emailAddress)) {
@@ -245,8 +255,22 @@ export function getReservationStepIssue(
     draft.avItems.length > 0
   if (!hasItems) return RESERVATION_EMPTY_MESSAGE
 
+  // Custom "Others" rows carry a free-text name instead of a catalog value, so
+  // they skip the campus whitelist below but must still be named.
+  if (draft.equipmentItems.some((item) => item.isOther && isBlank(item.name))) {
+    return "Enter a name for the custom equipment item."
+  }
+  if (
+    draft.avItems.some((item) => item.isOther && isBlank(item.equipmentNeeded))
+  ) {
+    return "Enter a name for the custom audiovisual equipment."
+  }
+  if (draft.roomItems.some((item) => item.isOther && isBlank(item.roomNeeded))) {
+    return "Enter a name for the custom room."
+  }
+
   const offCampus = draft.roomItems.find(
-    (item) => !isRoomOfferedAtCampus(campus, item.roomNeeded)
+    (item) => !item.isOther && !isRoomOfferedAtCampus(campus, item.roomNeeded)
   )
   if (offCampus) {
     return `Remove "${offCampus.roomNeeded}" — it is not offered at ${campus || "the selected campus"}.`

@@ -23,8 +23,15 @@ export async function action({
 
   const saafDraft = useOrgStore.getState().saafDraft
   const reservationDraft = useOrgStore.getState().reservationDraft
-  const editingEventId = useOrgStore.getState().editingEventId
-  const editingSubmissionId = useOrgStore.getState().editingSubmissionId
+  // The edit ids live in the store once hydration loads a returned paper, but
+  // the route's `?event=&submission=` params are the authoritative fallback so a
+  // resubmit still PUTs (never POSTs a duplicate) if hydration has not run yet.
+  const url = new URL(request.url)
+  const editingEventId =
+    useOrgStore.getState().editingEventId ?? url.searchParams.get("event")
+  const editingSubmissionId =
+    useOrgStore.getState().editingSubmissionId ??
+    url.searchParams.get("submission")
 
   if (!saafDraft) {
     return {

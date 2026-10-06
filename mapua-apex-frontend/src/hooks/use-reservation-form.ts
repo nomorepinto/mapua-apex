@@ -2,6 +2,7 @@ import { useCallback } from "react"
 
 import {
   DEFAULT_RESERVATION_DRAFT,
+  OTHER_OPTION,
   withReservationDefaults,
 } from "@/components/reservation/constants"
 import { DEFAULT_SAAF_DRAFT } from "@/components/submission/constants"
@@ -41,6 +42,8 @@ export function useReservationForm() {
     const current =
       useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
     const roomItems = current.roomItems ?? DEFAULT_RESERVATION_DRAFT.roomItems
+    // "Others" adds an open-ended row whose name is typed into the table cell.
+    const isOther = roomNeeded === OTHER_OPTION
     useOrgStore.getState().patchReservationDraft({
       roomItems: [
         ...roomItems,
@@ -50,9 +53,10 @@ export function useReservationForm() {
           endDateNeeded: "",
           timeNeeded: "",
           endTimeNeeded: "",
-          roomNeeded,
+          roomNeeded: isOther ? "" : roomNeeded,
           classroomName: "",
           remarks: "",
+          isOther,
         },
       ],
     })
@@ -93,6 +97,8 @@ export function useReservationForm() {
     const current =
       useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
     const avItems = current.avItems ?? DEFAULT_RESERVATION_DRAFT.avItems
+    // "Others" adds an open-ended row whose name is typed into the table cell.
+    const isOther = equipmentNeeded === OTHER_OPTION
     useOrgStore.getState().patchReservationDraft({
       avItems: [
         ...avItems,
@@ -102,8 +108,9 @@ export function useReservationForm() {
           endDateNeeded: "",
           timeNeeded: "",
           endTimeNeeded: "",
-          equipmentNeeded,
+          equipmentNeeded: isOther ? "" : equipmentNeeded,
           remarks: "",
+          isOther,
         },
       ],
     })
@@ -141,10 +148,12 @@ export function useReservationForm() {
       useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
     const equipmentItems =
       current.equipmentItems ?? DEFAULT_RESERVATION_DRAFT.equipmentItems
+    // "Others" adds an open-ended row whose name is typed into the table cell.
+    const isOther = name === OTHER_OPTION
     useOrgStore.getState().patchReservationDraft({
       equipmentItems: [
         ...equipmentItems,
-        { id: String(Date.now()), name, purpose: "", remark: "" },
+        { id: String(Date.now()), name: isOther ? "" : name, purpose: "", remark: "", isOther },
       ],
     })
   }, [])
@@ -162,7 +171,7 @@ export function useReservationForm() {
   const handleUpdateEquipmentItem = useCallback(
     (id: string, field: keyof EquipmentItem, value: string) => {
       let sanitized = value
-      if (field === "purpose" || field === "remark") {
+      if (field === "name" || field === "purpose" || field === "remark") {
         sanitized = value.slice(0, 40)
       }
       const current =

@@ -45,21 +45,15 @@ const BudgetRow = memo(function BudgetRow({
       <td className="border-r border-neutral-300 p-2 text-center">
         <input
           type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={7}
+          maxLength={12}
           name={`budgetItem_${index}_unit`}
           value={item.unit}
-          onKeyDown={blockNonIntegerKeys}
+          placeholder="pc"
           onChange={(e) =>
-            onUpdate(
-              item.id,
-              "unit",
-              sanitizeIntegerInput(e.target.value).slice(0, 7)
-            )
+            onUpdate(item.id, "unit", e.target.value.slice(0, 12))
           }
           style={{ color: "#171717" }}
-          className="w-full rounded border border-transparent bg-transparent py-1 text-center !text-neutral-900 focus:border-neutral-300 focus:bg-white focus:outline-none"
+          className="w-full rounded border border-transparent bg-transparent py-1 text-center !text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-300 focus:bg-white focus:outline-none"
         />
       </td>
       <td className="border-r border-neutral-300 p-2 text-center">

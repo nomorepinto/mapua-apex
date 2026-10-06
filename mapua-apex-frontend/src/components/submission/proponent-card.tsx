@@ -5,8 +5,10 @@ import { FieldWarning } from "@/components/forms/field-warning"
 import {
   DEPARTMENTS,
   FIELD_INPUT_CLASS,
+  MOBILE_NUMBER_LENGTH,
   SELECT_CONTENT_STYLE,
   SELECT_ITEM_CLASS,
+  STUDENT_NUMBER_LENGTH,
 } from "@/components/submission/constants"
 import type { Proponent } from "@/components/submission/types"
 import { Button } from "@/components/ui/button"
@@ -146,14 +148,15 @@ export const ProponentCard = memo(function ProponentCard({
             inputMode="numeric"
             name={`proponent_${index}_studentNumber`}
             placeholder="202XXXXXXX"
-            maxLength={10}
+            minLength={STUDENT_NUMBER_LENGTH}
+            maxLength={STUDENT_NUMBER_LENGTH}
             value={proponent.studentNumber}
             onKeyDown={blockNonIntegerKeys}
             onChange={(e) =>
               onUpdate(
                 proponent.id,
                 "studentNumber",
-                sanitizeIntegerInput(e.target.value).slice(0, 10)
+                sanitizeIntegerInput(e.target.value).slice(0, STUDENT_NUMBER_LENGTH)
               )
             }
             style={{ color: "#171717" }}
@@ -281,21 +284,22 @@ export const ProponentCard = memo(function ProponentCard({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-neutral-700">
-            Contact Number <span className="text-red-500">*</span>
+            Mobile Number <span className="text-red-500">*</span>
           </label>
           <Input
             type="text"
             inputMode="numeric"
             name={`proponent_${index}_contactNumber`}
             placeholder="09XXXXXXXXX"
-            maxLength={11}
+            minLength={MOBILE_NUMBER_LENGTH}
+            maxLength={MOBILE_NUMBER_LENGTH}
             value={proponent.contactNumber}
             onKeyDown={blockNonIntegerKeys}
             onChange={(e) =>
               onUpdate(
                 proponent.id,
                 "contactNumber",
-                sanitizeIntegerInput(e.target.value).slice(0, 11)
+                sanitizeIntegerInput(e.target.value).slice(0, MOBILE_NUMBER_LENGTH)
               )
             }
             style={{ color: "#171717" }}

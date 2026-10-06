@@ -61,7 +61,11 @@ export function SaafActivityStep() {
 
   return (
     <SaafStepPanel index={2}>
-      <ActivityDetailsSection values={state.draft} onChange={actions.updateField} />
+      <ActivityDetailsSection
+        values={state.draft}
+        onChange={actions.updateField}
+        includeReservation={state.includeReservation}
+      />
     </SaafStepPanel>
   )
 }
@@ -158,11 +162,8 @@ function SaafContinueActions() {
       <button
         type="button"
         onClick={actions.goNext}
-        aria-disabled={!state.currentStepComplete}
-        className={cn(
-          brand.action,
-          !state.currentStepComplete && "cursor-not-allowed opacity-40"
-        )}
+        disabled={!state.currentStepComplete}
+        className={brand.action}
       >
         Continue
       </button>

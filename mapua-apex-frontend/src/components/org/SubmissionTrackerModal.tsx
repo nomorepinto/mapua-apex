@@ -12,7 +12,6 @@ import {
   apiSubmissionToDashboardRow,
   formatDocumentId,
 } from "@/lib/dynamodb-adapters"
-import { useOrgStore } from "@/stores/org-store"
 import { layout, modal } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -71,7 +70,11 @@ export function SubmissionTrackerModal({
         "—"
 
   const handleResubmit = () => {
-    useOrgStore.getState().setEditingSubmission(eventId, submissionId)
+    // Do NOT mark the submission as editing here. `useHydrateEditingSubmission`
+    // owns `setEditingSubmission` and only runs when the editing ids do not
+    // already match; pre-setting them makes its guard skip loading the returned
+    // paper, so the form would open blank instead of prefilled. The route's
+    // `?event=&submission=` params carry the ids to the action for the PUT.
     onClose()
     navigate(
       `/students/submissions/saaf?event=${encodeURIComponent(eventId)}&submission=${encodeURIComponent(submissionId)}`

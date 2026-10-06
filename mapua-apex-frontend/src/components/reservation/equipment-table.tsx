@@ -2,6 +2,7 @@ import { Trash2Icon } from "lucide-react"
 
 import {
   EQUIPMENT_OPTIONS,
+  OTHER_OPTION,
   TABLE_INPUT_CLASS,
 } from "@/components/reservation/constants"
 import type { EquipmentItem } from "@/components/reservation/types"
@@ -31,7 +32,9 @@ export function EquipmentTable({
   const available = EQUIPMENT_OPTIONS.filter(
     (option) => !safeItems.some((item) => item.name === option)
   )
-  const exhausted = available.length === 0
+  // "Others" is always offered so an open-ended custom row can be added even
+  // after every catalog item is used, and added more than once.
+  const options = [...available, OTHER_OPTION]
 
   return (
     <div className="space-y-3">
@@ -73,7 +76,21 @@ export function EquipmentTable({
               {safeItems.map((item) => (
                 <tr key={item.id} className="hover:bg-neutral-50/60">
                   <td className="border-r border-neutral-300 p-2 text-center text-sm font-medium !text-neutral-900">
-                    {item.name}
+                    {item.isOther ? (
+                      <input
+                        type="text"
+                        maxLength={40}
+                        value={item.name}
+                        placeholder="Enter item name..."
+                        onChange={(e) =>
+                          onUpdate(item.id, "name", e.target.value)
+                        }
+                        style={{ color: "#171717" }}
+                        className={`${TABLE_INPUT_CLASS} placeholder:text-neutral-400`}
+                      />
+                    ) : (
+                      item.name
+                    )}
                   </td>
                   <td className="border-r border-neutral-300 p-2">
                     <input
@@ -121,20 +138,15 @@ export function EquipmentTable({
 
       <Select
         value={null}
-        disabled={exhausted}
         onValueChange={(item: string | null) => {
           if (item) onAdd(item)
         }}
       >
         <SelectTrigger className="w-full">
-          <SelectValue
-            placeholder={
-              exhausted ? "All equipment added" : "Add equipment requested…"
-            }
-          />
+          <SelectValue placeholder="Add equipment requested…" />
         </SelectTrigger>
         <SelectPopup>
-          {available.map((option) => (
+          {options.map((option) => (
             <SelectItem key={option} value={option}>
               {option}
             </SelectItem>
