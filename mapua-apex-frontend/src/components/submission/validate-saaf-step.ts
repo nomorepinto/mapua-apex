@@ -7,7 +7,7 @@ import {
   SAME_EVENT_TIME_MESSAGE,
   splitEventTime,
 } from "@/components/submission/event-time"
-import { isVenue, MAX_PROPONENTS, MOBILE_NUMBER_LENGTH, STUDENT_NUMBER_LENGTH } from "@/components/submission/constants"
+import { isVenue, MAX_PROPONENTS, MAX_STUDENT_YEAR, MIN_STUDENT_YEAR, MOBILE_NUMBER_LENGTH, STUDENT_NUMBER_LENGTH, YEAR_LEVEL_OPTIONS } from "@/components/submission/constants"
 import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
@@ -23,7 +23,7 @@ import {
 } from "@/lib/date-key"
 
 const EMAIL_PATTERN =
-  /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+  /^[a-zA-Z0-9._%+-]+@(mymail\.mapua\.edu\.ph|mapua\.edu\.ph)$/i
 
 function isBlank(value: string | undefined): boolean {
   return !value || !value.trim()
@@ -59,10 +59,18 @@ function isInsideEventWindow(value: string): boolean {
   )
 }
 
-function isValidAbsoluteUrl(value: string): boolean {
+function isValidFacebookUrl(value: string): boolean {
+  const trimmed = value.trim()
+  if (!/^https:\/\/(www\.)?facebook\.com\/.+/i.test(trimmed)) {
+    return false
+  }
   try {
-    const url = new URL(value)
-    return url.protocol === "http:" || url.protocol === "https:"
+    const url = new URL(trimmed)
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "facebook.com" || url.hostname === "www.facebook.com") &&
+      url.pathname.length > 1
+    )
   } catch {
     return false
   }
@@ -126,12 +134,33 @@ function proponentWarnings(
   } else if (proponent.studentNumber.trim().length < STUDENT_NUMBER_LENGTH) {
     warnings[key("studentNumber")] =
       `Student number must be ${STUDENT_NUMBER_LENGTH} digits.`
+  } else {
+    const year = Number(proponent.studentNumber.slice(0, 4))
+    if (year < MIN_STUDENT_YEAR || year > MAX_STUDENT_YEAR) {
+      warnings[key("studentNumber")] =
+        `Student number must start with a year between ${MIN_STUDENT_YEAR} and ${MAX_STUDENT_YEAR}.`
+    }
   }
-  if (isBlank(proponent.programAndYear)) warnings[key("programAndYear")] = REQUIRED
+  if (isBlank(proponent.programAndYear)) {
+    warnings[key("programAndYear")] = REQUIRED
+  } else {
+    const trimmed = proponent.programAndYear.trim()
+    const hasYear = YEAR_LEVEL_OPTIONS.some((yr) =>
+      trimmed.toLowerCase().endsWith(yr.toLowerCase())
+    )
+    const hasProgram =
+      trimmed.includes(" - ") ||
+      (!hasYear && !isBlank(trimmed))
+    if (!hasYear || !hasProgram) {
+      warnings[key("programAndYear")] = "Both program and year level are required."
+    }
+  }
   if (isBlank(proponent.positionOfApplicant)) warnings[key("positionOfApplicant")] = REQUIRED
   if (isBlank(proponent.orgOrCourseSection)) warnings[key("orgOrCourseSection")] = REQUIRED
   if (isBlank(proponent.contactNumber)) {
     warnings[key("contactNumber")] = REQUIRED
+  } else if (!proponent.contactNumber.trim().startsWith("09")) {
+    warnings[key("contactNumber")] = "Mobile number must start with 09."
   } else if (proponent.contactNumber.trim().length < MOBILE_NUMBER_LENGTH) {
     warnings[key("contactNumber")] =
       `Mobile number must be ${MOBILE_NUMBER_LENGTH} digits.`
@@ -141,13 +170,15 @@ function proponentWarnings(
   if (isBlank(proponent.emailAddress)) {
     warnings[key("emailAddress")] = REQUIRED
   } else if (!EMAIL_PATTERN.test(proponent.emailAddress.trim())) {
-    warnings[key("emailAddress")] = "Enter a valid email address."
+    warnings[key("emailAddress")] =
+      "Email must end with @mymail.mapua.edu.ph or @mapua.edu.ph."
   }
 
   if (isBlank(proponent.facebookLink)) {
     warnings[key("facebookLink")] = REQUIRED
-  } else if (!isValidAbsoluteUrl(proponent.facebookLink.trim())) {
-    warnings[key("facebookLink")] = "Enter a valid Facebook URL."
+  } else if (!isValidFacebookUrl(proponent.facebookLink.trim())) {
+    warnings[key("facebookLink")] =
+      "Facebook link must start with https://facebook.com/"
   }
 }
 
@@ -221,7 +252,13 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
     }
   }
 
-  if (isBlank(draft.expectedParticipants)) warnings.expectedParticipants = REQUIRED
+  if (isBlank(draft.expectedParticipants)) {
+    warnings.expectedParticipants = REQUIRED
+  } else if (Number(draft.expectedParticipants) < 30) {
+    warnings.expectedParticipants = "Must be at least 30 participants."
+  } else if (Number(draft.expectedParticipants) > 3000) {
+    warnings.expectedParticipants = "Cannot exceed 3000 participants."
+  }
   if (isBlank(draft.individualContribution)) warnings.individualContribution = REQUIRED
   if (isBlank(draft.proposedBudget)) warnings.proposedBudget = REQUIRED
 
@@ -248,7 +285,7 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   return warnings
 }
 
-const STEP_PREFIXES: Record<SaafStepIndex, string[]> = {
+export const STEP_PREFIXES: Record<SaafStepIndex, string[]> = {
   0: ["activityType", "totalOrgMembers"],
   1: ["proponent."],
   2: [
