@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
-export function AdminOsaPanel() {
+export function AdminDashboard() {
   const scrollToTop = () => {
     const topEl = document.getElementById("admin-dashboard-top")
     if (topEl) {
