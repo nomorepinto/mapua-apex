@@ -61,6 +61,6 @@ export function AdminOsaPanel() {
         <EditAnnouncementDialog />
         <DeleteAnnouncementDialog />
       </div>
-    </div>
+    </AdminDashboardProvider>
   )
 }
