@@ -49,6 +49,22 @@ final class DynamoKeys
         return 'ANNOUNCEMENT';
     }
 
+    /**
+     * PK for a session log item: SESSION#{session_id}
+     */
+    public static function session(string $sessionId): string
+    {
+        return 'SESSION#'.self::strip($sessionId, 'SESSION#');
+    }
+
+    /**
+     * GSI1PK for monthly-bucketed session log queries: LOG#SESSION#{YYYY-MM}
+     */
+    public static function sessionGsi1(string $yearMonth): string
+    {
+        return 'LOG#SESSION#'.$yearMonth;
+    }
+
     public static function roleIndex(string $role, ?string $department = null): string
     {
         $key = 'ROLE#'.Str::upper($role);

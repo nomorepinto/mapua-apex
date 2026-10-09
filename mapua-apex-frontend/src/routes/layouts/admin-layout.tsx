@@ -55,7 +55,7 @@ export function AdminLayout() {
   ]
 
   return (
-    <AuthGuard allowedGroups={["admin", "osaar"]}>
+    <AuthGuard allowedGroups={["admin"]}>
       <div className={layout.frame}>
         <AppSidebar
           homeTo="/admin/dashboard"
