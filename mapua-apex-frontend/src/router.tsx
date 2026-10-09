@@ -26,11 +26,11 @@ import { RoleRedirect } from "@/components/auth/RoleRedirect"
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: () => (
-      <AuthGuard>
-        <RoleRedirect />
-      </AuthGuard>
-    ),
+    HydrateFallback: RouteFallback,
+    lazy: async () => {
+      const { LandingPage } = await import("@/routes/landing")
+      return { Component: LandingPage }
+    },
   },
   {
     path: "students",
