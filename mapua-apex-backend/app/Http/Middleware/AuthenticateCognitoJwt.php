@@ -21,9 +21,11 @@ class AuthenticateCognitoJwt
      * @var array<string, list<string>>
      */
     private const ROUTE_GROUPS = [
-        'student' => ['student', 'students', 'org_submitter', 'admin'],
-        'signatory' => ['signatory', 'signatories', 'org_adviser', 'dean', 'cdm_reviewer', 'cdm', 'osaar', 'admin'],
-        'admin' => ['admin', 'osaar'],
+        'student'     => ['student', 'students', 'org_submitter', 'admin'],
+        'signatory'   => ['signatory', 'signatories', 'org_adviser', 'dean', 'cdm_reviewer', 'cdm', 'osaar', 'admin'],
+        'admin'       => ['admin', 'osaar'],
+        'super_admin' => ['super_admin'],
+        // 'any' is handled explicitly in mayAccessRole — valid JWT, no group check
     ];
 
     public function __construct(private CognitoJwtVerifier $verifier) {}
@@ -208,6 +210,11 @@ class AuthenticateCognitoJwt
      */
     private function mayAccessRole(string $role, array $normalizedGroups): bool
     {
+        // 'any' = accept any valid JWT, no group membership required
+        if ($role === 'any') {
+            return true;
+        }
+
         $allowed = self::ROUTE_GROUPS[strtolower($role)] ?? [strtolower($role)];
 
         foreach ($allowed as $group) {

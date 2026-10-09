@@ -26,6 +26,7 @@ import {
   getSaafStepIssue,
   isStepHtmlValid,
   STEP_INVALID_FOCUS_SELECTOR,
+  getMovedReservationFieldsIssue,
 } from "@/components/submission/validate-saaf-step"
 import {
   calculateRowTotal,
@@ -191,9 +192,9 @@ export function useSaafForm() {
         {
           id: String(Date.now()),
           item: "",
-          unit: "pc",
-          quantity: "1",
-          pricePerUnit: "0",
+          unit: "",
+          quantity: "",
+          pricePerUnit: "",
         },
       ],
     })
@@ -213,7 +214,7 @@ export function useSaafForm() {
       if (field === "quantity") {
         sanitized = sanitizeIntegerInput(value).slice(0, 7)
       } else if (field === "pricePerUnit") {
-        sanitized = sanitizeDecimalInput(value).slice(0, 8)
+        sanitized = sanitizeDecimalInput(value).slice(0, 5)
       } else if (field === "unit") {
         // Unit is a free-text label ("pc", "box", "kg", …), not a number.
         sanitized = value.slice(0, 12)
@@ -269,13 +270,13 @@ export function useSaafForm() {
       const htmlValid = panel ? isStepHtmlValid(panel) : false
       const issue =
         step === 4
-          ? getReservationStepIssue(
+          ? (getMovedReservationFieldsIssue(draft) || getReservationStepIssue(
               withReservationDefaults(
                 useOrgStore.getState().reservationDraft
               ),
               draft.activityVenue
-            )
-          : getSaafStepIssue(step as SaafStepIndex, draft)
+            ))
+          : getSaafStepIssue(step as SaafStepIndex, draft, includeReservation)
 
       if (!htmlValid || issue) {
         revealInvalidFields(panel ?? form)
@@ -298,7 +299,7 @@ export function useSaafForm() {
       // Check standard constraints
       const isHtmlValid = form.checkValidity()
       const issues = ([0, 1, 2, 3] as const)
-        .map((step) => getSaafStepIssue(step, draft))
+        .map((step) => getSaafStepIssue(step, draft, includeReservation))
         .filter((issue): issue is string => Boolean(issue))
 
       // When the wizard includes the reservation step, it must hold at least one

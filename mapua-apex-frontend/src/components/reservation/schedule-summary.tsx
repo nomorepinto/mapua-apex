@@ -26,11 +26,11 @@ function ScheduleField({
  * shown once at the top of the reservation step. Every reservation table shares
  * these values, so the per-row date/time columns were removed.
  */
-export function ScheduleSummary({ schedule }: { schedule: EventSchedule }) {
+export function ScheduleSummary({ schedule, hideTime }: { schedule: EventSchedule, hideTime?: boolean }) {
   return (
     <div className="space-y-2">
       <p className="text-xs font-bold text-neutral-900">Event Schedule</p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${hideTime ? "" : "lg:grid-cols-4"}`}>
         <ScheduleField label="Start Date">
           <DatePicker
             size="sm"
@@ -51,26 +51,30 @@ export function ScheduleSummary({ schedule }: { schedule: EventSchedule }) {
             aria-label="Event end date"
           />
         </ScheduleField>
-        <ScheduleField label="Start Time">
-          <TimePicker
-            size="sm"
-            disabled
-            value={schedule.startTime}
-            onChange={() => {}}
-            placeholder="—"
-            aria-label="Event start time"
-          />
-        </ScheduleField>
-        <ScheduleField label="End Time">
-          <TimePicker
-            size="sm"
-            disabled
-            value={schedule.endTime}
-            onChange={() => {}}
-            placeholder="—"
-            aria-label="Event end time"
-          />
-        </ScheduleField>
+        {!hideTime && (
+          <>
+            <ScheduleField label="Start Time">
+              <TimePicker
+                size="sm"
+                disabled
+                value={schedule.startTime}
+                onChange={() => {}}
+                placeholder="—"
+                aria-label="Event start time"
+              />
+            </ScheduleField>
+            <ScheduleField label="End Time">
+              <TimePicker
+                size="sm"
+                disabled
+                value={schedule.endTime}
+                onChange={() => {}}
+                placeholder="—"
+                aria-label="Event end time"
+              />
+            </ScheduleField>
+          </>
+        )}
       </div>
     </div>
   )

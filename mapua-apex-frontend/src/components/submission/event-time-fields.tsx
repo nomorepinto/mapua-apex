@@ -3,10 +3,8 @@ import {
   SELECT_ITEM_CLASS,
 } from "@/components/submission/constants"
 import {
-  clockMinutes,
   hourChoices,
   minuteChoices,
-  SAME_EVENT_TIME_MESSAGE,
   type ClockParts,
   type Period,
 } from "@/components/submission/event-time"
@@ -78,7 +76,20 @@ function TimeParts({
   onMinute: (minute: string) => void
   onPeriod: (period: Period) => void
 }) {
-  const hours = hourChoices(parts.hour)
+  let hours = hourChoices(parts.hour)
+  if (group === "Start") {
+    if (parts.period === "AM") {
+      hours = hours.filter((h) => ["7", "8", "9", "10", "11", parts.hour].includes(h))
+    } else if (parts.period === "PM") {
+      hours = hours.filter((h) => ["12", "1", "2", "3", "4", "5", "6", parts.hour].includes(h))
+    }
+  } else if (group === "End") {
+    if (parts.period === "AM") {
+      hours = hours.filter((h) => ["8", "9", "10", "11", parts.hour].includes(h))
+    } else if (parts.period === "PM") {
+      hours = hours.filter((h) => ["12", "1", "2", "3", "4", "5", "6", "7", "8", "9", parts.hour].includes(h))
+    }
+  }
   const minutes = minuteChoices(parts.minute)
 
   return (
@@ -146,11 +157,6 @@ export function EventTimeFields({
   onStartPeriod: (period: Period) => void
   onEndPeriod: (period: Period) => void
 }) {
-  const startMinutes = clockMinutes(start)
-  const endMinutes = clockMinutes(end)
-  const sameTime =
-    startMinutes !== null && endMinutes !== null && startMinutes === endMinutes
-
   return (
     <div className="space-y-1.5">
       <label className="block text-xs font-semibold text-neutral-800">
@@ -178,11 +184,6 @@ export function EventTimeFields({
       <span className="block text-[10px] text-neutral-500">
         Between 7:00 AM and 9:00 PM. End time cannot be earlier than the start.
       </span>
-      {sameTime ? (
-        <span className="block text-[10px] font-medium text-red-600">
-          {SAME_EVENT_TIME_MESSAGE}
-        </span>
-      ) : null}
     </div>
   )
 }

@@ -1,22 +1,38 @@
-import { useCallback } from "react"
+import { useCallback } from "react";
 
 export function useSignOut() {
-  return useCallback(() => {
-    // Cognito's /logout endpoint expects `client_id` + `logout_uri`,
-    // NOT the standard OIDC `post_logout_redirect_uri` that oidc-client-ts sends.
-    const domain = import.meta.env.VITE_COGNITO_DOMAIN
-    const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID
-    const authority = import.meta.env.VITE_COGNITO_AUTHORITY
-    const logoutUri = import.meta.env.VITE_COGNITO_POST_LOGOUT_REDIRECT_URI
+  return useCallback((evtOrSessionId?: string | null | React.MouseEvent) => {
+    const sessionId = typeof evtOrSessionId === "string" ? evtOrSessionId : null;
 
-    // Clear the OIDC user data directly from storage (synchronous).
-    // We CANNOT use auth.removeUser() because even fire-and-forget,
-    // its resolved promise triggers a React re-render where AuthGuard
-    // calls signinRedirect() — overriding our logout redirect.
-    const storageKey = `oidc.user:${authority}:${clientId}`
-    sessionStorage.removeItem(storageKey)
+    // End session keepalive call before Cognito redirect
+    try {
+      if (sessionId) {
+        const url = `/api/v1/sessions/${sessionId}/end`;
+        const blob = new Blob([JSON.stringify({ reason: "logout" })], {
+          type: "application/json",
+        });
+        navigator.sendBeacon(url, blob);
+      }
+    } catch (err) {
+      console.warn("useSignOut: end session beacon failed", err);
+    }
 
-    // Redirect to Cognito's logout endpoint with correct params
-    window.location.href = `${domain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`
-  }, [])
+    const domain = import.meta.env.VITE_COGNITO_DOMAIN;
+    const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+    const authority = import.meta.env.VITE_COGNITO_AUTHORITY;
+    const logoutUri = import.meta.env.VITE_COGNITO_POST_LOGOUT_REDIRECT_URI;
+
+    // Clear OIDC session storage
+    if (authority && clientId) {
+      const storageKey = `oidc.user:${authority}:${clientId}`;
+      sessionStorage.removeItem(storageKey);
+    }
+
+    // Redirect to Cognito logout endpoint
+    if (domain && clientId && logoutUri) {
+      window.location.href = `${domain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
+    } else {
+      window.location.href = "/";
+    }
+  }, []);
 }

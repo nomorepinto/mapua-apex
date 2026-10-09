@@ -261,3 +261,67 @@ Use this as the **POST** `/api/v1/students/submissions` body. For **PUT**, copy 
   }
 }
 ```
+
+---
+
+## Super Admin Security & Activity Analytics
+
+`Authorization: Bearer <Super Admin or Admin ID token>`
+
+| Method | Endpoint | Description |
+| :---- | :---- | :---- |
+| **GET** | `/api/v1/super-admin/analytics` | Query security metrics, login volume, privileged mutations, and security alerts for a date range. |
+
+**Query Parameters:**
+- `startDate` (string, `YYYY-MM-DD`, default: today in Asia/Manila)
+- `endDate` (string, `YYYY-MM-DD`, default: today in Asia/Manila)
+
+**Response `200`:**
+```json
+{
+  "activeNow": 4,
+  "logins": 28,
+  "uniqueUsers": 19,
+  "deletes": 2,
+  "afterHours": 5,
+  "privilegedActions": 12,
+  "loginsOverTime": [
+    { "bucket": "08:00", "count": 3 },
+    { "bucket": "09:00", "count": 8 },
+    { "bucket": "10:00", "count": 12 },
+    { "bucket": "11:00", "count": 5 }
+  ],
+  "actionsByType": {
+    "CREATE": 14,
+    "UPDATE": 8,
+    "DELETE": 2
+  },
+  "alerts": [
+    {
+      "type": "CONCURRENT_SESSIONS",
+      "userName": "Maria Santos",
+      "detail": "2+ active sessions detected simultaneously from different IPs (136.158.42.10 and 120.28.194.55)",
+      "sessionId": "sess_89a7f10b2c3d4e5f"
+    },
+    {
+      "type": "NEW_IP_LOCATION",
+      "userName": "Prof. Alejandro Ramos",
+      "detail": "Login detected from unrecognized IP address (180.191.10.22)",
+      "sessionId": "sess_11b22c33d44e55f6"
+    },
+    {
+      "type": "LONG_SESSION",
+      "userName": "Juan Dela Cruz",
+      "detail": "Session has been continuously active for over 9.5 hours",
+      "sessionId": "sess_77c88d99e00f11a2"
+    },
+    {
+      "type": "BULK_CHANGES",
+      "userName": "Mac Taz (Super Admin)",
+      "detail": "5+ deletes performed within a 10-minute window",
+      "activityId": "act_102"
+    }
+  ]
+}
+```
+

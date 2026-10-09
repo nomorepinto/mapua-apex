@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
+import { useSignOut } from "@/hooks/use-sign-out"
 
 export type AuthGuardProps = {
   children: React.ReactNode
@@ -11,6 +12,7 @@ export type AuthGuardProps = {
 
 export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
   const auth = useAuth()
+  const handleSignOut = useSignOut()
   const [hasAttemptedSignin, setHasAttemptedSignin] = useState(false)
 
   useEffect(() => {
@@ -76,14 +78,7 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
                 Go Home
               </button>
               <button
-                onClick={() => {
-                  const domain = import.meta.env.VITE_COGNITO_DOMAIN
-                  const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID
-                  const authority = import.meta.env.VITE_COGNITO_AUTHORITY
-                  const logoutUri = import.meta.env.VITE_COGNITO_POST_LOGOUT_REDIRECT_URI
-                  sessionStorage.removeItem(`oidc.user:${authority}:${clientId}`)
-                  window.location.href = `${domain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`
-                }}
+                onClick={() => handleSignOut()}
                 className="min-h-11 rounded-xl bg-[#8B0000] px-4 py-2 text-sm font-medium text-white hover:bg-[#6b0000]"
               >
                 Sign Out

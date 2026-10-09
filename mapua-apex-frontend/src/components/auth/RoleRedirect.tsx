@@ -30,9 +30,14 @@ export function RoleRedirect() {
 
   const userGroups = (auth.user?.profile["cognito:groups"] as string[]) || []
 
-  // Admin & OSAAR → admin panel
-  if (hasGroup(userGroups, "admin") || hasGroup(userGroups, "osaar")) {
+  // Admin → admin panel
+  if (hasGroup(userGroups, "admin")) {
     return <Navigate to="/admin/dashboard" replace />
+  }
+
+  // OSAAR → osaar panel
+  if (hasGroup(userGroups, "osaar")) {
+    return <Navigate to="/osaar/dashboard" replace />
   }
 
   // CDM Reviewer → own panel

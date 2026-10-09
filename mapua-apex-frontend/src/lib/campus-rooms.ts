@@ -10,6 +10,8 @@ const FIXED_ROOMS: Record<Campus, string[]> = {
     "Cervantes Room",
     "Makati Campus Lobby",
     "Global Classroom",
+    "Gym",
+    "4th Floor Outdoor",
   ],
   "Intramuros Campus": ["AV Room", "Seminar Room", "Global Classroom"],
 }
@@ -39,14 +41,8 @@ const CLASSROOM_MAX_LENGTH = 6
 
 /**
  * Rooms the reservation step offers for the SAAF venue campus: that campus's
-<<<<<<< HEAD
- * fixed rooms plus "Classroom". Returns nothing when no campus is selected or
- * the venue is not a physical campus (e.g. "Online") — the venue field on
- * step 3 is the only source.
-=======
  * fixed rooms plus "Classroom". Returns nothing when no campus (or an
  * unrecognized one) is selected — the venue field on step 3 is the only source.
->>>>>>> 53d37c2ba39433d50ddbee7d6416d3d2fb75347e
  */
 export function roomOptionsForCampus(campus: string): string[] {
   return isCampus(campus) ? [...FIXED_ROOMS[campus], CLASSROOM_ROOM] : []
