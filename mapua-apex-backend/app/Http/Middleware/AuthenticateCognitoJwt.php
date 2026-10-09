@@ -21,9 +21,9 @@ class AuthenticateCognitoJwt
      * @var array<string, list<string>>
      */
     private const ROUTE_GROUPS = [
-        'student'     => ['student', 'students', 'org_submitter', 'admin'],
-        'signatory'   => ['signatory', 'signatories', 'org_adviser', 'dean', 'cdm_reviewer', 'cdm', 'osaar', 'admin'],
-        'admin'       => ['admin', 'osaar'],
+        'student'     => ['student', 'students', 'org_submitter', 'admin', 'super_admin'],
+        'signatory'   => ['signatory', 'signatories', 'org_adviser', 'dean', 'cdm_reviewer', 'cdm', 'osaar', 'admin', 'super_admin'],
+        'admin'       => ['admin', 'osaar', 'cdm_reviewer', 'cdm', 'super_admin'],
         'super_admin' => ['super_admin'],
         // 'any' is handled explicitly in mayAccessRole — valid JWT, no group check
     ];
@@ -66,7 +66,7 @@ class AuthenticateCognitoJwt
 
         $groups = $this->groups($claims['cognito:groups'] ?? null);
         $normalizedGroups = array_map(strtolower(...), $groups);
-        $isAdmin = in_array('admin', $normalizedGroups, true);
+        $isAdmin = in_array('admin', $normalizedGroups, true) || in_array('super_admin', $normalizedGroups, true);
         $mayImpersonateSignatory = $isAdmin || in_array('osaar', $normalizedGroups, true);
 
         if (is_string($role) && $role !== '' && ! $this->mayAccessRole($role, $normalizedGroups)) {
@@ -81,6 +81,25 @@ class AuthenticateCognitoJwt
                 ],
             );
         }
+
+        $userRole = 'student';
+        if ($isAdmin) {
+            $userRole = 'admin';
+        } elseif (array_intersect($normalizedGroups, ['signatory', 'signatories', 'org_adviser', 'dean', 'cdm_reviewer', 'cdm', 'osaar'])) {
+            $userRole = 'signatory';
+        }
+
+        $cognitoUser = [
+            'sub' => (string) ($claims['sub'] ?? 'unknown'),
+            'email' => (string) ($claims['email'] ?? 'unknown@mapua.edu.ph'),
+            'name' => (string) ($claims['name'] ?? $claims['email'] ?? 'Unknown User'),
+            'role' => (string) ($claims['custom:role'] ?? $userRole),
+            'auth_time' => (int) ($claims['auth_time'] ?? time()),
+            'claims' => $claims,
+        ];
+
+        $request->attributes->set('cognito_user', $cognitoUser);
+        Context::addHidden('cognito_user', $cognitoUser);
 
         $request->attributes->set('cognito.is_admin', $isAdmin);
         Context::addHidden('cognito.is_admin', $isAdmin);

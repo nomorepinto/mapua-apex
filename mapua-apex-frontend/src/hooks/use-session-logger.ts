@@ -69,12 +69,13 @@ export function useSessionLogger() {
         const pages = [...pendingPagesRef.current];
         pendingPagesRef.current = [];
 
-        const res = await apiClient.post<SessionResponse>("/sessions", {
+        const res = await apiClient.post<SessionResponse>("/sessions/start", {
           pagesVisited: pages,
         });
 
         if (res && res.sessionId) {
           sessionIdRef.current = res.sessionId;
+          sessionStorage.setItem("apex_session_id", res.sessionId);
         }
       } catch (err) {
         console.warn("useSessionLogger: Open session failed", err);
@@ -100,13 +101,14 @@ export function useSessionLogger() {
         const pages = [...pendingPagesRef.current];
         pendingPagesRef.current = [];
 
-        await apiClient.patch(`/sessions/${currentSessionId}`, {
+        await apiClient.patch(`/sessions/${currentSessionId}/heartbeat`, {
           pagesVisited: pages,
         });
       } catch (err: any) {
         if (err?.status === 409) {
           console.warn("useSessionLogger: 409 Session expired/ended. Re-opening session...");
           sessionIdRef.current = null;
+          sessionStorage.removeItem("apex_session_id");
           await openSession();
         } else {
           console.warn("useSessionLogger: Heartbeat failed", err);

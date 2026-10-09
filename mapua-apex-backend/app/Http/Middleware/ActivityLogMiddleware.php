@@ -1,7 +1,9 @@
 <?php
 
-namespace App\Logging;
+namespace App\Http\Middleware;
 
+use App\Logging\ActivityLoggingConfig;
+use App\Logging\ActivityLogWriter;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -25,17 +27,17 @@ class ActivityLogMiddleware
             $method = strtoupper($request->method());
             $path = $request->path();
 
-            if (!ActivityLoggingConfig::shouldLog($method, $path)) {
+            if (! ActivityLoggingConfig::shouldLog($method, $path)) {
                 return $response;
             }
 
             $user = $request->attributes->get('cognito_user');
-            if (!$user) {
+            if (! $user) {
                 return $response;
             }
 
             $details = ActivityLoggingConfig::extractDetails($request, $response);
-            if (!$details) {
+            if (! $details) {
                 return $response;
             }
 
@@ -55,9 +57,10 @@ class ActivityLogMiddleware
                 description: $details['description'] ?? '',
                 before: $details['before'] ?? null,
                 after: $details['after'] ?? null,
+                organizationName: $details['organizationName'] ?? null,
             );
         } catch (\Throwable $e) {
-            Log::error('ActivityLogMiddleware failed: ' . $e->getMessage(), [
+            Log::error('ActivityLogMiddleware failed: '.$e->getMessage(), [
                 'exception' => $e,
                 'path' => $request->path(),
             ]);

@@ -12,7 +12,7 @@ import type {
   LogQueryParams,
 } from "../types/logs";
 
-export const IS_MOCK_MODE = import.meta.env.VITE_MOCK_MONITOR === "true" || true;
+export const IS_MOCK_MODE = import.meta.env.VITE_MOCK_MONITOR === "true";
 
 const nowMs = Date.now();
 const tenMinsAgo = new Date(nowMs - 10 * 60 * 1000).toISOString();
@@ -105,37 +105,53 @@ export const MOCK_SESSIONS: Session[] = [
 // MOCK NOTIFICATIONS (Matching the exact DynamoDB NOTIFICATION item shape)
 export const MOCK_NOTIFICATIONS: ActivityNotification[] = [
   {
-    submission_id: "sub_2026_099",
+    activity_id: "ACT-31831",
+    submission_id: "SAAF-072A122A",
     sent_at: tenMinsAgo,
-    signatory: "adv_001_uuid",
+    signatory: "40f61ea5-eb27-4e7b-9496-3f1a9bdea6dc",
+    userRole: "org_adviser",
+    userName: "Organization Adviser",
+    organization_name: "Mapúa Computing Society",
     notif_type: "approved",
     comment: "Adviser review completed. Approved for Dean endorsement.",
   },
   {
-    submission_id: "sub_2026_095",
+    activity_id: "ACT-48291",
+    submission_id: "SAAF-189B44C1",
     sent_at: twoHoursAgo,
-    signatory: "dean_soit_002_uuid",
+    signatory: "8e71b22a-11c3-4d89-9a21-4f8101a1102b",
+    userRole: "dean",
+    userName: "School Dean",
     notif_type: "returned",
     comment: "Returned for revision: Please update venue reservation hours to end before 9:00 PM.",
   },
   {
-    submission_id: "sub_2026_092",
+    activity_id: "ACT-59102",
+    submission_id: "SAAF-928C33F4",
     sent_at: nineHoursAgo,
-    signatory: "cdm_001_uuid",
+    signatory: "12a99c01-77b3-4f21-819a-992011b0021a",
+    userRole: "cdm",
+    userName: "Campus Director (CDM)",
     notif_type: "denied",
     comment: "Denied: Proposed budget exceeds campus allocation limit for co-curricular events.",
   },
   {
-    submission_id: "sub_2026_088",
+    activity_id: "ACT-61244",
+    submission_id: "SAAF-441D99E2",
     sent_at: threeHoursAgo,
-    signatory: "osaar_001_uuid",
+    signatory: "99c81b00-33a1-4190-88b1-10223940192e",
+    userRole: "osaar",
+    userName: "OSAAR Officer",
     notif_type: "fully approved",
     comment: "Final clearance granted. SAAF fully approved by OSAAR desk.",
   },
   {
-    submission_id: "sub_2026_095",
+    activity_id: "ACT-73819",
+    submission_id: "SAAF-189B44C1",
     sent_at: fifteenMinsAgo,
-    signatory: "osaar_001_uuid",
+    signatory: "99c81b00-33a1-4190-88b1-10223940192e",
+    userRole: "osaar",
+    userName: "OSAAR Officer",
     notif_type: "returned",
     comment: "Returned for clarification on Institutional Alignment SDG explanation.",
   },
@@ -174,7 +190,10 @@ export function getMockSessionsResponse(params?: LogQueryParams): SessionsRespon
 }
 
 export function getMockActivitiesResponse(params?: LogQueryParams): ActivitiesResponse {
-  let filtered = [...MOCK_NOTIFICATIONS];
+  let filtered = MOCK_NOTIFICATIONS.filter((n) => {
+    const act = String(n.notif_type || "").toUpperCase();
+    return !act.includes("LOGIN") && !act.includes("LOGOUT");
+  });
 
   if (params?.startDate && params?.endDate) {
     const startTs = new Date(params.startDate + "T00:00:00+08:00").getTime();

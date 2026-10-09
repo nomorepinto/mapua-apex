@@ -1,20 +1,19 @@
 import { useCallback } from "react";
+import { apiClient } from "@/lib/api-client";
 
 export function useSignOut() {
-  return useCallback((evtOrSessionId?: string | null | React.MouseEvent) => {
-    const sessionId = typeof evtOrSessionId === "string" ? evtOrSessionId : null;
+  return useCallback(async (evtOrSessionId?: string | null | React.MouseEvent) => {
+    const passedSessionId = typeof evtOrSessionId === "string" ? evtOrSessionId : null;
+    const sessionId = passedSessionId || sessionStorage.getItem("apex_session_id");
 
-    // End session keepalive call before Cognito redirect
+    // End session call before Cognito redirect
     try {
       if (sessionId) {
-        const url = `/api/v1/sessions/${sessionId}/end`;
-        const blob = new Blob([JSON.stringify({ reason: "logout" })], {
-          type: "application/json",
-        });
-        navigator.sendBeacon(url, blob);
+        await apiClient.post(`/sessions/${sessionId}/end`, { endReason: "logout" });
+        sessionStorage.removeItem("apex_session_id");
       }
     } catch (err) {
-      console.warn("useSignOut: end session beacon failed", err);
+      console.warn("useSignOut: end session call failed", err);
     }
 
     const domain = import.meta.env.VITE_COGNITO_DOMAIN;

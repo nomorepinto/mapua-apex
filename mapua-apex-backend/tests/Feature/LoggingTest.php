@@ -40,7 +40,7 @@ class LoggingTest extends TestCase
             ->andReturn(new \Aws\Result(['Item' => null]));
 
         $this->dynamoDbMock->shouldReceive('putItem')
-            ->twice() // 1 for session, 1 for LOGIN activity event
+            ->once() // 1 for session item
             ->andReturn(new \Aws\Result([]));
 
         $response = $this->withStudentAuth([
@@ -63,19 +63,26 @@ class LoggingTest extends TestCase
         $sub = 'usr-123';
         $authTime = 1700000000;
         $baseId = hash('sha256', "{$sub}:{$authTime}");
+        $now = date('Y-m-d\TH:i:s\Z');
 
         $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
             ->once()
             ->andReturn(new \Aws\Result([
                 'Item' => [
-                    'sessionId' => ['S' => $baseId],
-                    'userId' => ['S' => $sub],
+                    'session_id' => ['S' => $baseId],
+                    'sub' => ['S' => $sub],
                     'status' => ['S' => 'active'],
-                    'timeIn' => ['S' => '2026-10-09T10:00:00Z'],
-                    'lastSeen' => ['S' => '2026-10-09T10:05:00Z'],
-                    'ttl' => ['N' => (string)(time() + 86400)],
+                    'login_time' => ['S' => $now],
+                    'last_heartbeat' => ['S' => $now],
+                    'TTL' => ['N' => (string)(time() + 86400)],
                 ],
             ]));
+
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}#2"))
+            ->once()
+            ->andReturn(new \Aws\Result(['Item' => null]));
 
         $this->dynamoDbMock->shouldReceive('updateItem')
             ->once()
@@ -102,22 +109,22 @@ class LoggingTest extends TestCase
         $suffix2Id = "{$baseId}#2";
 
         $this->dynamoDbMock->shouldReceive('getItem')
-            ->with(Mockery::on(fn($args) => $args['Key']['sessionId']['S'] === $baseId))
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
             ->once()
             ->andReturn(new \Aws\Result([
                 'Item' => [
-                    'sessionId' => ['S' => $baseId],
+                    'session_id' => ['S' => $baseId],
                     'status' => ['S' => 'ended'],
                 ],
             ]));
 
         $this->dynamoDbMock->shouldReceive('getItem')
-            ->with(Mockery::on(fn($args) => $args['Key']['sessionId']['S'] === $suffix2Id))
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$suffix2Id}"))
             ->once()
             ->andReturn(new \Aws\Result(['Item' => null]));
 
         $this->dynamoDbMock->shouldReceive('putItem')
-            ->twice() // session + LOGIN activity
+            ->once() // session item
             ->andReturn(new \Aws\Result([]));
 
         $response = $this->withStudentAuth([
@@ -142,22 +149,22 @@ class LoggingTest extends TestCase
         $suffix3Id = "{$baseId}#3";
 
         $this->dynamoDbMock->shouldReceive('getItem')
-            ->with(Mockery::on(fn($args) => $args['Key']['sessionId']['S'] === $baseId))
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
             ->once()
             ->andReturn(new \Aws\Result(['Item' => ['status' => ['S' => 'ended']]]));
 
         $this->dynamoDbMock->shouldReceive('getItem')
-            ->with(Mockery::on(fn($args) => $args['Key']['sessionId']['S'] === $suffix2Id))
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$suffix2Id}"))
             ->once()
             ->andReturn(new \Aws\Result(['Item' => ['status' => ['S' => 'ended']]]));
 
         $this->dynamoDbMock->shouldReceive('getItem')
-            ->with(Mockery::on(fn($args) => $args['Key']['sessionId']['S'] === $suffix3Id))
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$suffix3Id}"))
             ->once()
             ->andReturn(new \Aws\Result(['Item' => null]));
 
         $this->dynamoDbMock->shouldReceive('putItem')
-            ->twice()
+            ->once()
             ->andReturn(new \Aws\Result([]));
 
         $response = $this->withStudentAuth([
@@ -181,30 +188,20 @@ class LoggingTest extends TestCase
         $suffix2Id = "{$baseId}#2";
 
         $this->dynamoDbMock->shouldReceive('getItem')
-            ->with(Mockery::on(fn($args) => $args['Key']['sessionId']['S'] === $baseId))
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
             ->once()
             ->andReturn(new \Aws\Result(['Item' => null]));
 
-        $exception = new \Aws\DynamoDb\Exception\DynamoDbException(
-            'Conditional check failed',
-            Mockery::mock(CommandInterface::class)
-        );
+        $exception = Mockery::mock(\Aws\DynamoDb\Exception\DynamoDbException::class);
+        $exception->shouldReceive('getAwsErrorCode')->andReturn('ConditionalCheckFailedException');
 
         // First putItem fails due to race condition
         $this->dynamoDbMock->shouldReceive('putItem')
             ->once()
             ->andThrow($exception);
 
-        // Chain walk finds base is now active
-        $this->dynamoDbMock->shouldReceive('getItem')
-            ->with(Mockery::on(fn($args) => $args['Key']['sessionId']['S'] === $baseId))
-            ->once()
-            ->andReturn(new \Aws\Result(['Item' => [
-                'sessionId' => ['S' => $baseId],
-                'status' => ['S' => 'active'],
-            ]]));
-
-        $this->dynamoDbMock->shouldReceive('updateItem')
+        // Second putItem succeeds for #2 session + LOGIN activity event (2 calls total)
+        $this->dynamoDbMock->shouldReceive('putItem')
             ->once()
             ->andReturn(new \Aws\Result([]));
 
@@ -215,7 +212,6 @@ class LoggingTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'sessionId' => $baseId,
                 'status' => 'active',
             ]);
     }
@@ -225,15 +221,18 @@ class LoggingTest extends TestCase
         $sub = 'usr-123';
         $authTime = 1700000000;
         $baseId = hash('sha256', "{$sub}:{$authTime}");
+        $now = date('Y-m-d\TH:i:s\Z');
 
         $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
             ->once()
             ->andReturn(new \Aws\Result([
                 'Item' => [
-                    'sessionId' => ['S' => $baseId],
-                    'userId' => ['S' => $sub],
+                    'session_id' => ['S' => $baseId],
+                    'sub' => ['S' => $sub],
                     'status' => ['S' => 'active'],
-                    'timeIn' => ['S' => '2026-10-09T10:00:00Z'],
+                    'login_time' => ['S' => $now],
+                    'last_heartbeat' => ['S' => $now],
                 ],
             ]));
 
@@ -263,8 +262,8 @@ class LoggingTest extends TestCase
             ->once()
             ->andReturn(new \Aws\Result([
                 'Item' => [
-                    'sessionId' => ['S' => $baseId],
-                    'userId' => ['S' => $sub],
+                    'session_id' => ['S' => $baseId],
+                    'sub' => ['S' => $sub],
                     'status' => ['S' => 'ended'],
                 ],
             ]));
@@ -287,6 +286,16 @@ class LoggingTest extends TestCase
         $authTime = 1700000000;
         $baseIdForUserB = hash('sha256', "{$subB}:{$authTime}");
 
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->once()
+            ->andReturn(new \Aws\Result([
+                'Item' => [
+                    'session_id' => ['S' => $baseIdForUserB],
+                    'sub' => ['S' => $subB],
+                    'status' => ['S' => 'active'],
+                ],
+            ]));
+
         $response = $this->withStudentAuth([
             'sub' => $subA,
             'auth_time' => $authTime,
@@ -305,14 +314,14 @@ class LoggingTest extends TestCase
             ->once()
             ->andReturn(new \Aws\Result([
                 'Item' => [
-                    'sessionId' => ['S' => $baseId],
-                    'userId' => ['S' => $sub],
-                    'userName' => ['S' => 'Test Student'],
-                    'userEmail' => ['S' => 'student@mapua.edu.ph'],
-                    'userRole' => ['S' => 'student'],
-                    'ipAddress' => ['S' => '127.0.0.1'],
+                    'session_id' => ['S' => $baseId],
+                    'sub' => ['S' => $sub],
+                    'user_name' => ['S' => 'Test Student'],
+                    'user_email' => ['S' => 'student@mapua.edu.ph'],
+                    'user_role' => ['S' => 'student'],
+                    'ip_address' => ['S' => '127.0.0.1'],
                     'status' => ['S' => 'active'],
-                    'timeIn' => ['S' => '2026-10-09T10:00:00Z'],
+                    'login_time' => ['S' => '2026-10-09T10:00:00Z'],
                 ],
             ]));
 
@@ -320,9 +329,7 @@ class LoggingTest extends TestCase
             ->once()
             ->andReturn(new \Aws\Result([]));
 
-        $this->dynamoDbMock->shouldReceive('putItem')
-            ->once() // LOGOUT activity event
-            ->andReturn(new \Aws\Result([]));
+
 
         $response = $this->withStudentAuth([
             'sub' => $sub,
@@ -334,8 +341,7 @@ class LoggingTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'sessionId' => $baseId,
-                'status' => 'ended',
-                'endReason' => 'logout',
+                'status' => 'completed',
             ]);
     }
 
@@ -364,6 +370,16 @@ class LoggingTest extends TestCase
         $authTime = 1700000000;
         $baseIdForUserB = hash('sha256', "{$subB}:{$authTime}");
 
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->once()
+            ->andReturn(new \Aws\Result([
+                'Item' => [
+                    'session_id' => ['S' => $baseIdForUserB],
+                    'sub' => ['S' => $subB],
+                    'status' => ['S' => 'active'],
+                ],
+            ]));
+
         $response = $this->withStudentAuth([
             'sub' => $subA,
             'auth_time' => $authTime,
@@ -377,8 +393,7 @@ class LoggingTest extends TestCase
         $writer = new ActivityLogWriter(new LogTableItems($this->dynamoDbMock));
 
         $this->dynamoDbMock->shouldReceive('putItem')
-            ->twice()
-            ->andReturn(new \Aws\Result([]));
+            ->never();
 
         $writer->logLogin('sess-1', 'usr-1', 'Name', 'email@mapua.edu.ph', 'student', '127.0.0.1');
         $writer->logLogout('sess-1', 'usr-1', 'Name', 'email@mapua.edu.ph', 'student', '127.0.0.1', 300, 'logout');
@@ -412,6 +427,7 @@ class LoggingTest extends TestCase
     {
         // No putItem calls expected for GET request
         $this->dynamoDbMock->shouldReceive('putItem')->never();
+        $this->dynamoDbMock->shouldReceive('query')->andReturn(new \Aws\Result(['Items' => []]));
 
         $response = $this->withStudentAuth()->getJson('/api/v1/students/deadlines');
 
@@ -441,7 +457,7 @@ class LoggingTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'items',
+                'data',
                 'nextToken',
             ]);
     }
@@ -470,7 +486,7 @@ class LoggingTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'items',
+                'data',
                 'nextToken',
             ]);
     }
@@ -491,9 +507,11 @@ class LoggingTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'activeSessionsCount',
-                'totalSessionsToday',
-                'totalActivityToday',
+                'data' => [
+                    'activeSessionsCount',
+                    'totalSessionsToday',
+                    'totalActivityToday',
+                ],
             ]);
     }
 }

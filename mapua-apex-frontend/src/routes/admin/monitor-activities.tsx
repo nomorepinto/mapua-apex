@@ -6,17 +6,19 @@ import {
   XIcon,
   ChevronRightIcon,
   ChevronLeftIcon,
-  ArrowRightIcon,
-  AlertTriangleIcon,
   FileEditIcon,
   StampIcon,
+  AlertTriangleIcon,
 } from "lucide-react";
 import { FormPageHeader } from "@/components/forms/form-page-header";
 import { layout } from "@/config";
 import {
   useActivitiesQuery,
   useActivityAnalyticsQuery,
-  usePipelineAnalyticsQuery,
+  formatActivityId,
+  formatEventId,
+  resolveUserDisplayName,
+  resolveUserGroup,
 } from "@/hooks/use-monitor";
 import type { LogQueryParams, ActivityNotification, NotificationType } from "@/types/logs";
 import { IS_MOCK_MODE } from "@/lib/mock-monitor-data";
@@ -66,12 +68,30 @@ function getTodayManila(): string {
   }).format(new Date());
 }
 
+function getYesterdayManila(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: MANILA_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(Date.now() - 24 * 60 * 60 * 1000));
+}
+
+function getThirtyDaysAgoManila(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: MANILA_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+}
+
 export function AdminMonitorActivitiesPage() {
-  // Filter State (Default range = today Manila)
-  const [startDate, setStartDate] = useState<string>(getTodayManila());
+  // Filter State (Default range = yesterday to today Manila)
+  const [startDate, setStartDate] = useState<string>(getYesterdayManila());
   const [endDate, setEndDate] = useState<string>(getTodayManila());
   const [notifTypeFilter, setNotifTypeFilter] = useState<string>("");
-  const [submissionSearch, setSubmissionSearch] = useState<string>("");
+  const [activitySearch, setActivitySearch] = useState<string>("");
   const [signatorySearch, setSignatorySearch] = useState<string>("");
 
   // Pagination State
@@ -86,20 +106,49 @@ export function AdminMonitorActivitiesPage() {
       startDate,
       endDate,
       notifType: notifTypeFilter || undefined,
-      submissionId: submissionSearch || undefined,
       signatoryId: signatorySearch || undefined,
-      pageSize,
     }),
-    [startDate, endDate, notifTypeFilter, submissionSearch, signatorySearch, pageSize]
+    [startDate, endDate, notifTypeFilter, signatorySearch]
+  );
+
+  const analyticsParams = useMemo(
+    () => ({
+      startDate,
+      endDate,
+    }),
+    [startDate, endDate]
   );
 
   const activitiesQuery = useActivitiesQuery(queryParams);
-  const activityAnalyticsQuery = useActivityAnalyticsQuery(queryParams);
-  const pipelineQuery = usePipelineAnalyticsQuery(queryParams);
+  const activityAnalyticsQuery = useActivityAnalyticsQuery(analyticsParams);
 
-  const notifications = activitiesQuery.data?.data ?? [];
+  const isActivitiesLoading = activitiesQuery.isLoading || activitiesQuery.isFetching;
+
+  const rawNotifications = activitiesQuery.data?.data ?? [];
   const activityStats = activityAnalyticsQuery.data;
-  const pipeline = pipelineQuery.data;
+
+  const notifications = useMemo(() => {
+    return rawNotifications.filter((n, idx) => {
+      if (notifTypeFilter) {
+        if (notifTypeFilter === "submitted") {
+          if (n.notif_type !== "submitted" && n.notif_type !== "submission_create") return false;
+        } else if (n.notif_type !== notifTypeFilter) {
+          return false;
+        }
+      }
+      if (activitySearch) {
+        const q = activitySearch.trim().toLowerCase();
+        const actId = (n.activity_id || formatActivityId(undefined, n.sent_at + idx)).toLowerCase();
+        const cleanActId = actId.replace(/-/g, "");
+        const cleanQ = q.replace(/-/g, "");
+        if (!actId.includes(q) && !cleanActId.includes(cleanQ)) return false;
+      }
+      if (signatorySearch && !n.signatory.toLowerCase().includes(signatorySearch.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
+  }, [rawNotifications, notifTypeFilter, activitySearch, signatorySearch]);
 
   // Client-side pagination slice
   const totalPages = Math.ceil(notifications.length / pageSize) || 1;
@@ -109,22 +158,17 @@ export function AdminMonitorActivitiesPage() {
     return notifications.slice(start, start + pageSize);
   }, [notifications, currentPage, pageSize]);
 
-  // Stage click handler -> filters table to that signatory role
-  const handleStageClick = (role: string) => {
-    setSignatorySearch(role);
-    setCurrentPage(1);
-  };
-
   // CSV Export handler
   const handleExportCsv = () => {
     try {
-      const headers = ["Sent At (Manila)", "Submission ID", "Signatory ID", "Notification Type", "Comment / Remarks"];
+      const headers = ["Sent At (Manila)", "Activity ID", "Event ID", "User", "Type", "Remarks / Comment"];
       const rows = notifications.map((n) => [
         formatManila(n.sent_at),
-        n.submission_id,
-        n.signatory,
+        n.activity_id || formatActivityId(undefined, n.sent_at),
+        formatEventId(n.submission_id),
+        `"${resolveUserDisplayName(n)}"`,
         n.notif_type,
-        `"${n.comment.replace(/"/g, '""')}"`,
+        `"${(n.comment || "").replace(/"/g, '""')}"`,
       ]);
       const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
 
@@ -167,31 +211,6 @@ export function AdminMonitorActivitiesPage() {
             </button>
           </div>
         </div>
-
-        {/* NEEDS ATTENTION ALERTS (Rendered ONLY when alerts are present) */}
-        {activityStats?.alerts && activityStats.alerts.length > 0 && (
-          <div className="rounded-2xl bg-white p-5 shadow-xs border border-red-200 space-y-3">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-2">
-              <span className="text-xs font-bold text-red-700 flex items-center gap-1.5 uppercase tracking-wider">
-                <AlertTriangleIcon className="h-4 w-4 text-red-600" />
-                Needs Attention — Bulk Changes & After-Hours Actions ({activityStats.alerts.length})
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {activityStats.alerts.map((al, idx) => (
-                <div key={idx} className="rounded-xl border border-red-100 bg-red-50/60 p-3 text-xs space-y-1">
-                  <div className="font-bold text-red-900 flex items-center justify-between gap-2">
-                    <span>{al.userName}</span>
-                    <span className="rounded bg-red-200/80 px-2 py-0.5 text-[10px] font-mono text-red-800 uppercase">
-                      {al.type.replace(/_/g, " ")}
-                    </span>
-                  </div>
-                  <p className="text-neutral-700 text-[11px] leading-relaxed">{al.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* STAT CARDS SECTION (Respects page date range filter) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -242,7 +261,7 @@ export function AdminMonitorActivitiesPage() {
               <StampIcon className="h-4 w-4 text-teal-600" />
             </div>
             <div className="text-2xl font-bold text-neutral-900">{activityStats?.cdmReviews ?? 0}</div>
-            <p className="text-[10px] text-neutral-400 mt-1">Campus Director decisions</p>
+            <p className="text-[10px] text-neutral-400 mt-1">Campus Decisions</p>
           </div>
 
           {/* Card 6: In-Edit (Submissions status = returned) */}
@@ -256,74 +275,7 @@ export function AdminMonitorActivitiesPage() {
           </div>
         </div>
 
-        {/* APPROVAL PIPELINE (HIGHLIGHT FEATURE) */}
-        <div className="space-y-3 rounded-2xl bg-white p-5 shadow-xs border border-neutral-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-3">
-            <div>
-              <h2 className="text-sm font-bold text-neutral-900 flex items-center gap-2 uppercase tracking-wider">
-                <StampIcon className="h-4 w-4 text-[#8B0000]" />
-                Approval Pipeline & Bottleneck Analysis
-              </h2>
-              <p className="text-xs text-neutral-500 mt-0.5">
-                Real-time review stage turnaround, queue length, and bottleneck highlight (Adviser → Dean → OSAAR → CDM).
-              </p>
-            </div>
-            {pipeline?.bottleneckRole && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800 border border-red-300 animate-pulse self-start sm:self-auto">
-                <AlertTriangleIcon className="h-3.5 w-3.5 text-red-600" />
-                Bottleneck: {pipeline.bottleneckRole.toUpperCase()} Desk
-              </span>
-            )}
-          </div>
-
-          {/* Stage Visual Flow */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2">
-            {pipeline?.stages.map((st, idx) => (
-              <div key={st.role} className="flex items-center gap-2">
-                <div
-                  onClick={() => handleStageClick(st.role)}
-                  className={`flex-1 rounded-2xl p-4 border transition-all cursor-pointer hover:shadow-md ${
-                    st.isBottleneck
-                      ? "bg-red-50/80 border-red-300 ring-2 ring-red-500/20"
-                      : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-neutral-900">{st.label}</span>
-                    {st.isBottleneck ? (
-                      <span className="rounded-full bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 uppercase tracking-wider">
-                        Bottleneck
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-neutral-400 font-mono">Stage {idx + 1}</span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-1 pt-1 text-center">
-                    <div className="bg-white/80 rounded-xl p-1.5 border border-neutral-100">
-                      <span className="block text-[10px] text-neutral-400 font-medium">Waiting</span>
-                      <span className="text-sm font-bold text-neutral-800">{st.waitingCount}</span>
-                    </div>
-                    <div className="bg-white/80 rounded-xl p-1.5 border border-neutral-100">
-                      <span className="block text-[10px] text-neutral-400 font-medium">Turnaround</span>
-                      <span className="text-sm font-bold text-neutral-800">{st.avgTurnaroundHours}h</span>
-                    </div>
-                    <div className="bg-white/80 rounded-xl p-1.5 border border-neutral-100">
-                      <span className="block text-[10px] text-neutral-400 font-medium">Return Rate</span>
-                      <span className="text-sm font-bold text-amber-700">{st.returnRatePercent}%</span>
-                    </div>
-                  </div>
-                </div>
-
-                {idx < (pipeline?.stages.length ?? 0) - 1 && (
-                  <ArrowRightIcon className="hidden md:block h-5 w-5 text-neutral-300 shrink-0" />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Filters Bar (Only properties supported by NOTIFICATION object) */}
+        {/* Filters Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 rounded-2xl bg-white p-4 shadow-xs border border-neutral-200">
           <div>
             <label className="block text-[11px] font-semibold text-neutral-500 mb-1">Start Date</label>
@@ -352,7 +304,7 @@ export function AdminMonitorActivitiesPage() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-neutral-500 mb-1">Notification Type</label>
+            <label className="block text-[11px] font-semibold text-neutral-500 mb-1">Type</label>
             <select
               value={notifTypeFilter}
               onChange={(e) => {
@@ -362,22 +314,22 @@ export function AdminMonitorActivitiesPage() {
               className="w-full rounded-xl border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 focus:border-[#8B0000] focus:ring-[#8B0000]"
             >
               <option value="">All Types</option>
+              <option value="submitted">submitted</option>
               <option value="approved">approved</option>
-              <option value="fully approved">fully approved</option>
               <option value="returned">returned</option>
               <option value="denied">denied</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-neutral-500 mb-1">Submission ID</label>
+            <label className="block text-[11px] font-semibold text-neutral-500 mb-1">Activity ID</label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search submission ID..."
-                value={submissionSearch}
+                placeholder="Search activity ID (e.g. ACT-31831)..."
+                value={activitySearch}
                 onChange={(e) => {
-                  setSubmissionSearch(e.target.value);
+                  setActivitySearch(e.target.value);
                   setCurrentPage(1);
                 }}
                 className="w-full rounded-xl border border-neutral-200 pl-8 pr-3 py-1.5 text-xs font-medium text-neutral-700 focus:border-[#8B0000] focus:ring-[#8B0000]"
@@ -387,11 +339,11 @@ export function AdminMonitorActivitiesPage() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-neutral-500 mb-1">Signatory ID / Role</label>
+            <label className="block text-[11px] font-semibold text-neutral-500 mb-1">Signatory / User</label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search signatory ID or desk..."
+                placeholder="Search user or desk..."
                 value={signatorySearch}
                 onChange={(e) => {
                   setSignatorySearch(e.target.value);
@@ -404,56 +356,96 @@ export function AdminMonitorActivitiesPage() {
           </div>
         </div>
 
-        {/* DATA TABLE (FULL WIDTH + STICKY HEADER) */}
+        {/* DATA TABLE (SENT AT, ACTIVITY ID, USER, TYPE, REMARKS / COMMENT, DETAILS) */}
         <div className="rounded-2xl bg-white shadow-xs border border-neutral-200 overflow-hidden flex flex-col justify-between">
           <div className="max-h-[600px] overflow-y-auto">
             <table className="w-full text-left text-xs">
               <thead className="sticky top-0 z-10 bg-neutral-50 text-neutral-500 font-semibold border-b border-neutral-200 shadow-2xs">
                 <tr>
                   <th className="px-4 py-3.5">Sent At (Manila)</th>
-                  <th className="px-4 py-3.5">Submission ID</th>
-                  <th className="px-4 py-3.5">Signatory ID</th>
-                  <th className="px-4 py-3.5">Type</th>
-                  <th className="px-4 py-3.5">Remarks / Comment</th>
+                  <th className="px-4 py-3.5">ACTIVITY ID</th>
+                  <th className="px-4 py-3.5">USER</th>
+                  <th className="px-4 py-3.5">TYPE</th>
+                  <th className="px-4 py-3.5">REMARKS / COMMENT</th>
                   <th className="px-4 py-3.5 text-right">Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 text-neutral-700 font-medium">
-                {paginatedNotifications.length === 0 ? (
+                {activitiesQuery.isError ? (
+                  <tr>
+                    <td colSpan={6} className="py-16 text-center backdrop-blur-md bg-neutral-50/60">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600 mb-3 border border-red-200">
+                        <AlertTriangleIcon className="h-6 w-6" />
+                      </div>
+                      <div className="text-sm font-bold text-neutral-900">Failed to load activity logs</div>
+                      <div className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+                        Could not fetch activity records from the backend API. Please check your network connection or permissions.
+                      </div>
+                      <button
+                        onClick={() => activitiesQuery.refetch()}
+                        className="mt-4 rounded-xl bg-[#8B0000] px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#6b0000] transition-colors"
+                      >
+                        Retry Loading
+                      </button>
+                    </td>
+                  </tr>
+                ) : isActivitiesLoading ? (
+                  Array.from({ length: 5 }).map((_, idx) => (
+                    <tr key={idx} className="animate-pulse">
+                      <td className="px-4 py-3.5"><div className="h-4 w-28 bg-neutral-200 rounded" /></td>
+                      <td className="px-4 py-3.5"><div className="h-4 w-20 bg-neutral-200 rounded font-mono" /></td>
+                      <td className="px-4 py-3.5"><div className="h-4 w-32 bg-neutral-200 rounded" /></td>
+                      <td className="px-4 py-3.5"><div className="h-4 w-20 bg-neutral-200 rounded-full" /></td>
+                      <td className="px-4 py-3.5"><div className="h-4 w-48 bg-neutral-200 rounded" /></td>
+                      <td className="px-4 py-3.5 text-right"><div className="h-4 w-12 bg-neutral-200 rounded ml-auto" /></td>
+                    </tr>
+                  ))
+                ) : paginatedNotifications.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-neutral-400">
                       No notification records match the selected date range ({formatDateUnambiguous(startDate)} to {formatDateUnambiguous(endDate)}) or filters.
                     </td>
                   </tr>
                 ) : (
-                  paginatedNotifications.map((n, idx) => (
-                    <tr
-                      key={idx}
-                      onClick={() => setSelectedNotification(n)}
-                      className="hover:bg-neutral-50/80 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3.5 whitespace-nowrap text-neutral-500 font-mono text-[11px]">
-                        {formatManila(n.sent_at)}
-                      </td>
-                      <td className="px-4 py-3.5 font-mono text-[11px] text-neutral-800 font-semibold">
-                        {n.submission_id}
-                      </td>
-                      <td className="px-4 py-3.5 font-mono text-[11px] text-neutral-600">
-                        {n.signatory}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <NotificationBadge type={n.notif_type} />
-                      </td>
-                      <td className="px-4 py-3.5 max-w-sm text-neutral-600 line-clamp-2 leading-relaxed">
-                        {n.comment || <span className="text-neutral-400 italic">No comment attached</span>}
-                      </td>
-                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                        <span className="text-[#8B0000] font-semibold hover:underline inline-flex items-center gap-1">
-                          View <ChevronRightIcon className="h-4 w-4" />
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  paginatedNotifications.map((n, idx) => {
+                    const actId = n.activity_id || formatActivityId(undefined, n.sent_at + idx);
+                    const userDisplay = resolveUserDisplayName(n);
+                    return (
+                      <tr
+                        key={idx}
+                        onClick={() => setSelectedNotification(n)}
+                        className="hover:bg-neutral-50/80 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 py-3.5 whitespace-nowrap text-neutral-500 font-mono text-[11px]">
+                          {formatManila(n.sent_at)}
+                        </td>
+                        <td className="px-4 py-3.5 font-mono text-xs text-neutral-900 font-bold">
+                          {actId}
+                        </td>
+                        <td className="px-4 py-3.5 space-y-0.5">
+                          <div className="font-semibold text-neutral-900 text-xs">
+                            {userDisplay}
+                          </div>
+                          {n.userEmail && (
+                            <div className="text-[10px] text-neutral-400 font-mono">
+                              {n.userEmail}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <NotificationBadge type={n.notif_type} />
+                        </td>
+                        <td className="px-4 py-3.5 max-w-sm text-neutral-600 line-clamp-2 leading-relaxed">
+                          {n.comment || <span className="text-neutral-400 italic">No comment attached</span>}
+                        </td>
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                          <span className="text-[#8B0000] font-semibold hover:underline inline-flex items-center gap-1">
+                            View <ChevronRightIcon className="h-4 w-4" />
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -511,7 +503,7 @@ export function AdminMonitorActivitiesPage() {
               <div className="flex items-center justify-between border-b border-neutral-200 pb-4 mb-5">
                 <div className="flex items-center gap-2">
                   <FileCheck2Icon className="h-5 w-5 text-[#8B0000]" />
-                  <h2 className="text-base font-bold text-neutral-900">Notification Item Record</h2>
+                  <h2 className="text-base font-bold text-neutral-900">Activity Log Record Details</h2>
                 </div>
                 <button
                   onClick={() => setSelectedNotification(null)}
@@ -530,17 +522,45 @@ export function AdminMonitorActivitiesPage() {
 
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div>
-                      <span className="text-neutral-400 block font-medium">Submission ID</span>
-                      <span className="font-mono font-bold text-neutral-900">{selectedNotification.submission_id}</span>
+                      <span className="text-neutral-400 block font-medium">ACTIVITY ID</span>
+                      <span className="font-mono font-bold text-neutral-900 text-xs">
+                        {selectedNotification.activity_id || formatActivityId(undefined, selectedNotification.sent_at)}
+                      </span>
                     </div>
                     <div>
-                      <span className="text-neutral-400 block font-medium">Signatory ID</span>
-                      <span className="font-mono font-bold text-neutral-800">{selectedNotification.signatory}</span>
+                      <span className="text-neutral-400 block font-medium">EVENT ID</span>
+                      <span className="font-mono font-bold text-[#8B0000] text-xs">
+                        {formatEventId(selectedNotification.submission_id)}
+                      </span>
                     </div>
+                    <div>
+                      <span className="text-neutral-400 block font-medium">USER</span>
+                      <span className="font-semibold text-neutral-800 text-sm block">
+                        {resolveUserDisplayName(selectedNotification)}
+                      </span>
+                      {selectedNotification.userEmail && (
+                        <span className="block font-mono text-neutral-500 text-[10px]">{selectedNotification.userEmail}</span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-neutral-400 block font-medium">ROLE / USER GROUP</span>
+                      <span className="font-mono font-bold text-neutral-900 text-xs rounded bg-neutral-200/80 px-2 py-0.5 inline-block mt-1">
+                        {resolveUserGroup(selectedNotification)}
+                      </span>
+                    </div>
+                    {selectedNotification.organization_name &&
+                      selectedNotification.organization_name !== "N/A" &&
+                      selectedNotification.organization_name !== "null" &&
+                      selectedNotification.organization_name !== "undefined" && (
+                        <div className="col-span-2 pt-1 border-t border-neutral-100">
+                          <span className="text-neutral-400 block font-medium">ORGANIZATION</span>
+                          <span className="font-semibold text-neutral-800">{selectedNotification.organization_name}</span>
+                        </div>
+                      )}
                   </div>
 
                   <div className="pt-2 border-t border-neutral-200">
-                    <span className="text-neutral-400 block font-medium mb-1">Remarks / Reviewer Comment</span>
+                    <span className="text-neutral-400 block font-medium mb-1">REMARKS / COMMENT</span>
                     <div className="rounded-xl bg-white p-3 border border-neutral-200 text-neutral-800 leading-relaxed font-sans text-xs">
                       {selectedNotification.comment || <span className="text-neutral-400 italic">No comment provided.</span>}
                     </div>
@@ -564,17 +584,19 @@ export function AdminMonitorActivitiesPage() {
   );
 }
 
-function NotificationBadge({ type }: { type: NotificationType }) {
-  switch (type) {
-    case "approved":
-      return <span className="rounded bg-emerald-100 px-2 py-0.5 font-bold text-emerald-800">approved</span>;
-    case "fully approved":
-      return <span className="rounded bg-teal-100 px-2 py-0.5 font-bold text-teal-900">fully approved</span>;
-    case "returned":
-      return <span className="rounded bg-amber-100 px-2 py-0.5 font-bold text-amber-800">returned</span>;
-    case "denied":
-      return <span className="rounded bg-red-100 px-2 py-0.5 font-bold text-red-800 font-mono">denied</span>;
-    default:
-      return <span className="rounded bg-neutral-100 px-2 py-0.5 font-semibold text-neutral-700">{type}</span>;
+function NotificationBadge({ type }: { type: NotificationType | string }) {
+  const norm = String(type || "").toLowerCase().replace(/_/g, " ");
+  if (norm.includes("approve")) {
+    return <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-200">approved</span>;
   }
+  if (norm.includes("return") || norm.includes("revision")) {
+    return <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">returned</span>;
+  }
+  if (norm.includes("deny") || norm.includes("denied")) {
+    return <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-800 border border-red-200 font-mono">denied</span>;
+  }
+  if (norm.includes("create") || norm.includes("submit") || norm.includes("submission")) {
+    return <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-800 border border-blue-200">submitted</span>;
+  }
+  return <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-semibold text-neutral-700 border border-neutral-200">{type}</span>;
 }
