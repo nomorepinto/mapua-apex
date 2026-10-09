@@ -1,15 +1,18 @@
 import {
   AlertTriangle,
   Bell,
+  CalendarClock,
   CheckCircle,
   CheckSquare,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
   RotateCcw,
 } from "lucide-react"
 
 import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
 import { layout } from "@/config"
+import { arcusAttendanceUrl, arcusEvaluationUrl } from "@/lib/arcus-links"
 import { cn } from "@/lib/utils"
 
 export function RemindersPanel() {
@@ -77,6 +80,7 @@ function RemindersBody() {
           <DeniedNoticeList />
           <ReturnedNoticeList />
           <ApprovedNoticeList />
+          <ScheduledNoticeList />
           <ImportantReminderList />
           <UpcomingReminderList />
         </>
@@ -218,6 +222,92 @@ function ApprovedNoticeList() {
               ) : null}
             </div>
           </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ScheduledNoticeList() {
+  const { state, actions } = useStudentDashboard()
+  if (state.scheduledNotices.length === 0) return null
+
+  const attendanceUrl = arcusAttendanceUrl()
+  const evaluationUrl = arcusEvaluationUrl()
+  const showTopSpacing =
+    state.deniedNotices.length +
+      state.returnedNotices.length +
+      state.approvedNotices.length >
+    0
+
+  return (
+    <div className={showTopSpacing ? "pt-4" : undefined}>
+      <div className="mb-4 flex items-center gap-2">
+        <div className="flex h-3 w-3 items-center justify-center rounded-full border-2 border-sky-500 bg-white">
+          <div className="h-1.5 w-1.5 rounded-full bg-sky-500"></div>
+        </div>
+        <h3 className="font-sans text-lg font-light tracking-wide text-sky-700">
+          Scheduled
+        </h3>
+      </div>
+      <div className="ml-1.5 space-y-4 border-l-2 border-sky-300 pl-4">
+        {state.scheduledNotices.map((notice) => (
+          <div
+            key={notice.id}
+            className="relative flex min-h-11 w-full items-start gap-3 rounded-xl p-1 text-left"
+          >
+            <div className="absolute top-0.5 -left-[27px] flex h-6 w-6 items-center justify-center rounded-md border border-sky-300 bg-white text-sky-600 shadow-2xs">
+              <CalendarClock className="h-3.5 w-3.5" />
+            </div>
+            <div className="min-w-0 flex-1 pl-1">
+              <button
+                type="button"
+                onClick={() => actions.selectNotice(notice)}
+                className="block w-full text-left transition-colors hover:text-sky-700"
+              >
+                <span className="mb-0.5 block text-sm text-neutral-500">
+                  {notice.dateStr}
+                </span>
+                <h4 className="text-sm font-bold tracking-tight text-[#1E293B] uppercase">
+                  {notice.title}
+                </h4>
+                <p className="mt-1 line-clamp-2 text-sm leading-snug font-semibold text-sky-700">
+                  Event scheduled
+                </p>
+                {notice.comment ? (
+                  <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-neutral-600">
+                    {notice.comment}
+                  </p>
+                ) : null}
+              </button>
+              {attendanceUrl || evaluationUrl ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {attendanceUrl ? (
+                    <a
+                      href={attendanceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 text-xs font-bold text-sky-700 transition-colors hover:bg-sky-50"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Attendance
+                    </a>
+                  ) : null}
+                  {evaluationUrl ? (
+                    <a
+                      href={evaluationUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 text-xs font-bold text-sky-700 transition-colors hover:bg-sky-50"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Evaluation
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
         ))}
       </div>
     </div>

@@ -63,6 +63,19 @@ final class ApproveSubmission
                 submission: $submission,
             );
 
+            // Opens the attendance/evaluation lifecycle: a timeline notice the
+            // org_submitter sees (with the arcus buttons) plus an email carrying
+            // both links. NOTIFICATION SK is second-precision, so stamp this row
+            // one second later to avoid colliding with the 'fully approved' row.
+            $this->notifications->create(
+                $submissionId,
+                $signatoryId,
+                'event scheduled',
+                $this->eventScheduledComment($submission),
+                sentAt: now()->utc()->addSecond()->format('Y-m-d\TH:i:s\Z'),
+                submission: $submission,
+            );
+
             return $submission;
         }
 
@@ -115,5 +128,20 @@ final class ApproveSubmission
             static fn (string $id): string => DynamoKeys::signatory($id),
             $this->sequence->signatoryIds($organizationId, $submission),
         );
+    }
+
+    /**
+     * Timeline message for the event-scheduled notice.
+     *
+     * @param  array<string, mixed>  $submission
+     */
+    private function eventScheduledComment(array $submission): string
+    {
+        $windowDays = (int) config('services.arcus.post_evaluation_window_days', 3);
+        $date = data_get($submission, 'activity_details.date_of_event');
+        $when = is_string($date) && $date !== '' ? $date : 'the scheduled date';
+
+        return 'Your event will happen on '.$when.'. You have '.$windowDays
+            .' days to evaluate attendees after that date.';
     }
 }

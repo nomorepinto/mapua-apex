@@ -1,4 +1,5 @@
 import { memo } from "react"
+import { ExternalLink } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -12,6 +13,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { layout, modal } from "@/config"
+import { arcusAttendanceUrl, arcusEvaluationUrl } from "@/lib/arcus-links"
 import type { ReviewNotice } from "@/lib/dynamodb-adapters"
 import { cn } from "@/lib/utils"
 
@@ -53,6 +55,12 @@ const VARIANTS: Record<ReviewNotice["notifType"], NoticeVariant> = {
     heading: "Approval note",
     fallback: "All signatories have approved this submission.",
   },
+  "event scheduled": {
+    badge: "Event Scheduled",
+    badgeClass: "bg-sky-50 text-sky-700",
+    heading: "Event details",
+    fallback: "Your proposal was fully approved and the event is now scheduled.",
+  },
 }
 
 const ReviewNoticeModal = memo(function ReviewNoticeModal({
@@ -63,6 +71,8 @@ const ReviewNoticeModal = memo(function ReviewNoticeModal({
   const body = notice?.comment?.trim()
     ? notice.comment
     : variant.fallback || notice?.comment
+  const attendanceUrl = arcusAttendanceUrl()
+  const evaluationUrl = arcusEvaluationUrl()
 
   return (
     <Dialog
@@ -98,6 +108,33 @@ const ReviewNoticeModal = memo(function ReviewNoticeModal({
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-800">
             {body}
           </p>
+          {notice?.notifType === "event scheduled" &&
+          (attendanceUrl || evaluationUrl) ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {attendanceUrl ? (
+                <a
+                  href={attendanceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-sky-300 bg-white px-4 text-sm font-semibold text-sky-700 transition-colors hover:bg-sky-50"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open Attendance
+                </a>
+              ) : null}
+              {evaluationUrl ? (
+                <a
+                  href={evaluationUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-sky-300 bg-white px-4 text-sm font-semibold text-sky-700 transition-colors hover:bg-sky-50"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open Evaluation
+                </a>
+              ) : null}
+            </div>
+          ) : null}
         </DialogPanel>
 
         <DialogFooter className={cn(layout.actions, "border-t border-neutral-100 p-4 sm:p-6")}>

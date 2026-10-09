@@ -60,6 +60,10 @@ final class WriteSubmission
             abort(422, 'Denied submissions cannot be edited.');
         }
 
+        if ($status === 'finished') {
+            abort(422, 'Finished submissions cannot be edited.');
+        }
+
         if (! in_array($status, ['pending', 'returned'], true)) {
             abort(422, 'This submission cannot be edited.');
         }

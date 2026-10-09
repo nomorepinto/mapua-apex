@@ -66,10 +66,19 @@ Every NOTIFICATION write also fires best-effort emails via SES (`Aws\Ses\SesClie
 | Student POST `/students/submissions` | First desk in `signatory_sequence`: "new event submission from {org name}" |
 | Student PUT a **returned** paper | The desk it now sits on (kept desk or sequence[0]): "resubmitted for your review". Plain edits of `pending` papers send nothing |
 | Approve (mid-chain) | Student: "{approver} approved" **and** next desk: "new event submission from {org name}" |
-| Approve (final hop) | Student: "fully approved" |
+| Approve (final hop) | Student: "fully approved" **and** an "event scheduled" timeline notice + email carrying the arcus attendance & evaluation links |
 | Deny / Return | Student: "denied" / "returned for revision", including the signatory comment |
 | Signatory or student POST notifications | Student: the row's `notif_type` + comment |
 | PUT notifications (edit a row) | Nothing |
+
+---
+
+## Arcus service routes (server-to-server)
+
+Not Cognito-JWT routes. The arcus companion apps (arcus-attendance-system, arcus-evaluation-system) call these from their **own server** using a shared secret, because their users authenticate through a **different** Cognito app client whose tokens this API cannot verify. Every request needs:
+
+```http
+X-Arcus-Service-Token: <ARCUS_SERVICE_TOKEN>
 
 ---
 

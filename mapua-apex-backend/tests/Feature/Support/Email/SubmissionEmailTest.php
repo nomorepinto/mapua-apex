@@ -61,7 +61,7 @@ class SubmissionEmailTest extends TestCase
         $this->assertStringContainsString('Mapua Computing Society', $next['body']);
     }
 
-    public function test_final_approval_emails_only_the_student(): void
+    public function test_final_approval_emails_the_student_the_decision_and_the_event_schedule(): void
     {
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::event($db);
@@ -76,10 +76,78 @@ class SubmissionEmailTest extends TestCase
             ->postJson('/api/v1/signatories/events/e001/submissions/s001/approve')
             ->assertOk();
 
-        $this->assertCount(1, $this->mailer->sent());
-        $mail = $this->mailer->to('nsantos@mymail.mapua.edu.ph')[0] ?? null;
+        // Final approval now sends the student two emails: the decision
+        // ('fully approved') and the lifecycle kickoff ('event scheduled').
+        $studentMail = $this->mailer->to('nsantos@mymail.mapua.edu.ph');
+        $this->assertCount(2, $this->mailer->sent());
+        $this->assertCount(2, $studentMail);
+
+        $subjects = implode('|', array_column($studentMail, 'subject'));
+        $this->assertStringContainsString('fully approved', $subjects);
+        $this->assertStringContainsString('post-evaluation', $subjects);
+    }
+
+    public function test_final_approval_writes_an_event_scheduled_notification(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db);
+        DynamoFixtures::signatory($db, 'adv001', 'adviser');
+        DynamoFixtures::submission($db, [
+            'current_signatory' => 'SIGNATORY#adv001',
+            'GSI2PK' => 'SIGNATORY#adv001',
+            'signatory_sequence' => ['SIGNATORY#adv001'],
+        ]);
+
+        $this->withSignatoryAuth()
+            ->postJson('/api/v1/signatories/events/e001/submissions/s001/approve')
+            ->assertOk();
+
+        $scheduled = array_values(array_filter(
+            $db->all(),
+            static fn (array $item): bool => ($item['notif_type'] ?? null) === 'event scheduled',
+        ));
+
+        $this->assertCount(1, $scheduled);
+        $this->assertSame('SUBMISSION#s001', $scheduled[0]['PK']);
+        $this->assertSame('SIGNATORY#adv001', $scheduled[0]['signatory']);
+        $this->assertStringContainsString('days to evaluate attendees', $scheduled[0]['comment']);
+    }
+
+    public function test_event_scheduled_email_carries_the_arcus_links(): void
+    {
+        config([
+            'services.arcus.attendance_url' => 'https://attendance.test/scanner',
+            'services.arcus.evaluation_url' => 'https://evaluation.test/officer',
+            'services.arcus.post_evaluation_window_days' => 3,
+        ]);
+
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db);
+        DynamoFixtures::signatory($db, 'adv001', 'adviser');
+        DynamoFixtures::submission($db, [
+            'current_signatory' => 'SIGNATORY#adv001',
+            'GSI2PK' => 'SIGNATORY#adv001',
+            'signatory_sequence' => ['SIGNATORY#adv001'],
+        ]);
+
+        $this->withSignatoryAuth()
+            ->postJson('/api/v1/signatories/events/e001/submissions/s001/approve')
+            ->assertOk();
+
+        $mail = null;
+
+        foreach ($this->mailer->to('nsantos@mymail.mapua.edu.ph') as $candidate) {
+            if (str_contains($candidate['subject'], 'post-evaluation')) {
+                $mail = $candidate;
+
+                break;
+            }
+        }
+
         $this->assertNotNull($mail);
-        $this->assertStringContainsString('fully approved', $mail['subject']);
+        $this->assertStringContainsString('https://attendance.test/scanner', $mail['body']);
+        $this->assertStringContainsString('https://evaluation.test/officer', $mail['body']);
+        $this->assertStringContainsString('3 days after the event', $mail['body']);
     }
 
     public function test_deny_emails_the_student_with_the_comment(): void

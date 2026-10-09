@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\ActivityLogMiddleware;
+use App\Http\Middleware\AuthenticateArcusService;
 use App\Http\Middleware\AuthenticateCognitoJwt;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,7 +20,8 @@ $app = Application::configure(basePath: dirname(__DIR__))
         $middleware->throttleApi();
         $middleware->alias([
             'cognito.jwt' => AuthenticateCognitoJwt::class,
-            'activity.log' => \App\Http\Middleware\ActivityLogMiddleware::class,
+            'activity.log' => ActivityLogMiddleware::class,
+            'arcus.service' => AuthenticateArcusService::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

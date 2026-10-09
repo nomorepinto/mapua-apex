@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Admin\AnnouncementController;
+use App\Http\Controllers\Api\V1\Admin\LogMonitorController;
 use App\Http\Controllers\Api\V1\Admin\OrganizationController;
 use App\Http\Controllers\Api\V1\Admin\SignatoryController;
 use App\Http\Controllers\Api\V1\Admin\SubmissionController as AdminSubmissionController;
+use App\Http\Controllers\Api\V1\Arcus\EventController;
+use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\Signatory\NotificationController as SignatoryNotificationController;
 use App\Http\Controllers\Api\V1\Signatory\ProfileController as SignatoryProfileController;
 use App\Http\Controllers\Api\V1\Signatory\SubmissionController as SignatorySubmissionController;
@@ -20,11 +23,12 @@ Route::middleware(['throttle:student'])->group(function (): void {
     });
 });
 
+Route::prefix('v1')->name('v1.')->group(function (): void {
     // Session lifecycle endpoints (open to any authenticated user role)
     Route::middleware(['cognito.jwt:any'])->prefix('sessions')->name('sessions.')->group(function (): void {
-        Route::post('start', [\App\Http\Controllers\Api\V1\SessionController::class, 'start'])->name('start');
-        Route::patch('{sessionId}/heartbeat', [\App\Http\Controllers\Api\V1\SessionController::class, 'heartbeat'])->name('heartbeat');
-        Route::post('{sessionId}/end', [\App\Http\Controllers\Api\V1\SessionController::class, 'end'])->name('end');
+        Route::post('start', [SessionController::class, 'start'])->name('start');
+        Route::patch('{sessionId}/heartbeat', [SessionController::class, 'heartbeat'])->name('heartbeat');
+        Route::post('{sessionId}/end', [SessionController::class, 'end'])->name('end');
     });
 
     Route::middleware(['cognito.jwt:student', 'throttle:student', 'activity.log'])
@@ -91,10 +95,10 @@ Route::middleware(['throttle:student'])->group(function (): void {
         ->group(function (): void {
             // Super Admin Log Monitoring endpoints
             Route::middleware(['cognito.jwt:super_admin'])->prefix('monitor')->name('monitor.')->group(function (): void {
-                Route::get('sessions', [\App\Http\Controllers\Api\V1\Admin\LogMonitorController::class, 'querySessions'])->name('sessions');
-                Route::get('activity', [\App\Http\Controllers\Api\V1\Admin\LogMonitorController::class, 'queryActivity'])->name('activity');
-                Route::get('activity/{activityId}', [\App\Http\Controllers\Api\V1\Admin\LogMonitorController::class, 'getActivityDetail'])->name('activity.show');
-                Route::get('stats', [\App\Http\Controllers\Api\V1\Admin\LogMonitorController::class, 'getStats'])->name('stats');
+                Route::get('sessions', [LogMonitorController::class, 'querySessions'])->name('sessions');
+                Route::get('activity', [LogMonitorController::class, 'queryActivity'])->name('activity');
+                Route::get('activity/{activityId}', [LogMonitorController::class, 'getActivityDetail'])->name('activity.show');
+                Route::get('stats', [LogMonitorController::class, 'getStats'])->name('stats');
             });
 
             Route::get('submissions', [AdminSubmissionController::class, 'index'])->name('submissions.index');
@@ -135,5 +139,17 @@ Route::middleware(['throttle:student'])->group(function (): void {
             Route::delete('signatories/{signatory}', [SignatoryController::class, 'destroy'])
                 ->middleware('throttle:admin-write')
                 ->name('signatories.destroy');
+        });
+
+    // Arcus companion apps — server-to-server, shared secret (not a Cognito JWT).
+    Route::middleware(['arcus.service', 'throttle:admin'])
+        ->prefix('arcus')
+        ->name('arcus.')
+        ->group(function (): void {
+            Route::get('events', [EventController::class, 'index'])
+                ->name('events.index');
+            Route::post('events/{event}/submissions/{submission}/finish', [EventController::class, 'finish'])
+                ->middleware('throttle:admin-write')
+                ->name('submissions.finish');
         });
 });
