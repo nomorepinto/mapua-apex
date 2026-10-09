@@ -32,6 +32,12 @@ export type AppSidebarItem = {
   to: string
   icon: LucideIcon
   end?: boolean
+  subItems?: {
+    label: string
+    to: string
+    icon: LucideIcon
+    end?: boolean
+  }[]
 }
 
 export type AppSidebarPanelSwitch = {

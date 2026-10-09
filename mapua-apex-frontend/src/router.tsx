@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet } from "react-router"
 
 import { layout } from "@/config"
+import { SESSION_LOG_GROUPS, ACTIVITY_LOG_GROUPS } from "@/constants/auth"
 import { AdminLayout } from "@/routes/layouts/admin-layout"
 import { SignatoriesLayout } from "@/routes/layouts/signatories-layout"
 import { StudentsLayout } from "@/routes/layouts/students-layout"
@@ -28,6 +29,15 @@ export const router = createBrowserRouter([
         <RoleRedirect />
       </AuthGuard>
     ),
+  },
+  {
+    path: "monitor",
+    children: [
+      { index: true, Component: () => <Navigate to="/admin/sessions" replace /> },
+      { path: "overview", Component: () => <Navigate to="/admin/sessions" replace /> },
+      { path: "sessions", Component: () => <Navigate to="/admin/sessions" replace /> },
+      { path: "activities", Component: () => <Navigate to="/admin/activities" replace /> },
+    ],
   },
   {
     path: "students",
@@ -99,6 +109,22 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "activities",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorActivitiesPage } = await import(
+            "@/routes/admin/monitor-activities"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
+                <AdminMonitorActivitiesPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
         path: "about",
         HydrateFallback: RouteFallback,
         lazy: async () => {
@@ -123,6 +149,60 @@ export const router = createBrowserRouter([
           const { AdminOsaPanel } = await import("@/routes/admin/dashboard")
           return { Component: AdminOsaPanel }
         },
+      },
+      {
+        path: "sessions",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorSessionsPage } = await import(
+            "@/routes/admin/monitor-sessions"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={SESSION_LOG_GROUPS}>
+                <AdminMonitorSessionsPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
+        path: "activities",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorActivitiesPage } = await import(
+            "@/routes/admin/monitor-activities"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
+                <AdminMonitorActivitiesPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
+        path: "monitor",
+        Component: PassThroughLayout,
+        children: [
+          {
+            index: true,
+            Component: () => <Navigate to="/admin/sessions" replace />,
+          },
+          {
+            path: "overview",
+            Component: () => <Navigate to="/admin/sessions" replace />,
+          },
+          {
+            path: "sessions",
+            Component: () => <Navigate to="/admin/sessions" replace />,
+          },
+          {
+            path: "activities",
+            Component: () => <Navigate to="/admin/activities" replace />,
+          },
+        ],
       },
       {
         path: "organizations",
