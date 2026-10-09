@@ -379,6 +379,8 @@ export interface DashboardSubmissionRow {
   nature?: "major" | "minor"
   current_signatory: string
   target_date: string
+  date_of_event?: string
+  end_date_of_event?: string
   requires_venue: boolean
   submitted_date: string
   /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
@@ -703,6 +705,8 @@ export function apiSubmissionToDashboardRow(
     nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,
     current_signatory: currentSignatoryLabel,
     target_date: submission.activity_details?.date_of_event || submission.sent_at,
+    date_of_event: submission.activity_details?.date_of_event,
+    end_date_of_event: submission.activity_details?.end_date_of_event,
     requires_venue: Boolean(submission.venue_reservation?.has_reservation),
     submitted_date: formatDisplayDate(submission.sent_at),
     sent_at: submission.sent_at || "",
@@ -811,7 +815,9 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
       classroomName: item.classroom_name,
       remarks: item.remarks || "",
       dateNeeded: item.date_needed,
+      endDateNeeded: item.end_date_needed,
       timeNeeded: item.time_needed,
+      endTimeNeeded: item.end_time_needed,
     })),
     avEquipmentRequested: (
       submission.venue_reservation?.audiovisual_equipment?.items || []
@@ -836,6 +842,9 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
         }
       }
     ),
+    hasReservation: Boolean(submission.venue_reservation?.has_reservation),
+    dateOfEvent: submission.activity_details?.date_of_event,
+    endDateOfEvent: submission.activity_details?.end_date_of_event,
     budgetGrandTotal:
       typeof submission.detailed_budget_proposal?.grand_total === "number"
         ? submission.detailed_budget_proposal.grand_total
