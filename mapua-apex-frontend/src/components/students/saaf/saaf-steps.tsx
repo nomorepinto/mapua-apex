@@ -188,13 +188,14 @@ function SaafReviewActions() {
         <button type="button" onClick={actions.goBack} className={brand.actionGhost}>
           Back
         </button>
-        <SaafClearButton />
       </div>
       <SubmissionActions
         isSubmitting={state.isSubmitting}
         inactive={!state.formComplete}
         onSavePdf={onSavePdf}
         onSubmit={actions.initiateSubmit}
+        onClear={actions.openClear}
+        canClear={state.canClear}
       />
     </div>
   )

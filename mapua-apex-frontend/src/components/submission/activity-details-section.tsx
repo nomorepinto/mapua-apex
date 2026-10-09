@@ -28,7 +28,6 @@ import {
 import {
   blockNonDecimalKeys,
   blockNonIntegerKeys,
-  sanitizeDecimalInput,
   sanitizeIntegerInput,
 } from "@/lib/numeric-input"
 import { cn } from "@/lib/utils"
@@ -57,13 +56,17 @@ type DetailsFields = Pick<
   proponents?: Array<{ dateOfSubmission?: string }>
 }
 
+const MIN_EXPECTED_PARTICIPANTS = 30
+const MAX_EXPECTED_PARTICIPANTS = 3000
+const MAX_INDIVIDUAL_CONTRIBUTION = 5000
+
 export function ActivityDetailsSection({
   values,
   onChange,
   includeReservation = false,
 }: {
   values: DetailsFields
-  onChange: (key: any, value: any) => void
+  onChange: <K extends keyof SaafDraft>(key: K, value: SaafDraft[K]) => void
   includeReservation?: boolean
 }) {
   const minStartDate = minEventDateKey()
@@ -137,7 +140,7 @@ export function ActivityDetailsSection({
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
             <label className="block text-xs font-semibold text-neutral-800">
-              Title and Nature of Activity applied for{" "}
+              Title of Activity applied for{" "}
               <span className="text-red-500">*</span>
             </label>
             <span className="text-[11px] text-neutral-400">
@@ -147,12 +150,17 @@ export function ActivityDetailsSection({
           <Input
             name="activityTitle"
             value={values.activityTitle}
-            maxLength={100}
-            onChange={(e) => onChange("activityTitle", e.target.value)}
+            disabled
+            readOnly
+            tabIndex={-1}
             placeholder="i.e. Seminar, Field Trip, Plant Visit, Outing, Socials, Assembly, Meeting, etc."
             style={{ color: "#171717" }}
-            className="h-10 rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900 placeholder:text-neutral-400"
-            required
+            className="h-10 cursor-not-allowed rounded-lg border-neutral-300 bg-neutral-100/70 text-sm !text-neutral-900 select-none placeholder:text-neutral-400"
+          />
+          <input
+            type="hidden"
+            name="activityTitle"
+            value={values.activityTitle}
           />
           <FieldWarning name="activityTitle" />
         </div>
@@ -307,19 +315,40 @@ export function ActivityDetailsSection({
               inputMode="numeric"
               pattern="[0-9]*"
               name="expectedParticipants"
-              placeholder="0"
-              maxLength={5}
+              placeholder="30"
+              min={MIN_EXPECTED_PARTICIPANTS}
+              max={MAX_EXPECTED_PARTICIPANTS}
+              maxLength={4}
               value={values.expectedParticipants}
               onKeyDown={blockNonIntegerKeys}
-              onChange={(e) =>
-                onChange("expectedParticipants", sanitizeIntegerInput(e.target.value).slice(0, 5))
-              }
+              onChange={(e) => {
+                const sanitized = sanitizeIntegerInput(e.target.value)
+                if (!sanitized) {
+                  onChange("expectedParticipants", "")
+                  return
+                }
+                const num = Number(sanitized)
+                if (num > MAX_EXPECTED_PARTICIPANTS) {
+                  onChange("expectedParticipants", String(MAX_EXPECTED_PARTICIPANTS))
+                } else {
+                  onChange("expectedParticipants", sanitized.slice(0, 4))
+                }
+              }}
+              onBlur={(e) => {
+                const sanitized = sanitizeIntegerInput(e.target.value)
+                if (!sanitized) return
+                const num = Number(sanitized)
+                if (num < MIN_EXPECTED_PARTICIPANTS) {
+                  onChange("expectedParticipants", String(MIN_EXPECTED_PARTICIPANTS))
+                }
+              }}
               style={{ color: "#171717" }}
               className="no-spinner h-9.5 rounded-lg border-neutral-300 bg-white text-center !text-neutral-900 placeholder:text-neutral-400"
               required
             />
             <FieldWarning name="expectedParticipants" />
           </div>
+
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-neutral-800">
               Amount of Individual Contribution{" "}
@@ -330,15 +359,23 @@ export function ActivityDetailsSection({
               inputMode="decimal"
               name="individualContribution"
               placeholder="0.00"
-              maxLength={10}
+              maxLength={4}
+              max={MAX_INDIVIDUAL_CONTRIBUTION}
               value={values.individualContribution}
               onKeyDown={blockNonDecimalKeys}
-              onChange={(e) =>
-                onChange(
-                  "individualContribution",
-                  sanitizeDecimalInput(e.target.value).slice(0, 10)
-                )
-              }
+              onChange={(e) => {
+                const sanitized = sanitizeIntegerInput(e.target.value)
+                if (!sanitized) {
+                  onChange("individualContribution", "")
+                  return
+                }
+                const num = Number(sanitized)
+                if (num > MAX_INDIVIDUAL_CONTRIBUTION) {
+                  onChange("individualContribution", String(MAX_INDIVIDUAL_CONTRIBUTION))
+                } else {
+                  onChange("individualContribution", sanitized.slice(0, 4))
+                }
+              }}
               style={{ color: "#171717" }}
               className="no-spinner h-9.5 rounded-lg border-neutral-300 bg-white text-center !text-neutral-900 placeholder:text-neutral-400"
               required

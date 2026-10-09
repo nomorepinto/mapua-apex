@@ -14,7 +14,10 @@ import {
   reservationHasUserInput,
   withReservationDefaults,
 } from "@/components/reservation/constants"
-import { saafHasUserInput } from "@/components/submission/constants"
+import {
+  getClearedFieldsForSaafStep,
+  saafStepHasUserInput,
+} from "@/components/submission/constants"
 import type {
   SaafStepIndex,
   WizardStepIndex,
@@ -24,6 +27,7 @@ import {
   isReservationStepComplete,
   isSaafDraftComplete,
   isSaafStepComplete,
+  STEP_PREFIXES,
 } from "@/components/submission/validate-saaf-step"
 import { useSaafForm } from "@/hooks/use-saaf-form"
 import { useOrgStore } from "@/stores/org-store"
@@ -188,7 +192,9 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       isReservationStepComplete(reservationDraft, draft.activityVenue))
 
   const canClear =
-    step === 4 ? reservationHasUserInput(reservationDraft) : saafHasUserInput(draft)
+    step === 4
+      ? reservationHasUserInput(reservationDraft)
+      : saafStepHasUserInput(step as SaafStepIndex, draft)
 
   const value: SaafFormContextValue = {
     state: {
@@ -242,11 +248,25 @@ export function SaafProvider({ children }: { children: ReactNode }) {
           // stays put; the SAAF answers captured earlier are preserved.
           useOrgStore.getState().clearReservationDraft()
         } else {
-          form.handleClearForm()
-          setStep(0)
-          setAdvancedStep(0)
+          // Clear only the fields belonging to the current step/tab;
+          // answers on other tabs are preserved.
+          const cleared = getClearedFieldsForSaafStep(step as SaafStepIndex)
+          useOrgStore.getState().patchSaafDraft(cleared)
+          setAdvancedStep((prev) => Math.min(prev, step) as WizardStepIndex)
         }
-        setTouched({})
+        setTouched((prev) => {
+          if (step === 4) return prev
+          const prefixes = STEP_PREFIXES[step as SaafStepIndex] || []
+          const next = { ...prev }
+          for (const key of Object.keys(next)) {
+            if (prefixes.some((p) => key === p || key.startsWith(p))) {
+              delete next[key]
+            }
+          }
+          return next
+        })
+        form.setStepError(null)
+        form.setShowErrors(false)
         form.setShowConfirmClearModal(false)
       },
       closeConfirm: () => form.setShowConfirmModal(false),
