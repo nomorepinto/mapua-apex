@@ -473,16 +473,13 @@ export function useSessionAnalyticsQuery(params: LogQueryParams & { compare?: "m
         return getMockSessionAnalytics(params);
       }
       try {
-        const [statsRes, sessionsRes] = await Promise.all([
-          apiClient.get<{ data: any }>("/admins/monitor/stats"),
-          apiClient.get<{ data: any[] }>("/admins/monitor/sessions", {
-            params: {
-              startDate: params.startDate,
-              endDate: params.endDate,
-              limit: 200,
-            },
-          }),
-        ]);
+        const sessionsRes = await apiClient.get<{ data: any[] }>("/admins/monitor/sessions", {
+          params: {
+            startDate: params.startDate,
+            endDate: params.endDate,
+            limit: 200,
+          },
+        });
 
         const rawSessions = sessionsRes.data || [];
         const sessions = rawSessions.map(normalizeSessionItem);
@@ -620,12 +617,9 @@ export function usePipelineAnalyticsQuery(params: LogQueryParams) {
         return getMockPipelineAnalytics(params);
       }
       try {
-        const [bnRes, actRes] = await Promise.all([
-          apiClient.get<{ data: any }>("/admins/monitor/bottlenecks"),
-          apiClient.get<{ data: any[] }>("/admins/monitor/activity", {
-            params: { startDate: params.startDate, endDate: params.endDate, limit: 200 },
-          }),
-        ]);
+        const actRes = await apiClient.get<{ data: any[] }>("/admins/monitor/activity", {
+          params: { startDate: params.startDate, endDate: params.endDate, limit: 200 },
+        });
 
         const rawActs = actRes.data || [];
         const acts = rawActs.map(normalizeActivityItem);

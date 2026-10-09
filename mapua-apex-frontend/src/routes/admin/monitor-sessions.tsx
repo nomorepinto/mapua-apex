@@ -74,14 +74,7 @@ function getYesterdayManila(): string {
   }).format(new Date(Date.now() - 24 * 60 * 60 * 1000));
 }
 
-function getThirtyDaysAgoManila(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: MANILA_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-}
+
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
