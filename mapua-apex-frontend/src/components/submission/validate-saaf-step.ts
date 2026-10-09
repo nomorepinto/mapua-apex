@@ -19,10 +19,7 @@ import {
 import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
-import {
-  CLASSROOM_ROOM,
-  isRoomOfferedAtCampus,
-} from "@/lib/campus-rooms"
+import { isRoomOfferedAtCampus } from "@/lib/campus-rooms"
 import {
   EVENT_DATE_TOO_SOON_MESSAGE,
   minEventDateKey,

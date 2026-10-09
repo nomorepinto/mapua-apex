@@ -3,10 +3,8 @@ import {
   SELECT_ITEM_CLASS,
 } from "@/components/submission/constants"
 import {
-  clockMinutes,
   hourChoices,
   minuteChoices,
-  SAME_EVENT_TIME_MESSAGE,
   type ClockParts,
   type Period,
 } from "@/components/submission/event-time"
