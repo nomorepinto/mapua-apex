@@ -7,15 +7,21 @@ import {
   SAME_EVENT_TIME_MESSAGE,
   splitEventTime,
 } from "@/components/submission/event-time"
-import { isVenue, MAX_PROPONENTS, MAX_STUDENT_YEAR, MIN_STUDENT_YEAR, MOBILE_NUMBER_LENGTH, STUDENT_NUMBER_LENGTH, YEAR_LEVEL_OPTIONS } from "@/components/submission/constants"
+import {
+  isVenue,
+  MAX_PROPONENTS,
+  MAX_STUDENT_YEAR,
+  MIN_STUDENT_YEAR,
+  MOBILE_NUMBER_LENGTH,
+  STUDENT_NUMBER_LENGTH,
+  YEAR_LEVEL_OPTIONS,
+} from "@/components/submission/constants"
 import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
 import {
   CLASSROOM_ROOM,
-  classroomFormatFor,
   isRoomOfferedAtCampus,
-  isValidClassroomName,
 } from "@/lib/campus-rooms"
 import {
   EVENT_DATE_TOO_SOON_MESSAGE,
@@ -78,27 +84,16 @@ function isValidFacebookUrl(value: string): boolean {
 
 const REQUIRED = "This field is required."
 
-/**
- * Proponent details that must be unique across every proponent in Section 2.
- * Two rows sharing a non-blank value for any of these are a data-entry clash,
- * so the duplicated rows are flagged and the wizard refuses to advance.
- */
 const UNIQUE_PROPONENT_FIELDS: Array<{
   field: keyof Proponent
   label: string
 }> = [
-  { field: "studentNumber", label: "student number" },
-  { field: "contactNumber", label: "mobile number" },
-  { field: "positionOfApplicant", label: "position of the applicant" },
-  { field: "facebookLink", label: "Facebook link" },
-]
+    { field: "studentNumber", label: "student number" },
+    { field: "contactNumber", label: "mobile number" },
+    { field: "positionOfApplicant", label: "position of the applicant" },
+    { field: "facebookLink", label: "Facebook link" },
+  ]
 
-/**
- * Flags every proponent row whose unique-required detail repeats another row's.
- * Comparison is trimmed and case-insensitive; blank values are skipped so the
- * per-field "required" warning stays the actionable message. A duplicate never
- * overwrites an existing format error already recorded for that field.
- */
 function markDuplicateProponents(
   proponents: Proponent[],
   warnings: Record<string, string>
@@ -193,8 +188,6 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   }
 
   if (draft.proponents.length > MAX_PROPONENTS) {
-    // Reachable only from a legacy draft (restored paper or saved session) —
-    // the wizard hides "Add Proponent" once the cap is hit.
     warnings["proponent.max"] = `A maximum of ${MAX_PROPONENTS} proponents is allowed. Remove ${draft.proponents.length - MAX_PROPONENTS} to continue.`
   }
 
@@ -222,7 +215,6 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   if (isBlank(draft.activityVenue)) {
     warnings.activityVenue = "Select a venue."
   } else if (!isVenue(draft.activityVenue)) {
-    // Drafts saved before the venue became a selector hold free text.
     warnings.activityVenue = "Select a venue from the list."
   }
 
@@ -285,7 +277,30 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   return warnings
 }
 
-export const STEP_PREFIXES: Record<SaafStepIndex, string[]> = {
+// Prefixes:
+// 0: Classification
+// 1: People
+// 2: Reservation (timeOfEvent & expectedParticipants)
+// 3: Activity
+// 4: Alignment & Budget
+export const STEP_PREFIXES_WITH_RESERVATION: Record<SaafStepIndex, string[]> = {
+  0: ["activityType", "totalOrgMembers"],
+  1: ["proponent."],
+  2: ["timeOfEvent", "expectedParticipants"],
+  3: [
+    "activityTitle",
+    "activityDescription",
+    "activityObjectives",
+    "activityVenue",
+    "dateOfEvent",
+    "endDateOfEvent",
+    "individualContribution",
+    "proposedBudget",
+  ],
+  4: ["mission", "coreValuesExplanation", "peoExplanation", "sdgExplanation"],
+}
+
+export const STEP_PREFIXES_NO_RESERVATION: Record<SaafStepIndex, string[]> = {
   0: ["activityType", "totalOrgMembers"],
   1: ["proponent."],
   2: [
@@ -301,6 +316,7 @@ export const STEP_PREFIXES: Record<SaafStepIndex, string[]> = {
     "proposedBudget",
   ],
   3: ["mission", "coreValuesExplanation", "peoExplanation", "sdgExplanation"],
+  4: [],
 }
 
 export function getSaafStepIssue(
@@ -309,12 +325,11 @@ export function getSaafStepIssue(
   includeReservation: boolean = false
 ): string | null {
   const warnings = saafFieldWarnings(draft)
-  let prefixes = STEP_PREFIXES[step]
+  const map = includeReservation
+    ? STEP_PREFIXES_WITH_RESERVATION
+    : STEP_PREFIXES_NO_RESERVATION
 
-  // If these fields are moved to the reservation step, don't block step 2 on them.
-  if (step === 2 && includeReservation) {
-    prefixes = prefixes.filter((p) => p !== "timeOfEvent" && p !== "expectedParticipants")
-  }
+  const prefixes = map[step] || []
 
   const messages = Object.entries(warnings)
     .filter(([key]) => prefixes.some((prefix) => key === prefix || key.startsWith(prefix)))
@@ -332,18 +347,13 @@ export function isSaafStepComplete(
 }
 
 export function isSaafDraftComplete(draft: SaafDraft, includeReservation: boolean = false): boolean {
-  return ([0, 1, 2, 3] as const).every((step) => isSaafStepComplete(step, draft, includeReservation))
+  const total = includeReservation ? ([0, 1, 2, 3, 4] as const) : ([0, 1, 2, 3] as const)
+  return total.every((step) => isSaafStepComplete(step, draft, includeReservation))
 }
 
 const RESERVATION_EMPTY_MESSAGE =
   "Add at least one equipment, room, or audiovisual item."
 
-/**
- * The reservation step advances once the proponent has added at least one
- * equipment, function room, or audiovisual row. Rooms must also fit the venue
- * campus: only that campus's rooms can be booked, and every "Classroom" row
- * needs a code matching the campus format, so a wrong code stops submission.
- */
 export function getReservationStepIssue(
   draft: ReservationDraft,
   campus: string
@@ -354,8 +364,6 @@ export function getReservationStepIssue(
     draft.avItems.length > 0
   if (!hasItems) return RESERVATION_EMPTY_MESSAGE
 
-  // Custom "Others" rows carry a free-text name instead of a catalog value, so
-  // they skip the campus whitelist below but must still be named.
   if (draft.equipmentItems.some((item) => item.isOther && isBlank(item.name))) {
     return "Enter a name for the custom equipment item."
   }
@@ -373,18 +381,6 @@ export function getReservationStepIssue(
   )
   if (offCampus) {
     return `Remove "${offCampus.roomNeeded}" — it is not offered at ${campus || "the selected campus"}.`
-  }
-
-  const classroom = draft.roomItems.find(
-    (item) =>
-      item.roomNeeded === CLASSROOM_ROOM &&
-      !isValidClassroomName(campus, item.classroomName)
-  )
-  if (classroom) {
-    const format = classroomFormatFor(campus)
-    return isBlank(classroom.classroomName)
-      ? `Enter the classroom name (format: ${format}).`
-      : `Fix the classroom name — format: ${format}.`
   }
 
   return null

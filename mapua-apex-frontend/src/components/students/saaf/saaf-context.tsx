@@ -27,7 +27,8 @@ import {
   isReservationStepComplete,
   isSaafDraftComplete,
   isSaafStepComplete,
-  STEP_PREFIXES,
+  STEP_PREFIXES_WITH_RESERVATION,
+  STEP_PREFIXES_NO_RESERVATION,
 } from "@/components/submission/validate-saaf-step"
 import { useSaafForm } from "@/hooks/use-saaf-form"
 import { useOrgStore } from "@/stores/org-store"
@@ -91,19 +92,28 @@ export interface SaafFormContextValue {
 
 const SaafFormContext = createContext<SaafFormContextValue | null>(null)
 
-/**
- * Highest wizard step the saved answers already unlock: the first incomplete
- * SAAF step caps progress, so a restored draft re-earns every step it satisfies
- * instead of leaving the user stranded on step 1.
- */
 function earnedStepFromDraft(
   draft: SaafDraft,
   finalStep: WizardStepIndex,
-  includeReservation: boolean
+  includeReservation: boolean,
+  reservationDraft: any
 ): WizardStepIndex {
   let earned: WizardStepIndex = 0
-  for (const index of [0, 1, 2, 3] as const) {
-    if (!isSaafStepComplete(index, draft, includeReservation)) break
+  const stepsToCheck = includeReservation
+    ? ([0, 1, 2, 3, 4] as const)
+    : ([0, 1, 2, 3] as const)
+
+  for (const index of stepsToCheck) {
+    if (includeReservation && index === 2) {
+      if (!isReservationStepComplete(reservationDraft, draft.activityVenue) ||
+        !isSaafStepComplete(2, draft, true)) {
+        break
+      }
+    } else {
+      if (!isSaafStepComplete(index as SaafStepIndex, draft, includeReservation)) {
+        break
+      }
+    }
     earned = Math.min(index + 1, finalStep) as WizardStepIndex
   }
   return earned
@@ -123,37 +133,25 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   const form = useSaafForm()
   const { draft } = form
   const [requestedStep, setStep] = useState<WizardStepIndex>(0)
-  // Highest step reached by clicking Continue. Saved answers unlock steps on
-  // their own (see `farthestStep` below), so the wizard allows whichever of the
-  // two reaches further.
   const [advancedStep, setAdvancedStep] = useState<WizardStepIndex>(0)
 
-  // Fields the user has left (blurred). A field's inline warning surfaces as
-  // soon as an invalid value is in the box, instead of only after a
-  // Continue/Submit press. Reset on Clear so a wiped form shows no stale errors.
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const markTouched = useCallback((key: string) => {
     setTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }))
   }, [])
 
-  // The reservation step is present only when the start page chose to reserve
-  // facilities. Its draft lives in the same store so the wizard (the parent of
-  // ReservationProvider) can gate advancement/submission on it.
   const includeReservation = form.reserveFacilities === "yes"
   const finalStep: WizardStepIndex = includeReservation ? 4 : 3
   const storedReservationDraft = useOrgStore((state) => state.reservationDraft)
   const reservationDraft = withReservationDefaults(storedReservationDraft)
 
-  // Step 5 vanishes whenever `reserveFacilities` resets — notably when the store
-  // is cleared right after a successful submit — so the position is clamped to
-  // the steps that still exist instead of pointing past the end of the list.
   const step = Math.min(requestedStep, finalStep) as WizardStepIndex
 
-  // The drafts persist in the org store (sessionStorage) but the wizard position
-  // does not, so on a reload or an edit-hydration the steps already satisfied by
-  // the saved answers stay clickable instead of collapsing back to step 1.
   const farthestStep = Math.min(
-    Math.max(advancedStep, earnedStepFromDraft(draft, finalStep, includeReservation)),
+    Math.max(
+      advancedStep,
+      earnedStepFromDraft(draft, finalStep, includeReservation, reservationDraft)
+    ),
     finalStep
   ) as WizardStepIndex
 
@@ -182,21 +180,23 @@ export function SaafProvider({ children }: { children: ReactNode }) {
     goToStep((step - 1) as WizardStepIndex)
   }
 
+  // Step 2 is Reservation when includeReservation is true
   const currentStepComplete =
-    step === 4
+    includeReservation && step === 2
       ? isReservationStepComplete(reservationDraft, draft.activityVenue) &&
-        !form.stepError // The built-in html validity check sets this if time/participants are empty
+      isSaafStepComplete(2, draft, true) &&
+      !form.stepError
       : isSaafStepComplete(step as SaafStepIndex, draft, includeReservation)
 
   const formComplete =
     isSaafDraftComplete(draft, includeReservation) &&
     (!includeReservation ||
       (isReservationStepComplete(reservationDraft, draft.activityVenue) &&
-       !form.stepError))
+        !form.stepError))
 
   const canClear =
-    step === 4
-      ? reservationHasUserInput(reservationDraft)
+    includeReservation && step === 2
+      ? reservationHasUserInput(reservationDraft) || saafStepHasUserInput(2 as SaafStepIndex, draft)
       : saafStepHasUserInput(step as SaafStepIndex, draft)
 
   const value: SaafFormContextValue = {
@@ -227,11 +227,6 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       markTouched,
       updateField: <K extends keyof SaafDraft>(key: K, value: SaafDraft[K]) => {
         form.updateField(key, value)
-        // "Time of event" is a single warning (`timeOfEvent`) but is edited
-        // through several nameless selects (start/end hour, minute, period), so
-        // the form's blur delegation can't map them to it. Touch the composite
-        // key on any of those edits so an out-of-window (7AM–9PM) or mis-ordered
-        // time surfaces the moment it is picked, not only after Continue/Submit.
         if (typeof key === "string" && key.startsWith("timeOfEvent")) {
           markTouched("timeOfEvent")
         }
@@ -246,20 +241,18 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       openClear: () => form.setShowConfirmClearModal(true),
       closeClear: () => form.setShowConfirmClearModal(false),
       confirmClear: () => {
-        if (step === 4) {
-          // On the reservation step, Clear only wipes the reservation draft and
-          // stays put; the SAAF answers captured earlier are preserved.
+        if (includeReservation && step === 2) {
           useOrgStore.getState().clearReservationDraft()
-        } else {
-          // Clear only the fields belonging to the current step/tab;
-          // answers on other tabs are preserved.
-          const cleared = getClearedFieldsForSaafStep(step as SaafStepIndex)
-          useOrgStore.getState().patchSaafDraft(cleared)
-          setAdvancedStep((prev) => Math.min(prev, step) as WizardStepIndex)
         }
+        const cleared = getClearedFieldsForSaafStep(step as SaafStepIndex)
+        useOrgStore.getState().patchSaafDraft(cleared)
+        setAdvancedStep((prev) => Math.min(prev, step) as WizardStepIndex)
+
         setTouched((prev) => {
-          if (step === 4) return prev
-          const prefixes = STEP_PREFIXES[step as SaafStepIndex] || []
+          const map = includeReservation
+            ? STEP_PREFIXES_WITH_RESERVATION
+            : STEP_PREFIXES_NO_RESERVATION
+          const prefixes = map[step as SaafStepIndex] || []
           const next = { ...prev }
           for (const key of Object.keys(next)) {
             if (prefixes.some((p) => key === p || key.startsWith(p))) {
