@@ -1,4 +1,8 @@
-import { Building2Icon, ClipboardCheckIcon, HomeIcon, StampIcon } from "lucide-react"
+import {
+  ActivityIcon,
+  Building2Icon,
+  LayoutDashboardIcon,
+} from "lucide-react"
 import { Outlet } from "react-router"
 
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -9,31 +13,33 @@ const ADMIN_NAV = [
   {
     label: "Dashboard",
     to: "/admin/dashboard",
-    icon: HomeIcon,
+    icon: LayoutDashboardIcon,
     end: true,
   },
   {
-    label: "Organizations",
-    to: "/admin/organizations",
+    label: "Monitor",
+    to: "/admin/monitor",
+    icon: ActivityIcon,
+  },
+]
+
+const ADMIN_PANEL_SWITCHES = [
+  {
+    label: "Switch to OSAAR",
+    to: "/osaar/dashboard",
     icon: Building2Icon,
-  },
-  {
-    label: "Signatories",
-    to: "/admin/signatories",
-    icon: StampIcon,
-  },
-  {
-    label: "Review",
-    to: "/admin/review/dashboard",
-    icon: ClipboardCheckIcon,
   },
 ]
 
 export function AdminLayout() {
   return (
-    <AuthGuard allowedGroups={["admin", "osaar"]}>
+    <AuthGuard allowedGroups={["admin"]}>
       <div className={layout.frame}>
-        <AppSidebar homeTo="/admin/dashboard" items={ADMIN_NAV} />
+        <AppSidebar
+          homeTo="/admin/dashboard"
+          items={ADMIN_NAV}
+          panelSwitches={ADMIN_PANEL_SWITCHES}
+        />
         <main className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto">
           <Outlet />
         </main>

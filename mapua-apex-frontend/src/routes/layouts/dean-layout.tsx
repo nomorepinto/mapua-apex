@@ -1,8 +1,8 @@
 import { HomeIcon } from "lucide-react"
 import { Outlet } from "react-router"
 
-import { AppSidebar } from "@/components/layout/app-sidebar"
 import { AuthGuard } from "@/components/auth/AuthGuard"
+import { AppSidebar } from "@/components/layout/app-sidebar"
 import { layout } from "@/config"
 
 const DEAN_NAV = [
