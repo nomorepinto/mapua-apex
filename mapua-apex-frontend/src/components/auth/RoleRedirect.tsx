@@ -24,8 +24,7 @@ export function RoleRedirect() {
   }
 
   if (!auth.isAuthenticated) {
-    // AuthGuard at the root layout usually handles this, but just in case
-    return <Navigate to="/students/dashboard" replace />
+    return <Navigate to="/login" replace />
   }
 
   const userGroups = (auth.user?.profile["cognito:groups"] as string[]) || []

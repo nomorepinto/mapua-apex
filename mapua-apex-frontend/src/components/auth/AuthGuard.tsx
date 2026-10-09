@@ -22,9 +22,8 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
       !auth.activeNavigator &&
       !auth.isLoading
     ) {
-      // Trigger sign-in
       setHasAttemptedSignin(true)
-      auth.signinRedirect()
+      window.location.href = "/login"
     }
   }, [auth, hasAttemptedSignin])
 
