@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet } from "react-router"
 
 import { layout } from "@/config"
+import { SESSION_LOG_GROUPS, ACTIVITY_LOG_GROUPS } from "@/constants/auth"
 import { AdminLayout } from "@/routes/layouts/admin-layout"
 import { CdmReviewerLayout } from "@/routes/layouts/cdm-reviewer-layout"
 import { DeanLayout } from "@/routes/layouts/dean-layout"
@@ -31,6 +32,15 @@ export const router = createBrowserRouter([
         <RoleRedirect />
       </AuthGuard>
     ),
+  },
+  {
+    path: "monitor",
+    children: [
+      { index: true, Component: () => <Navigate to="/admin/sessions" replace /> },
+      { path: "overview", Component: () => <Navigate to="/admin/sessions" replace /> },
+      { path: "sessions", Component: () => <Navigate to="/admin/sessions" replace /> },
+      { path: "activities", Component: () => <Navigate to="/admin/activities" replace /> },
+    ],
   },
   {
     path: "students",
@@ -101,6 +111,22 @@ export const router = createBrowserRouter([
             "@/routes/cdm-reviewer/dashboard"
           )
           return { Component: CdmReviewerDashboard }
+        },
+      },
+      {
+        path: "activities",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorActivitiesPage } = await import(
+            "@/routes/admin/monitor-activities"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
+                <AdminMonitorActivitiesPage />
+              </AuthGuard>
+            ),
+          }
         },
       },
       {
@@ -276,12 +302,59 @@ export const router = createBrowserRouter([
         },
       },
       {
-        path: "monitor",
+      {
+        path: "sessions",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { AdminMonitor } = await import("@/routes/admin/monitor")
-          return { Component: AdminMonitor }
+          const { AdminMonitorSessionsPage } = await import(
+            "@/routes/admin/monitor-sessions"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={SESSION_LOG_GROUPS}>
+                <AdminMonitorSessionsPage />
+              </AuthGuard>
+            ),
+          }
         },
+      },
+      {
+        path: "activities",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorActivitiesPage } = await import(
+            "@/routes/admin/monitor-activities"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
+                <AdminMonitorActivitiesPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
+        path: "monitor",
+        Component: PassThroughLayout,
+        children: [
+          {
+            index: true,
+            Component: () => <Navigate to="/admin/sessions" replace />,
+          },
+          {
+            path: "overview",
+            Component: () => <Navigate to="/admin/sessions" replace />,
+          },
+          {
+            path: "sessions",
+            Component: () => <Navigate to="/admin/sessions" replace />,
+          },
+          {
+            path: "activities",
+            Component: () => <Navigate to="/admin/activities" replace />,
+          },
+        ],
       },
       {
         path: "about",

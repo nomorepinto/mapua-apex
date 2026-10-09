@@ -1,24 +1,41 @@
-import { HomeIcon } from "lucide-react"
+import { FileCheck2Icon, HomeIcon } from "lucide-react"
 import { Outlet } from "react-router"
+import { useAuth } from "react-oidc-context"
 
 import { AuthGuard } from "@/components/auth/AuthGuard"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { layout } from "@/config"
-
-const CDM_REVIEWER_NAV = [
-  {
-    label: "Dashboard",
-    to: "/cdm-reviewer/dashboard",
-    icon: HomeIcon,
-    end: true,
-  },
-]
+import { ACTIVITY_LOG_GROUPS } from "@/constants/auth"
 
 export function CdmReviewerLayout() {
+  const auth = useAuth()
+  const userGroups = (auth.user?.profile["cognito:groups"] as string[]) || []
+  const hasActivityAccess = userGroups.some((g) =>
+    ACTIVITY_LOG_GROUPS.some((target) => g.toLowerCase() === target.toLowerCase())
+  )
+
+  const cdmNav = [
+    {
+      label: "Dashboard",
+      to: "/cdm-reviewer/dashboard",
+      icon: HomeIcon,
+      end: true,
+    },
+    ...(hasActivityAccess
+      ? [
+          {
+            label: "Activity Log",
+            to: "/cdm-reviewer/activities",
+            icon: FileCheck2Icon,
+          },
+        ]
+      : []),
+  ]
+
   return (
-    <AuthGuard allowedGroups={["admin", "cdm_reviewer"]}>
+    <AuthGuard allowedGroups={["admin", "cdm_reviewer", "cdm"]}>
       <div className={layout.frame}>
-        <AppSidebar homeTo="/cdm-reviewer/dashboard" items={CDM_REVIEWER_NAV} />
+        <AppSidebar homeTo="/cdm-reviewer/dashboard" items={cdmNav} />
         <main className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto">
           <Outlet />
         </main>

@@ -21,7 +21,7 @@ const STUDENT_NAV = [
 
 export function StudentsLayout() {
   return (
-    <AuthGuard allowedGroups={["admin", "org_adviser", "org_submitter"]}>
+    <AuthGuard allowedGroups={["admin", "org_adviser", "org_submitter", "student"]}>
       <div className={layout.frame}>
         <AppSidebar homeTo="/students/dashboard" items={STUDENT_NAV} />
         <main className={layout.main}>

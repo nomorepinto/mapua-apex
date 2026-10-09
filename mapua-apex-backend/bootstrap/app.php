@@ -18,6 +18,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
         $middleware->throttleApi();
         $middleware->alias([
             'cognito.jwt' => AuthenticateCognitoJwt::class,
+            'activity.log' => \App\Http\Middleware\ActivityLogMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

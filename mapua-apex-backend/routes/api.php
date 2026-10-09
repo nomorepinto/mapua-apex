@@ -20,8 +20,14 @@ Route::middleware(['throttle:student'])->group(function (): void {
     });
 });
 
-Route::prefix('v1')->name('v1.')->group(function (): void {
-    Route::middleware(['cognito.jwt:student', 'throttle:student'])
+    // Session lifecycle endpoints (open to any authenticated user role)
+    Route::middleware(['cognito.jwt:any'])->prefix('sessions')->name('sessions.')->group(function (): void {
+        Route::post('start', [\App\Http\Controllers\Api\V1\SessionController::class, 'start'])->name('start');
+        Route::patch('{sessionId}/heartbeat', [\App\Http\Controllers\Api\V1\SessionController::class, 'heartbeat'])->name('heartbeat');
+        Route::post('{sessionId}/end', [\App\Http\Controllers\Api\V1\SessionController::class, 'end'])->name('end');
+    });
+
+    Route::middleware(['cognito.jwt:student', 'throttle:student', 'activity.log'])
         ->prefix('students')
         ->name('students.')
         ->group(function (): void {
@@ -49,7 +55,7 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
             Route::get('organizations', [StudentOrganizationController::class, 'index'])->name('organizations.index');
         });
 
-    Route::middleware(['cognito.jwt:signatory', 'throttle:signatory'])
+    Route::middleware(['cognito.jwt:signatory', 'throttle:signatory', 'activity.log'])
         ->prefix('signatories')
         ->name('signatories.')
         ->group(function (): void {
@@ -79,10 +85,18 @@ Route::prefix('v1')->name('v1.')->group(function (): void {
                 ->name('submissions.notifications.update');
         });
 
-    Route::middleware(['cognito.jwt:admin', 'throttle:admin'])
+    Route::middleware(['cognito.jwt:admin', 'throttle:admin', 'activity.log'])
         ->prefix('admins')
         ->name('admins.')
         ->group(function (): void {
+            // Super Admin Log Monitoring endpoints
+            Route::middleware(['cognito.jwt:super_admin'])->prefix('monitor')->name('monitor.')->group(function (): void {
+                Route::get('sessions', [\App\Http\Controllers\Api\V1\Admin\LogMonitorController::class, 'querySessions'])->name('sessions');
+                Route::get('activity', [\App\Http\Controllers\Api\V1\Admin\LogMonitorController::class, 'queryActivity'])->name('activity');
+                Route::get('activity/{activityId}', [\App\Http\Controllers\Api\V1\Admin\LogMonitorController::class, 'getActivityDetail'])->name('activity.show');
+                Route::get('stats', [\App\Http\Controllers\Api\V1\Admin\LogMonitorController::class, 'getStats'])->name('stats');
+            });
+
             Route::get('submissions', [AdminSubmissionController::class, 'index'])->name('submissions.index');
             Route::get('events/{event}/submissions/{submission}', [AdminSubmissionController::class, 'show'])
                 ->name('submissions.show');
