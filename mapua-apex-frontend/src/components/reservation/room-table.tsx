@@ -1,6 +1,5 @@
 import { Trash2Icon } from "lucide-react"
 
-import { ClassroomInput } from "@/components/reservation/classroom-input"
 import {
   OTHER_OPTION,
   TABLE_INPUT_CLASS,
@@ -39,22 +38,20 @@ export function RoomTable({
   const canRemove = safeItems.length > 0
   const catalog = roomOptionsForCampus(campus)
   const campusSelected = catalog.length > 0
-  // A fixed room can only be booked once, but "Classroom" stays selectable so an
-  // event can reserve several classrooms, each named on its own row.
+
+  // Classroom stays selectable so multiple classrooms can still be booked if needed
   const available = catalog.filter(
     (option) =>
       option === CLASSROOM_ROOM ||
       !safeItems.some((item) => item.roomNeeded === option)
   )
-  // "Others" adds an open-ended custom room and stays selectable. Rooms are
-  // campus-scoped, so it is only offered once a venue campus is chosen.
-  const options = campusSelected ? [...available, OTHER_OPTION] : []
+
+  const options = campusSelected
+    ? [...available, ...(campus === "Makati Campus" ? [] : [OTHER_OPTION])]
+    : []
   const exhausted = options.length === 0
-  const hasClassroom = safeItems.some(
-    (item) => item.roomNeeded === CLASSROOM_ROOM
-  )
   const terms = campusRoomTerms(campus)
-  const columnCount = 2 + (hasClassroom ? 1 : 0) + (canRemove ? 1 : 0)
+  const columnCount = 2 + (canRemove ? 1 : 0)
 
   return (
     <div className="space-y-3 pt-2">
@@ -68,14 +65,9 @@ export function RoomTable({
           >
             <thead>
               <tr className="border-b border-neutral-300 bg-neutral-50/80 text-xs font-semibold tracking-wider text-neutral-700 uppercase">
-                <th className="w-52 border-r border-neutral-300 px-4 py-3 text-center">
+                <th className="w-64 border-r border-neutral-300 px-4 py-3 text-center">
                   Room Needed
                 </th>
-                {hasClassroom ? (
-                  <th className="w-44 border-r border-neutral-300 px-4 py-3 text-center">
-                    Classroom Name
-                  </th>
-                ) : null}
                 <th className="px-4 py-3 text-center">Remarks</th>
                 {canRemove ? (
                   <th className="w-10 px-2 py-3 text-center" />
@@ -112,23 +104,6 @@ export function RoomTable({
                       item.roomNeeded
                     )}
                   </td>
-                  {hasClassroom ? (
-                    <td className="border-r border-neutral-300 p-2">
-                      {item.roomNeeded === CLASSROOM_ROOM ? (
-                        <ClassroomInput
-                          value={item.classroomName}
-                          campus={campus}
-                          onChange={(value) =>
-                            onUpdate(item.id, "classroomName", value)
-                          }
-                        />
-                      ) : (
-                        <span className="block py-1 text-xs text-neutral-400">
-                          —
-                        </span>
-                      )}
-                    </td>
-                  ) : null}
                   <td className="p-2">
                     <input
                       type="text"

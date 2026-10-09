@@ -277,19 +277,23 @@ export function ActivityDetailsSection({
 
         </div>
 
-        <EventTimeFields
-          start={startParts}
-          end={endParts}
-          onStartHour={(hour) => updateStart(withHour(startParts, hour))}
-          onStartMinute={(minute) => updateStart({ ...startParts, minute })}
-          onStartPeriod={(period) => updateStart(withPeriod(startParts, period))}
-          onEndHour={(hour) => updateEnd(withHour(endParts, hour))}
-          onEndMinute={(minute) => updateEnd({ ...endParts, minute })}
-          onEndPeriod={(period) => updateEnd(withPeriod(endParts, period))}
-        />
-        <FieldWarning name="timeOfEvent" />
-        <input type="hidden" name="timeOfEventStart" value={format24(startParts)} required />
-        <input type="hidden" name="timeOfEventEnd" value={format24(endParts)} required />
+        {!includeReservation && (
+          <>
+            <EventTimeFields
+              start={startParts}
+              end={endParts}
+              onStartHour={(hour) => updateStart(withHour(startParts, hour))}
+              onStartMinute={(minute) => updateStart({ ...startParts, minute })}
+              onStartPeriod={(period) => updateStart(withPeriod(startParts, period))}
+              onEndHour={(hour) => updateEnd(withHour(endParts, hour))}
+              onEndMinute={(minute) => updateEnd({ ...endParts, minute })}
+              onEndPeriod={(period) => updateEnd(withPeriod(endParts, period))}
+            />
+            <FieldWarning name="timeOfEvent" />
+          </>
+        )}
+        <input type="hidden" name="timeOfEventStart" value={format24(startParts)} required={!includeReservation} />
+        <input type="hidden" name="timeOfEventEnd" value={format24(endParts)} required={!includeReservation} />
         <input
           type="hidden"
           name="timeOfEvent"
@@ -297,29 +301,31 @@ export function ActivityDetailsSection({
         />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-neutral-800">
-              Number of Expected Participants{" "}
-              <span className="text-red-500">*</span>
-            </label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              name="expectedParticipants"
-              placeholder="0"
-              maxLength={5}
-              value={values.expectedParticipants}
-              onKeyDown={blockNonIntegerKeys}
-              onChange={(e) =>
-                onChange("expectedParticipants", sanitizeIntegerInput(e.target.value).slice(0, 5))
-              }
-              style={{ color: "#171717" }}
-              className="no-spinner h-9.5 rounded-lg border-neutral-300 bg-white text-center !text-neutral-900 placeholder:text-neutral-400"
-              required
-            />
-            <FieldWarning name="expectedParticipants" />
-          </div>
+          {!includeReservation && (
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-neutral-800">
+                Number of Expected Participants{" "}
+                <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                name="expectedParticipants"
+                placeholder="0"
+                maxLength={5}
+                value={values.expectedParticipants}
+                onKeyDown={blockNonIntegerKeys}
+                onChange={(e) =>
+                  onChange("expectedParticipants", sanitizeIntegerInput(e.target.value).slice(0, 5))
+                }
+                style={{ color: "#171717" }}
+                className="no-spinner h-9.5 rounded-lg border-neutral-300 bg-white text-center !text-neutral-900 placeholder:text-neutral-400"
+                required
+              />
+              <FieldWarning name="expectedParticipants" />
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-neutral-800">
               Amount of Individual Contribution{" "}

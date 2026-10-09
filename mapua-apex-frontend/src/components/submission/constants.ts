@@ -115,11 +115,9 @@ export function createEmptyProponent(id: string): Proponent {
   }
 }
 
-// Default to 1 row with empty item name to show the "Item Name" placeholder.
-// Unit defaults to "pc" (pieces) and is free text so it can be changed to any
-// measuring unit (box, kg, set, …).
+// Default to 1 row with empty fields so users select from the item/unit dropdowns.
 export const DEFAULT_BUDGET_ITEMS: BudgetItem[] = [
-  { id: "1", item: "", unit: "pc", quantity: "1", pricePerUnit: "0" },
+  { id: "1", item: "", unit: "", quantity: "", pricePerUnit: "" },
 ]
 
 function filled(value: string | undefined): boolean {

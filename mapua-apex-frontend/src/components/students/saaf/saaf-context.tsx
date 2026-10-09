@@ -94,11 +94,12 @@ const SaafFormContext = createContext<SaafFormContextValue | null>(null)
  */
 function earnedStepFromDraft(
   draft: SaafDraft,
-  finalStep: WizardStepIndex
+  finalStep: WizardStepIndex,
+  includeReservation: boolean
 ): WizardStepIndex {
   let earned: WizardStepIndex = 0
   for (const index of [0, 1, 2, 3] as const) {
-    if (!isSaafStepComplete(index, draft)) break
+    if (!isSaafStepComplete(index, draft, includeReservation)) break
     earned = Math.min(index + 1, finalStep) as WizardStepIndex
   }
   return earned
@@ -148,7 +149,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   // does not, so on a reload or an edit-hydration the steps already satisfied by
   // the saved answers stay clickable instead of collapsing back to step 1.
   const farthestStep = Math.min(
-    Math.max(advancedStep, earnedStepFromDraft(draft, finalStep)),
+    Math.max(advancedStep, earnedStepFromDraft(draft, finalStep, includeReservation)),
     finalStep
   ) as WizardStepIndex
 
@@ -179,13 +180,15 @@ export function SaafProvider({ children }: { children: ReactNode }) {
 
   const currentStepComplete =
     step === 4
-      ? isReservationStepComplete(reservationDraft, draft.activityVenue)
-      : isSaafStepComplete(step as SaafStepIndex, draft)
+      ? isReservationStepComplete(reservationDraft, draft.activityVenue) &&
+        !form.stepError // The built-in html validity check sets this if time/participants are empty
+      : isSaafStepComplete(step as SaafStepIndex, draft, includeReservation)
 
   const formComplete =
-    isSaafDraftComplete(draft) &&
+    isSaafDraftComplete(draft, includeReservation) &&
     (!includeReservation ||
-      isReservationStepComplete(reservationDraft, draft.activityVenue))
+      (isReservationStepComplete(reservationDraft, draft.activityVenue) &&
+       !form.stepError))
 
   const canClear =
     step === 4 ? reservationHasUserInput(reservationDraft) : saafHasUserInput(draft)

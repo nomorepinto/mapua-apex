@@ -268,10 +268,17 @@ const STEP_PREFIXES: Record<SaafStepIndex, string[]> = {
 
 export function getSaafStepIssue(
   step: SaafStepIndex,
-  draft: SaafDraft
+  draft: SaafDraft,
+  includeReservation: boolean = false
 ): string | null {
   const warnings = saafFieldWarnings(draft)
-  const prefixes = STEP_PREFIXES[step]
+  let prefixes = STEP_PREFIXES[step]
+
+  // If these fields are moved to the reservation step, don't block step 2 on them.
+  if (step === 2 && includeReservation) {
+    prefixes = prefixes.filter((p) => p !== "timeOfEvent" && p !== "expectedParticipants")
+  }
+
   const messages = Object.entries(warnings)
     .filter(([key]) => prefixes.some((prefix) => key === prefix || key.startsWith(prefix)))
     .map(([, message]) => message)
@@ -279,12 +286,16 @@ export function getSaafStepIssue(
   return messages[0] ?? null
 }
 
-export function isSaafStepComplete(step: SaafStepIndex, draft: SaafDraft): boolean {
-  return getSaafStepIssue(step, draft) === null
+export function isSaafStepComplete(
+  step: SaafStepIndex,
+  draft: SaafDraft,
+  includeReservation: boolean = false
+): boolean {
+  return getSaafStepIssue(step, draft, includeReservation) === null
 }
 
-export function isSaafDraftComplete(draft: SaafDraft): boolean {
-  return ([0, 1, 2, 3] as const).every((step) => isSaafStepComplete(step, draft))
+export function isSaafDraftComplete(draft: SaafDraft, includeReservation: boolean = false): boolean {
+  return ([0, 1, 2, 3] as const).every((step) => isSaafStepComplete(step, draft, includeReservation))
 }
 
 const RESERVATION_EMPTY_MESSAGE =
@@ -364,3 +375,8 @@ export function isStepHtmlValid(panel: HTMLElement): boolean {
 
 export const STEP_INVALID_FOCUS_SELECTOR =
   'input:invalid:not([type="hidden"]), textarea:invalid, select:invalid, .saaf-glow-invalid'
+
+export function getMovedReservationFieldsIssue(draft: SaafDraft): string | null {
+  const warnings = saafFieldWarnings(draft)
+  return warnings.timeOfEvent || warnings.expectedParticipants || null
+}
