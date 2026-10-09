@@ -13,6 +13,35 @@ export interface Objective {
   description: string
 }
 
+export interface EquipmentItem {
+  name: string
+  purpose?: string
+  remark?: string
+}
+
+export interface RoomRequestedItem {
+  roomNeeded: string
+  classroomName?: string
+  remarks?: string
+  dateNeeded?: string
+  timeNeeded?: string
+}
+
+export interface AvEquipmentItem {
+  equipmentNeeded: string
+  remarks?: string
+  dateNeeded?: string
+  timeNeeded?: string
+}
+
+export interface ActivityBudgetItem {
+  item: string
+  unit: number | string
+  quantity: number
+  pricePerUnit: number
+  total: number
+}
+
 export interface Activity {
   id: string
   eventId: string
@@ -20,9 +49,13 @@ export interface Activity {
   title: string
   org: string
   department: string
+  /** Abbreviation/code of the lead proponent's department (e.g. "SOIT"; "—" when unavailable). */
+  departmentCode: string
   date: string
   time?: string
   submittedDate: string
+  /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
+  submittedAt: string
   representative: string
   decision: ActivityDecision
   type: string
@@ -34,6 +67,16 @@ export interface Activity {
   proposedBudget: string
   proponents: Proponent[]
   objectives: Objective[]
+  /** Equipment items requested in the venue reservation form. Empty array when no reservation or no equipment. */
+  equipmentRequested: EquipmentItem[]
+  /** Rooms requested in the venue reservation form */
+  roomsRequested?: RoomRequestedItem[]
+  /** Audio-visual equipment requested in the venue reservation form */
+  avEquipmentRequested?: AvEquipmentItem[]
+  /** Detailed budget proposal items */
+  budgetItems?: ActivityBudgetItem[]
+  /** Grand total of the detailed budget proposal */
+  budgetGrandTotal?: number
 }
 
 export type StatusVariant = "success" | "warning" | "error" | "outline"

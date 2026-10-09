@@ -6,7 +6,10 @@ use Illuminate\Support\Str;
 
 final class SignatoryRecords
 {
-    public function __construct(private DynamoDbItems $items) {}
+    public function __construct(
+        private DynamoDbItems $items,
+        private OrganizationRecords $organizations,
+    ) {}
 
     /**
      * @return list<array<string, mixed>>
@@ -49,6 +52,55 @@ final class SignatoryRecords
         }
 
         return $this->write($signatoryId, $name, $role, $department);
+    }
+
+    /**
+     * Permanently remove a signatory, refusing when the person still occupies an
+     * organization desk or has submissions waiting on their desk (GSI2 inbox).
+     */
+    public function delete(string $signatoryId): void
+    {
+        $id = DynamoKeys::strip($signatoryId, 'SIGNATORY#') ?? $signatoryId;
+        $key = DynamoKeys::signatory($id);
+
+        if ($this->items->get($key, $key) === null) {
+            abort(404);
+        }
+
+        if ($this->occupiesDesk($id)) {
+            abort(409, 'This signatory is still assigned to an organization desk and cannot be deleted.');
+        }
+
+        if ($this->hasOpenSubmissions($key)) {
+            abort(409, 'This signatory still has submissions awaiting review and cannot be deleted.');
+        }
+
+        $this->items->delete($key, $key);
+    }
+
+    private function occupiesDesk(string $signatoryId): bool
+    {
+        foreach ($this->organizations->list() as $organization) {
+            foreach ($this->organizations->desks($organization) as $desk) {
+                if ($desk['signatory_id'] === $signatoryId) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function hasOpenSubmissions(string $signatoryKey): bool
+    {
+        return $this->items->query([
+            'IndexName' => 'GSI2',
+            'KeyConditionExpression' => 'GSI2PK = :signatory',
+            'ExpressionAttributeValues' => [
+                ':signatory' => ['S' => $signatoryKey],
+            ],
+            'Limit' => 1,
+        ], allPages: false) !== [];
     }
 
     /**

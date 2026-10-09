@@ -77,6 +77,11 @@ export function EditOrganizationDialog() {
                 key={item.value}
                 label={item.label}
                 onValueChange={(value) => actions.changeEditDesk(item.value, value)}
+                optionalLabel={
+                  item.value === "dean" && state.editIsHigherCouncil
+                    ? "Not required — higher councils skip the dean desk."
+                    : undefined
+                }
                 placeholder={`Search ${item.label.toLowerCase()}`}
                 value={state.editDesks[item.value]}
               />
@@ -93,8 +98,22 @@ export function EditOrganizationDialog() {
                 <AlertDescription>{state.editError}</AlertDescription>
               </Alert>
             ) : null}
+            {state.deleteError ? (
+              <Alert variant="error">
+                <CircleAlertIcon />
+                <AlertTitle>Could not delete</AlertTitle>
+                <AlertDescription>{state.deleteError}</AlertDescription>
+              </Alert>
+            ) : null}
           </DialogPanel>
           <DialogFooter>
+            <Button
+              onClick={actions.openDelete}
+              type="button"
+              variant="destructive-outline"
+            >
+              Delete
+            </Button>
             <DialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
             </DialogClose>

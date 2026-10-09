@@ -7,6 +7,7 @@ use App\Aws\DynamoDb\DenySubmission;
 use App\Aws\DynamoDb\DynamoDbItems;
 use App\Aws\DynamoDb\DynamoKeys;
 use App\Aws\DynamoDb\GetSubmission;
+use App\Aws\DynamoDb\ListSignatoryHistory;
 use App\Aws\DynamoDb\ListSignatoryQueue;
 use App\Aws\DynamoDb\ReturnSubmission;
 use App\Aws\DynamoDb\SignatoryChainResolver;
@@ -24,13 +25,41 @@ class SubmissionController extends Controller
         return SubmissionResource::collection($queue->handle(CognitoIdentity::signatoryId($request)));
     }
 
-    public function show(Request $request, string $event, string $submission, GetSubmission $submissions, SignatoryChainResolver $chain): SubmissionResource
+    public function history(Request $request, ListSignatoryHistory $history): AnonymousResourceCollection
     {
-        $item = $submissions->require($event, $submission);
-        $signatory = CognitoIdentity::signatoryId($request);
+        return SubmissionResource::collection($history->handle(CognitoIdentity::signatoryId($request)));
+    }
 
-        if (($item['current_signatory'] ?? null) !== 'SIGNATORY#'.$signatory) {
-            abort(404);
+    public function show(
+        Request $request,
+        string $event,
+        string $submission,
+        GetSubmission $submissions,
+        SignatoryChainResolver $chain,
+        ListSignatoryHistory $historyService,
+    ): SubmissionResource {
+        $item = $submissions->require($event, $submission);
+        $signatoryId = CognitoIdentity::signatoryId($request);
+        $signatoryKey = DynamoKeys::signatory($signatoryId);
+
+        $isOnDesk = ($item['current_signatory'] ?? null) === $signatoryKey;
+        $inSequence = in_array($signatoryKey, (array) ($item['signatory_sequence'] ?? []), true);
+
+        if (! $isOnDesk && ! $inSequence) {
+            $hist = $historyService->handle($signatoryId);
+            $eventKey = DynamoKeys::event($event);
+            $subKey = DynamoKeys::submission($submission);
+            $foundInHistory = false;
+            foreach ($hist as $h) {
+                if (($h['PK'] ?? null) === $eventKey && ($h['SK'] ?? null) === $subKey) {
+                    $foundInHistory = true;
+                    break;
+                }
+            }
+
+            if (! $foundInHistory) {
+                abort(404);
+            }
         }
 
         $item['signatory_chain'] = $chain->handle($item);

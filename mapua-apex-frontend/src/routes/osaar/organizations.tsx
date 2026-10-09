@@ -1,4 +1,5 @@
 import { AddOrganizationCard } from "@/components/admin/organizations/add-organization-card"
+import { DeleteOrganizationDialog } from "@/components/admin/organizations/delete-organization-dialog"
 import { EditOrganizationDialog } from "@/components/admin/organizations/edit-organization-dialog"
 import { OrganizationsLoadAlert } from "@/components/admin/organizations/organizations-load-alert"
 import { OrganizationsProvider } from "@/components/admin/organizations/organizations-context"
@@ -13,7 +14,7 @@ export function AdminOrganizationsPage() {
       <div className={layout.page}>
         <div className={cn(layout.container, layout.stack)}>
           <FormPageHeader
-            subtitle="Assign a dean and adviser to each organization. Admin, CDM, and OSAAR are shared accounts used by every organization."
+            subtitle="Assign a dean and adviser to each organization. Higher councils skip the dean — an adviser is enough. Admin, CDM, and OSAAR are shared accounts used by every organization."
             title="Organizations"
           />
           <OrganizationsLoadAlert />
@@ -28,6 +29,7 @@ export function AdminOrganizationsPage() {
           </div>
         </div>
         <EditOrganizationDialog />
+        <DeleteOrganizationDialog />
       </div>
     </OrganizationsProvider>
   )

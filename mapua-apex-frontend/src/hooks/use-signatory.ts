@@ -6,6 +6,7 @@ import { SUBMISSION_KEYS } from "@/hooks/use-submissions"
 export const SIGNATORY_KEYS = {
   me: ["signatory-me"] as const,
   queue: ["signatory-queue"] as const,
+  history: ["signatory-history"] as const,
   detail: (eventId: string, submissionId: string) =>
     ["signatory-submission-detail", eventId, submissionId] as const,
 }
@@ -31,6 +32,22 @@ export function useSignatoryQueueQuery() {
     queryKey: SIGNATORY_KEYS.queue,
     queryFn: async () => {
       const res = await apiClient.get<{ data: ApiSubmission[] }>("/signatories/submissions")
+      return res.data || []
+    },
+  })
+}
+
+/**
+ * Fetch all submissions that have passed through this signatory's desk
+ * (approved, denied — no longer on the active queue).
+ */
+export function useSignatoryHistoryQuery() {
+  return useQuery({
+    queryKey: SIGNATORY_KEYS.history,
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: ApiSubmission[] }>(
+        "/signatories/submissions/history"
+      )
       return res.data || []
     },
   })
@@ -74,6 +91,7 @@ export function useApproveSubmissionMutation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.queue })
+      queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.history })
       queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
       queryClient.invalidateQueries({ queryKey: ["submission-notifications"] })
     },
@@ -108,6 +126,7 @@ export function useReturnSubmissionMutation() {
     mutationFn: commentMutation("return"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.queue })
+      queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.history })
       queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
       queryClient.invalidateQueries({ queryKey: ["submission-notifications"] })
     },
@@ -124,6 +143,7 @@ export function useDenySubmissionMutation() {
     mutationFn: commentMutation("deny"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.queue })
+      queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.history })
       queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
       queryClient.invalidateQueries({ queryKey: ["submission-notifications"] })
     },

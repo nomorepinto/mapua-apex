@@ -43,6 +43,7 @@ export type AppSidebarItem = {
 export type AppSidebarPanelSwitch = {
   label: string
   to: string
+  icon?: LucideIcon
 }
 
 function navClassName({ isActive }: { isActive: boolean }) {
@@ -108,12 +109,19 @@ function SidebarNav({
   onNavigate,
   onSignOut,
   panelSwitch,
+  panelSwitches,
 }: {
   items: AppSidebarItem[]
   onNavigate?: () => void
   onSignOut: () => void
   panelSwitch?: AppSidebarPanelSwitch
+  panelSwitches?: AppSidebarPanelSwitch[]
 }) {
+  const allSwitches = [
+    ...(panelSwitches ?? []),
+    ...(panelSwitch ? [panelSwitch] : []),
+  ]
+
   return (
     <nav className="space-y-1.5 pt-2">
       {items.map((item) => (
@@ -138,15 +146,23 @@ function SidebarNav({
         </NavLink>
       ))}
 
-      {panelSwitch ? (
-        <Link
-          to={panelSwitch.to}
-          onClick={onNavigate}
-          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-medium text-white/90 transition-all hover:bg-neutral-200/20 hover:text-white"
-        >
-          <ArrowRightLeftIcon className="h-4.5 w-4.5 shrink-0 text-white/80" />
-          <span>{panelSwitch.label}</span>
-        </Link>
+      {allSwitches.length > 0 ? (
+        <div className="border-t border-red-900/60 pt-2 space-y-1">
+          {allSwitches.map((sw) => {
+            const Icon = sw.icon ?? ArrowRightLeftIcon
+            return (
+              <Link
+                key={sw.to}
+                to={sw.to}
+                onClick={onNavigate}
+                className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left text-sm font-medium text-white/90 transition-all hover:bg-neutral-200/20 hover:text-white"
+              >
+                <Icon className="h-4.5 w-4.5 shrink-0 text-white/80" />
+                <span>{sw.label}</span>
+              </Link>
+            )
+          })}
+        </div>
       ) : null}
 
       <button
@@ -204,6 +220,7 @@ function SidebarPanel({
   onSignOut,
   onClose,
   panelSwitch,
+  panelSwitches,
   from = "side",
 }: {
   homeTo: string
@@ -215,6 +232,7 @@ function SidebarPanel({
   onSignOut: () => void
   onClose?: () => void
   panelSwitch?: AppSidebarPanelSwitch
+  panelSwitches?: AppSidebarPanelSwitch[]
   from?: "side" | "top"
 }) {
   const isTop = from === "top"
@@ -261,6 +279,7 @@ function SidebarPanel({
           onNavigate={onNavigate}
           onSignOut={onSignOut}
           panelSwitch={panelSwitch}
+          panelSwitches={panelSwitches}
         />
       </div>
       <div className={isTop ? "mt-4" : undefined}>
@@ -280,11 +299,13 @@ export function AppSidebar({
   items,
   switchPanelTo,
   switchPanelLabel,
+  panelSwitches,
 }: {
   homeTo: string
   items: AppSidebarItem[]
   switchPanelTo?: string
   switchPanelLabel?: string
+  panelSwitches?: AppSidebarPanelSwitch[]
 }) {
   const auth = useAuth()
   const profile = auth.user?.profile
@@ -302,16 +323,16 @@ export function AppSidebar({
       ? userGroups.map((g) => g.replace(/_/g, " ")).join(", ")
       : "No role assigned"
 
-  // OSAAR and admin staff can access both the admin and signatory panels but
-  // are unlikely to edit the URL by hand, so surface a one-click switch for them.
-  const isPanelSwitcher = userGroups.some((g) => {
-    const group = g.toLowerCase()
-    return group === "osaar" || group === "admin"
-  })
-  const panelSwitch =
-    isPanelSwitcher && switchPanelTo
-      ? { to: switchPanelTo, label: switchPanelLabel ?? "Switch Panel" }
-      : undefined
+  // Panel switches are strictly visible only to admin users
+  const isAdmin = userGroups.some((g) => g.toLowerCase() === "admin")
+  const activePanelSwitches = isAdmin
+    ? [
+        ...(panelSwitches ?? []),
+        ...(switchPanelTo
+          ? [{ to: switchPanelTo, label: switchPanelLabel ?? "Switch Panel" }]
+          : []),
+      ]
+    : undefined
 
   const handleSignOut = useSignOut()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -334,7 +355,7 @@ export function AppSidebar({
     items,
     name,
     displayRole,
-    panelSwitch,
+    panelSwitches: activePanelSwitches,
     onSignOut: requestSignOut,
   }
 

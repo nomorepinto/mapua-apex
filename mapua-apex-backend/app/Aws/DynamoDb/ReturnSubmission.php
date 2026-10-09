@@ -20,8 +20,6 @@ final class ReturnSubmission
         $submission = $this->submissions->require($eventId, $submissionId);
         SignatoryDesk::requireOpen($submission, $signatoryId);
 
-        $this->notifications->create($submissionId, $signatoryId, 'returned', $comment);
-
         $this->items->patch(
             DynamoKeys::event($eventId),
             DynamoKeys::submission($submissionId),
@@ -29,6 +27,8 @@ final class ReturnSubmission
         );
 
         $submission['status'] = 'returned';
+
+        $this->notifications->create($submissionId, $signatoryId, 'returned', $comment, submission: $submission);
 
         return $submission;
     }

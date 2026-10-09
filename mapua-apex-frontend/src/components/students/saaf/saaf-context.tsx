@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
+  useCallback,
   useRef,
   useState,
   type MouseEvent,
@@ -13,7 +14,10 @@ import {
   reservationHasUserInput,
   withReservationDefaults,
 } from "@/components/reservation/constants"
-import { saafHasUserInput } from "@/components/submission/constants"
+import {
+  getClearedFieldsForSaafStep,
+  saafStepHasUserInput,
+} from "@/components/submission/constants"
 import type {
   SaafStepIndex,
   WizardStepIndex,
@@ -23,6 +27,8 @@ import {
   isReservationStepComplete,
   isSaafDraftComplete,
   isSaafStepComplete,
+  STEP_PREFIXES_WITH_RESERVATION,
+  STEP_PREFIXES_NO_RESERVATION,
 } from "@/components/submission/validate-saaf-step"
 import { useSaafForm } from "@/hooks/use-saaf-form"
 import { useOrgStore } from "@/stores/org-store"
@@ -36,6 +42,7 @@ interface SaafFormState {
   finalStep: WizardStepIndex
   includeReservation: boolean
   showErrors: boolean
+  touched: Record<string, boolean>
   stepError: string | null
   submitError: string | null
   isSubmitting: boolean
@@ -53,6 +60,7 @@ interface SaafFormActions {
   goToStep: (next: WizardStepIndex) => void
   goNext: () => void
   goBack: () => void
+  markTouched: (key: string) => void
   updateField: SaafFormModel["updateField"]
   handleUpdateProponent: SaafFormModel["handleUpdateProponent"]
   handleRemoveProponent: SaafFormModel["handleRemoveProponent"]
@@ -84,18 +92,28 @@ export interface SaafFormContextValue {
 
 const SaafFormContext = createContext<SaafFormContextValue | null>(null)
 
-/**
- * Highest wizard step the saved answers already unlock: the first incomplete
- * SAAF step caps progress, so a restored draft re-earns every step it satisfies
- * instead of leaving the user stranded on step 1.
- */
 function earnedStepFromDraft(
   draft: SaafDraft,
-  finalStep: WizardStepIndex
+  finalStep: WizardStepIndex,
+  includeReservation: boolean,
+  reservationDraft: any
 ): WizardStepIndex {
   let earned: WizardStepIndex = 0
-  for (const index of [0, 1, 2, 3] as const) {
-    if (!isSaafStepComplete(index, draft)) break
+  const stepsToCheck = includeReservation
+    ? ([0, 1, 2, 3, 4] as const)
+    : ([0, 1, 2, 3] as const)
+
+  for (const index of stepsToCheck) {
+    if (includeReservation && index === 2) {
+      if (!isReservationStepComplete(reservationDraft, draft.activityVenue) ||
+        !isSaafStepComplete(2, draft, true)) {
+        break
+      }
+    } else {
+      if (!isSaafStepComplete(index as SaafStepIndex, draft, includeReservation)) {
+        break
+      }
+    }
     earned = Math.min(index + 1, finalStep) as WizardStepIndex
   }
   return earned
@@ -115,29 +133,25 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   const form = useSaafForm()
   const { draft } = form
   const [requestedStep, setStep] = useState<WizardStepIndex>(0)
-  // Highest step reached by clicking Continue. Saved answers unlock steps on
-  // their own (see `farthestStep` below), so the wizard allows whichever of the
-  // two reaches further.
   const [advancedStep, setAdvancedStep] = useState<WizardStepIndex>(0)
 
-  // The reservation step is present only when the start page chose to reserve
-  // facilities. Its draft lives in the same store so the wizard (the parent of
-  // ReservationProvider) can gate advancement/submission on it.
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const markTouched = useCallback((key: string) => {
+    setTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }))
+  }, [])
+
   const includeReservation = form.reserveFacilities === "yes"
   const finalStep: WizardStepIndex = includeReservation ? 4 : 3
   const storedReservationDraft = useOrgStore((state) => state.reservationDraft)
   const reservationDraft = withReservationDefaults(storedReservationDraft)
 
-  // Step 5 vanishes whenever `reserveFacilities` resets — notably when the store
-  // is cleared right after a successful submit — so the position is clamped to
-  // the steps that still exist instead of pointing past the end of the list.
   const step = Math.min(requestedStep, finalStep) as WizardStepIndex
 
-  // The drafts persist in the org store (sessionStorage) but the wizard position
-  // does not, so on a reload or an edit-hydration the steps already satisfied by
-  // the saved answers stay clickable instead of collapsing back to step 1.
   const farthestStep = Math.min(
-    Math.max(advancedStep, earnedStepFromDraft(draft, finalStep)),
+    Math.max(
+      advancedStep,
+      earnedStepFromDraft(draft, finalStep, includeReservation, reservationDraft)
+    ),
     finalStep
   ) as WizardStepIndex
 
@@ -166,18 +180,24 @@ export function SaafProvider({ children }: { children: ReactNode }) {
     goToStep((step - 1) as WizardStepIndex)
   }
 
+  // Step 2 is Reservation when includeReservation is true
   const currentStepComplete =
-    step === 4
-      ? isReservationStepComplete(reservationDraft, draft.activityVenue)
-      : isSaafStepComplete(step as SaafStepIndex, draft)
+    includeReservation && step === 2
+      ? isReservationStepComplete(reservationDraft, draft.activityVenue) &&
+      isSaafStepComplete(2, draft, true) &&
+      !form.stepError
+      : isSaafStepComplete(step as SaafStepIndex, draft, includeReservation)
 
   const formComplete =
-    isSaafDraftComplete(draft) &&
+    isSaafDraftComplete(draft, includeReservation) &&
     (!includeReservation ||
-      isReservationStepComplete(reservationDraft, draft.activityVenue))
+      (isReservationStepComplete(reservationDraft, draft.activityVenue) &&
+        !form.stepError))
 
   const canClear =
-    step === 4 ? reservationHasUserInput(reservationDraft) : saafHasUserInput(draft)
+    includeReservation && step === 2
+      ? reservationHasUserInput(reservationDraft) || saafStepHasUserInput(2 as SaafStepIndex, draft)
+      : saafStepHasUserInput(step as SaafStepIndex, draft)
 
   const value: SaafFormContextValue = {
     state: {
@@ -187,6 +207,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       finalStep,
       includeReservation,
       showErrors: form.showErrors,
+      touched,
       stepError: form.stepError,
       submitError: form.submitError,
       isSubmitting: form.isSubmitting,
@@ -203,7 +224,13 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       goToStep,
       goNext,
       goBack,
-      updateField: form.updateField,
+      markTouched,
+      updateField: <K extends keyof SaafDraft>(key: K, value: SaafDraft[K]) => {
+        form.updateField(key, value)
+        if (typeof key === "string" && key.startsWith("timeOfEvent")) {
+          markTouched("timeOfEvent")
+        }
+      },
       handleUpdateProponent: form.handleUpdateProponent,
       handleRemoveProponent: form.handleRemoveProponent,
       handleAddProponent: form.handleAddProponent,
@@ -214,15 +241,28 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       openClear: () => form.setShowConfirmClearModal(true),
       closeClear: () => form.setShowConfirmClearModal(false),
       confirmClear: () => {
-        if (step === 4) {
-          // On the reservation step, Clear only wipes the reservation draft and
-          // stays put; the SAAF answers captured earlier are preserved.
+        if (includeReservation && step === 2) {
           useOrgStore.getState().clearReservationDraft()
-        } else {
-          form.handleClearForm()
-          setStep(0)
-          setAdvancedStep(0)
         }
+        const cleared = getClearedFieldsForSaafStep(step as SaafStepIndex)
+        useOrgStore.getState().patchSaafDraft(cleared)
+        setAdvancedStep((prev) => Math.min(prev, step) as WizardStepIndex)
+
+        setTouched((prev) => {
+          const map = includeReservation
+            ? STEP_PREFIXES_WITH_RESERVATION
+            : STEP_PREFIXES_NO_RESERVATION
+          const prefixes = map[step as SaafStepIndex] || []
+          const next = { ...prev }
+          for (const key of Object.keys(next)) {
+            if (prefixes.some((p) => key === p || key.startsWith(p))) {
+              delete next[key]
+            }
+          }
+          return next
+        })
+        form.setStepError(null)
+        form.setShowErrors(false)
         form.setShowConfirmClearModal(false)
       },
       closeConfirm: () => form.setShowConfirmModal(false),

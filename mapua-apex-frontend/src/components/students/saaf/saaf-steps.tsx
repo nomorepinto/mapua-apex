@@ -16,6 +16,7 @@ import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
 import { brand } from "@/config"
 import { cn } from "@/lib/utils"
 
+// STEP 1: Classification (Index 0)
 export function SaafClassificationStep() {
   const { state, actions } = useSaafFormContext()
   const { draft } = state
@@ -34,6 +35,7 @@ export function SaafClassificationStep() {
   )
 }
 
+// STEP 2: People (Index 1)
 export function SaafPeopleStep() {
   const { state, actions } = useSaafFormContext()
   const { draft } = state
@@ -56,21 +58,41 @@ export function SaafPeopleStep() {
   )
 }
 
-export function SaafActivityStep() {
-  const { state, actions } = useSaafFormContext()
+// STEP 3: Reservation (Index 2 when includeReservation is true)
+export function SaafReservationStep() {
+  const { state } = useSaafFormContext()
+  if (!state.includeReservation) return null
 
   return (
     <SaafStepPanel index={2}>
-      <ActivityDetailsSection values={state.draft} onChange={actions.updateField} />
+      <ReservationFields />
     </SaafStepPanel>
   )
 }
 
-export function SaafAlignmentStep() {
+// STEP 4: Activity (Index 3 with reservation, Index 2 without)
+export function SaafActivityStep() {
   const { state, actions } = useSaafFormContext()
+  const stepIndex = state.includeReservation ? 3 : 2
 
   return (
-    <SaafStepPanel index={3}>
+    <SaafStepPanel index={stepIndex}>
+      <ActivityDetailsSection
+        values={state.draft}
+        onChange={actions.updateField}
+        includeReservation={state.includeReservation}
+      />
+    </SaafStepPanel>
+  )
+}
+
+// STEP 5: Alignment & Budget (Index 4 with reservation, Index 3 without)
+export function SaafAlignmentStep() {
+  const { state, actions } = useSaafFormContext()
+  const stepIndex = state.includeReservation ? 4 : 3
+
+  return (
+    <SaafStepPanel index={stepIndex}>
       <InstitutionalAlignmentSection
         values={state.draft}
         onChange={actions.updateField}
@@ -82,17 +104,6 @@ export function SaafAlignmentStep() {
         onRemove={actions.handleRemoveBudgetItem}
         onAdd={actions.handleAddBudgetItem}
       />
-    </SaafStepPanel>
-  )
-}
-
-export function SaafReservationStep() {
-  const { state } = useSaafFormContext()
-  if (!state.includeReservation) return null
-
-  return (
-    <SaafStepPanel index={4}>
-      <ReservationFields />
     </SaafStepPanel>
   )
 }
@@ -158,11 +169,8 @@ function SaafContinueActions() {
       <button
         type="button"
         onClick={actions.goNext}
-        aria-disabled={!state.currentStepComplete}
-        className={cn(
-          brand.action,
-          !state.currentStepComplete && "cursor-not-allowed opacity-40"
-        )}
+        disabled={!state.currentStepComplete}
+        className={brand.action}
       >
         Continue
       </button>
@@ -175,8 +183,6 @@ function SaafReviewActions() {
   const { actions: reservationActions } = useReservationFormContext()
   if (state.step !== state.finalStep) return null
 
-  // On the reservation step the full-proposal PDF (SAAF + reservation) is the
-  // meaningful export; otherwise the SAAF-only variant is used.
   const onSavePdf = state.includeReservation
     ? reservationActions.handleSavePdf
     : actions.savePdf
@@ -187,13 +193,14 @@ function SaafReviewActions() {
         <button type="button" onClick={actions.goBack} className={brand.actionGhost}>
           Back
         </button>
-        <SaafClearButton />
       </div>
       <SubmissionActions
         isSubmitting={state.isSubmitting}
         inactive={!state.formComplete}
         onSavePdf={onSavePdf}
         onSubmit={actions.initiateSubmit}
+        onClear={actions.openClear}
+        canClear={state.canClear}
       />
     </div>
   )

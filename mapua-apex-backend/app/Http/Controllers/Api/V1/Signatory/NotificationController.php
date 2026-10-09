@@ -31,6 +31,7 @@ class NotificationController extends Controller
             $signatoryId,
             (string) $request->validated('notif_type'),
             $request->comment(),
+            submission: $paper,
         );
 
         return (new NotificationResource($item))->response()->setStatusCode(201);

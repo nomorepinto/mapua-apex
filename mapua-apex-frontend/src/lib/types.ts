@@ -76,13 +76,14 @@ export interface MissionStatements {
 export interface InstitutionalAlignment {
   mission_statements: MissionStatements
   core_values_explanation: string
-  peo_explanation: string
+  peo_explanation?: string | null
   sdg_explanation: string
 }
 
 export interface BudgetItem {
   item_no: string
-  unit: number
+  /** Free-text measuring unit ("pc", "box", …); legacy rows stored a number. */
+  unit: number | string
   quantity: number
   price_per_unit: number
   total: number

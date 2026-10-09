@@ -35,6 +35,14 @@ export const AV_EQUIPMENT_OPTIONS: string[] = [
 export const TABLE_INPUT_CLASS =
   "w-full text-center bg-transparent py-1 px-2 !text-neutral-900 focus:outline-none focus:bg-white rounded border border-transparent focus:border-neutral-300 placeholder:text-neutral-400"
 
+/**
+ * Sentinel dropdown value that adds an open-ended row. Unlike the fixed catalog
+ * entries (which render as static labels), an "Others" row exposes a free-text
+ * input so the proponent can name a custom item, room, or piece of equipment.
+ * It stays selectable after use so several custom rows can be added.
+ */
+export const OTHER_OPTION = "Others"
+
 export const ADD_BUTTON_CLASS =
   "flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white/40 py-3 text-sm font-medium text-neutral-700 shadow-xs transition-all hover:border-neutral-400 hover:bg-neutral-100/50"
 

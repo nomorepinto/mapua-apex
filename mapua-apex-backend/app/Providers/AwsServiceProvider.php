@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use App\Aws\AwsClientFactory;
 use App\Aws\DynamoDb\DynamoDbItems;
+use App\Support\Email\EmailSender;
+use App\Support\Email\SesEmailSender;
+use Aws\CognitoIdentityProvider\CognitoIdentityProviderClient;
 use Aws\DynamoDb\DynamoDbClient;
 use Aws\S3\S3Client;
 use Aws\Ses\SesClient;
@@ -35,6 +38,14 @@ class AwsServiceProvider extends ServiceProvider
 
         $this->app->singleton(SesClient::class, function (Application $app): SesClient {
             return new SesClient($app->make(AwsClientFactory::class)->clientOptions('ses'));
+        });
+
+        $this->app->singleton(CognitoIdentityProviderClient::class, function (Application $app): CognitoIdentityProviderClient {
+            return new CognitoIdentityProviderClient($app->make(AwsClientFactory::class)->clientOptions('cognito'));
+        });
+
+        $this->app->singleton(EmailSender::class, function (Application $app): EmailSender {
+            return new SesEmailSender($app->make(SesClient::class));
         });
     }
 }

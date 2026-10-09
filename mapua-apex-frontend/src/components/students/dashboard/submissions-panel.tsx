@@ -1,6 +1,9 @@
 import { Link } from "react-router"
 
 import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
+import { SubmissionsFilterHeader } from "@/components/students/dashboard/submissions-filter-header"
+import { SubmissionsSortHeader } from "@/components/students/dashboard/submissions-sort-header"
+import { CollabBadge } from "@/components/students/dashboard/collab-badge"
 import {
   Table,
   TableBody,
@@ -9,7 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { formatDocumentId } from "@/lib/dynamodb-adapters"
+import { Input } from "@/components/ui/input"
+import { formatDocumentId, type DashboardSubmissionRow } from "@/lib/dynamodb-adapters"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -43,42 +47,108 @@ function natureBadgeClass(nature: string | undefined, status: string) {
   return statusTextColor(status)
 }
 
+/** Pill combining the submission status with its major/minor nature. */
+function StatusBadge({ sub }: { sub: DashboardSubmissionRow }) {
+  return (
+    <span
+      className={`rounded-md px-2.5 py-1 text-xs font-bold ${natureBadgeClass(sub.nature, sub.status)}`}
+    >
+      {sub.nature
+        ? `${sub.status} (${sub.nature.charAt(0).toUpperCase() + sub.nature.slice(1)})`
+        : sub.status}
+    </span>
+  )
+}
+
 export function SubmissionsPanel() {
   const { state, actions } = useStudentDashboard()
 
   return (
     <div className={cn(layout.section, "overflow-hidden")}>
-      <div className="mb-5">
-        <h2 className="text-lg font-bold text-[#1E293B] sm:text-xl">
-          Project Status & Submissions
-        </h2>
-        <p className="text-xs text-neutral-600">
-          Track current signatory routing and approval statuses
-        </p>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-[#1E293B] sm:text-xl">
+            Project Status & Submissions
+          </h2>
+          <p className="text-xs text-neutral-600">
+            Track current signatory routing and approval statuses
+          </p>
+        </div>
+        <Input
+          aria-label="Search submissions"
+          className="w-full min-w-0 sm:w-64"
+          onChange={(event) => actions.setSearch(event.currentTarget.value)}
+          placeholder="Search all columns"
+          type="search"
+          value={state.search}
+        />
       </div>
 
       <div className={layout.tableWrap}>
-        <Table className="w-full text-left">
+        <Table className={cn(layout.table, "min-w-0 sm:min-w-[36rem] text-left")}>
           <TableHeader>
             <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-600 uppercase">
               <TableHead className="pr-4 pb-3 font-bold">DOCUMENT ID</TableHead>
-              <TableHead className="pr-6 pb-3 font-bold">EVENT TITLE</TableHead>
-              <TableHead className="pr-4 pb-3 font-bold">
-                CLASSIFICATION
-              </TableHead>
-              <TableHead className="pr-4 pb-3 font-bold">
-                CURRENT SIGNATORY
-              </TableHead>
-              <TableHead className="pb-3 text-right font-bold">
-                STATUS
-              </TableHead>
+              <SubmissionsFilterHeader
+                label="Event Title"
+                column="collab"
+                className="pr-6"
+                options={state.filterOptions.collab}
+                selected={state.columnFilters.collab}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+              />
+              <SubmissionsFilterHeader
+                label="Venue"
+                column="venue"
+                options={state.filterOptions.venue}
+                selected={state.columnFilters.venue}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                className="hidden pr-4 sm:table-cell"
+              />
+              <SubmissionsFilterHeader
+                label="Classification"
+                column="classification"
+                options={state.filterOptions.classification}
+                selected={state.columnFilters.classification}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                capitalize
+                className="hidden pr-4 sm:table-cell"
+              />
+              <SubmissionsSortHeader
+                label="Date Applied"
+                direction={state.dateSortDirection}
+                onSort={actions.toggleDateSort}
+                className="hidden pr-4 sm:table-cell"
+              />
+              <SubmissionsFilterHeader
+                label="Current Signatory"
+                column="signatory"
+                options={state.filterOptions.signatory}
+                selected={state.columnFilters.signatory}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                className="hidden pr-4 sm:table-cell"
+              />
+              <SubmissionsFilterHeader
+                label="Status"
+                column="status"
+                options={state.filterOptions.status}
+                selected={state.columnFilters.status}
+                onToggle={actions.toggleColumnFilter}
+                onClear={actions.clearColumnFilter}
+                align="right"
+                className="hidden pl-2 text-right sm:table-cell"
+              />
             </TableRow>
           </TableHeader>
           <TableBody className="divide-y divide-neutral-50">
             {state.submissionsLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={7}
                   className="py-12 text-center text-sm font-semibold text-neutral-600"
                 >
                   Loading submissions…
@@ -87,7 +157,7 @@ export function SubmissionsPanel() {
             ) : state.submissionsError ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={7}
                   className="py-12 text-center text-sm font-semibold text-rose-600"
                 >
                   Could not load submissions.
@@ -95,7 +165,7 @@ export function SubmissionsPanel() {
               </TableRow>
             ) : state.submissions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center">
+                <TableCell colSpan={7} className="py-12 text-center">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <p className="text-sm font-bold text-[#1E293B]">
                       No submissions yet
@@ -113,8 +183,19 @@ export function SubmissionsPanel() {
                   </div>
                 </TableCell>
               </TableRow>
+            ) : state.filteredSubmissions.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={7}
+                  className="py-12 text-center text-sm font-semibold text-neutral-600"
+                >
+                  {state.search.trim()
+                    ? `No submissions match “${state.search.trim()}”.`
+                    : "No submissions match the selected column filters."}
+                </TableCell>
+              </TableRow>
             ) : (
-              state.submissions.map((sub) => (
+              state.filteredSubmissions.map((sub) => (
                 <TableRow
                   key={`${sub.event_id}:${sub.submission_id}`}
                   className="group cursor-pointer transition-colors hover:bg-neutral-50/80"
@@ -136,28 +217,31 @@ export function SubmissionsPanel() {
                   >
                     {formatDocumentId(sub.submission_id)}
                   </TableCell>
-                  <TableCell className="py-3.5 pr-6 text-xs font-semibold text-[#1E293B]">
+                  <TableCell className="py-3.5 pr-6 text-xs font-semibold break-words text-[#1E293B]">
                     {sub.activity_details.title}
-                    {sub.requires_venue ? (
-                      <span className="ml-2 text-[10px] font-normal text-[#3B82F6]">
-                        ({sub.activity_details.venue})
-                      </span>
+                    {sub.is_collaboration ? (
+                      <CollabBadge role={sub.role ?? "proponent"} />
                     ) : null}
+                    {/* Mobile: the STATUS column is hidden, so the badge rides
+                        under the title instead of forcing a horizontal scroll. */}
+                    <span className="mt-1 block w-fit sm:hidden">
+                      <StatusBadge sub={sub} />
+                    </span>
                   </TableCell>
-                  <TableCell className="py-3.5 pr-4 text-xs text-[#64748B] capitalize">
+                  <TableCell className="hidden py-3.5 pr-4 text-xs text-[#64748B] sm:table-cell">
+                    {sub.activity_details.venue || "—"}
+                  </TableCell>
+                  <TableCell className="hidden py-3.5 pr-4 text-xs text-[#64748B] capitalize sm:table-cell">
                     {sub.activity_classification}
                   </TableCell>
-                  <TableCell className="py-3.5 pr-4 text-xs font-medium text-[#475569]">
+                  <TableCell className="hidden py-3.5 pr-4 text-xs whitespace-nowrap text-[#64748B] sm:table-cell">
+                    {sub.submitted_date}
+                  </TableCell>
+                  <TableCell className="hidden py-3.5 pr-4 text-xs font-medium text-[#475569] sm:table-cell">
                     {sub.current_signatory}
                   </TableCell>
-                  <TableCell className="py-3.5 text-right whitespace-nowrap">
-                    <span
-                      className={`rounded-md px-2.5 py-1 text-xs font-bold ${natureBadgeClass(sub.nature, sub.status)}`}
-                    >
-                      {sub.nature
-                        ? `${sub.status} (${sub.nature.charAt(0).toUpperCase() + sub.nature.slice(1)})`
-                        : sub.status}
-                    </span>
+                  <TableCell className="hidden py-3.5 text-right whitespace-nowrap sm:table-cell">
+                    <StatusBadge sub={sub} />
                   </TableCell>
                 </TableRow>
               ))

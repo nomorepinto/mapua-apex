@@ -233,7 +233,8 @@ function parseCsvBoolean(value: string): boolean | null {
 /**
  * Parse an organization CSV.
  * Columns: name, dean, adviser, is_higher_council. A header row is optional.
- * Shared admin / CDM / OSAAR desks are not in the file.
+ * The dean column may be left empty for higher-council rows (they skip the
+ * dean desk). Shared admin / CDM / OSAAR desks are not in the file.
  */
 export function parseOrganizationCsv(text: string): {
   rows: OrganizationCsvRow[]
@@ -288,16 +289,24 @@ export function parseOrganizationCsv(text: string): {
       continue
     }
 
-    const missing = ORGANIZATION_CSV_COLUMNS.filter((role) => !desks[role])
-    if (!name || missing.length > 0) {
-      errors.push(`Row ${line}: expected name, dean, and adviser.`)
-      continue
-    }
-
     const isHigherCouncil = parseCsvBoolean(flagRaw)
     if (isHigherCouncil === null) {
       errors.push(
         `Row ${line}: is_higher_council must be true, false, yes, no, 1, or 0.`
+      )
+      continue
+    }
+
+    // Higher councils skip the dean desk, so their dean column may be empty.
+    const required = ORGANIZATION_CSV_COLUMNS.filter(
+      (role) => role !== "dean" || !isHigherCouncil
+    )
+    const missing = required.filter((role) => !desks[role])
+    if (!name || missing.length > 0) {
+      errors.push(
+        isHigherCouncil
+          ? `Row ${line}: expected name and adviser.`
+          : `Row ${line}: expected name, dean, and adviser.`
       )
       continue
     }

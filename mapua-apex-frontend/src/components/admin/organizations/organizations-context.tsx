@@ -22,6 +22,7 @@ import { toastManager } from "@/components/ui/toast"
 import {
   useBulkCreateOrganizationsMutation,
   useCreateOrganizationMutation,
+  useDeleteOrganizationMutation,
   useOrganizationsQuery,
   useSignatoriesQuery,
   useUpdateOrganizationMutation,
@@ -76,6 +77,9 @@ interface OrganizationsState {
   editDesks: AssignableDesks
   editIsHigherCouncil: boolean
   editError: string
+  deleteOpen: boolean
+  deleteError: string
+  deletePending: boolean
 }
 
 interface OrganizationsActions {
@@ -98,6 +102,9 @@ interface OrganizationsActions {
   ) => void
   setEditIsHigherCouncil: (checked: boolean) => void
   handleEditSave: (event: FormEvent<HTMLFormElement>) => Promise<void>
+  setDeleteOpen: (open: boolean) => void
+  openDelete: () => void
+  handleDelete: () => Promise<void>
 }
 
 interface OrganizationsContextValue {
@@ -120,6 +127,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
   const signatoriesQuery = useSignatoriesQuery()
   const createOrg = useCreateOrganizationMutation()
   const updateOrg = useUpdateOrganizationMutation()
+  const deleteOrg = useDeleteOrganizationMutation()
   const bulkCreate = useBulkCreateOrganizationsMutation()
 
   const [name, setName] = useState("")
@@ -136,6 +144,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
   const [editDesks, setEditDesks] = useState<AssignableDesks>(emptyDesks)
   const [editIsHigherCouncil, setEditIsHigherCouncil] = useState(false)
   const [editError, setEditError] = useState("")
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
 
   const organizations = orgsQuery.data ?? EMPTY_ORGANIZATIONS
   const signatories = signatoriesQuery.data ?? EMPTY_SIGNATORIES
@@ -185,6 +195,10 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       const selected: Partial<AssignableDesks> = {}
 
       for (const item of ORGANIZATION_ASSIGNABLE_DESK_ITEMS) {
+        // Higher-council rows skip the dean desk — an empty dean column is valid.
+        if (item.value === "dean" && row.is_higher_council && !row.desks.dean) {
+          continue
+        }
         const { match, ambiguous } = resolveSignatoryByRole(
           signatories,
           item.value,
@@ -210,12 +224,12 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (rowFailed || !selected.dean || !selected.adviser) {
+      if (rowFailed || !selected.adviser) {
         continue
       }
 
       const assignments = withSharedDesks(
-        selected.dean,
+        selected.dean ?? null,
         selected.adviser,
         signatories
       )
@@ -286,7 +300,11 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       setFormError("Register shared admin, CDM, and OSAAR accounts first.")
       return
     }
-    if (!desks.dean || !desks.adviser) {
+    if (!desks.adviser) {
+      setFormError("Select an adviser.")
+      return
+    }
+    if (!isHigherCouncil && !desks.dean) {
       setFormError("Select a dean and an adviser.")
       return
     }
@@ -373,7 +391,11 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       setEditError("That organization is already registered.")
       return
     }
-    if (!editDesks.dean || !editDesks.adviser) {
+    if (!editDesks.adviser) {
+      setEditError("Select an adviser.")
+      return
+    }
+    if (!editIsHigherCouncil && !editDesks.dean) {
       setEditError("Select a dean and an adviser.")
       return
     }
@@ -407,6 +429,31 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         description: error instanceof Error ? error.message : "Request failed.",
         type: "error",
       })
+    }
+  }
+
+  async function handleDelete() {
+    if (!editing) {
+      return
+    }
+
+    const removedName = editing.name
+    try {
+      await deleteOrg.mutateAsync(editing.organization_id)
+      setDeleteOpen(false)
+      setEditing(null)
+      setEditError("")
+      setDeleteError("")
+      toastManager.add({
+        title: "Organization removed",
+        description: `${removedName} was deleted.`,
+        type: "success",
+      })
+    } catch (error) {
+      setDeleteOpen(false)
+      setDeleteError(
+        error instanceof Error ? error.message : "Could not delete this organization."
+      )
     }
   }
 
@@ -451,6 +498,9 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       editDesks,
       editIsHigherCouncil,
       editError,
+      deleteOpen,
+      deleteError,
+      deletePending: deleteOrg.isPending,
     },
     actions: {
       changeName: (next) => {
@@ -461,7 +511,15 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         setDesks((current) => ({ ...current, [role]: next }))
         if (formError) setFormError("")
       },
-      setIsHigherCouncil,
+      setIsHigherCouncil: (checked) => {
+        setIsHigherCouncil(checked)
+        // A higher council skips the dean desk, so drop any dean selection made
+        // while the flag was off.
+        if (checked) {
+          setDesks((current) => ({ ...current, dean: null }))
+        }
+        if (formError) setFormError("")
+      },
       handleAddOne,
       chooseCsv: (file, text) => {
         if (!file) {
@@ -483,6 +541,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       closeEdit: () => {
         setEditing(null)
         setEditError("")
+        setDeleteOpen(false)
+        setDeleteError("")
       },
       changeEditName: (next) => {
         setEditName(next)
@@ -492,8 +552,23 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         setEditDesks((current) => ({ ...current, [role]: next }))
         if (editError) setEditError("")
       },
-      setEditIsHigherCouncil,
+      setEditIsHigherCouncil: (checked) => {
+        setEditIsHigherCouncil(checked)
+        if (checked) {
+          setEditDesks((current) => ({ ...current, dean: null }))
+        }
+        if (editError) setEditError("")
+      },
       handleEditSave,
+      setDeleteOpen: (open) => {
+        setDeleteOpen(open)
+        if (!open) setDeleteError("")
+      },
+      openDelete: () => {
+        setDeleteError("")
+        setDeleteOpen(true)
+      },
+      handleDelete,
     },
   }
 

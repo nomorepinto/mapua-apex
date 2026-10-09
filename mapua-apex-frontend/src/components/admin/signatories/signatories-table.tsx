@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
-  CardAction,
   CardDescription,
   CardHeader,
   CardPanel,
@@ -30,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { layout } from "@/config"
+import { formatDocumentId } from "@/lib/dynamodb-adapters"
 import { cn } from "@/lib/utils"
 
 export function SignatoriesTableCard() {
@@ -46,16 +46,6 @@ export function SignatoriesTableCard() {
                 state.signatories.length === 1 ? "y" : "ies"
               } · sorted by role · use Edit to update a row`}
         </CardDescription>
-        <CardAction>
-          <Input
-            aria-label="Search signatories"
-            className="w-full min-w-0 sm:w-56"
-            onChange={(event) => actions.setSearch(event.currentTarget.value)}
-            placeholder="Search name or role"
-            type="search"
-            value={state.search}
-          />
-        </CardAction>
       </CardHeader>
       <CardPanel className="p-0">
         {state.loading ? (
@@ -78,10 +68,19 @@ export function SignatoriesTableCard() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <div className="px-4 pb-4 sm:px-6 sm:pb-6 md:px-7 md:pb-7">
+          <div className="px-4 pt-4 pb-4 sm:px-6 sm:pb-6 md:px-7 md:pb-7">
+            <Input
+              aria-label="Search signatories"
+              className="mb-3 w-full min-w-0 sm:w-64"
+              onChange={(event) => actions.setSearch(event.currentTarget.value)}
+              placeholder="Search all columns"
+              type="search"
+              value={state.search}
+            />
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Document ID</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Department</TableHead>
@@ -93,7 +92,7 @@ export function SignatoriesTableCard() {
               <TableBody>
                 {state.filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell className="text-muted-foreground" colSpan={4}>
+                    <TableCell className="text-muted-foreground" colSpan={5}>
                       No signatories match “{state.search}”.
                     </TableCell>
                   </TableRow>
@@ -107,6 +106,12 @@ export function SignatoriesTableCard() {
                         actions.openEdit(person)
                       }}
                     >
+                      <TableCell
+                        className="font-mono text-xs whitespace-nowrap"
+                        title={person.signatory_id}
+                      >
+                        {formatDocumentId(person.signatory_id, "SIG")}
+                      </TableCell>
                       <TableCell className="font-medium whitespace-normal">
                         {person.name}
                       </TableCell>

@@ -3,10 +3,18 @@ import { Trash2Icon } from "lucide-react"
 
 import { FieldWarning } from "@/components/forms/field-warning"
 import {
-  DEPARTMENTS,
+  DEPARTMENT_GROUPS,
   FIELD_INPUT_CLASS,
+  getDepartmentItem,
+  getDepartmentPrograms,
+  getProgramItem,
+  MOBILE_NUMBER_LENGTH,
+  sanitizeMobileNumber,
   SELECT_CONTENT_STYLE,
   SELECT_ITEM_CLASS,
+  STUDENT_NUMBER_LENGTH,
+  SUFFIX_OPTIONS,
+  YEAR_LEVEL_OPTIONS,
 } from "@/components/submission/constants"
 import type { Proponent } from "@/components/submission/types"
 import { Button } from "@/components/ui/button"
@@ -14,6 +22,8 @@ import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
+  SelectGroup,
+  SelectGroupLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -21,6 +31,27 @@ import {
 import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
+
+function parseProgramAndYear(val: string): { program: string; year: string } {
+  const trimmed = (val || "").trim()
+  if (!trimmed) return { program: "", year: "" }
+
+  const match = trimmed.match(
+    /^(.*?)\s*-\s*(1st Year|2nd Year|3rd Year|4th Year|5th Year)$/i
+  )
+  if (match) {
+    return { program: match[1].trim(), year: match[2].trim() }
+  }
+
+  const foundYear = (YEAR_LEVEL_OPTIONS as readonly string[]).find(
+    (y) => y.toLowerCase() === trimmed.toLowerCase()
+  )
+  if (foundYear) {
+    return { program: "", year: foundYear }
+  }
+
+  return { program: trimmed, year: "" }
+}
 
 interface ProponentCardProps {
   proponent: Proponent
@@ -48,6 +79,22 @@ export const ProponentCard = memo(function ProponentCard({
   const submissionDate = proponent.dateOfSubmission || today
   // Derived from the applying organization, so it can never disagree with it.
   const organizationValue = organizationName || proponent.orgOrCourseSection
+
+  const deptItem = getDepartmentItem(departmentValue)
+  const selectedDeptCode = deptItem?.code ?? departmentValue
+
+  const { program: parsedProgram, year: currentYear } = parseProgramAndYear(
+    proponent.programAndYear
+  )
+  const currentProgItem = getProgramItem(selectedDeptCode, parsedProgram)
+  const selectedProgCode = currentProgItem?.code ?? parsedProgram
+
+  const availablePrograms = getDepartmentPrograms(selectedDeptCode)
+  const programOptions =
+    selectedProgCode &&
+      !availablePrograms.some((p) => p.code === selectedProgCode)
+      ? [{ code: selectedProgCode, name: selectedProgCode }, ...availablePrograms]
+      : availablePrograms
 
   return (
     <div className={cn(layout.section, "space-y-6")}>
@@ -104,7 +151,7 @@ export const ProponentCard = memo(function ProponentCard({
             className={FIELD_INPUT_CLASS}
           />
         </div>
-        <div className="space-y-1.5 md:col-span-4">
+        <div className="space-y-1.5 md:col-span-3">
           <label className="block text-xs font-medium text-neutral-700">
             Last Name <span className="text-red-500">*</span>
           </label>
@@ -120,24 +167,50 @@ export const ProponentCard = memo(function ProponentCard({
           />
           <FieldWarning name={`proponent.${proponent.id}.lastName`} />
         </div>
-        <div className="space-y-1.5 md:col-span-1">
+        <div className="space-y-1.5 md:col-span-2">
           <label className="block text-xs font-medium text-neutral-700">
             Suffix
           </label>
-          <Input
+          <Select
+            value={
+              SUFFIX_OPTIONS.find(
+                (opt) => opt.value.toLowerCase() === (proponent.suffix || "").toLowerCase()
+              )?.value ?? (proponent.suffix || "none")
+            }
+            onValueChange={(val) => {
+              if (typeof val === "string") {
+                onUpdate(proponent.id, "suffix", val === "none" ? "" : val)
+              }
+            }}
+          >
+            <SelectTrigger
+              className="h-9.5 w-full min-w-0 truncate rounded-lg border-neutral-300 bg-white !text-neutral-900"
+            >
+              <SelectValue placeholder="None">
+                {proponent.suffix || "None"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent
+              className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
+              style={SELECT_CONTENT_STYLE}
+            >
+              {SUFFIX_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className={SELECT_ITEM_CLASS}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <input
+            type="hidden"
             name={`proponent_${index}_suffix`}
             value={proponent.suffix}
-            maxLength={7}
-            onChange={(e) => onUpdate(proponent.id, "suffix", e.target.value)}
-            placeholder="Jr."
-            style={{ color: "#171717" }}
-            className={FIELD_INPUT_CLASS}
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="space-y-1.5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-12">
+        <div className="space-y-1.5 md:col-span-3">
           <label className="block text-xs font-medium text-neutral-700">
             Student Number <span className="text-red-500">*</span>
           </label>
@@ -146,14 +219,15 @@ export const ProponentCard = memo(function ProponentCard({
             inputMode="numeric"
             name={`proponent_${index}_studentNumber`}
             placeholder="202XXXXXXX"
-            maxLength={10}
+            minLength={STUDENT_NUMBER_LENGTH}
+            maxLength={STUDENT_NUMBER_LENGTH}
             value={proponent.studentNumber}
             onKeyDown={blockNonIntegerKeys}
             onChange={(e) =>
               onUpdate(
                 proponent.id,
                 "studentNumber",
-                sanitizeIntegerInput(e.target.value).slice(0, 10)
+                sanitizeIntegerInput(e.target.value).slice(0, STUDENT_NUMBER_LENGTH)
               )
             }
             style={{ color: "#171717" }}
@@ -162,85 +236,158 @@ export const ProponentCard = memo(function ProponentCard({
           />
           <FieldWarning name={`proponent.${proponent.id}.studentNumber`} />
         </div>
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-neutral-700">
-            Program and Year <span className="text-red-500">*</span>
-          </label>
-          <Input
-            name={`proponent_${index}_programAndYear`}
-            value={proponent.programAndYear}
-            maxLength={20}
-            onChange={(e) =>
-              onUpdate(proponent.id, "programAndYear", e.target.value)
-            }
-            placeholder="BSCS - 3rd Year"
-            style={{ color: "#171717" }}
-            className={FIELD_INPUT_CLASS}
-            required
-          />
-          <FieldWarning name={`proponent.${proponent.id}.programAndYear`} />
-        </div>
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-neutral-700">
-            Date of Submission <span className="text-red-500">*</span>
-          </label>
-          <Input
-            type="date"
-            value={submissionDate}
-            readOnly
-            tabIndex={-1}
-            style={{ color: "#171717" }}
-            className={`${FIELD_INPUT_CLASS} cursor-not-allowed bg-neutral-100/70 select-none px-3`}
-          />
-          <input
-            type="hidden"
-            name={`proponent_${index}_dateOfSubmission`}
-            value={submissionDate}
-          />
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 md:col-span-3">
           <label className="block text-xs font-medium text-neutral-700">
             Department <span className="text-red-500">*</span>
           </label>
           <Select
-            value={departmentValue}
+            value={selectedDeptCode}
             onValueChange={(val) => {
-              if (typeof val === "string") onDepartmentChange(proponent.id, val)
+              if (typeof val === "string") {
+                onDepartmentChange(proponent.id, val)
+                const newPrograms = getDepartmentPrograms(val)
+                if (
+                  selectedProgCode &&
+                  !newPrograms.some((p) => p.code === selectedProgCode)
+                ) {
+                  onUpdate(
+                    proponent.id,
+                    "programAndYear",
+                    currentYear ? currentYear : ""
+                  )
+                }
+              }
             }}
           >
             <SelectTrigger
               className={cn(
                 "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
-                !departmentValue && "saaf-glow-invalid"
+                !selectedDeptCode && "saaf-glow-invalid"
               )}
             >
               <SelectValue placeholder="Select Department">
-                {departmentValue || "Select Department"}
+                {selectedDeptCode || "Select Department"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent
               className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
               style={SELECT_CONTENT_STYLE}
             >
-              {DEPARTMENTS.map((dept) => (
-                <SelectItem key={dept} value={dept} className={SELECT_ITEM_CLASS}>
-                  {dept}
-                </SelectItem>
+              {DEPARTMENT_GROUPS.map((group) => (
+                <SelectGroup key={group.campus}>
+                  <SelectGroupLabel className="px-2 py-1.5 text-xs font-semibold text-neutral-500">
+                    {group.campus}
+                  </SelectGroupLabel>
+                  {group.departments.map((dept) => (
+                    <SelectItem key={dept.code} value={dept.code} className={SELECT_ITEM_CLASS}>
+                      {dept.name} ({dept.code})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>
           <input
             type="hidden"
             name={`proponent_${index}_department`}
-            value={departmentValue}
+            value={selectedDeptCode}
             required
           />
           <FieldWarning name={`proponent.${proponent.id}.department`} />
         </div>
 
+        <div className="space-y-1.5 md:col-span-3">
+          <label className="block text-xs font-medium text-neutral-700">
+            Program <span className="text-red-500">*</span>
+          </label>
+          <Select
+            value={selectedProgCode}
+            disabled={!selectedDeptCode}
+            onValueChange={(val) => {
+              if (typeof val === "string") {
+                const combined = currentYear ? `${val} - ${currentYear}` : val
+                onUpdate(proponent.id, "programAndYear", combined)
+              }
+            }}
+          >
+            <SelectTrigger
+              className={cn(
+                "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
+                !selectedDeptCode &&
+                "cursor-not-allowed bg-neutral-100/70 text-neutral-400 opacity-70",
+                selectedDeptCode && !selectedProgCode && "saaf-glow-invalid"
+              )}
+            >
+              <SelectValue
+                placeholder={
+                  selectedDeptCode ? "Select Program" : "Select Department first"
+                }
+              >
+                {selectedProgCode ||
+                  (selectedDeptCode ? "Select Program" : "Select Department first")}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent
+              className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
+              style={SELECT_CONTENT_STYLE}
+            >
+              {programOptions.map((prog) => (
+                <SelectItem key={prog.code} value={prog.code} className={SELECT_ITEM_CLASS}>
+                  {prog.name === prog.code ? prog.code : `${prog.name} (${prog.code})`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldWarning name={`proponent.${proponent.id}.programAndYear`} />
+        </div>
+
+        <div className="space-y-1.5 md:col-span-3">
+          <label className="block text-xs font-medium text-neutral-700">
+            Year Level <span className="text-red-500">*</span>
+          </label>
+          <Select
+            value={currentYear}
+            onValueChange={(val) => {
+              if (typeof val === "string") {
+                const combined = selectedProgCode
+                  ? `${selectedProgCode} - ${val}`
+                  : val
+                onUpdate(proponent.id, "programAndYear", combined)
+              }
+            }}
+          >
+            <SelectTrigger
+              className={cn(
+                "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
+                !currentYear && "saaf-glow-invalid"
+              )}
+            >
+              <SelectValue placeholder="Select Year">
+                {currentYear || "Select Year"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent
+              className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
+              style={SELECT_CONTENT_STYLE}
+            >
+              {YEAR_LEVEL_OPTIONS.map((yr) => (
+                <SelectItem key={yr} value={yr} className={SELECT_ITEM_CLASS}>
+                  {yr}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <input
+            type="hidden"
+            name={`proponent_${index}_programAndYear`}
+            value={proponent.programAndYear}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-neutral-700">
             Position of the Applicant <span className="text-red-500">*</span>
@@ -276,28 +423,58 @@ export const ProponentCard = memo(function ProponentCard({
           />
           <FieldWarning name={`proponent.${proponent.id}.orgOrCourseSection`} />
         </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-neutral-700">
+            Date of Submission <span className="text-red-500">*</span>
+          </label>
+          <Input
+            type="date"
+            value={submissionDate}
+            readOnly
+            tabIndex={-1}
+            style={{ color: "#171717" }}
+            className={`${FIELD_INPUT_CLASS} cursor-not-allowed bg-neutral-100/70 select-none px-3`}
+          />
+          <input
+            type="hidden"
+            name={`proponent_${index}_dateOfSubmission`}
+            value={submissionDate}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-neutral-700">
-            Contact Number <span className="text-red-500">*</span>
+            Mobile Number <span className="text-red-500">*</span>
           </label>
           <Input
             type="text"
             inputMode="numeric"
             name={`proponent_${index}_contactNumber`}
             placeholder="09XXXXXXXXX"
-            maxLength={11}
+            minLength={MOBILE_NUMBER_LENGTH}
+            maxLength={MOBILE_NUMBER_LENGTH}
             value={proponent.contactNumber}
             onKeyDown={blockNonIntegerKeys}
-            onChange={(e) =>
-              onUpdate(
-                proponent.id,
-                "contactNumber",
-                sanitizeIntegerInput(e.target.value).slice(0, 11)
+            onFocus={() => {
+              if (!proponent.contactNumber) {
+                onUpdate(proponent.id, "contactNumber", "09")
+              }
+            }}
+            onBlur={() => {
+              if (proponent.contactNumber === "09" || proponent.contactNumber === "0") {
+                onUpdate(proponent.id, "contactNumber", "")
+              }
+            }}
+            onChange={(e) => {
+              const sanitized = sanitizeMobileNumber(
+                e.target.value,
+                proponent.contactNumber
               )
-            }
+              onUpdate(proponent.id, "contactNumber", sanitized)
+            }}
             style={{ color: "#171717" }}
             className={FIELD_INPUT_CLASS}
             required

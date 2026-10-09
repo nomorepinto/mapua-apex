@@ -42,13 +42,14 @@ class NotificationController extends Controller
         SubmissionAccess $access,
         NotificationRecords $notifications,
     ): JsonResponse {
-        $this->authorize($request, $event, $submission, $events, $submissions, $access, requireProponent: true);
+        $paper = $this->authorize($request, $event, $submission, $events, $submissions, $access, requireProponent: true);
 
         $item = $notifications->create(
             $submission,
             (string) $request->validated('signatory'),
             (string) $request->validated('notif_type'),
             $request->comment(),
+            submission: $paper,
         );
 
         return (new NotificationResource($item))->response()->setStatusCode(201);

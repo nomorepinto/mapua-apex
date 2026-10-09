@@ -1,20 +1,41 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router"
-import { X, Check, FileText, CheckCircle2 } from "lucide-react"
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  DownloadIcon,
+  FileText,
+  Loader2,
+  MessageSquare,
+} from "lucide-react"
 
 import {
+  useCurrentOrganizationQuery,
   useSubmissionDetailQuery,
   useSubmissionNotificationsQuery,
-  useCurrentOrganizationQuery,
 } from "@/hooks/use-submissions"
 import {
   apiNotificationsToStepper,
-  apiSubmissionToDashboardRow,
+  apiSubmissionToActivity,
+  formatDisplayDateTime,
   formatDocumentId,
+  formatSignatoryRole,
+  signatoryChainLabel,
 } from "@/lib/dynamodb-adapters"
-import { useOrgStore } from "@/stores/org-store"
-import { layout, modal } from "@/config"
+import { brand, modal } from "@/config"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { ActivityBudgetTable } from "@/components/ui/activity-budget-table"
+import { ActivityReservationDetails } from "@/components/ui/activity-reservation-details"
+import { saveActivityAsPdf, saveSubmissionAsPdf } from "@/lib/save-proposal-pdf"
 
 interface SubmissionTrackerModalProps {
   isOpen: boolean
@@ -31,6 +52,7 @@ export function SubmissionTrackerModal({
 }: SubmissionTrackerModalProps) {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<"details" | "progress">("details")
+  const [isSavingPdf, setIsSavingPdf] = useState(false)
 
   const orgQuery = useCurrentOrganizationQuery()
   const detailQuery = useSubmissionDetailQuery(
@@ -42,11 +64,10 @@ export function SubmissionTrackerModal({
     isOpen ? submissionId || undefined : undefined
   )
 
-  if (!isOpen || !eventId || !submissionId) return null
-
-  const submission = detailQuery.data
-    ? apiSubmissionToDashboardRow(detailQuery.data, orgQuery.data?.signatories)
+  const activity = detailQuery.data
+    ? apiSubmissionToActivity(detailQuery.data)
     : null
+
   const stepper = apiNotificationsToStepper(
     notificationsQuery.data || [],
     detailQuery.data?.current_signatory,
@@ -60,256 +81,462 @@ export function SubmissionTrackerModal({
       signatoryChain: detailQuery.data?.signatory_chain,
     }
   )
-  const canResubmit = submission?.api_status === "returned"
-  const isDependent = submission?.role === "dependent"
-  const isDenied = submission?.api_status === "denied"
-  const currentSignatoryName =
-    submission?.status === "Approved" || submission?.api_status === "approved"
-      ? "Completed"
-      : stepper.assigneesList.find((a) => a.state === "current")?.name ||
-        submission?.current_signatory ||
-        "—"
+
+  const canResubmit = detailQuery.data?.status === "returned"
+  const isDependent = detailQuery.data?.role === "dependent"
+  const isDenied = detailQuery.data?.status === "denied"
+
+  const returnNotifications = useMemo(() => {
+    if (!notificationsQuery.data || notificationsQuery.data.length === 0) return []
+    return notificationsQuery.data
+      .filter((item) => item.notif_type === "returned")
+      .sort((a, b) => (b.sent_at || "").localeCompare(a.sent_at || ""))
+  }, [notificationsQuery.data])
+
+  const latestReturnNotification = returnNotifications[0] || null
+
+  const returnSignatoryLabel = useMemo(() => {
+    if (!latestReturnNotification) return null
+    const chain = detailQuery.data?.signatory_chain
+    if (Array.isArray(chain) && chain.length > 0) {
+      const stripId = (val?: string | null) => (val || "").replace(/^SIGNATORY#/i, "").trim()
+      const link = chain.find(
+        (c) => stripId(c.signatory_id) === stripId(latestReturnNotification.signatory)
+      )
+      if (link) {
+        const distinctOrgs = new Set(chain.map((c) => c.organization_id).filter(Boolean))
+        return signatoryChainLabel(link, distinctOrgs.size > 1)
+      }
+    }
+    return formatSignatoryRole(
+      latestReturnNotification.signatory,
+      orgQuery.data?.signatories
+    )
+  }, [latestReturnNotification, detailQuery.data?.signatory_chain, orgQuery.data?.signatories])
+
+  const latestDeniedNotification = useMemo(() => {
+    if (!notificationsQuery.data || notificationsQuery.data.length === 0) return null
+    return (
+      notificationsQuery.data
+        .filter((n) => n.notif_type === "denied")
+        .sort((a, b) => (b.sent_at || "").localeCompare(a.sent_at || ""))[0] || null
+    )
+  }, [notificationsQuery.data])
+
+  const handleSavePdf = async () => {
+    try {
+      setIsSavingPdf(true)
+      if (detailQuery.data) {
+        await saveSubmissionAsPdf(detailQuery.data)
+      } else if (activity) {
+        await saveActivityAsPdf(activity)
+      }
+    } catch (err) {
+      console.error("Failed to save proposal PDF:", err)
+    } finally {
+      setIsSavingPdf(false)
+    }
+  }
 
   const handleResubmit = () => {
-    useOrgStore.getState().setEditingSubmission(eventId, submissionId)
+    if (!eventId || !submissionId) return
     onClose()
     navigate(
       `/students/submissions/saaf?event=${encodeURIComponent(eventId)}&submission=${encodeURIComponent(submissionId)}`
     )
   }
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) onClose()
+  }
+
+  if (!isOpen || !eventId || !submissionId) return null
+
   return (
-    <div className={modal.overlay}>
-      <div className={cn(modal.shell, modal.xl, modal.tall)}>
-        <div className={modal.header}>
-          <div className="min-w-0">
-            <div className="mb-1 flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-red-50 px-2 py-0.5 font-mono text-xs font-bold text-[#D9291C]" title={submission?.id || submissionId}>
-                {formatDocumentId(submission?.id || submissionId)}
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogPopup
+        className={cn(modal.dialogXl, "flex-col")}
+        closeProps={{
+          className:
+            "text-white/80 hover:text-white hover:bg-white/10 top-5 end-5 cursor-pointer size-9",
+        }}
+      >
+        <DialogHeader className="shrink-0 rounded-t-2xl bg-[#8B0000] px-4 py-6 text-white sm:px-8">
+          <div className="w-full pr-10">
+            <div className="mb-2.5 flex flex-wrap items-center gap-2">
+              <span
+                className="rounded-md bg-white/20 px-2.5 py-0.5 font-mono text-xs font-bold text-white shadow-2xs"
+                title={submissionId || activity?.submissionId || undefined}
+              >
+                {formatDocumentId(submissionId || activity?.submissionId)}
               </span>
-              <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-xs font-extrabold tracking-wider text-[#475569] uppercase">
-                {submission?.activity_classification || "saaf"}
-              </span>
+              {activity?.org ? (
+                <span className={brand.chipGold}>{activity.org}</span>
+              ) : null}
+              {activity?.submittedDate ? (
+                <span className="rounded-sm bg-white/15 px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-white uppercase">
+                  Submitted {activity.submittedDate}
+                </span>
+              ) : null}
             </div>
-            <h2 className="text-xl font-extrabold tracking-tight text-[#1E293B] sm:text-2xl">
+
+            <DialogTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight text-white">
               {detailQuery.isLoading
                 ? "Loading submission…"
-                : submission?.activity_details.title || "Submission"}
-            </h2>
-            <p className="mt-0.5 text-xs font-medium text-[#64748B]">
-              {submission?.activity_details.proponent
-                ? `Submitted by ${submission.activity_details.proponent}`
-                : "Student activity application"}
+                : `${activity?.title || "Submission"} Proposal`}
+            </DialogTitle>
+
+            <p className="mt-1.5 text-xs font-medium text-[#FBC02D] sm:text-sm">
+              Submitted by: {activity?.org || "Organization"} • Representative:{" "}
+              {activity?.representative || "—"}
             </p>
-          </div>
 
-          <div className="flex w-full min-w-0 flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <div className="relative flex h-11 w-full items-center rounded-xl border border-slate-200/80 bg-slate-100/90 p-1 shadow-inner sm:h-10 sm:w-84">
-              <div
-                className="absolute top-1 bottom-1 z-0 rounded-lg border border-slate-200/60 bg-white shadow-xs transition-all duration-200 ease-in-out"
-                style={{
-                  left: activeTab === "details" ? "4px" : "calc(50% + 2px)",
-                  width: "calc(50% - 6px)",
-                }}
-              ></div>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("details")}
-                className={`relative z-10 flex h-full w-1/2 cursor-pointer items-center justify-center gap-2 rounded-lg text-center text-xs select-none transition-colors ${
-                  activeTab === "details"
-                    ? "font-bold text-[#D9291C]"
-                    : "font-medium text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <FileText
-                  className={`h-3.5 w-3.5 shrink-0 ${activeTab === "details" ? "text-[#D9291C]" : "text-slate-400"}`}
-                />
-                <span className="sm:hidden">Details</span>
-                <span className="hidden sm:inline">Document Details</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("progress")}
-                className={`relative z-10 flex h-full w-1/2 cursor-pointer items-center justify-center gap-2 rounded-lg text-center text-xs select-none transition-colors ${
-                  activeTab === "progress"
-                    ? "font-bold text-[#D9291C]"
-                    : "font-medium text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <CheckCircle2
-                  className={`h-3.5 w-3.5 shrink-0 ${activeTab === "progress" ? "text-[#D9291C]" : "text-slate-400"}`}
-                />
-                <span className="sm:hidden">Progress</span>
-                <span className="hidden sm:inline">Milestone & Progress</span>
-              </button>
+            <div className="mt-4 flex items-center">
+              <div className="inline-flex items-center rounded-xl bg-black/20 p-1 border border-white/10 backdrop-blur-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("details")}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer",
+                    activeTab === "details"
+                      ? "bg-white text-[#8B0000] shadow-xs"
+                      : "text-white/80 hover:text-white hover:bg-white/10"
+                  )}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span>Document Details</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("progress")}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer",
+                    activeTab === "progress"
+                      ? "bg-white text-[#8B0000] shadow-xs"
+                      : "text-white/80 hover:text-white hover:bg-white/10"
+                  )}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Milestone & Progress</span>
+                </button>
+              </div>
             </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className={cn(modal.close, "self-end sm:self-center")}
-              aria-label="Close submission tracker"
-            >
-              <X className="h-6 w-6" />
-            </button>
           </div>
-        </div>
+        </DialogHeader>
 
-        <div className={cn(modal.body, layout.stack, "bg-neutral-50/40")}>
-          {detailQuery.isError ? (
+        <DialogPanel className="flex-1 overflow-y-auto bg-white px-4 py-6 text-neutral-800 sm:px-8">
+          {detailQuery.isLoading ? (
+            <div className="flex items-center justify-center p-12 text-sm text-neutral-500">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin text-[#8B0000]" />
+              <span>Loading submission details…</span>
+            </div>
+          ) : detailQuery.isError ? (
             <p className="text-sm font-semibold text-rose-600">
               Could not load this submission. Try again from the dashboard.
             </p>
           ) : null}
 
-          {activeTab === "details" && submission && (
-            <div className={cn(layout.stack, "animate-in fade-in duration-200")}>
-              <div className={cn("grid grid-cols-1 items-stretch lg:grid-cols-2", layout.gap)}>
-                <div className={cn(layout.section, "flex flex-col")}>
-                  <h3 className="text-lg font-extrabold text-[#1E293B] mb-4">
-                    Document Specification & Details
-                  </h3>
-
-                  <div className={layout.tableWrap}>
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="border-b border-neutral-100 text-xs font-bold text-neutral-600 tracking-wider">
-                          <th className="pb-3 pr-4 w-1/3">Field</th>
-                          <th className="pb-3">Detail</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-neutral-100 text-xs sm:text-sm">
-                        <tr>
-                          <td className="py-3 pr-4 font-semibold text-[#64748B]">
-                            Document / Event Name
-                          </td>
-                          <td className="py-3 font-bold text-[#1E293B]">
-                            {submission.activity_details.title}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-3 pr-4 font-semibold text-[#64748B]">
-                            Classification
-                          </td>
-                          <td className="py-3 font-bold text-[#1E293B] capitalize">
-                            {submission.activity_classification}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-3 pr-4 font-semibold text-[#64748B]">
-                            Requested Venue
-                          </td>
-                          <td className="py-3 font-medium text-[#1E293B]">
-                            {submission.activity_details.venue}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-3 pr-4 font-semibold text-[#64748B]">
-                            Proposed Date & Time
-                          </td>
-                          <td className="py-3 font-medium text-[#1E293B]">
-                            {submission.activity_details.date}
-                            {submission.activity_details.time
-                              ? ` | ${submission.activity_details.time}`
-                              : ""}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-3 pr-4 font-semibold text-[#64748B]">
-                            Expected Attendees
-                          </td>
-                          <td className="py-3 font-medium text-[#1E293B]">
-                            {submission.activity_details.expected_attendees ?? "—"} students
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="py-3 pr-4 font-semibold text-[#64748B]">
-                            Estimated Budget
-                          </td>
-                          <td className="py-3 font-medium text-[#1E293B]">
-                            {submission.activity_details.budget}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+          {canResubmit && !isDependent ? (
+            <div className="mb-6 rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50 to-amber-50/60 p-4 sm:p-5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                    <AlertCircle className="size-5 text-amber-800" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-base font-bold text-amber-950">Application Returned</span>
+                      <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-900">
+                        Action Required
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-800/90 mt-0.5">
+                      Update this application and resubmit it to the current signatory.
+                    </p>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleResubmit}
+                  className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#8B0000] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#700000] transition-colors shrink-0"
+                >
+                  Edit and resubmit
+                </button>
+              </div>
 
-                <div className="flex flex-col gap-4">
-                  <div className={cn(layout.section, "flex-1 flex flex-col min-h-[220px]")}>
-                    <h4 className="text-xs font-bold text-neutral-600 uppercase tracking-wider mb-2 shrink-0">
-                      Description
-                    </h4>
-                    <div className="flex-1 overflow-y-auto max-h-[260px] pr-2 space-y-3 [overflow-wrap:anywhere] break-words whitespace-pre-wrap">
-                      <p className="text-sm text-[#1E293B] leading-relaxed">
-                        {submission.activity_details.description || "No description provided."}
-                      </p>
-                      {submission.activity_details.objectives ? (
-                        <div className="pt-3 border-t border-neutral-100">
-                          <h5 className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider mb-1">
-                            Objectives
-                          </h5>
-                          <p className="text-sm text-[#1E293B] leading-relaxed">
-                            {submission.activity_details.objectives}
+              <div className="mt-4 rounded-xl border border-amber-200/90 bg-white/95 p-4 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="size-3.5 text-amber-700" />
+                    <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                      Reason for Return
+                    </span>
+                  </div>
+                  {(returnSignatoryLabel || latestReturnNotification?.sent_at) && (
+                    <span className="text-xs font-medium text-neutral-500">
+                      {returnSignatoryLabel ? `Returned by ${returnSignatoryLabel}` : ""}
+                      {returnSignatoryLabel && latestReturnNotification?.sent_at ? " • " : ""}
+                      {latestReturnNotification?.sent_at
+                        ? formatDisplayDateTime(latestReturnNotification.sent_at)
+                        : ""}
+                    </span>
+                  )}
+                </div>
+
+                <div className="pt-2.5">
+                  {notificationsQuery.isLoading ? (
+                    <div className="flex items-center gap-2 py-2 text-xs text-neutral-500">
+                      <Loader2 className="size-3.5 animate-spin text-amber-700" />
+                      <span>Loading reviewer feedback…</span>
+                    </div>
+                  ) : latestReturnNotification?.comment ? (
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium text-neutral-800">
+                      {latestReturnNotification.comment}
+                    </p>
+                  ) : (
+                    <p className="text-xs italic text-neutral-500">
+                      No specific remarks were provided by the reviewer.
+                    </p>
+                  )}
+                </div>
+
+                {returnNotifications.length > 1 && (
+                  <details className="mt-3 border-t border-amber-100/80 pt-2.5 text-xs">
+                    <summary className="cursor-pointer font-semibold text-amber-900 hover:text-amber-950 select-none">
+                      Previous Return Feedback ({returnNotifications.length - 1} earlier)
+                    </summary>
+                    <div className="mt-2 space-y-2.5 pl-2 border-l-2 border-amber-200">
+                      {returnNotifications.slice(1).map((item, idx) => (
+                        <div key={`${item.sent_at}-${idx}`} className="text-xs">
+                          <div className="font-semibold text-neutral-600">
+                            {formatSignatoryRole(item.signatory, orgQuery.data?.signatories)} •{" "}
+                            {formatDisplayDateTime(item.sent_at)}
+                          </div>
+                          <p className="mt-0.5 whitespace-pre-wrap text-neutral-700">
+                            {item.comment || "No comment"}
                           </p>
                         </div>
-                      ) : null}
+                      ))}
                     </div>
-                  </div>
+                  </details>
+                )}
+              </div>
+            </div>
+          ) : null}
 
-                  <div className={cn(layout.section, "shrink-0")}>
-                    <h4 className="text-xs font-bold text-neutral-600 uppercase tracking-wider mb-2">
-                      Proponent & Routing
-                    </h4>
-                    <p className="text-xs text-[#64748B] mb-3">
-                      Current signatory:{" "}
-                      <span className="font-bold text-[#1E293B]">
-                        {currentSignatoryName}
-                      </span>
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`text-xs font-semibold px-3 py-1 rounded-lg border ${
-                          submission.nature === "major"
-                            ? "bg-emerald-100 text-[#065F46] border-emerald-300 ring-1 ring-emerald-400"
-                            : submission.nature === "minor"
-                            ? "bg-emerald-50 text-[#10B981] border-emerald-200"
-                            : "text-[#475569] bg-neutral-100 border-neutral-200/60"
-                        }`}
-                      >
-                        {submission.nature
-                          ? `${submission.status} (${submission.nature.charAt(0).toUpperCase() + submission.nature.slice(1)})`
-                          : submission.status}
-                      </span>
-                    </div>
+          {isDependent && canResubmit ? (
+            <div className="mb-6 rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50 to-amber-50/60 p-4 sm:p-5 shadow-xs">
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                  <AlertCircle className="size-5 text-amber-800" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-base font-bold text-amber-950">Application Returned</span>
+                    <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-900">
+                      Collaborator View
+                    </span>
                   </div>
+                  <p className="text-xs text-amber-800/90 mt-0.5">
+                    This application was returned for revision. As a collaborating organization, this view is read-only — the proponent organization manages edits and resubmission.
+                  </p>
                 </div>
               </div>
+
+              <div className="mt-4 rounded-xl border border-amber-200/90 bg-white/95 p-4 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="size-3.5 text-amber-700" />
+                    <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                      Reason for Return
+                    </span>
+                  </div>
+                  {(returnSignatoryLabel || latestReturnNotification?.sent_at) && (
+                    <span className="text-xs font-medium text-neutral-500">
+                      {returnSignatoryLabel ? `Returned by ${returnSignatoryLabel}` : ""}
+                      {returnSignatoryLabel && latestReturnNotification?.sent_at ? " • " : ""}
+                      {latestReturnNotification?.sent_at
+                        ? formatDisplayDateTime(latestReturnNotification.sent_at)
+                        : ""}
+                    </span>
+                  )}
+                </div>
+
+                <div className="pt-2.5">
+                  {notificationsQuery.isLoading ? (
+                    <div className="flex items-center gap-2 py-2 text-xs text-neutral-500">
+                      <Loader2 className="size-3.5 animate-spin text-amber-700" />
+                      <span>Loading reviewer feedback…</span>
+                    </div>
+                  ) : latestReturnNotification?.comment ? (
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium text-neutral-800">
+                      {latestReturnNotification.comment}
+                    </p>
+                  ) : (
+                    <p className="text-xs italic text-neutral-500">
+                      No specific remarks were provided by the reviewer.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : isDependent ? (
+            <div className="mb-6 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-600">
+              You are a collaborating organization on this application. It is read-only — the proponent organization manages edits and resubmission.
+            </div>
+          ) : null}
+
+          {isDenied ? (
+            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 sm:p-5 text-rose-900 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="size-4 shrink-0 text-rose-600" />
+                <p className="text-sm font-bold text-rose-900">
+                  This submission was denied and cannot be edited.
+                </p>
+              </div>
+              {latestDeniedNotification?.comment ? (
+                <div className="mt-3 rounded-xl border border-rose-200/80 bg-white/90 p-3.5 shadow-2xs">
+                  <span className="text-[11px] font-bold text-rose-900 uppercase tracking-wider block mb-1">
+                    Reason for Rejection
+                  </span>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-800">
+                    {latestDeniedNotification.comment}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {activity && activeTab === "details" && (
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <h3 className="text-center text-xs font-bold text-neutral-500 uppercase tracking-widest">
+                  Proponents
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {activity.proponents.map((prop, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-neutral-50 border border-neutral-200/80 rounded-xl p-3.5 text-center shadow-2xs hover:bg-neutral-100/50 transition-colors"
+                    >
+                      <p className="text-xs text-neutral-500 font-semibold">{prop.role}</p>
+                      <p className="text-sm font-bold text-neutral-900 mt-0.5">{prop.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <hr className="border-neutral-200" />
+
+              <div className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm md:grid-cols-2">
+                <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-bold text-neutral-900">Event Date & Time</span>
+                  <span className="font-medium text-neutral-600 sm:text-right">
+                    {activity.time ? `${activity.time} ` : ""}{activity.date}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-bold text-neutral-900">Venue</span>
+                  <span className="font-medium text-neutral-600 sm:text-right">{activity.venue}</span>
+                </div>
+
+                <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-bold text-neutral-900">Estimated Budget</span>
+                  <span className="font-medium text-neutral-600 sm:text-right">{activity.proposedBudget}</span>
+                </div>
+
+                <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-bold text-neutral-900">Number of Participants</span>
+                  <span className="font-medium text-neutral-600 sm:text-right">{activity.expectedParticipants}</span>
+                </div>
+
+                <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-bold text-neutral-900">Activity type</span>
+                  <span className="font-medium text-neutral-600 sm:text-right capitalize">
+                    {activity.type}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-bold text-neutral-900">Event Nature</span>
+                  <span className="font-medium sm:text-right">
+                    {activity.nature?.toLowerCase() === "major" ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider bg-red-100 text-[#8B0000] border border-red-200">
+                        Major Event
+                      </span>
+                    ) : activity.nature?.toLowerCase() === "minor" ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider bg-neutral-100 text-neutral-700 border border-neutral-200">
+                        Minor Event
+                      </span>
+                    ) : (
+                      <span className="text-neutral-400 text-xs italic">
+                        Pending classification
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <h4 className="text-sm font-bold text-neutral-900">
+                  Description of the Activity
+                </h4>
+                <p className="text-sm text-neutral-700 leading-relaxed">
+                  {activity.description}
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <h4 className="text-sm font-bold text-neutral-900">
+                  Objectives of the Activity
+                </h4>
+                <ul className="space-y-2.5 text-sm text-neutral-700">
+                  {activity.objectives.map((obj, idx) => (
+                    <li key={idx} className="flex items-start gap-2.5">
+                      <span className="text-neutral-400 font-bold mt-1 text-xs">•</span>
+                      <div>
+                        <span className="font-bold text-neutral-900">{obj.title}: </span>
+                        <span className="leading-relaxed">{obj.description}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <ActivityBudgetTable
+                items={activity.budgetItems}
+                grandTotal={activity.budgetGrandTotal}
+              />
+
+              <ActivityReservationDetails
+                equipmentRequested={activity.equipmentRequested}
+                roomsRequested={activity.roomsRequested}
+                avEquipmentRequested={activity.avEquipmentRequested}
+              />
             </div>
           )}
 
           {activeTab === "progress" && (
-            <div className={cn(layout.stack, "animate-in fade-in duration-200")}>
-              <div className={layout.section}>
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-2xs">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-lg font-extrabold text-[#1E293B]">Progress</h3>
-                  <span className="text-xs text-neutral-600 font-medium">
+                  <h3 className="text-base font-bold text-neutral-900">Progress Tracking</h3>
+                  <span className="text-xs text-neutral-500 font-medium">
                     {notificationsQuery.isLoading ? "Loading notifications…" : "From review notifications"}
                   </span>
                 </div>
 
-                <div className="mb-6 flex flex-col gap-2 text-xs text-[#64748B] sm:flex-row sm:items-center sm:justify-between">
+                <div className="mb-6 flex flex-col gap-2 text-xs text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
                   <span className="min-w-0">
-                    {formatDocumentId(submissionId)} • Submitted {submission?.submitted_date || "—"} •{" "}
+                    {formatDocumentId(submissionId)} • Submitted {activity?.submittedDate || "—"} •{" "}
                     {stepper.isAllApproved
                       ? "All steps completed"
                       : `${stepper.remainingSteps} tasks remaining before final approval`}
                   </span>
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs font-medium text-[#64748B]">Overall progress</span>
-                    <span className="text-base font-extrabold text-[#1E293B]">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-neutral-500">Overall progress</span>
+                    <span className="text-base font-extrabold text-[#8B0000]">
                       {stepper.progressPercent}%
                     </span>
                   </div>
@@ -321,9 +548,9 @@ export function SubmissionTrackerModal({
                     const isCurrent = !stepper.isAllApproved && idx === stepper.currentStepIdx
                     let nodeBg = "bg-neutral-100 border-neutral-300 text-neutral-400"
                     if (isCompleted) {
-                      nodeBg = "bg-[#D1FAE5] border-[#10B981] text-[#065F46]"
+                      nodeBg = "bg-emerald-100 border-emerald-500 text-emerald-800"
                     } else if (isCurrent) {
-                      nodeBg = "bg-[#FEF3C7] border-[#F59E0B] text-[#92400E] ring-4 ring-amber-100"
+                      nodeBg = "bg-amber-100 border-amber-500 text-amber-900 ring-4 ring-amber-100"
                     }
 
                     return (
@@ -343,10 +570,10 @@ export function SubmissionTrackerModal({
                           className={cn(
                             "min-w-0 text-xs font-bold",
                             isCompleted
-                              ? "text-[#1E293B]"
+                              ? "text-neutral-900"
                               : isCurrent
                                 ? "font-extrabold text-amber-900"
-                                : "text-slate-400"
+                                : "text-neutral-400"
                           )}
                         >
                           {stepName}
@@ -359,7 +586,7 @@ export function SubmissionTrackerModal({
                 <div className="relative hidden select-none px-2 py-4 md:block">
                   <div className="absolute top-9 left-8 right-8 -translate-y-1/2 h-1.5 bg-neutral-200 rounded-full z-0 overflow-hidden">
                     <div
-                      className="h-full bg-[#10B981] rounded-full transition-all duration-500 ease-out"
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out"
                       style={{
                         width: `${
                           stepper.fullSteps.length > 1
@@ -380,9 +607,9 @@ export function SubmissionTrackerModal({
 
                       let nodeBg = "bg-neutral-100 border-neutral-300 text-neutral-400"
                       if (isCompleted) {
-                        nodeBg = "bg-[#D1FAE5] border-[#10B981] text-[#065F46]"
+                        nodeBg = "bg-emerald-100 border-emerald-500 text-emerald-800"
                       } else if (isCurrent) {
-                        nodeBg = "bg-[#FEF3C7] border-[#F59E0B] text-[#92400E] ring-4 ring-amber-100"
+                        nodeBg = "bg-amber-100 border-amber-500 text-amber-900 ring-4 ring-amber-100"
                       }
 
                       return (
@@ -410,10 +637,10 @@ export function SubmissionTrackerModal({
                             className={cn(
                               "text-xs font-bold mt-2 text-center whitespace-nowrap px-1 max-w-[120px] truncate",
                               isCompleted
-                                ? "text-[#1E293B]"
+                                ? "text-neutral-900"
                                 : isCurrent
                                 ? "text-amber-900 font-extrabold"
-                                : "text-slate-400"
+                                : "text-neutral-400"
                             )}
                             title={stepName}
                           >
@@ -426,16 +653,16 @@ export function SubmissionTrackerModal({
                 </div>
               </div>
 
-              <div className={layout.section}>
+              <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-2xs">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-lg font-extrabold text-[#1E293B]">Pending approval</h3>
+                  <h3 className="text-base font-bold text-neutral-900">Signatory Approvals</h3>
                 </div>
-                <p className="text-xs font-bold text-[#64748B] mb-4">Assignees</p>
-                <div className="space-y-4">
+                <p className="text-xs font-semibold text-neutral-500 mb-4">Required Reviewers</p>
+                <div className="space-y-3.5">
                   {stepper.assigneesList.map((item, idx) => {
                     let iconBg = "bg-neutral-200 text-neutral-400"
-                    if (item.state === "completed") iconBg = "bg-[#10B981] text-white"
-                    else if (item.state === "current") iconBg = "bg-[#FBBF24] text-white"
+                    if (item.state === "completed") iconBg = "bg-emerald-500 text-white"
+                    else if (item.state === "current") iconBg = "bg-amber-500 text-white"
 
                     return (
                       <div key={`${item.role}-${idx}`} className="flex items-center gap-3">
@@ -448,9 +675,9 @@ export function SubmissionTrackerModal({
                             <div className="w-2 h-2 rounded-full bg-white"></div>
                           )}
                         </div>
-                        <div className="text-xs sm:text-sm font-medium text-[#1E293B]">
+                        <div className="text-xs sm:text-sm font-medium text-neutral-900">
                           <span className="font-bold">{item.name}</span>
-                          <span className="text-[#64748B]"> — {item.statusText}</span>
+                          <span className="text-neutral-500"> — {item.statusText}</span>
                         </div>
                       </div>
                     )
@@ -460,42 +687,37 @@ export function SubmissionTrackerModal({
             </div>
           )}
 
+        </DialogPanel>
+
+        <div className="flex shrink-0 justify-end gap-3 rounded-b-2xl border-t border-neutral-200 bg-white px-4 py-4 sm:px-8">
           {canResubmit && !isDependent ? (
-            <div className={cn(layout.section, "space-y-4")}>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <p className="text-sm text-[#475569]">
-                  Update this application and resubmit it to the current signatory.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleResubmit}
-                  className="min-h-11 rounded-xl bg-[#1E293B] px-4 py-2 text-xs font-bold text-white"
-                >
-                  Edit and resubmit
-                </button>
-              </div>
-            </div>
+            <Button
+              type="button"
+              onClick={handleResubmit}
+              className="bg-[#8B0000] text-white hover:bg-[#700000] font-bold shadow-xs cursor-pointer"
+            >
+              Edit and resubmit
+            </Button>
           ) : null}
-
-          {isDependent ? (
-            <div className={cn(layout.section)}>
-              <p className="text-sm text-[#475569]">
-                You are a collaborating organization on this application. It is
-                read-only — the proponent organization manages edits and
-                resubmission.
-              </p>
-            </div>
-          ) : null}
-
-          {isDenied ? (
-            <div className={cn(layout.section)}>
-              <p className="text-sm text-[#475569]">
-                This submission was denied and cannot be edited.
-              </p>
-            </div>
-          ) : null}
+          <Button
+            type="button"
+            disabled={isSavingPdf || !activity}
+            onClick={handleSavePdf}
+            variant="outline"
+            className="gap-2 text-neutral-800 cursor-pointer"
+          >
+            {isSavingPdf ? (
+              <Loader2 className="h-4 w-4 animate-spin text-[#8B0000]" />
+            ) : (
+              <DownloadIcon className="h-4 w-4 text-[#8B0000]" />
+            )}
+            Save as PDF
+          </Button>
+          <Button type="button" variant="outline" onClick={onClose} className="cursor-pointer">
+            Close
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogPopup>
+    </Dialog>
   )
 }

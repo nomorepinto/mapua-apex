@@ -2,9 +2,14 @@
 
 namespace App\Aws\DynamoDb;
 
+use App\Support\Email\SubmissionEmailer;
+
 final class NotificationRecords
 {
-    public function __construct(private DynamoDbItems $items) {}
+    public function __construct(
+        private DynamoDbItems $items,
+        private SubmissionEmailer $emailer,
+    ) {}
 
     /**
      * @return array<string, mixed>|null
@@ -32,6 +37,12 @@ final class NotificationRecords
     }
 
     /**
+     * Write a NOTIFICATION row and, when the caller supplies the submission it
+     * belongs to, fire the matching best-effort email(s). NOTIFICATION rows key
+     * off SUBMISSION#id alone, so the submission item (student address, org,
+     * sequence) has to ride along from the caller — it is always in memory there.
+     *
+     * @param  array<string, mixed>|null  $submission
      * @return array<string, mixed>
      */
     public function create(
@@ -40,6 +51,7 @@ final class NotificationRecords
         string $notifType,
         string $comment = '',
         ?string $sentAt = null,
+        ?array $submission = null,
     ): array {
         $item = $this->item(
             $submissionId,
@@ -49,6 +61,10 @@ final class NotificationRecords
             $comment,
         );
         $this->items->put($item);
+
+        if ($submission !== null) {
+            $this->emailer->notificationCreated($submission, $signatoryId, $notifType, $comment);
+        }
 
         return $item;
     }

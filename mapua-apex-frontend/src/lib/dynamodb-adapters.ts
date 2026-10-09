@@ -1,5 +1,13 @@
-import { DEFAULT_RESERVATION_DRAFT } from "@/components/reservation/constants"
+import {
+  AV_EQUIPMENT_OPTIONS,
+  DEFAULT_RESERVATION_DRAFT,
+  EQUIPMENT_OPTIONS,
+} from "@/components/reservation/constants"
 import type { EquipmentItem, ReservationDraft } from "@/components/reservation/types"
+import {
+  CLASSROOM_ROOM,
+  isRoomOfferedAtCampus,
+} from "@/lib/campus-rooms"
 import {
   createEmptyProponent,
   DEFAULT_BUDGET_ITEMS,
@@ -8,6 +16,7 @@ import {
 import type { SaafDraft } from "@/components/submission/types"
 import type { Activity } from "@/components/ui/activity.types"
 import { getEventSchedule } from "@/lib/event-schedule"
+import { departmentAbbreviation } from "@/lib/departments"
 
 /**
  * Backend API Submission shape returned by Laravel DynamoDB routes
@@ -86,7 +95,8 @@ export interface ApiSubmission {
   detailed_budget_proposal?: {
     items?: Array<{
       item_no: string
-      unit: number
+      /** Free-text measuring unit ("pc", "box", …); legacy rows stored a number. */
+      unit: number | string
       quantity: number
       price_per_unit: number
       total: number
@@ -295,7 +305,8 @@ export function buildSaafApiPayload(
     detailed_budget_proposal: {
       items: (saafDraft.budgetItems || []).map((b, idx) => ({
         item_no: b.item || String(idx + 1),
-        unit: Number(b.unit) || 1,
+        // Unit is a free-text label ("pc", "box", …), sent as typed.
+        unit: (b.unit || "").trim() || "pc",
         quantity: Number(b.quantity) || 0,
         price_per_unit: Number(b.pricePerUnit) || 0,
         total: (Number(b.quantity) || 0) * (Number(b.pricePerUnit) || 0),
@@ -360,6 +371,8 @@ export interface DashboardSubmissionRow {
   event_id: string
   submission_id: string
   organization_name: string
+  /** Abbreviation/code of the lead proponent's department (e.g. "SOIT"; "—" when unavailable). */
+  department: string
   id: string
   activity_classification: string
   /** OSAAR-assigned event nature (major / minor). Undefined until OSAAR sets it. */
@@ -368,6 +381,8 @@ export interface DashboardSubmissionRow {
   target_date: string
   requires_venue: boolean
   submitted_date: string
+  /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
+  sent_at: string
   api_status: "pending" | "approved" | "denied" | "returned"
   activity_details: {
     title: string
@@ -385,6 +400,8 @@ export interface DashboardSubmissionRow {
   statusColor: string
   /** Proponent vs collaboration-dependent view for the caller. */
   role?: "proponent" | "dependent"
+  /** True when this submission involves collaborating organizations. */
+  is_collaboration: boolean
 }
 
 export interface TrackerAssignee {
@@ -421,7 +438,7 @@ export interface ReviewNotice {
   sentAt: string
   dateStr: string
   title: string
-  notifType: "denied" | "returned"
+  notifType: "denied" | "returned" | "approved" | "fully approved"
   comment: string
   signatoryLabel: string
 }
@@ -474,11 +491,12 @@ export function formatDisplayDateTime(value?: string | null): string {
 export function formatDocumentId(id?: string | null, prefix = "SAAF"): string {
   if (!id || id === "—") return "—"
   const cleaned = id.replace(/^(SUBMISSION#|EVENT#)/i, "")
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleaned)
+  const targetId = cleaned.includes(":") ? cleaned.split(":").pop()! : cleaned
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId)
   if (isUuid) {
-    return `${prefix}-${cleaned.slice(0, 8).toUpperCase()}`
+    return `${prefix}-${targetId.slice(0, 8).toUpperCase()}`
   }
-  return cleaned
+  return targetId
 }
 
 function expectedSignatoryRoles(options?: {
@@ -679,6 +697,7 @@ export function apiSubmissionToDashboardRow(
         submissionOrganizationId(submission),
         organizations || []
       ),
+    department: departmentAbbreviation(firstProponent?.department),
     id: submission.submission_id,
     activity_classification: submission.activity_classification?.activity_type || "extra-curricular",
     nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,
@@ -686,6 +705,7 @@ export function apiSubmissionToDashboardRow(
     target_date: submission.activity_details?.date_of_event || submission.sent_at,
     requires_venue: Boolean(submission.venue_reservation?.has_reservation),
     submitted_date: formatDisplayDate(submission.sent_at),
+    sent_at: submission.sent_at || "",
     api_status: submission.status,
     activity_details: {
       title,
@@ -705,6 +725,8 @@ export function apiSubmissionToDashboardRow(
     status: meta.label as DashboardSubmissionStatus,
     statusColor: meta.color,
     role: submission.role ?? "proponent",
+    is_collaboration:
+      (submission.collaboration?.dependent_organization_ids?.length ?? 0) > 0,
   }
 }
 
@@ -749,14 +771,16 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     eventId: submission.event_id,
     submissionId: submission.submission_id,
     title,
-    org: firstProponent?.org_or_course_section || "Organization",
+    org: submission.organization_name || firstProponent?.org_or_course_section || "Organization",
     department: firstProponent?.department || "—",
+    departmentCode: departmentAbbreviation(firstProponent?.department),
     date: formatDisplayDateRange(
       submission.activity_details?.date_of_event,
       submission.activity_details?.end_date_of_event
     ),
     time: submission.activity_details?.time_of_event || "",
     submittedDate: formatDisplayDate(submission.sent_at),
+    submittedAt: submission.sent_at || "",
     representative: formatProponentName(firstProponent) || "—",
     type: submission.activity_classification?.activity_type || "extra-curricular",
     nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,
@@ -775,6 +799,54 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
       objectives.length > 0
         ? objectives
         : [{ title: "Objective", description: "No objectives listed." }],
+    equipmentRequested: (submission.venue_reservation?.equipment_requested?.items || []).map(
+      (item) => ({
+        name: item.name,
+        purpose: item.purpose || "",
+        remark: item.remark || "",
+      })
+    ),
+    roomsRequested: (submission.venue_reservation?.function_rooms?.items || []).map((item) => ({
+      roomNeeded: item.room_needed,
+      classroomName: item.classroom_name,
+      remarks: item.remarks || "",
+      dateNeeded: item.date_needed,
+      timeNeeded: item.time_needed,
+    })),
+    avEquipmentRequested: (
+      submission.venue_reservation?.audiovisual_equipment?.items || []
+    ).map((item) => ({
+      equipmentNeeded: item.equipment_needed,
+      remarks: item.remarks || "",
+      dateNeeded: item.date_needed,
+      timeNeeded: item.time_needed,
+    })),
+    budgetItems: (submission.detailed_budget_proposal?.items || []).map(
+      (item, idx) => {
+        const qty = Number(item.quantity) || 0
+        const price = Number(item.price_per_unit) || 0
+        const total =
+          typeof item.total === "number" ? item.total : qty * price
+        return {
+          item: item.item_no || `Item ${idx + 1}`,
+          unit: item.unit ?? 1,
+          quantity: qty,
+          pricePerUnit: price,
+          total,
+        }
+      }
+    ),
+    budgetGrandTotal:
+      typeof submission.detailed_budget_proposal?.grand_total === "number"
+        ? submission.detailed_budget_proposal.grand_total
+        : (submission.detailed_budget_proposal?.items || []).reduce(
+            (acc, curr) =>
+              acc +
+              (typeof curr.total === "number"
+                ? curr.total
+                : (Number(curr.quantity) || 0) * (Number(curr.price_per_unit) || 0)),
+            0
+          ),
   }
 }
 
@@ -974,9 +1046,9 @@ export function apiNotificationsToReviewNotices(
       submission.activity_details?.title_and_nature || submission.submission_id
 
     for (const item of notifications) {
-      if (item.notif_type !== "denied" && item.notif_type !== "returned") continue
       const comment = (item.comment || "").trim()
-      if (!comment) continue
+      // Denied/returned notices require a reason; approvals are recorded without one.
+      if (!comment && (item.notif_type === "denied" || item.notif_type === "returned")) continue
 
       notices.push({
         id: `${submission.submission_id}:${item.sent_at}`,
@@ -1027,7 +1099,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
     submission.detailed_budget_proposal?.items?.map((item, index) => ({
       id: String(index + 1),
       item: item.item_no || String(index + 1),
-      unit: String(item.unit ?? 1),
+      unit: String(item.unit || "pc"),
       quantity: String(item.quantity ?? 0),
       pricePerUnit: String(item.price_per_unit ?? 0),
     })) || DEFAULT_BUDGET_ITEMS
@@ -1062,13 +1134,18 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
         name: item.name || "",
         purpose: item.purpose || "",
         remark: item.remark || "",
+        // A stored name outside the fixed catalog was typed via "Others", so it
+        // reopens as an editable custom row.
+        isOther: !EQUIPMENT_OPTIONS.includes(item.name || ""),
       }))
     : legacyNames.map((name, index) => ({
         id: String(index + 1),
         name,
         purpose: "",
         remark: "",
+        isOther: !EQUIPMENT_OPTIONS.includes(name),
       }))
+  const roomCampus = submission.activity_details?.venue || ""
   const reservation: ReservationDraft = {
     equipmentItems,
     roomItems: reservationSource?.function_rooms?.items?.length
@@ -1081,6 +1158,10 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
         roomNeeded: item.room_needed,
         classroomName: item.classroom_name || "",
         remarks: item.remarks || "",
+        // Neither a fixed campus room nor "Classroom" => a custom "Others" row.
+        isOther:
+          item.room_needed !== CLASSROOM_ROOM &&
+          !isRoomOfferedAtCampus(roomCampus, item.room_needed),
       }))
       : DEFAULT_RESERVATION_DRAFT.roomItems,
     avItems: reservationSource?.audiovisual_equipment?.items?.length
@@ -1092,6 +1173,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
         endTimeNeeded: item.end_time_needed || item.time_needed,
         equipmentNeeded: item.equipment_needed,
         remarks: item.remarks || "",
+        isOther: !AV_EQUIPMENT_OPTIONS.includes(item.equipment_needed || ""),
       }))
       : DEFAULT_RESERVATION_DRAFT.avItems,
   }

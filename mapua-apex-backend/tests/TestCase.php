@@ -4,14 +4,52 @@ namespace Tests;
 
 use App\Auth\CognitoJwtVerifier;
 use App\Aws\DynamoDb\DynamoDbItems;
+use App\Support\Email\CognitoSignatoryEmails;
+use App\Support\Email\EmailSender;
 use Aws\DynamoDb\DynamoDbClient;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Mockery\MockInterface;
 use Tests\Fakes\FakeCognitoJwtVerifier;
+use Tests\Fakes\FakeCognitoSignatoryEmails;
+use Tests\Fakes\FakeEmailSender;
 use Tests\Fakes\InMemoryDynamoDb;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Keep every test offline: no SES sends, no Cognito user-pool lookups.
+        $this->fakeEmailSender();
+        $this->fakeSignatoryEmails();
+    }
+
+    protected function fakeEmailSender(): FakeEmailSender
+    {
+        $sender = new FakeEmailSender;
+        $this->app->instance(EmailSender::class, $sender);
+
+        return $sender;
+    }
+
+    /**
+     * @param  array<string, string>  $emails  signatory uuid => email
+     */
+    protected function fakeSignatoryEmails(array $emails = [
+        'adv001' => 'adv001@mapua.edu.ph',
+        'adv002' => 'adv002@mapua.edu.ph',
+        'dean001' => 'dean001@mapua.edu.ph',
+        'osaar001' => 'osaar001@mapua.edu.ph',
+        'cdm001' => 'cdm001@mapua.edu.ph',
+    ]): FakeCognitoSignatoryEmails
+    {
+        $lookup = new FakeCognitoSignatoryEmails($emails);
+        $this->app->instance(CognitoSignatoryEmails::class, $lookup);
+
+        return $lookup;
+    }
+
     /**
      * @param  array<string, mixed>  $claims
      */

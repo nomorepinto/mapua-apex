@@ -30,19 +30,29 @@ export function RoleRedirect() {
 
   const userGroups = (auth.user?.profile["cognito:groups"] as string[]) || []
 
-  // Admin & OSAAR → admin panel
-  if (hasGroup(userGroups, "admin") || hasGroup(userGroups, "osaar")) {
+  // Admin → admin panel
+  if (hasGroup(userGroups, "admin")) {
     return <Navigate to="/admin/dashboard" replace />
   }
 
-  // CDM Reviewer → signatories panel
-  if (hasGroup(userGroups, "cdm_reviewer")) {
-    return <Navigate to="/signatories/dashboard" replace />
+  // OSAAR → osaar panel
+  if (hasGroup(userGroups, "osaar")) {
+    return <Navigate to="/osaar/dashboard" replace />
   }
 
-  // Org Adviser & Dean → signatories panel
-  if (hasGroup(userGroups, "org_adviser") || hasGroup(userGroups, "dean")) {
-    return <Navigate to="/signatories/dashboard" replace />
+  // CDM Reviewer → own panel
+  if (hasGroup(userGroups, "cdm_reviewer")) {
+    return <Navigate to="/cdm-reviewer/dashboard" replace />
+  }
+
+  // Dean → own panel
+  if (hasGroup(userGroups, "dean")) {
+    return <Navigate to="/dean/dashboard" replace />
+  }
+
+  // Org Adviser → own panel
+  if (hasGroup(userGroups, "org_adviser")) {
+    return <Navigate to="/org-adviser/dashboard" replace />
   }
 
   // Org Submitter (student orgs) → student panel

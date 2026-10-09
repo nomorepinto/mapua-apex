@@ -179,6 +179,23 @@ export function useUpdateOrganizationMutation() {
   })
 }
 
+/**
+ * Permanently remove an organization. The API rejects (409) an organization
+ * that still owns submissions, so the caller surfaces the message.
+ */
+export function useDeleteOrganizationMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (organizationId: string) => {
+      await apiClient.delete(`/admins/organizations/${organizationId}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.organizations })
+    },
+  })
+}
+
 export type BulkCreateResult<T extends { name: string }> = {
   created: T[]
   failed: Array<{ name: string; error: string }>
@@ -272,6 +289,24 @@ export function useUpdateSignatoryMutation() {
         payload
       )
       return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.signatories })
+      queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.organizations })
+    },
+  })
+}
+
+/**
+ * Permanently remove a signatory. The API rejects (409) a person still assigned
+ * to an organization desk or holding an in-flight submission.
+ */
+export function useDeleteSignatoryMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (signatoryId: string) => {
+      await apiClient.delete(`/admins/signatories/${signatoryId}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.signatories })

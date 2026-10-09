@@ -19,40 +19,68 @@ import {
   useSignatoriesQuery,
   useUpdateAnnouncementMutation,
 } from "@/hooks/use-admin"
+import type { Activity } from "@/components/ui/activity.types"
 import {
   apiNotificationsToStepper,
+  apiSubmissionToActivity,
   apiSubmissionToDashboardRow,
   formatDisplayDateTime,
-  submissionOrganizationId,
   type ApiAnnouncement,
   type DashboardSubmissionRow,
 } from "@/lib/dynamodb-adapters"
 
 export const ANNOUNCEMENT_MAX = 5000
 
-export const STATUS_FILTERS = [
-  { value: "", label: "All statuses" },
-  { value: "pending", label: "Under Review" },
-  { value: "returned", label: "Returned" },
-  { value: "approved", label: "Approved" },
-  { value: "denied", label: "Denied" },
-] as const
+/** Columns of the admin submissions table that expose a value-filter dropdown. */
+export type AdminFilterColumn =
+  | "organization"
+  | "department"
+  | "type"
+  | "status"
 
-export const TYPE_FILTERS = [
-  { value: "", label: "All types" },
-  { value: "extra-curricular", label: "Extra-curricular" },
-  { value: "co-curricular", label: "Co-curricular" },
-  { value: "curricular", label: "Curricular" },
-] as const
+/** Selected values per filterable column; an empty list means "no filter". */
+export type AdminColumnFilters = Record<AdminFilterColumn, string[]>
 
-type SubmissionStatus = "" | "pending" | "approved" | "denied" | "returned"
+/** Sort direction of the sortable Submitted column; null = default order. */
+export type DateSortDirection = "asc" | "desc" | null
+
+const EMPTY_COLUMN_FILTERS: AdminColumnFilters = {
+  organization: [],
+  department: [],
+  type: [],
+  status: [],
+}
+
+/** The row value a given filterable column filters and lists options against. */
+function columnValue(
+  row: DashboardSubmissionRow,
+  column: AdminFilterColumn
+): string {
+  switch (column) {
+    case "organization":
+      return row.organization_name
+    case "department":
+      return row.department
+    case "type":
+      return row.activity_classification
+    case "status":
+      return row.status
+    default:
+      return ""
+  }
+}
 
 interface AdminDashboardState {
-  organizationId: string
-  status: SubmissionStatus
-  activityType: string
-  organizations: { organization_id: string; name: string }[]
   rows: DashboardSubmissionRow[]
+  /** Rows after the search box, per-column filters, and date sort are applied. */
+  filteredRows: DashboardSubmissionRow[]
+  search: string
+  /** Per-column value filters; an empty list means the column is not filtered. */
+  columnFilters: AdminColumnFilters
+  /** Distinct selectable values per filterable column, derived from all rows. */
+  filterOptions: AdminColumnFilters
+  /** Sort direction of the Submitted column; null keeps the default order. */
+  dateSortDirection: DateSortDirection
   submissionsLoading: boolean
   submissionsError: boolean
   announcements: ApiAnnouncement[]
@@ -60,6 +88,7 @@ interface AdminDashboardState {
   announcementsError: boolean
   selectedKeys: { eventId: string; submissionId: string } | null
   selectedRow: DashboardSubmissionRow | null
+  selectedActivity: Activity | null
   stepper: ReturnType<typeof apiNotificationsToStepper>
   detailLoading: boolean
   detailError: boolean
@@ -77,9 +106,10 @@ interface AdminDashboardState {
 }
 
 interface AdminDashboardActions {
-  setOrganizationId: (value: string) => void
-  setStatus: (value: SubmissionStatus) => void
-  setActivityType: (value: string) => void
+  setSearch: (value: string) => void
+  toggleColumnFilter: (column: AdminFilterColumn, value: string) => void
+  clearColumnFilter: (column: AdminFilterColumn) => void
+  toggleDateSort: () => void
   selectSubmission: (eventId: string, submissionId: string) => void
   closeSubmission: () => void
   openCreate: () => void
@@ -117,9 +147,11 @@ export function formatAnnouncementPostedAt(sentAt: string) {
 }
 
 export function AdminDashboardProvider({ children }: { children: ReactNode }) {
-  const [organizationId, setOrganizationId] = useState("")
-  const [status, setStatus] = useState<SubmissionStatus>("")
-  const [activityType, setActivityType] = useState("")
+  const [search, setSearch] = useState("")
+  const [columnFilters, setColumnFilters] =
+    useState<AdminColumnFilters>(EMPTY_COLUMN_FILTERS)
+  const [dateSortDirection, setDateSortDirection] =
+    useState<DateSortDirection>(null)
   const [selectedKeys, setSelectedKeys] = useState<{
     eventId: string
     submissionId: string
@@ -135,11 +167,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
 
   const signatoriesQuery = useSignatoriesQuery()
   const organizationsQuery = useOrganizationsQuery()
-  const submissionsQuery = useAdminSubmissionsQuery({
-    status: status || undefined,
-    activity_type: activityType || undefined,
-    organization_id: organizationId || undefined,
-  })
+  const submissionsQuery = useAdminSubmissionsQuery()
   const announcementsQuery = useAdminAnnouncementsQuery()
   const detailQuery = useAdminSubmissionDetailQuery(
     selectedKeys?.eventId,
@@ -156,22 +184,63 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       ),
     [organizationsQuery.data]
   )
-  const rows = useMemo(() => {
-    const selectedOrganization = organizationId.replace(/^ORGANIZATION#/i, "")
-
-    return (submissionsQuery.data || [])
-      .filter((submission) => {
-        if (!selectedOrganization) return true
-        return submissionOrganizationId(submission) === selectedOrganization
-      })
-      .map((submission) =>
+  const rows = useMemo(
+    () =>
+      (submissionsQuery.data || []).map((submission) =>
         apiSubmissionToDashboardRow(
           submission,
           signatoriesQuery.data,
           organizations
         )
+      ),
+    [organizations, signatoriesQuery.data, submissionsQuery.data]
+  )
+
+  const filterOptions = useMemo(() => {
+    const collect = (column: AdminFilterColumn) =>
+      Array.from(new Set(rows.map((row) => columnValue(row, column)))).sort(
+        (a, b) => a.localeCompare(b)
       )
-  }, [organizationId, organizations, signatoriesQuery.data, submissionsQuery.data])
+    return {
+      organization: collect("organization"),
+      department: collect("department"),
+      type: collect("type"),
+      status: collect("status"),
+    }
+  }, [rows])
+
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    const columns = Object.keys(columnFilters) as AdminFilterColumn[]
+    const matched = rows.filter((row) => {
+      if (query) {
+        const haystack = [
+          row.activity_details.title,
+          row.organization_name,
+          row.department,
+          row.activity_classification,
+          row.submitted_date,
+          row.status,
+        ]
+          .join(" ")
+          .toLowerCase()
+        if (!haystack.includes(query)) return false
+      }
+      return columns.every((column) => {
+        const selected = columnFilters[column]
+        return (
+          selected.length === 0 || selected.includes(columnValue(row, column))
+        )
+      })
+    })
+    if (!dateSortDirection) {
+      return matched
+    }
+    const sorted = [...matched].sort(
+      (a, b) => (Date.parse(a.sent_at) || 0) - (Date.parse(b.sent_at) || 0)
+    )
+    return dateSortDirection === "desc" ? sorted.reverse() : sorted
+  }, [columnFilters, dateSortDirection, rows, search])
 
   const selectedRow = detailQuery.data
     ? apiSubmissionToDashboardRow(
@@ -179,6 +248,9 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
         signatoriesQuery.data,
         organizations
       )
+    : null
+  const selectedActivity = detailQuery.data
+    ? apiSubmissionToActivity(detailQuery.data)
     : null
   const stepper = apiNotificationsToStepper(
     detailQuery.data?.notifications || [],
@@ -284,11 +356,12 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
 
   const value: AdminDashboardContextValue = {
     state: {
-      organizationId,
-      status,
-      activityType,
-      organizations,
       rows,
+      filteredRows,
+      search,
+      columnFilters,
+      filterOptions,
+      dateSortDirection,
       submissionsLoading: submissionsQuery.isLoading,
       submissionsError: submissionsQuery.isError,
       announcements: announcementsQuery.data || [],
@@ -296,6 +369,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       announcementsError: announcementsQuery.isError,
       selectedKeys,
       selectedRow,
+      selectedActivity,
       stepper,
       detailLoading: detailQuery.isLoading,
       detailError: detailQuery.isError,
@@ -312,9 +386,21 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       deletePending: deleteAnnouncement.isPending,
     },
     actions: {
-      setOrganizationId,
-      setStatus,
-      setActivityType,
+      setSearch,
+      toggleColumnFilter: (column, value) =>
+        setColumnFilters((prev) => {
+          const current = prev[column]
+          return {
+            ...prev,
+            [column]: current.includes(value)
+              ? current.filter((item) => item !== value)
+              : [...current, value],
+          }
+        }),
+      clearColumnFilter: (column) =>
+        setColumnFilters((prev) => ({ ...prev, [column]: [] })),
+      toggleDateSort: () =>
+        setDateSortDirection((prev) => (prev === "asc" ? "desc" : "asc")),
       selectSubmission: (eventId, submissionId) =>
         setSelectedKeys({ eventId, submissionId }),
       closeSubmission: () => setSelectedKeys(null),

@@ -1,5 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useMemo, useState, type FormEvent, type ReactNode } from "react"
+import {
+  createContext,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react"
 import { use } from "react"
 
 import {
@@ -19,11 +25,16 @@ import { toastManager } from "@/components/ui/toast"
 import {
   useBulkCreateSignatoriesMutation,
   useCreateSignatoryMutation,
+  useDeleteSignatoryMutation,
   useSignatoriesQuery,
   useUpdateSignatoryMutation,
 } from "@/hooks/use-admin"
 import { departmentLabel } from "@/lib/departments"
-import { buildSignatoryPayload, type ApiSignatory } from "@/lib/dynamodb-adapters"
+import {
+  buildSignatoryPayload,
+  formatDocumentId,
+  type ApiSignatory,
+} from "@/lib/dynamodb-adapters"
 import { parseSignatoryCsv, type SignatoryCsvRow } from "@/lib/parse-csv"
 
 const EMPTY_SIGNATORIES: ApiSignatory[] = []
@@ -60,6 +71,9 @@ interface SignatoriesState {
   editRole: SignatoryRoleValue | null
   editDepartment: DepartmentOption | null
   editError: string
+  deleteOpen: boolean
+  deleteError: string
+  deletePending: boolean
 }
 
 interface SignatoriesActions {
@@ -76,6 +90,9 @@ interface SignatoriesActions {
   changeEditRole: (role: SignatoryRoleValue | null) => void
   setEditDepartment: (value: DepartmentOption | null) => void
   handleEditSave: (event: FormEvent<HTMLFormElement>) => Promise<void>
+  setDeleteOpen: (open: boolean) => void
+  openDelete: () => void
+  handleDelete: () => Promise<void>
 }
 
 interface SignatoriesContextValue {
@@ -88,7 +105,9 @@ const SignatoriesContext = createContext<SignatoriesContextValue | null>(null)
 export function useSignatoriesPage() {
   const value = use(SignatoriesContext)
   if (!value) {
-    throw new Error("useSignatoriesPage must be used within SignatoriesProvider")
+    throw new Error(
+      "useSignatoriesPage must be used within SignatoriesProvider"
+    )
   }
   return value
 }
@@ -97,6 +116,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
   const signatoriesQuery = useSignatoriesQuery()
   const createSignatory = useCreateSignatoryMutation()
   const updateSignatory = useUpdateSignatoryMutation()
+  const deleteSignatory = useDeleteSignatoryMutation()
   const bulkCreate = useBulkCreateSignatoriesMutation()
 
   const [name, setName] = useState("")
@@ -115,6 +135,8 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
     null
   )
   const [editError, setEditError] = useState("")
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
 
   const signatories = signatoriesQuery.data ?? EMPTY_SIGNATORIES
   const takenRoles = takenSingletonRoles(signatories)
@@ -166,6 +188,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       const haystack = [
         person.name,
         person.signatory_id,
+        formatDocumentId(person.signatory_id, "SIG"),
         person.role,
         signatoryRoleLabel(person.role),
         person.department ?? "",
@@ -313,7 +336,11 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
     try {
       await updateSignatory.mutateAsync({
         signatoryId: editing.signatory_id,
-        ...buildSignatoryPayload(editName.trim(), editRole, editDepartment?.value),
+        ...buildSignatoryPayload(
+          editName.trim(),
+          editRole,
+          editDepartment?.value
+        ),
       })
       setEditing(null)
       toastManager.add({
@@ -327,6 +354,33 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
         description: error instanceof Error ? error.message : "Request failed.",
         type: "error",
       })
+    }
+  }
+
+  async function handleDelete() {
+    if (!editing) {
+      return
+    }
+
+    const removedName = editing.name
+    try {
+      await deleteSignatory.mutateAsync(editing.signatory_id)
+      setDeleteOpen(false)
+      setEditing(null)
+      setEditError("")
+      setDeleteError("")
+      toastManager.add({
+        title: "Signatory removed",
+        description: `${removedName} was deleted.`,
+        type: "success",
+      })
+    } catch (error) {
+      setDeleteOpen(false)
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : "Could not delete this signatory."
+      )
     }
   }
 
@@ -364,6 +418,9 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       editRole,
       editDepartment,
       editError,
+      deleteOpen,
+      deleteError,
+      deletePending: deleteSignatory.isPending,
     },
     actions: {
       changeName: (next) => {
@@ -397,6 +454,8 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       closeEdit: () => {
         setEditing(null)
         setEditError("")
+        setDeleteOpen(false)
+        setDeleteError("")
       },
       changeEditName: (next) => {
         setEditName(next)
@@ -409,6 +468,15 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       },
       setEditDepartment,
       handleEditSave,
+      setDeleteOpen: (open) => {
+        setDeleteOpen(open)
+        if (!open) setDeleteError("")
+      },
+      openDelete: () => {
+        setDeleteError("")
+        setDeleteOpen(true)
+      },
+      handleDelete,
     },
   }
 

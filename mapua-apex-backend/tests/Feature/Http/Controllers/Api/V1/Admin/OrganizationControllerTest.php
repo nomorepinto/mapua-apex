@@ -223,4 +223,38 @@ class OrganizationControllerTest extends TestCase
         $stored = $db->find('ORGANIZATION#a1b2', 'ORGANIZATION#a1b2');
         $this->assertTrue($stored['is_higher_council'] ?? false);
     }
+
+    public function test_deletes_an_organization_without_submissions(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::organization($db);
+
+        $this->withAdminAuth()
+            ->deleteJson('/api/v1/admins/organizations/a1b2')
+            ->assertNoContent();
+
+        $this->assertNull($db->find('ORGANIZATION#a1b2', 'ORGANIZATION#a1b2'));
+    }
+
+    public function test_returns_404_when_deleting_a_missing_organization(): void
+    {
+        InMemoryDynamoDb::bind($this);
+
+        $this->withAdminAuth()
+            ->deleteJson('/api/v1/admins/organizations/missing')
+            ->assertNotFound();
+    }
+
+    public function test_returns_409_when_the_organization_still_has_events(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::organization($db);
+        DynamoFixtures::event($db);
+
+        $this->withAdminAuth()
+            ->deleteJson('/api/v1/admins/organizations/a1b2')
+            ->assertConflict();
+
+        $this->assertNotNull($db->find('ORGANIZATION#a1b2', 'ORGANIZATION#a1b2'));
+    }
 }

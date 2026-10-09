@@ -1,5 +1,6 @@
 import { layout, modal } from "@/config"
 import { cn } from "@/lib/utils"
+import { useEffect, useState } from "react"
 
 export function ConfirmClearModal({
   open,
@@ -17,10 +18,40 @@ export function ConfirmClearModal({
   if (!open) return null
 
   return (
-    <div
-      onClick={onClose}
-      className={modal.overlayCenter}
-    >
+    <ConfirmClearModalContent
+      title={title}
+      description={description}
+      onClose={onClose}
+      onConfirm={onConfirm}
+    />
+  )
+}
+function ConfirmClearModalContent({
+  title,
+  description,
+  onClose,
+  onConfirm,
+}: {
+  title: string
+  description: string
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  const [countdown, setCountdown] = useState(5)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+  return (
+    <div onClick={onClose} className={modal.overlayCenter}>
       <div
         onClick={(e) => e.stopPropagation()}
         className={cn(modal.shell, modal.md, "min-h-[200px] justify-between rounded-2xl")}
@@ -30,7 +61,6 @@ export function ConfirmClearModal({
             {title}
           </h3>
         </div>
-
         <div className="flex flex-1 flex-col justify-center space-y-5 px-5 py-5 text-center sm:px-8">
           <p className="text-sm leading-relaxed font-normal text-neutral-700">
             {description}{" "}
@@ -38,7 +68,6 @@ export function ConfirmClearModal({
               This action cannot be undone.
             </strong>
           </p>
-
           <div className={cn(layout.actionRow, "justify-center pt-1 sm:items-center sm:gap-4")}>
             <button
               type="button"
@@ -50,9 +79,10 @@ export function ConfirmClearModal({
             <button
               type="button"
               onClick={onConfirm}
-              className="min-h-11 w-full cursor-pointer rounded-xl bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#B91C1C] sm:w-40"
+              disabled={countdown > 0}
+              className="min-h-11 w-full cursor-pointer rounded-xl bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#B91C1C] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#DC2626] sm:w-40"
             >
-              Clear
+              {countdown > 0 ? `Clear (${countdown}s)` : "Clear"}
             </button>
           </div>
         </div>

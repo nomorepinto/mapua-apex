@@ -9,6 +9,7 @@ type ReviewDashboardModel = ReturnType<typeof useReviewDashboard>
 type ReviewDashboardActionName =
   | "handleDeptSelect"
   | "handleOrgSelect"
+  | "handleSearchChange"
   | "handleActivitySelect"
   | "handleModalClose"
   | "handleModalAction"
@@ -37,24 +38,35 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ReviewDashboardContextValue>(
     () => ({
       state: {
+        role: dashboard.role,
         roleLabel: dashboard.roleLabel,
         stats: dashboard.stats,
         departments: dashboard.departments,
         departmentOrgMap: dashboard.departmentOrgMap,
         selectedDept: dashboard.selectedDept,
         selectedOrg: dashboard.selectedOrg,
+        search: dashboard.search,
         activeActivity: dashboard.activeActivity,
-        filteredActivities: dashboard.filteredActivities,
+        allActivities: dashboard.allActivities,
+        reviewActivities: dashboard.reviewActivities,
+        historyActivities: dashboard.historyActivities,
         hasActivities: dashboard.hasActivities,
         isLoading: dashboard.isLoading,
+        isHistoryLoading: dashboard.isHistoryLoading,
         isActing: dashboard.isActing,
         isOsaar: dashboard.isOsaar,
+        isCdm: dashboard.isCdm,
+        isAdviser: dashboard.isAdviser,
+        isDean: dashboard.isDean,
+        isCampusDesk: dashboard.isCampusDesk,
         isUpdatingClassification: dashboard.isUpdatingClassification,
+        isReadOnly: dashboard.isReadOnly,
         actionError: dashboard.actionError,
       },
       actions: {
         handleDeptSelect: dashboard.handleDeptSelect,
         handleOrgSelect: dashboard.handleOrgSelect,
+        handleSearchChange: dashboard.handleSearchChange,
         handleActivitySelect: dashboard.handleActivitySelect,
         handleModalClose: dashboard.handleModalClose,
         handleModalAction: dashboard.handleModalAction,

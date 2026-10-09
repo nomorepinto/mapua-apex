@@ -10,10 +10,8 @@ export const SAAF_STEPS = [
 
 export const RESERVATION_STEP = { id: "reservation", label: "Reservation" }
 
-/** Step indices for the four SAAF panels (used by the SAAF validation maps). */
-export type SaafStepIndex = 0 | 1 | 2 | 3
-
-/** Step indices for the whole wizard, including the optional reservation step. */
+/** Step indices for the wizard */
+export type SaafStepIndex = 0 | 1 | 2 | 3 | 4
 export type WizardStepIndex = 0 | 1 | 2 | 3 | 4
 
 export function SaafStepper({
@@ -29,37 +27,76 @@ export function SaafStepper({
   includeReservation: boolean
   onStepSelect: (step: WizardStepIndex) => void
 }) {
+  // Step order: Classification (1), People (2), Reservation (3), Activity (4), Alignment & budget (5)
   const steps = includeReservation
-    ? [...SAAF_STEPS, RESERVATION_STEP]
+    ? [
+      SAAF_STEPS[0], // Classification
+      SAAF_STEPS[1], // People
+      RESERVATION_STEP, // Reservation
+      SAAF_STEPS[2], // Activity
+      SAAF_STEPS[3], // Alignment & budget
+    ]
     : [...SAAF_STEPS]
-  // The list shrinks when the reservation step is dropped, so an out-of-range
-  // index must clamp instead of reading past the end.
+
   const activeStep = Math.min(step, steps.length - 1)
+
+  const stepStates = steps.map((item, index) => {
+    const active = index === activeStep
+    const reached = index <= farthestStep
+    const done = reached && !active
+    return { item, index, active, done, clickable: done }
+  })
 
   return (
     <div className="space-y-3">
       {eventTitle ? (
         <p className="text-sm font-semibold text-neutral-800">{eventTitle}</p>
       ) : null}
+
+      {/* Mobile progress rail */}
+      <ol className="flex items-center sm:hidden">
+        {stepStates.map(({ item, index, active, done, clickable }) => (
+          <li
+            key={item.id}
+            className={cn("flex items-center", index > 0 && "flex-1")}
+          >
+            {index > 0 && (
+              <span
+                aria-hidden
+                className={cn(
+                  "h-0.5 flex-1 rounded-full",
+                  index <= farthestStep ? "bg-[#8B0000]" : "bg-neutral-200"
+                )}
+              />
+            )}
+            <StepBall
+              index={index}
+              active={active}
+              done={done}
+              clickable={clickable}
+              label={item.label}
+              onSelect={onStepSelect}
+            />
+          </li>
+        ))}
+      </ol>
+
+      {/* Desktop cards */}
       <ol
         className={cn(
-          "grid grid-cols-2 gap-2",
+          "hidden gap-2 sm:grid",
           includeReservation ? "sm:grid-cols-5" : "sm:grid-cols-4"
         )}
       >
-        {steps.map((item, index) => {
-          const active = index === activeStep
-          const reached = index <= farthestStep
-          const done = reached && !active
-          const clickable = done
+        {stepStates.map(({ item, index, active, done, clickable }) => {
           const className = cn(
             "flex min-h-11 w-full items-center gap-2 rounded-xl border px-3 py-2 text-left",
             active && "border-[#8B0000] bg-[#8B0000] text-white",
             done &&
-              "cursor-pointer border-[#8B0000]/30 bg-[#8B0000]/5 text-[#8B0000] transition-colors hover:border-[#8B0000]/50 hover:bg-[#8B0000]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B0000]/40",
+            "cursor-pointer border-[#8B0000]/30 bg-[#8B0000]/5 text-[#8B0000] transition-colors hover:border-[#8B0000]/50 hover:bg-[#8B0000]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B0000]/40",
             !active &&
-              !done &&
-              "cursor-default border-neutral-200 bg-white text-neutral-600"
+            !done &&
+            "cursor-default border-neutral-200 bg-white text-neutral-600"
           )
 
           return (
@@ -118,5 +155,44 @@ function StepMarker({
     >
       {index + 1}
     </span>
+  )
+}
+
+function StepBall({
+  index,
+  active,
+  done,
+  clickable,
+  label,
+  onSelect,
+}: {
+  index: number
+  active: boolean
+  done: boolean
+  clickable: boolean
+  label: string
+  onSelect: (step: WizardStepIndex) => void
+}) {
+  const className = cn(
+    "flex size-10 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B0000]/40",
+    active && "border-[#8B0000] bg-[#8B0000] text-white",
+    done &&
+    "cursor-pointer border-[#8B0000] bg-white text-[#8B0000] hover:bg-[#8B0000] hover:text-white",
+    !active && !done && "border-neutral-200 bg-white text-neutral-400"
+  )
+
+  return clickable ? (
+    <button
+      type="button"
+      className={className}
+      onClick={() => onSelect(index as WizardStepIndex)}
+      aria-label={`Go to ${label}`}
+    >
+      {index + 1}
+    </button>
+  ) : (
+    <div className={className} aria-current={active ? "step" : undefined}>
+      {index + 1}
+    </div>
   )
 }

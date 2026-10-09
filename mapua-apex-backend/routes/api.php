@@ -61,6 +61,7 @@ Route::middleware(['throttle:student'])->group(function (): void {
         ->group(function (): void {
             Route::get('me', [SignatoryProfileController::class, 'show'])->name('me.show');
             Route::get('submissions', [SignatorySubmissionController::class, 'index'])->name('submissions.index');
+            Route::get('submissions/history', [SignatorySubmissionController::class, 'history'])->name('submissions.history');
             Route::get('events/{event}/submissions/{submission}', [SignatorySubmissionController::class, 'show'])
                 ->name('submissions.show');
             Route::post('events/{event}/submissions/{submission}/approve', [SignatorySubmissionController::class, 'approve'])
@@ -121,6 +122,9 @@ Route::middleware(['throttle:student'])->group(function (): void {
             Route::put('organizations/{organization}', [OrganizationController::class, 'update'])
                 ->middleware('throttle:admin-write')
                 ->name('organizations.update');
+            Route::delete('organizations/{organization}', [OrganizationController::class, 'destroy'])
+                ->middleware('throttle:admin-write')
+                ->name('organizations.destroy');
             Route::get('signatories', [SignatoryController::class, 'index'])->name('signatories.index');
             Route::post('signatories', [SignatoryController::class, 'store'])
                 ->middleware('throttle:admin-write')
@@ -128,5 +132,8 @@ Route::middleware(['throttle:student'])->group(function (): void {
             Route::put('signatories/{signatory}', [SignatoryController::class, 'update'])
                 ->middleware('throttle:admin-write')
                 ->name('signatories.update');
+            Route::delete('signatories/{signatory}', [SignatoryController::class, 'destroy'])
+                ->middleware('throttle:admin-write')
+                ->name('signatories.destroy');
         });
 });

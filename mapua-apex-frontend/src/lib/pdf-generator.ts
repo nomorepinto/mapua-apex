@@ -149,7 +149,7 @@ export function generateProposalPdf(
 
     autoTable(doc, {
         startY: y,
-        head: [["#", "Proponent Name", "Position", "Student No.", "Program & Yr", "Department", "Contact"]],
+        head: [["#", "Proponent Name", "Position", "Student No.", "Program & Yr", "Department", "Mobile No."]],
         headStyles: { fillColor: [60, 60, 60], textColor: [255, 255, 255], fontSize: 8 },
         styles: { fontSize: 7.5, cellPadding: 1.5 },
         body: proponentRows,
@@ -166,7 +166,7 @@ export function generateProposalPdf(
         grandTotal += total
         return [
             String(b.item || ""),
-            String(b.unit || "1"),
+            String(b.unit || "pc"),
             String(qty),
             `PHP ${price.toFixed(2)}`,
             `PHP ${total.toFixed(2)}`,

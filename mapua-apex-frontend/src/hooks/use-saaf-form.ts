@@ -7,6 +7,8 @@ import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import {
   createEmptyProponent,
   DEFAULT_SAAF_DRAFT,
+  MAX_PROPONENTS,
+  ONLINE_VENUE,
 } from "@/components/submission/constants"
 import { withReservationDefaults } from "@/components/reservation/constants"
 import type {
@@ -24,6 +26,7 @@ import {
   getSaafStepIssue,
   isStepHtmlValid,
   STEP_INVALID_FOCUS_SELECTOR,
+  getMovedReservationFieldsIssue,
 } from "@/components/submission/validate-saaf-step"
 import {
   calculateRowTotal,
@@ -122,6 +125,17 @@ export function useSaafForm() {
     }
   }, [fetcher.data?.success])
 
+  // A physical room reservation cannot happen at an "Online" venue, so when the
+  // proponent opted to reserve facilities the venue must be a campus. Clear a
+  // stale "Online" value (e.g. chosen before switching to reserve, or restored
+  // from a returned paper) so the CDM room catalog is not left empty; the venue
+  // selector hides "Online" in this flow too.
+  useEffect(() => {
+    if (includeReservation && draft.activityVenue === ONLINE_VENUE) {
+      useOrgStore.getState().patchSaafDraft({ activityVenue: "" })
+    }
+  }, [includeReservation, draft.activityVenue])
+
   const updateField = useCallback(
     <K extends keyof SaafDraft>(key: K, value: SaafDraft[K]) => {
       useOrgStore.getState().patchSaafDraft({ [key]: value })
@@ -131,6 +145,9 @@ export function useSaafForm() {
 
   const handleAddProponent = useCallback(() => {
     const current = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
+    // Section 2 caps the application at MAX_PROPONENTS proponents; the button
+    // is hidden at the limit, so this guard also covers stale callers.
+    if (current.proponents.length >= MAX_PROPONENTS) return
     const today = new Date().toISOString().split("T")[0]
     const newProponent = createEmptyProponent(String(Date.now()))
     newProponent.dateOfSubmission = today
@@ -175,9 +192,9 @@ export function useSaafForm() {
         {
           id: String(Date.now()),
           item: "",
-          unit: "1",
-          quantity: "1",
-          pricePerUnit: "0",
+          unit: "",
+          quantity: "",
+          pricePerUnit: "",
         },
       ],
     })
@@ -194,10 +211,13 @@ export function useSaafForm() {
   const handleUpdateBudgetItem = useCallback(
     (id: string, field: keyof BudgetItem, value: string) => {
       let sanitized = value
-      if (field === "unit" || field === "quantity") {
+      if (field === "quantity") {
         sanitized = sanitizeIntegerInput(value).slice(0, 7)
       } else if (field === "pricePerUnit") {
-        sanitized = sanitizeDecimalInput(value).slice(0, 8)
+        sanitized = sanitizeDecimalInput(value).slice(0, 5)
+      } else if (field === "unit") {
+        // Unit is a free-text label ("pc", "box", "kg", …), not a number.
+        sanitized = value.slice(0, 12)
       } else if (field === "item") {
         sanitized = value.slice(0, 40)
       }
@@ -250,13 +270,13 @@ export function useSaafForm() {
       const htmlValid = panel ? isStepHtmlValid(panel) : false
       const issue =
         step === 4
-          ? getReservationStepIssue(
+          ? (getMovedReservationFieldsIssue(draft) || getReservationStepIssue(
               withReservationDefaults(
                 useOrgStore.getState().reservationDraft
               ),
               draft.activityVenue
-            )
-          : getSaafStepIssue(step as SaafStepIndex, draft)
+            ))
+          : getSaafStepIssue(step as SaafStepIndex, draft, includeReservation)
 
       if (!htmlValid || issue) {
         revealInvalidFields(panel ?? form)
@@ -279,7 +299,7 @@ export function useSaafForm() {
       // Check standard constraints
       const isHtmlValid = form.checkValidity()
       const issues = ([0, 1, 2, 3] as const)
-        .map((step) => getSaafStepIssue(step, draft))
+        .map((step) => getSaafStepIssue(step, draft, includeReservation))
         .filter((issue): issue is string => Boolean(issue))
 
       // When the wizard includes the reservation step, it must hold at least one

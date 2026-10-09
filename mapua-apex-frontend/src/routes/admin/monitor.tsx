@@ -1,5 +1,5 @@
 import { Navigate } from "react-router";
 
 export function AdminMonitorPage() {
-  return <Navigate to="/admin/monitor/sessions" replace />;
+  return <Navigate to="/admin/sessions" replace />;
 }
