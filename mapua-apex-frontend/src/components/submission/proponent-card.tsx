@@ -8,6 +8,7 @@ import {
   getDepartmentItem,
   getDepartmentPrograms,
   getProgramItem,
+  getYearLevelOptions,
   MOBILE_NUMBER_LENGTH,
   sanitizeMobileNumber,
   SELECT_CONTENT_STYLE,
@@ -37,10 +38,15 @@ function parseProgramAndYear(val: string): { program: string; year: string } {
   if (!trimmed) return { program: "", year: "" }
 
   const match = trimmed.match(
-    /^(.*?)\s*-\s*(1st Year|2nd Year|3rd Year|4th Year|5th Year)$/i
+    /^(.*?)\s*-\s*(1st Year|2nd Year|3rd Year|4th Year|5th Year|11|12)$/i
   )
   if (match) {
-    return { program: match[1].trim(), year: match[2].trim() }
+    const matchedYear = match[2].trim()
+    const canonicalYear =
+      (YEAR_LEVEL_OPTIONS as readonly string[]).find(
+        (y) => y.toLowerCase() === matchedYear.toLowerCase()
+      ) ?? matchedYear
+    return { program: match[1].trim(), year: canonicalYear }
   }
 
   const foundYear = (YEAR_LEVEL_OPTIONS as readonly string[]).find(
@@ -95,6 +101,8 @@ export const ProponentCard = memo(function ProponentCard({
       !availablePrograms.some((p) => p.code === selectedProgCode)
       ? [{ code: selectedProgCode, name: selectedProgCode }, ...availablePrograms]
       : availablePrograms
+
+  const yearOptions = getYearLevelOptions(selectedDeptCode || departmentValue)
 
   return (
     <div className={cn(layout.section, "space-y-6")}>
@@ -247,15 +255,25 @@ export const ProponentCard = memo(function ProponentCard({
               if (typeof val === "string") {
                 onDepartmentChange(proponent.id, val)
                 const newPrograms = getDepartmentPrograms(val)
-                if (
+                const isProgValid = Boolean(
                   selectedProgCode &&
-                  !newPrograms.some((p) => p.code === selectedProgCode)
-                ) {
-                  onUpdate(
-                    proponent.id,
-                    "programAndYear",
-                    currentYear ? currentYear : ""
-                  )
+                    newPrograms.some((p) => p.code === selectedProgCode)
+                )
+                const newYearOptions = getYearLevelOptions(val)
+                const isYearValid = Boolean(
+                  currentYear &&
+                    (newYearOptions as readonly string[]).includes(currentYear)
+                )
+
+                const nextProg = isProgValid ? selectedProgCode : ""
+                const nextYear = isYearValid ? currentYear : ""
+
+                if (!isProgValid || !isYearValid) {
+                  const combined =
+                    nextProg && nextYear
+                      ? `${nextProg} - ${nextYear}`
+                      : nextProg || nextYear
+                  onUpdate(proponent.id, "programAndYear", combined)
                 }
               }
             }}
@@ -371,7 +389,7 @@ export const ProponentCard = memo(function ProponentCard({
               className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
               style={SELECT_CONTENT_STYLE}
             >
-              {YEAR_LEVEL_OPTIONS.map((yr) => (
+              {yearOptions.map((yr) => (
                 <SelectItem key={yr} value={yr} className={SELECT_ITEM_CLASS}>
                   {yr}
                 </SelectItem>

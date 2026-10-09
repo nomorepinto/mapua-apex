@@ -79,3 +79,6 @@ mapua-apex-backend/.idea/
 mapua-apex-backend/.nova/
 mapua-apex-backend/.vscode/
 mapua-apex-backend/.zed/
+
+# Fake Folders
+fake_folder/

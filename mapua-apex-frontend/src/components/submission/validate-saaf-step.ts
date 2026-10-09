@@ -14,7 +14,7 @@ import {
   MIN_STUDENT_YEAR,
   MOBILE_NUMBER_LENGTH,
   STUDENT_NUMBER_LENGTH,
-  YEAR_LEVEL_OPTIONS,
+  getYearLevelOptions,
 } from "@/components/submission/constants"
 import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
@@ -140,7 +140,8 @@ function proponentWarnings(
     warnings[key("programAndYear")] = REQUIRED
   } else {
     const trimmed = proponent.programAndYear.trim()
-    const hasYear = YEAR_LEVEL_OPTIONS.some((yr) =>
+    const allowedYears = getYearLevelOptions(department)
+    const hasYear = allowedYears.some((yr) =>
       trimmed.toLowerCase().endsWith(yr.toLowerCase())
     )
     const hasProgram =

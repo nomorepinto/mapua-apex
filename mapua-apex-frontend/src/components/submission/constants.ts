@@ -67,16 +67,37 @@ export function getDepartmentItem(nameOrCode: string | null | undefined): Depart
   )
 }
 
-export const YEAR_LEVEL_OPTIONS = [
+export const COLLEGE_YEAR_LEVEL_OPTIONS = [
   "1st Year",
   "2nd Year",
   "3rd Year",
   "4th Year",
   "5th Year",
-  "SHS",
+] as const
+
+export const SHS_YEAR_LEVEL_OPTIONS = ["11", "12"] as const
+
+export const YEAR_LEVEL_OPTIONS = [
+  ...COLLEGE_YEAR_LEVEL_OPTIONS,
+  ...SHS_YEAR_LEVEL_OPTIONS,
 ] as const
 
 export type YearLevel = (typeof YEAR_LEVEL_OPTIONS)[number]
+
+export function isShsDepartment(nameOrCode: string | null | undefined): boolean {
+  if (!nameOrCode) return false
+  const item = getDepartmentItem(nameOrCode)
+  const code = item?.code ?? nameOrCode.trim().toUpperCase()
+  return code === "SHS-INTRA" || code === "SHS-MAKATI"
+}
+
+export function getYearLevelOptions(
+  deptNameOrCode: string | null | undefined
+): readonly string[] {
+  return isShsDepartment(deptNameOrCode)
+    ? SHS_YEAR_LEVEL_OPTIONS
+    : COLLEGE_YEAR_LEVEL_OPTIONS
+}
 
 export interface ProgramItem {
   code: string
