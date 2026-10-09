@@ -301,7 +301,7 @@ export const router = createBrowserRouter([
           return { Component: AdminDashboard }
         },
       },
-      {
+
       {
         path: "sessions",
         HydrateFallback: RouteFallback,
