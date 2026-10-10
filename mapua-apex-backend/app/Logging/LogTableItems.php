@@ -3,6 +3,7 @@
 namespace App\Logging;
 
 use App\Aws\AwsClientFactory;
+use App\Aws\DynamoDb\DynamoKeys;
 use App\Aws\DynamoDb\ItemMarshaller;
 use Aws\DynamoDb\DynamoDbClient;
 use Aws\DynamoDb\Exception\DynamoDbException;
@@ -363,6 +364,101 @@ final class LogTableItems
         $pk = 'ACTIVITY#'.$activityId;
 
         return $this->get($table, $pk, $pk);
+    }
+
+    public function getActiveSessionPointer(string $sub): ?array
+    {
+        $table = $this->sessionTable();
+        $pk = DynamoKeys::user($sub);
+
+        return $this->get($table, $pk, DynamoKeys::activeSessionSk());
+    }
+
+    public function putActiveSessionPointer(string $sub, string $sessionId, ?string $deviceId, string $now, int $ttl): void
+    {
+        $table = $this->sessionTable();
+        $item = [
+            'PK' => DynamoKeys::user($sub),
+            'SK' => DynamoKeys::activeSessionSk(),
+            'sub' => $sub,
+            'session_id' => $sessionId,
+            'status' => 'active',
+            'login_time' => $now,
+            'last_heartbeat' => $now,
+            'TTL' => $ttl,
+        ];
+
+        if ($deviceId !== null && trim($deviceId) !== '') {
+            $item['device_id'] = trim($deviceId);
+        }
+
+        $this->put($table, $item);
+    }
+
+    public function clearActiveSessionPointerIfMatches(string $sub, string $sessionId): bool
+    {
+        $table = $this->sessionTable();
+        $pk = DynamoKeys::user($sub);
+        $sk = DynamoKeys::activeSessionSk();
+
+        try {
+            $this->client->deleteItem([
+                'TableName' => $table,
+                'Key' => $this->marshaller->marshal(['PK' => $pk, 'SK' => $sk]),
+                'ConditionExpression' => 'session_id = :sid',
+                'ExpressionAttributeValues' => $this->marshaller->marshal([':sid' => $sessionId]),
+            ]);
+
+            return true;
+        } catch (DynamoDbException $e) {
+            if ($e->getAwsErrorCode() === 'ConditionalCheckFailedException') {
+                return false;
+            }
+            throw $e;
+        }
+    }
+
+    public function transactWrite(array $transactItems): void
+    {
+        $this->client->transactWriteItems([
+            'TransactItems' => $transactItems,
+        ]);
+    }
+
+    public function makeTransactPut(string $table, array $item, ?string $conditionExpression = null): array
+    {
+        $put = [
+            'TableName' => $table,
+            'Item' => $this->marshaller->marshal($item),
+        ];
+        if ($conditionExpression !== null) {
+            $put['ConditionExpression'] = $conditionExpression;
+        }
+
+        return ['Put' => $put];
+    }
+
+    public function makeTransactUpdate(
+        string $table,
+        string $pk,
+        string $sk,
+        string $updateExpression,
+        array $expressionAttributeNames,
+        array $expressionAttributeValues,
+        ?string $conditionExpression = null
+    ): array {
+        $update = [
+            'TableName' => $table,
+            'Key' => $this->marshaller->marshal(['PK' => $pk, 'SK' => $sk]),
+            'UpdateExpression' => $updateExpression,
+            'ExpressionAttributeNames' => $expressionAttributeNames,
+            'ExpressionAttributeValues' => $this->marshaller->marshal($expressionAttributeValues),
+        ];
+        if ($conditionExpression !== null) {
+            $update['ConditionExpression'] = $conditionExpression;
+        }
+
+        return ['Update' => $update];
     }
 
     public function marshaller(): ItemMarshaller

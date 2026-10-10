@@ -7,6 +7,22 @@ import type { PageVisit } from "../types/logs";
 const HEARTBEAT_INTERVAL_MS = 90 * 1000;
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const SESSION_STORAGE_KEY = "apex_session_id";
+const DEVICE_STORAGE_KEY = "apex_device_id";
+
+export function getOrCreateDeviceId(): string {
+  try {
+    let id = localStorage.getItem(DEVICE_STORAGE_KEY);
+    if (!id) {
+      id = typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `dev_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      localStorage.setItem(DEVICE_STORAGE_KEY, id);
+    }
+    return id;
+  } catch {
+    return "dev_fallback";
+  }
+}
 
 /** Shared across all tabs in the same browser via localStorage. */
 function getStoredSessionId(): string | null {
@@ -37,6 +53,7 @@ interface SessionResponse {
   sessionId: string;
   status: string;
   isNewSession?: boolean;
+  displacedPreviousSession?: boolean;
 }
 
 export function useSessionLogger() {
@@ -45,6 +62,7 @@ export function useSessionLogger() {
   const pendingPagesRef = useRef<PageVisit[]>([]);
   const lastActiveTimestampRef = useRef<number>(0);
   const isOpeningRef = useRef<boolean>(false);
+  const isTerminatedRef = useRef<boolean>(false);
 
   useEffect(() => {
     lastActiveTimestampRef.current = Date.now();
@@ -93,25 +111,29 @@ export function useSessionLogger() {
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const openSession = async () => {
-      if (isOpeningRef.current) return;
+      if (isOpeningRef.current || isTerminatedRef.current) return;
       isOpeningRef.current = true;
 
       try {
         const pages = [...pendingPagesRef.current];
         pendingPagesRef.current = [];
 
-        // Pass the existing session ID so the backend can resume it (same browser)
-        // or close it and issue a new one (different device / concurrent login).
         const existingSessionId = getStoredSessionId();
+        const deviceId = getOrCreateDeviceId();
 
         const res = await apiClient.post<SessionResponse>("/sessions/start", {
           pagesVisited: pages,
           existingSessionId: existingSessionId ?? undefined,
+          deviceId,
         });
 
         if (res && res.sessionId) {
           sessionIdRef.current = res.sessionId;
           setStoredSessionId(res.sessionId);
+
+          if (res.displacedPreviousSession) {
+            window.dispatchEvent(new CustomEvent("apex:session_displaced_previous"));
+          }
         }
       } catch (err) {
         console.warn("useSessionLogger: Open session failed", err);
@@ -121,6 +143,8 @@ export function useSessionLogger() {
     };
 
     const sendHeartbeat = async () => {
+      if (isTerminatedRef.current) return;
+
       const currentSessionId = sessionIdRef.current;
       if (!currentSessionId) {
         await openSession();
@@ -142,13 +166,36 @@ export function useSessionLogger() {
         });
       } catch (err) {
         const status = (err as { status?: number })?.status;
-        if (status === 409 || status === 404) {
-          console.warn("useSessionLogger: Session expired/ended. Re-opening session...");
+        const errData = (err as { data?: { code?: string } })?.data;
+        const code = errData?.code;
+
+        if (code === "CONCURRENT_LOGIN_DISPLACED") {
+          console.warn("useSessionLogger: Session displaced by login on another device.");
+          isTerminatedRef.current = true;
+          if (intervalId) clearInterval(intervalId);
+          sessionIdRef.current = null;
+          clearStoredSessionId();
+          window.dispatchEvent(new CustomEvent("apex:session_displaced"));
+          return;
+        }
+
+        if (code === "SESSION_REVOKED") {
+          console.warn("useSessionLogger: Session revoked by administrator.");
+          isTerminatedRef.current = true;
+          if (intervalId) clearInterval(intervalId);
+          sessionIdRef.current = null;
+          clearStoredSessionId();
+          window.dispatchEvent(new CustomEvent("apex:session_revoked"));
+          return;
+        }
+
+        if (code === "SESSION_EXPIRED" || status === 404) {
+          console.warn("useSessionLogger: Session expired. Refreshing session...");
           sessionIdRef.current = null;
           clearStoredSessionId();
           await openSession();
         } else {
-          console.warn("useSessionLogger: Heartbeat failed", err);
+          console.warn("useSessionLogger: Heartbeat failed (transient network or cold start)", err);
         }
       }
     };
@@ -161,8 +208,7 @@ export function useSessionLogger() {
     };
     window.addEventListener("storage", onStorage);
 
-    // On mount: if we already have a session ID from localStorage, heartbeat it first
-    // (validates it's still active on the backend). Otherwise open a new session.
+    // Mount lifecycle: if a session ID exists in localStorage, validate it; otherwise open fresh
     if (sessionIdRef.current) {
       sendHeartbeat();
     } else {

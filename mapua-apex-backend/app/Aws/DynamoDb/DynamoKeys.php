@@ -92,6 +92,22 @@ final class DynamoKeys
         return 'LOG#SESSION#'.$yearMonth;
     }
 
+    /**
+     * PK for a user partition: USER#{sub}
+     */
+    public static function user(string $sub): string
+    {
+        return 'USER#'.self::strip($sub, 'USER#');
+    }
+
+    /**
+     * SK for a user's active session pointer: ACTIVE_SESSION
+     */
+    public static function activeSessionSk(): string
+    {
+        return 'ACTIVE_SESSION';
+    }
+
     public static function roleIndex(string $role, ?string $department = null): string
     {
         $key = 'ROLE#'.Str::upper($role);

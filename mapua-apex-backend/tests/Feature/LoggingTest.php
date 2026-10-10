@@ -35,12 +35,21 @@ class LoggingTest extends TestCase
         $authTime = 1700000000;
         $expectedBaseId = hash('sha256', "{$sub}:{$authTime}");
 
+        // 1. Pointer lookup -> null
         $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "USER#{$sub}"))
             ->once()
             ->andReturn(new \Aws\Result(['Item' => null]));
 
-        $this->dynamoDbMock->shouldReceive('putItem')
-            ->once() // 1 for session item
+        // 2. Candidate ID lookup -> null
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$expectedBaseId}"))
+            ->once()
+            ->andReturn(new \Aws\Result(['Item' => null]));
+
+        // 3. TransactWriteItems creates session and pointer
+        $this->dynamoDbMock->shouldReceive('transactWriteItems')
+            ->once()
             ->andReturn(new \Aws\Result([]));
 
         $response = $this->withStudentAuth([
@@ -65,6 +74,19 @@ class LoggingTest extends TestCase
         $baseId = hash('sha256', "{$sub}:{$authTime}");
         $now = date('Y-m-d\TH:i:s\Z');
 
+        // 1. Pointer lookup -> active pointer
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "USER#{$sub}"))
+            ->once()
+            ->andReturn(new \Aws\Result([
+                'Item' => [
+                    'session_id' => ['S' => $baseId],
+                    'device_id' => ['S' => 'dev-1'],
+                    'status' => ['S' => 'active'],
+                ],
+            ]));
+
+        // 2. Active session lookup -> active
         $this->dynamoDbMock->shouldReceive('getItem')
             ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
             ->once()
@@ -79,13 +101,9 @@ class LoggingTest extends TestCase
                 ],
             ]));
 
-        $this->dynamoDbMock->shouldReceive('getItem')
-            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}#2"))
-            ->once()
-            ->andReturn(new \Aws\Result(['Item' => null]));
-
+        // Session patch & pointer patch
         $this->dynamoDbMock->shouldReceive('updateItem')
-            ->once()
+            ->twice()
             ->andReturn(new \Aws\Result([]));
 
         $response = $this->withStudentAuth([
@@ -93,6 +111,7 @@ class LoggingTest extends TestCase
             'auth_time' => $authTime,
         ])->postJson('/api/v1/sessions/start', [
             'existingSessionId' => $baseId,
+            'deviceId' => 'dev-1',
         ]);
 
         $response->assertStatus(200)
@@ -111,10 +130,22 @@ class LoggingTest extends TestCase
         $suffix2Id = "{$baseId}#2";
         $now = date('Y-m-d\TH:i:s\Z');
 
-        // Check base session -> active
+        // 1. Pointer lookup -> pointer points to baseId on device-1
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "USER#{$sub}"))
+            ->once()
+            ->andReturn(new \Aws\Result([
+                'Item' => [
+                    'session_id' => ['S' => $baseId],
+                    'device_id' => ['S' => 'dev-1'],
+                    'status' => ['S' => 'active'],
+                ],
+            ]));
+
+        // 2. Candidate 0 lookup -> baseId already exists
         $this->dynamoDbMock->shouldReceive('getItem')
             ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
-            ->once()
+            ->twice() // once for findAvailableSessionId, once to check old session status
             ->andReturn(new \Aws\Result([
                 'Item' => [
                     'session_id' => ['S' => $baseId],
@@ -126,33 +157,31 @@ class LoggingTest extends TestCase
                 ],
             ]));
 
-        // Check suffix 2 -> null (empty chain slot)
+        // 3. Candidate 1 lookup -> suffix2Id is available
         $this->dynamoDbMock->shouldReceive('getItem')
             ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$suffix2Id}"))
             ->once()
             ->andReturn(new \Aws\Result(['Item' => null]));
 
-        // Old session closed via patch (updateItem)
-        $this->dynamoDbMock->shouldReceive('updateItem')
+        // 4. One TransactWriteItems closes old session, creates new session, updates pointer
+        $this->dynamoDbMock->shouldReceive('transactWriteItems')
             ->once()
             ->andReturn(new \Aws\Result([]));
 
-        // New session created for the new browser via putItem
-        $this->dynamoDbMock->shouldReceive('putItem')
-            ->once()
-            ->andReturn(new \Aws\Result([]));
-
-        // Call without existingSessionId or with a different one -> concurrent login
+        // Call from device-2 -> concurrent login
         $response = $this->withStudentAuth([
             'sub' => $sub,
             'auth_time' => $authTime,
-        ])->postJson('/api/v1/sessions/start');
+        ])->postJson('/api/v1/sessions/start', [
+            'deviceId' => 'dev-2',
+        ]);
 
         $response->assertStatus(200)
             ->assertJson([
                 'sessionId' => $suffix2Id,
                 'status' => 'active',
                 'isNewSession' => true,
+                'displacedPreviousSession' => true,
             ]);
     }
 
@@ -163,6 +192,13 @@ class LoggingTest extends TestCase
         $baseId = hash('sha256', "{$sub}:{$authTime}");
         $suffix2Id = "{$baseId}#2";
 
+        // 1. Pointer lookup -> null
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "USER#{$sub}"))
+            ->once()
+            ->andReturn(new \Aws\Result(['Item' => null]));
+
+        // 2. Candidate 0 -> ended
         $this->dynamoDbMock->shouldReceive('getItem')
             ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
             ->once()
@@ -173,13 +209,14 @@ class LoggingTest extends TestCase
                 ],
             ]));
 
+        // 3. Candidate 1 -> null
         $this->dynamoDbMock->shouldReceive('getItem')
             ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$suffix2Id}"))
             ->once()
             ->andReturn(new \Aws\Result(['Item' => null]));
 
-        $this->dynamoDbMock->shouldReceive('putItem')
-            ->once() // session item
+        $this->dynamoDbMock->shouldReceive('transactWriteItems')
+            ->once()
             ->andReturn(new \Aws\Result([]));
 
         $response = $this->withStudentAuth([
@@ -203,6 +240,12 @@ class LoggingTest extends TestCase
         $suffix2Id = "{$baseId}#2";
         $suffix3Id = "{$baseId}#3";
 
+        // 1. Pointer lookup -> null
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "USER#{$sub}"))
+            ->once()
+            ->andReturn(new \Aws\Result(['Item' => null]));
+
         $this->dynamoDbMock->shouldReceive('getItem')
             ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
             ->once()
@@ -218,7 +261,7 @@ class LoggingTest extends TestCase
             ->once()
             ->andReturn(new \Aws\Result(['Item' => null]));
 
-        $this->dynamoDbMock->shouldReceive('putItem')
+        $this->dynamoDbMock->shouldReceive('transactWriteItems')
             ->once()
             ->andReturn(new \Aws\Result([]));
 
@@ -240,23 +283,28 @@ class LoggingTest extends TestCase
         $sub = 'usr-123';
         $authTime = 1700000000;
         $baseId = hash('sha256', "{$sub}:{$authTime}");
-        $suffix2Id = "{$baseId}#2";
+
+        // First attempt: pointer is null, candidate is null
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "USER#{$sub}"))
+            ->twice() // once for attempt 1, once for retry
+            ->andReturn(new \Aws\Result(['Item' => null]));
 
         $this->dynamoDbMock->shouldReceive('getItem')
             ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
-            ->once()
+            ->twice() // once for attempt 1, once for retry
             ->andReturn(new \Aws\Result(['Item' => null]));
 
         $exception = Mockery::mock(\Aws\DynamoDb\Exception\DynamoDbException::class);
-        $exception->shouldReceive('getAwsErrorCode')->andReturn('ConditionalCheckFailedException');
+        $exception->shouldReceive('getAwsErrorCode')->andReturn('TransactionCanceledException');
 
-        // First putItem fails due to race condition
-        $this->dynamoDbMock->shouldReceive('putItem')
+        // First transactWriteItems fails due to race condition
+        $this->dynamoDbMock->shouldReceive('transactWriteItems')
             ->once()
             ->andThrow($exception);
 
-        // Second putItem succeeds for #2 session + LOGIN activity event (2 calls total)
-        $this->dynamoDbMock->shouldReceive('putItem')
+        // Second transactWriteItems succeeds on retry
+        $this->dynamoDbMock->shouldReceive('transactWriteItems')
             ->once()
             ->andReturn(new \Aws\Result([]));
 
@@ -291,8 +339,20 @@ class LoggingTest extends TestCase
                 ],
             ]));
 
-        $this->dynamoDbMock->shouldReceive('updateItem')
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "USER#{$sub}"))
             ->once()
+            ->andReturn(new \Aws\Result([
+                'Item' => [
+                    'session_id' => ['S' => $baseId],
+                    'sub' => ['S' => $sub],
+                    'status' => ['S' => 'active'],
+                    'last_heartbeat' => ['S' => $now],
+                ],
+            ]));
+
+        $this->dynamoDbMock->shouldReceive('updateItem')
+            ->twice() // 1 for session item, 1 for active pointer
             ->andReturn(new \Aws\Result([]));
 
         $response = $this->withStudentAuth([
@@ -314,7 +374,7 @@ class LoggingTest extends TestCase
         $baseId = hash('sha256', "{$sub}:{$authTime}");
 
         $this->dynamoDbMock->shouldReceive('getItem')
-            ->once()
+            ->twice() // 1 for session item, 1 for pointer lookup
             ->andReturn(new \Aws\Result([
                 'Item' => [
                     'session_id' => ['S' => $baseId],
@@ -384,7 +444,9 @@ class LoggingTest extends TestCase
             ->once()
             ->andReturn(new \Aws\Result([]));
 
-
+        $this->dynamoDbMock->shouldReceive('deleteItem')
+            ->once()
+            ->andReturn(new \Aws\Result([]));
 
         $response = $this->withStudentAuth([
             'sub' => $sub,
@@ -416,6 +478,34 @@ class LoggingTest extends TestCase
         ])->postJson("/api/v1/sessions/{$baseId}/end");
 
         $response->assertStatus(404);
+    }
+
+    public function test_10b_heartbeat_returns_409_displaced_when_session_ended_by_concurrent_login(): void
+    {
+        $sub = 'usr-123';
+        $authTime = 1700000000;
+        $baseId = hash('sha256', "{$sub}:{$authTime}");
+
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->twice() // session item + pointer lookup
+            ->andReturn(new \Aws\Result([
+                'Item' => [
+                    'session_id' => ['S' => $baseId],
+                    'sub' => ['S' => $sub],
+                    'status' => ['S' => 'completed'],
+                    'end_reason' => ['S' => 'concurrent_login'],
+                ],
+            ]));
+
+        $response = $this->withStudentAuth([
+            'sub' => $sub,
+            'auth_time' => $authTime,
+        ])->patchJson("/api/v1/sessions/{$baseId}/heartbeat");
+
+        $response->assertStatus(409)
+            ->assertJson([
+                'code' => 'CONCURRENT_LOGIN_DISPLACED',
+            ]);
     }
 
     public function test_11_end_session_returns_403_on_session_id_mismatch(): void
@@ -567,6 +657,68 @@ class LoggingTest extends TestCase
                     'totalSessionsToday',
                     'totalActivityToday',
                 ],
+            ]);
+    }
+
+    public function test_18_device_b_login_with_different_auth_time_displaces_device_a_session(): void
+    {
+        $sub = 'usr-123';
+        $authTimeA = 1700000000;
+        $authTimeB = 1700000500; // different auth_time from Cognito
+        $sessionAId = hash('sha256', "{$sub}:{$authTimeA}");
+        $sessionBId = hash('sha256', "{$sub}:{$authTimeB}");
+        $now = date('Y-m-d\TH:i:s\Z');
+
+        // Pointer currently points to Session A on Device A
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "USER#{$sub}"))
+            ->once()
+            ->andReturn(new \Aws\Result([
+                'Item' => [
+                    'session_id' => ['S' => $sessionAId],
+                    'device_id' => ['S' => 'device-a'],
+                    'status' => ['S' => 'active'],
+                ],
+            ]));
+
+        // Check if candidate 0 for Session B exists -> null
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$sessionBId}"))
+            ->once()
+            ->andReturn(new \Aws\Result(['Item' => null]));
+
+        // Check Session A to see if still active for displacement
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$sessionAId}"))
+            ->once()
+            ->andReturn(new \Aws\Result([
+                'Item' => [
+                    'session_id' => ['S' => $sessionAId],
+                    'sub' => ['S' => $sub],
+                    'status' => ['S' => 'active'],
+                    'login_time' => ['S' => $now],
+                    'last_heartbeat' => ['S' => $now],
+                ],
+            ]));
+
+        // Atomic TransactWriteItems: closes Session A with concurrent_login, creates Session B, updates pointer to B
+        $this->dynamoDbMock->shouldReceive('transactWriteItems')
+            ->once()
+            ->andReturn(new \Aws\Result([]));
+
+        $response = $this->withStudentAuth([
+            'sub' => $sub,
+            'auth_time' => $authTimeB,
+        ])->postJson('/api/v1/sessions/start', [
+            'deviceId' => 'device-b',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'sessionId' => $sessionBId,
+                'status' => 'active',
+                'isNewSession' => true,
+                'displacedPreviousSession' => true,
             ]);
     }
 }

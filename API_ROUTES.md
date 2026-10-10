@@ -472,9 +472,10 @@ Middleware: `cognito.jwt:admin` (allows `admin`, `osaar`, `cdm_reviewer`, `cdm`,
 
 | Method | Endpoint | Description | Example JSON |
 | :---- | :---- | :---- | :---- |
-| **POST** | `/api/v1/sessions/start` | Start a new session or extend an active one for the auth_time. Writes LOGIN activity event. | **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "login_time": "2026-10-09T23:00:00Z",<br>  "status": "active",<br>  "isNewSession": true<br>}</pre> |
-| **PATCH** | `/api/v1/sessions/{sessionId}/heartbeat` | Extend active session heartbeat and record page visits. | **Request body** <pre>{<br>  "pagesVisited": [<br>    { "path": "/students/dashboard", "pageName": "Dashboard", "timestamp": "2026-10-09T23:01:00Z" }<br>  ]<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "active"<br>}</pre> |
-| **POST** | `/api/v1/sessions/{sessionId}/end` | Close a session explicitly (logout or tab_closed). Writes LOGOUT activity event. | **Request body** <pre>{<br>  "reason": "tab_closed"<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "completed"<br>}</pre> |
+| **POST** | `/api/v1/sessions/start` | Start a new session or extend an active one. Accepts `deviceId` and `existingSessionId`. Returns `displacedPreviousSession: boolean`. | **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "login_time": "2026-10-09T23:00:00Z",<br>  "status": "active",<br>  "isNewSession": true,<br>  "displacedPreviousSession": false<br>}</pre> |
+| **GET** | `/api/v1/sessions/{sessionId}/validate` | Check if session is still active and not displaced. Returns `200` or `409`. | **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "active"<br>}</pre> |
+| **PATCH** | `/api/v1/sessions/{sessionId}/heartbeat` | Extend active session heartbeat. Returns `409 CONCURRENT_LOGIN_DISPLACED` if displaced, `409 SESSION_REVOKED` if revoked, `409 SESSION_EXPIRED` if stale. | **Request body** <pre>{<br>  "pagesVisited": [<br>    { "path": "/students/dashboard", "pageName": "Dashboard", "timestamp": "2026-10-09T23:01:00Z" }<br>  ]<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "active"<br>}</pre> |
+| **POST** | `/api/v1/sessions/{sessionId}/end` | Close a session explicitly (logout or tab_closed) and conditionally remove active pointer. | **Request body** <pre>{<br>  "reason": "logout"<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "completed"<br>}</pre> |
 
 ---
 

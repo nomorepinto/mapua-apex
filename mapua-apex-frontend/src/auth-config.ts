@@ -32,16 +32,5 @@ export const oidcConfig: AuthProviderProps = {
       document.title,
       window.location.pathname
     );
-
-    // Fire-and-forget session open call on signin
-    try {
-      fetch("/api/v1/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pagesVisited: [{ path: window.location.pathname, pageName: "Login Redirect", timestamp: new Date().toISOString() }] }),
-      }).catch((err) => console.warn("onSigninCallback: session open background call failed", err));
-    } catch (err) {
-      console.warn("onSigninCallback: session open failed", err);
-    }
   },
 }
