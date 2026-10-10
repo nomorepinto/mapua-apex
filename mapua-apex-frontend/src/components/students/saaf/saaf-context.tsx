@@ -24,6 +24,9 @@ import type {
 } from "@/components/submission/saaf-stepper"
 import type { SaafDraft } from "@/components/submission/types"
 import {
+  firstIncompleteWizardStep,
+  getReservationStepIssues,
+  getSaafStepIssues,
   isReservationStepComplete,
   isSaafDraftComplete,
   isSaafStepComplete,
@@ -43,7 +46,7 @@ interface SaafFormState {
   includeReservation: boolean
   showErrors: boolean
   touched: Record<string, boolean>
-  stepError: string | null
+  stepIssues: string[]
   submitError: string | null
   isSubmitting: boolean
   reserveFacilities: SaafFormModel["reserveFacilities"]
@@ -155,13 +158,42 @@ export function SaafProvider({ children }: { children: ReactNode }) {
     finalStep
   ) as WizardStepIndex
 
-  const goToStep = (next: WizardStepIndex) => {
-    if (next === step || next > farthestStep) return
-    if (next > step && !form.validateStep(step, formRef.current)) return
-    if (next < step) {
-      form.setShowErrors(false)
-      form.setStepError(null)
+  /**
+   * Everything still open on one page, each line naming the field. Built from
+   * the live drafts instead of snapshotted at click time, so a line disappears
+   * the moment its field is fixed. `showErrors` is the flag the inline glow uses
+   * too, so the summary and the fields can never disagree.
+   */
+  const unresolvedStepIssues = (targetStep: WizardStepIndex): string[] => {
+    const issues = getSaafStepIssues(
+      targetStep as SaafStepIndex,
+      draft,
+      includeReservation
+    )
+    if (includeReservation && targetStep === 2) {
+      issues.push(...getReservationStepIssues(reservationDraft, draft.activityVenue))
     }
+    // A browser-level rule (required / minLength / pattern) that no field
+    // warning covers has no label to name, so say what happened instead.
+    if (form.hasHtmlIssue && issues.length === 0) {
+      issues.push("A required field on this page is still empty or invalid.")
+    }
+    return issues
+  }
+
+  const goToStep = (next: WizardStepIndex) => {
+    if (next === step) return
+    if (next > farthestStep) {
+      // Never skip past a page that still has open items: take the proponent
+      // there and reveal it instead of silently ignoring the click.
+      const blocker =
+        firstIncompleteWizardStep(draft, includeReservation, reservationDraft) ?? next
+      if (blocker !== step) setStep(blocker)
+      form.validateStep(blocker, formRef.current)
+      return
+    }
+    if (next > step && !form.validateStep(step, formRef.current)) return
+    if (next < step) form.setShowErrors(false)
     setStep(next)
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
@@ -184,15 +216,12 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   const currentStepComplete =
     includeReservation && step === 2
       ? isReservationStepComplete(reservationDraft, draft.activityVenue) &&
-      isSaafStepComplete(2, draft, true) &&
-      !form.stepError
+      isSaafStepComplete(2, draft, true)
       : isSaafStepComplete(step as SaafStepIndex, draft, includeReservation)
 
   const formComplete =
     isSaafDraftComplete(draft, includeReservation) &&
-    (!includeReservation ||
-      (isReservationStepComplete(reservationDraft, draft.activityVenue) &&
-        !form.stepError))
+    (!includeReservation || isReservationStepComplete(reservationDraft, draft.activityVenue))
 
   const canClear =
     includeReservation && step === 2
@@ -208,7 +237,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       includeReservation,
       showErrors: form.showErrors,
       touched,
-      stepError: form.stepError,
+      stepIssues: form.showErrors ? unresolvedStepIssues(step) : [],
       submitError: form.submitError,
       isSubmitting: form.isSubmitting,
       reserveFacilities: form.reserveFacilities,
@@ -261,13 +290,24 @@ export function SaafProvider({ children }: { children: ReactNode }) {
           }
           return next
         })
-        form.setStepError(null)
         form.setShowErrors(false)
         form.setShowConfirmClearModal(false)
       },
       closeConfirm: () => form.setShowConfirmModal(false),
-      initiateSubmit: (event) =>
-        form.handleInitiateSubmit(event, formRef.current),
+      initiateSubmit: (event) => {
+        if (form.handleInitiateSubmit(event, formRef.current)) return
+        // Submit checks every page, so a rejection is usually about another
+        // page. Move there and reveal it rather than listing other pages' fields
+        // on the one the proponent is looking at.
+        const blocker = firstIncompleteWizardStep(
+          draft,
+          includeReservation,
+          reservationDraft
+        )
+        if (blocker === null || blocker === step) return
+        setStep(blocker)
+        form.validateStep(blocker, formRef.current)
+      },
       confirmProceed: () => form.handleConfirmProceed(formRef.current),
       savePdf: form.handleSavePdf,
       dismissSuccess: () => {

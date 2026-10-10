@@ -13,6 +13,7 @@ import {
   SaafPeopleStep,
   SaafReservationStep,
   SaafStepActions,
+  SaafStepIssueSummary,
   SaafSubmitError,
 } from "@/components/students/saaf/saaf-steps"
 import { layout } from "@/config"
@@ -27,6 +28,7 @@ export function Submission() {
             <SaafForm>
               <SaafHeader />
               <SaafStepperControl />
+              <SaafStepIssueSummary />
               <SaafClassificationStep />
               <SaafPeopleStep />
               <SaafActivityStep />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type MouseEvent } from "react"
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
 import { useFetcher, useNavigation } from "react-router"
 
 import { useScrollToTop } from "@/hooks/use-scroll-to-top"
@@ -22,11 +22,11 @@ import type {
   SubmissionActionData,
 } from "@/components/submission/types"
 import {
-  getReservationStepIssue,
-  getSaafStepIssue,
+  getReservationStepIssues,
+  getSaafStepIssues,
   isStepHtmlValid,
+  SAAF_STEP_ISSUES_ID,
   STEP_INVALID_FOCUS_SELECTOR,
-  getMovedReservationFieldsIssue,
 } from "@/components/submission/validate-saaf-step"
 import {
   calculateRowTotal,
@@ -34,7 +34,6 @@ import {
   sanitizeIntegerInput,
 } from "@/lib/numeric-input"
 import { saveProposalPdf } from "@/lib/save-proposal-pdf"
-import { EVENT_DATE_TOO_SOON_MESSAGE, minEventDateKey } from "@/lib/date-key"
 import { useOrgStore } from "@/stores/org-store"
 
 export function useSaafForm() {
@@ -48,8 +47,17 @@ export function useSaafForm() {
 
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [showConfirmClearModal, setShowConfirmClearModal] = useState(false)
-  const [showErrors, setShowErrors] = useState(false)
-  const [stepError, setStepError] = useState<string | null>(null)
+  const [showErrors, setShowErrorsState] = useState(false)
+  // A browser-level violation — `required`, `minLength`, `pattern` — has no
+  // `saafFieldWarnings` entry to name it, so a rejected click records that here
+  // and the page summary (built by SaafProvider) falls back to a generic line.
+  // It belongs to the reveal: hiding the reveal — accepted click, navigation,
+  // clear — hides it with it, so it can never outlive the click that found it.
+  const [hasHtmlIssue, setHasHtmlIssue] = useState(false)
+  const setShowErrors = useCallback((next: boolean) => {
+    setShowErrorsState(next)
+    if (!next) setHasHtmlIssue(false)
+  }, [])
   const [successDismissed, setSuccessDismissed] = useState(false)
   const showSuccessModal = Boolean(fetcher.data?.success) && !successDismissed
   const submitError =
@@ -59,19 +67,23 @@ export function useSaafForm() {
         "Failed to submit application. Please try again."
       : null
 
-  // Directly select draft from Zustand with fallback to default
+  // Directly select draft from Zustand with fallback to default. Memoized so the
+  // validation callbacks below keep their identity between unrelated renders.
   const saafDraft = useOrgStore((state) => state.saafDraft)
   const eventName = useOrgStore((state) => state.eventName)
-  const draft: SaafDraft = {
-    ...DEFAULT_SAAF_DRAFT,
-    ...(saafDraft ?? {}),
-    activityTitle:
-      saafDraft?.activityTitle || eventName || DEFAULT_SAAF_DRAFT.activityTitle,
-    proponents: saafDraft?.proponents ?? DEFAULT_SAAF_DRAFT.proponents,
-    budgetItems: saafDraft?.budgetItems ?? DEFAULT_SAAF_DRAFT.budgetItems,
-    departmentValues:
-      saafDraft?.departmentValues ?? DEFAULT_SAAF_DRAFT.departmentValues,
-  }
+  const draft: SaafDraft = useMemo(
+    () => ({
+      ...DEFAULT_SAAF_DRAFT,
+      ...(saafDraft ?? {}),
+      activityTitle:
+        saafDraft?.activityTitle || eventName || DEFAULT_SAAF_DRAFT.activityTitle,
+      proponents: saafDraft?.proponents ?? DEFAULT_SAAF_DRAFT.proponents,
+      budgetItems: saafDraft?.budgetItems ?? DEFAULT_SAAF_DRAFT.budgetItems,
+      departmentValues:
+        saafDraft?.departmentValues ?? DEFAULT_SAAF_DRAFT.departmentValues,
+    }),
+    [saafDraft, eventName]
+  )
 
   useScrollToTop()
 
@@ -255,15 +267,18 @@ export function useSaafForm() {
       setShowErrors(true)
     })
     window.setTimeout(() => {
+      // Land the reader on the summary, which names every open field on the
+      // page, and still move focus to the first offender without a second
+      // viewport jump fighting the summary.
+      document
+        .getElementById(SAAF_STEP_ISSUES_ID)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" })
       const firstInvalid = root.querySelector<HTMLElement>(
         STEP_INVALID_FOCUS_SELECTOR
       )
-      if (firstInvalid) {
-        firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" })
-        firstInvalid.focus?.()
-      }
+      firstInvalid?.focus({ preventScroll: true })
     }, 50)
-  }, [])
+  }, [setShowErrors])
 
   const validateStep = useCallback(
     (step: WizardStepIndex, form: HTMLFormElement | null): boolean => {
@@ -271,28 +286,35 @@ export function useSaafForm() {
 
       const panel = form.querySelector<HTMLElement>(`[data-saaf-step="${step}"]`)
       const htmlValid = panel ? isStepHtmlValid(panel) : false
-      const issue =
-        includeReservation && (step === 2 || step === 4)
-          ? (getMovedReservationFieldsIssue(draft) ||
-              getReservationStepIssue(
-                withReservationDefaults(
-                  useOrgStore.getState().reservationDraft
-                ),
-                draft.activityVenue
-              ))
-          : getSaafStepIssue(step as SaafStepIndex, draft, includeReservation)
+      const issues = getSaafStepIssues(
+        step as SaafStepIndex,
+        draft,
+        includeReservation
+      )
 
-      if (!htmlValid || issue) {
+      // The reservation page additionally owns the catalog picks, which live in
+      // the reservation draft and so are not covered by the SAAF field warnings.
+      if (includeReservation && step === 2) {
+        issues.push(
+          ...getReservationStepIssues(
+            withReservationDefaults(useOrgStore.getState().reservationDraft),
+            draft.activityVenue
+          )
+        )
+      }
+
+      // The issue list itself is derived by the provider from the live drafts,
+      // so this only decides whether the click is accepted and what to reveal.
+      if (!htmlValid || issues.length > 0) {
         revealInvalidFields(panel ?? form)
-        setStepError(issue ?? "Fill in every required field on this step before continuing.")
+        setHasHtmlIssue(!htmlValid)
         return false
       }
 
-      setStepError(null)
       setShowErrors(false)
       return true
     },
-    [draft, revealInvalidFields]
+    [draft, includeReservation, revealInvalidFields, setShowErrors]
   )
 
   // Validates standard HTML5 constraints and specific custom form rules
@@ -300,108 +322,38 @@ export function useSaafForm() {
     (form: HTMLFormElement | null): boolean => {
       if (!form) return false
 
-      // Check standard constraints
       const isHtmlValid = form.checkValidity()
-      const issues = ([0, 1, 2, 3] as const)
-        .map((step) => getSaafStepIssue(step, draft, includeReservation))
-        .filter((issue): issue is string => Boolean(issue))
+      const steps = includeReservation
+        ? ([0, 1, 2, 3, 4] as const)
+        : ([0, 1, 2, 3] as const)
+      const issues = steps.flatMap((step) =>
+        getSaafStepIssues(step, draft, includeReservation)
+      )
 
       // When the wizard includes the reservation step, it must hold at least one
-      // item and every room row must fit the venue campus before submit is
-      // allowed.
+      // item and every room must fit the venue campus before submit is allowed.
       const reservationIssues = includeReservation
-        ? [
-            getReservationStepIssue(
-              withReservationDefaults(useOrgStore.getState().reservationDraft),
-              draft.activityVenue
-            ),
-          ].filter((issue): issue is string => Boolean(issue))
+        ? getReservationStepIssues(
+            withReservationDefaults(useOrgStore.getState().reservationDraft),
+            draft.activityVenue
+          )
         : []
+      const allIssues = [...issues, ...reservationIssues]
 
-      if (!isHtmlValid || issues.length > 0 || reservationIssues.length > 0) {
+      // A submit is checked against the whole form; the provider then moves the
+      // proponent to the first page that still has open items.
+      if (!isHtmlValid || allIssues.length > 0) {
         revealInvalidFields(form)
-        setStepError(
-          [...issues, ...reservationIssues].join(" ") ||
-            "Fill in every required field before submitting."
-        )
+        setHasHtmlIssue(!isHtmlValid)
         return false
       }
 
-      // 3. Date buffer validation (at least 10 days from today)
-      const eventDateStr = draft.dateOfEvent
-      if (eventDateStr && eventDateStr < minEventDateKey()) {
-        setShowErrors(true)
-        alert(EVENT_DATE_TOO_SOON_MESSAGE)
-        return false
-      }
-
-      // 4. Activity details minimum length validations
-      if (draft.activityDescription && draft.activityDescription.trim().length < 100) {
-        setShowErrors(true)
-        alert("Activity Description must be at least 100 characters.")
-        return false
-      }
-
-      if (draft.activityObjectives && draft.activityObjectives.trim().length < 50) {
-        setShowErrors(true)
-        alert("Activity Objectives must be at least 50 characters.")
-        return false
-      }
-
-      // 5. Institutional alignment minimum length validations
-      if (
-        draft.coreValuesExplanation &&
-        draft.coreValuesExplanation.trim().length < 30
-      ) {
-        setShowErrors(true)
-        alert("Core Values Explanation must be at least 30 characters.")
-        return false
-      }
-
-      if (
-        draft.peoExplanation &&
-        draft.peoExplanation.trim().length > 0 &&
-        draft.peoExplanation.trim().length < 30
-      ) {
-        setShowErrors(true)
-        alert("Program Educational Objectives must be at least 30 characters if provided.")
-        return false
-      }
-
-      if (draft.sdgExplanation && draft.sdgExplanation.trim().length < 30) {
-        setShowErrors(true)
-        alert("UN Sustainability Goals explanation must be at least 30 characters.")
-        return false
-      }
-
-      // 6. Total Org Members length guard
-      if (draft.totalOrgMembers && draft.totalOrgMembers.length > 5) {
-        setShowErrors(true)
-        alert("Total number of class/org members cannot exceed 5 digits.")
-        return false
-      }
-
+      // The remaining rules (date buffer, minimum lengths, digit caps) are all
+      // part of `saafFieldWarnings`, so the list above already covers them.
       setShowErrors(false)
-      setStepError(null)
       return true
     },
-    [
-      draft.mission1,
-      draft.mission2,
-      draft.mission3,
-      draft.proponents,
-      draft.departmentValues,
-      draft.dateOfEvent,
-      draft.activityDescription,
-      draft.activityObjectives,
-      // The venue campus decides which rooms and classroom codes are valid.
-      draft.activityVenue,
-      draft.coreValuesExplanation,
-      draft.peoExplanation,
-      draft.sdgExplanation,
-      draft.totalOrgMembers,
-      revealInvalidFields,
-    ]
+    [draft, includeReservation, revealInvalidFields, setShowErrors]
   )
 
   const handleClearForm = useCallback(() => {
@@ -416,17 +368,17 @@ export function useSaafForm() {
       ],
     })
     setShowErrors(false)
-    setStepError(null)
     setShowConfirmClearModal(false)
-  }, [])
+  }, [setShowErrors])
 
   const handleInitiateSubmit = useCallback(
-    (e: MouseEvent, form: HTMLFormElement | null) => {
+    (e: MouseEvent, form: HTMLFormElement | null): boolean => {
       e.preventDefault()
       if (validateForm(form)) {
-        setShowErrors(false)
         setShowConfirmModal(true)
+        return true
       }
+      return false
     },
     [validateForm]
   )
@@ -457,7 +409,7 @@ export function useSaafForm() {
     showConfirmClearModal,
     showSuccessModal,
     showErrors,
-    stepError,
+    hasHtmlIssue,
     submitError,
     grandTotal,
     reserveFacilities,
@@ -477,7 +429,6 @@ export function useSaafForm() {
     setShowConfirmModal,
     setShowConfirmClearModal,
     setShowErrors,
-    setStepError,
     setSuccessDismissed,
   }
 }

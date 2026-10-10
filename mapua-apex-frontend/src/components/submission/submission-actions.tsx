@@ -2,6 +2,7 @@ import { DownloadIcon, RotateCcw } from "lucide-react"
 import type { MouseEvent } from "react"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 export function SubmissionActions({
   isSubmitting,
@@ -12,6 +13,10 @@ export function SubmissionActions({
   canClear = true,
 }: {
   isSubmitting: boolean
+  /**
+   * Visual cue that the form still has open items. The button stays clickable:
+   * the click is what runs the validation and reveals which fields are missing.
+   */
   inactive?: boolean
   onSavePdf: () => void
   onSubmit: (e: MouseEvent) => void
@@ -48,8 +53,11 @@ export function SubmissionActions({
         <Button
           type="button"
           onClick={onSubmit}
-          disabled={inactive || isSubmitting}
-          className="h-11 w-full min-w-36 rounded-lg bg-[#8B0000] px-10 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#6B0000] disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-auto"
+          disabled={isSubmitting}
+          className={cn(
+            "h-11 w-full min-w-36 rounded-lg bg-[#8B0000] px-10 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#6B0000] disabled:cursor-not-allowed disabled:opacity-40 sm:h-10 sm:w-auto",
+            inactive && "opacity-70"
+          )}
         >
           {isSubmitting ? "Submitting..." : "Submit"}
         </Button>

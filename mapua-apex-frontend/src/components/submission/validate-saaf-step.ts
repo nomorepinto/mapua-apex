@@ -15,7 +15,10 @@ import {
   STUDENT_NUMBER_LENGTH,
   YEAR_LEVEL_OPTIONS,
 } from "@/components/submission/constants"
-import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
+import type {
+  SaafStepIndex,
+  WizardStepIndex,
+} from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
 import {
@@ -321,11 +324,67 @@ export const STEP_PREFIXES_NO_RESERVATION: Record<SaafStepIndex, string[]> = {
   4: [],
 }
 
-export function getSaafStepIssue(
+/**
+ * Warning keys are machine-facing (`activityVenue`, `proponent.<id>.lastName`),
+ * so they say nothing to a reader. These labels turn a key into the words the
+ * field is actually called on screen, which is what makes a step-level error
+ * list actionable.
+ */
+const WARNING_KEY_LABELS: Record<string, string> = {
+  activityType: "Type of activity",
+  totalOrgMembers: "Total no. of org members",
+  activityTitle: "Title of activity",
+  activityDescription: "Description",
+  activityObjectives: "Objectives of the activity",
+  activityVenue: "Venue campus",
+  dateOfEvent: "Start date of event",
+  endDateOfEvent: "End date of event",
+  timeOfEvent: "Time of event",
+  expectedParticipants: "Expected participants",
+  individualContribution: "Individual contribution",
+  proposedBudget: "Proposed budget",
+  mission: "Mission statement",
+  coreValuesExplanation: "Core values explanation",
+  peoExplanation: "Program educational objectives",
+  sdgExplanation: "UN sustainability goals",
+}
+
+/** Proponent row fields, keyed by the `Proponent` property name. */
+const PROPONENT_FIELD_LABELS: Record<string, string> = {
+  firstName: "First name",
+  lastName: "Last name",
+  studentNumber: "Student number",
+  programAndYear: "Program / year level",
+  department: "Department",
+  positionOfApplicant: "Position of the applicant",
+  orgOrCourseSection: "Name of organization",
+  contactNumber: "Mobile number",
+  emailAddress: "Email address",
+  facebookLink: "Facebook link",
+}
+
+/**
+ * Turns a `saafFieldWarnings` key into a human label. Proponent keys carry the
+ * row id, which is resolved to its on-screen row number so a page with several
+ * proponents says *which* proponent is short a field.
+ */
+function warningKeyLabel(key: string, proponents: Proponent[]): string {
+  if (key === "proponent.max") return "Number of proponents"
+  const match = /^proponent\.([^.]+)\.(.+)$/.exec(key)
+  if (match) {
+    const index = proponents.findIndex((p) => p.id === match[1])
+    const field = PROPONENT_FIELD_LABELS[match[2]] ?? match[2]
+    return index >= 0 ? `Proponent ${index + 1} · ${field}` : `Proponent · ${field}`
+  }
+  return WARNING_KEY_LABELS[key] ?? key
+}
+
+/** Raw `[key, message]` warnings that belong to the given wizard step. */
+function stepWarningEntries(
   step: SaafStepIndex,
   draft: SaafDraft,
-  includeReservation: boolean = false
-): string | null {
+  includeReservation = false
+): Array<[string, string]> {
   const warnings = saafFieldWarnings(draft)
   const map = includeReservation
     ? STEP_PREFIXES_WITH_RESERVATION
@@ -333,19 +392,33 @@ export function getSaafStepIssue(
 
   const prefixes = map[step] || []
 
-  const messages = Object.entries(warnings)
-    .filter(([key]) => prefixes.some((prefix) => key === prefix || key.startsWith(prefix)))
-    .map(([, message]) => message)
-
-  return messages[0] ?? null
+  return Object.entries(warnings).filter(([key]) =>
+    prefixes.some((prefix) => key === prefix || key.startsWith(prefix))
+  )
 }
 
+/**
+ * Every unresolved field on a step, each prefixed with its label. A failed
+ * Continue reveals this list, so the proponent sees all that is missing on the
+ * page at once instead of one message per click.
+ */
+export function getSaafStepIssues(
+  step: SaafStepIndex,
+  draft: SaafDraft,
+  includeReservation = false
+): string[] {
+  return stepWarningEntries(step, draft, includeReservation).map(
+    ([key, message]) => `${warningKeyLabel(key, draft.proponents)}: ${message}`
+  )
+}
+
+/** Whether the step has nothing left to fill in or correct. */
 export function isSaafStepComplete(
   step: SaafStepIndex,
   draft: SaafDraft,
   includeReservation: boolean = false
 ): boolean {
-  return getSaafStepIssue(step, draft, includeReservation) === null
+  return stepWarningEntries(step, draft, includeReservation).length === 0
 }
 
 export function isSaafDraftComplete(draft: SaafDraft, includeReservation: boolean = false): boolean {
@@ -380,11 +453,53 @@ export function getReservationStepIssue(
   return null
 }
 
+// The reservation step owns its own catalog picks, which are not part of the
+// SAAF draft; label them the same way the field warnings are labelled.
+export function getReservationStepIssues(
+  draft: ReservationDraft,
+  campus: string
+): string[] {
+  const issue = getReservationStepIssue(draft, campus)
+  return issue ? [`Rooms and equipment: ${issue}`] : []
+}
+
 export function isReservationStepComplete(
   draft: ReservationDraft,
   campus: string
 ): boolean {
   return getReservationStepIssue(draft, campus) === null
+}
+
+/**
+ * First wizard page whose rules still fail. Used to move the proponent to the
+ * page that actually holds the problem when a submit is rejected from the last
+ * page, instead of leaving them staring at an error about another page's fields.
+ */
+export function firstIncompleteWizardStep(
+  draft: SaafDraft,
+  includeReservation: boolean,
+  reservationDraft: ReservationDraft
+): WizardStepIndex | null {
+  const steps = includeReservation
+    ? ([0, 1, 2, 3, 4] as const)
+    : ([0, 1, 2, 3] as const)
+
+  for (const step of steps) {
+    if (!isSaafStepComplete(step, draft, includeReservation)) {
+      return step as WizardStepIndex
+    }
+    // The picks live outside the SAAF draft, so they are checked separately on
+    // the reservation page only.
+    if (
+      includeReservation &&
+      step === 2 &&
+      !isReservationStepComplete(reservationDraft, draft.activityVenue)
+    ) {
+      return 2 as WizardStepIndex
+    }
+  }
+
+  return null
 }
 
 export function isStepHtmlValid(panel: HTMLElement): boolean {
@@ -403,14 +518,9 @@ export function isStepHtmlValid(panel: HTMLElement): boolean {
 export const STEP_INVALID_FOCUS_SELECTOR =
   'input:invalid:not([type="hidden"]), textarea:invalid, select:invalid, .saaf-glow-invalid'
 
-export function getMovedReservationFieldsIssue(draft: SaafDraft): string | null {
-  const warnings = saafFieldWarnings(draft)
-  return (
-    warnings.activityVenue ||
-    warnings.dateOfEvent ||
-    warnings.endDateOfEvent ||
-    warnings.timeOfEvent ||
-    warnings.expectedParticipants ||
-    null
-  )
-}
+/**
+ * Id of the wizard's per-page issue summary. The reveal scrolls to it, so the
+ * contract is shared between the hook that reveals and the component that
+ * renders the list.
+ */
+export const SAAF_STEP_ISSUES_ID = "saaf-step-issues"

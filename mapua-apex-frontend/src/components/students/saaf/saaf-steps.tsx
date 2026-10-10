@@ -8,12 +8,13 @@ import { InstitutionalAlignmentSection } from "@/components/submission/instituti
 import { ProponentsSection } from "@/components/submission/proponents-section"
 import { SubmissionActions } from "@/components/submission/submission-actions"
 import { SubmissionErrorAlert } from "@/components/forms/submission-error-alert"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ReservationFields } from "@/components/students/reservations/reservation-form"
 import { useReservationFormContext } from "@/components/students/reservations/reservation-context"
 import { SaafStepPanel } from "@/components/students/saaf/saaf-form"
 import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
 import { brand } from "@/config"
+import { SAAF_STEP_ISSUES_ID } from "@/components/submission/validate-saaf-step"
 import { cn } from "@/lib/utils"
 
 // STEP 1: Classification (Index 0)
@@ -114,14 +115,30 @@ export function SaafSubmitError() {
   return <SubmissionErrorAlert message={state.submitError} />
 }
 
-function SaafStepError() {
+/**
+ * What a rejected Continue/Submit says back: every field still open on the
+ * page, by name. Rendered above the panels so the click lands the reader here.
+ */
+export function SaafStepIssueSummary() {
   const { state } = useSaafFormContext()
-  if (!state.stepError) return null
+  if (state.stepIssues.length === 0) return null
+
+  const heading =
+    state.step === state.finalStep
+      ? "Resolve these before submitting"
+      : "Resolve these before continuing"
 
   return (
-    <Alert variant="error">
+    <Alert variant="error" id={SAAF_STEP_ISSUES_ID}>
       <CircleAlertIcon />
-      <AlertDescription>{state.stepError}</AlertDescription>
+      <AlertTitle>{heading}</AlertTitle>
+      <AlertDescription>
+        <ul className="list-disc space-y-1 pl-4">
+          {state.stepIssues.map((issue, index) => (
+            <li key={`${index}-${issue}`}>{issue}</li>
+          ))}
+        </ul>
+      </AlertDescription>
     </Alert>
   )
 }
@@ -166,11 +183,15 @@ function SaafContinueActions() {
         <SaafBackButton />
         <SaafClearButton />
       </div>
+      {/* Stays clickable while the page is incomplete: the click is what reveals
+          the page summary and glows the offending fields. */}
       <button
         type="button"
         onClick={actions.goNext}
-        disabled={!state.currentStepComplete}
-        className={brand.action}
+        className={cn(
+          brand.action,
+          !state.currentStepComplete && "opacity-70"
+        )}
       >
         Continue
       </button>
@@ -209,7 +230,6 @@ function SaafReviewActions() {
 export function SaafStepActions() {
   return (
     <>
-      <SaafStepError />
       <SaafContinueActions />
       <SaafReviewActions />
     </>
