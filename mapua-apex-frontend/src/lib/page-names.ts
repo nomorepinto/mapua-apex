@@ -24,7 +24,6 @@ export function getPageName(path: string): string {
   if (cleanPath === "/signatory/profile") return "Signatory Profile";
 
   // Admin routes
-  if (cleanPath === "/admin/dashboard") return "Admin Dashboard";
   if (cleanPath === "/admin/submissions") return "All Submissions";
   if (cleanPath.startsWith("/admin/submissions/")) return "Admin Submission View";
   if (cleanPath === "/admin/announcements") return "Manage Announcements";

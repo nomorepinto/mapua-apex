@@ -148,7 +148,7 @@ export function EditReservableDialog({
                 value={type}
               />
               <div className="flex flex-col gap-2">
-                <FieldLabel>Weekly availability</FieldLabel>
+                <span className="inline-flex items-center gap-2 text-base/4.5 font-medium text-foreground sm:text-sm/4">Weekly availability</span>
                 <ScheduleGrid
                   onToggle={(day, slot) =>
                     setSchedule((current) =>

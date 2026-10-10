@@ -7,6 +7,7 @@ import { CdmReviewerLayout } from "@/routes/layouts/cdm-reviewer-layout"
 import { DeanLayout } from "@/routes/layouts/dean-layout"
 import { OrgAdviserLayout } from "@/routes/layouts/org-adviser-layout"
 import { OsaarLayout } from "@/routes/layouts/osaar-layout"
+import { OsaarSetupLayout } from "@/routes/osaar/setup"
 import { StudentsLayout } from "@/routes/layouts/students-layout"
 import { RootErrorBoundary, NotFoundPage } from "@/components/layout/error-boundary"
 
@@ -264,32 +265,42 @@ export const router = createBrowserRouter([
         },
       },
       {
-        path: "organizations",
-        HydrateFallback: RouteFallback,
-        lazy: async () => {
-          const { AdminOrganizationsPage } = await import(
-            "@/routes/osaar/organizations"
-          )
-          return { Component: AdminOrganizationsPage }
-        },
-      },
-      {
-        path: "signatories",
-        HydrateFallback: RouteFallback,
-        lazy: async () => {
-          const { AdminSignatoriesPage } = await import(
-            "@/routes/osaar/signatories"
-          )
-          return { Component: AdminSignatoriesPage }
-        },
-      },
-      {
-        path: "campus",
-        HydrateFallback: RouteFallback,
-        lazy: async () => {
-          const { AdminCampusPage } = await import("@/routes/osaar/campus")
-          return { Component: AdminCampusPage }
-        },
+        path: "setup",
+        Component: OsaarSetupLayout,
+        children: [
+          {
+            index: true,
+            Component: () => <Navigate to="organizations" replace />,
+          },
+          {
+            path: "organizations",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminOrganizationsPage } = await import(
+                "@/routes/osaar/organizations"
+              )
+              return { Component: AdminOrganizationsPage }
+            },
+          },
+          {
+            path: "signatories",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminSignatoriesPage } = await import(
+                "@/routes/osaar/signatories"
+              )
+              return { Component: AdminSignatoriesPage }
+            },
+          },
+          {
+            path: "campuses",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminCampusPage } = await import("@/routes/osaar/campus")
+              return { Component: AdminCampusPage }
+            },
+          },
+        ],
       },
       {
         path: "review",
@@ -348,15 +359,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
-      },
-      {
-        path: "dashboard",
-        HydrateFallback: RouteFallback,
-        lazy: async () => {
-          const { AdminDashboard } = await import("@/routes/admin/dashboard")
-          return { Component: AdminDashboard }
-        },
+        Component: () => <Navigate to="/admin/sessions" replace />,
       },
       {
         path: "sessions",
@@ -422,7 +425,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "*",
-        Component: () => <Navigate to="/admin/dashboard" replace />,
+        Component: () => <Navigate to="/admin/sessions" replace />,
       },
     ],
   },

@@ -1,4 +1,4 @@
-import { ClockIcon, FileCheck2Icon, HomeIcon } from "lucide-react"
+import { ClockIcon, FileCheck2Icon } from "lucide-react"
 import { Outlet } from "react-router"
 import { useAuth } from "react-oidc-context"
 
@@ -18,12 +18,6 @@ export function AdminLayout() {
   )
 
   const adminNav = [
-    {
-      label: "Dashboard",
-      to: "/admin/dashboard",
-      icon: HomeIcon,
-      end: true,
-    },
     ...(isSessionViewer
       ? [
           {
@@ -48,11 +42,10 @@ export function AdminLayout() {
     <AuthGuard allowedGroups={["admin"]}>
       <div className={layout.frame}>
         <AppSidebar
-          homeTo="/admin/dashboard"
+          homeTo="/admin/sessions"
           items={adminNav}
           panelSwitches={[
             { label: "OSAAR Dashboard", to: "/osaar/dashboard" },
-            { label: "Signatory Dashboard", to: "/signatories/dashboard" },
           ]}
         />
         <main className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto">

@@ -83,7 +83,7 @@ export function OrganizationsTableCard() {
             </EmptyHeader>
             {!state.sharedAccountsReady ? (
               <EmptyContent>
-                <Button render={<Link to="/osaar/signatories" />}>
+                <Button render={<Link to="/osaar/setup/signatories" />}>
                   Add signatories
                 </Button>
               </EmptyContent>

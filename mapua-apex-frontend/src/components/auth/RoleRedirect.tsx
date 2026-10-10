@@ -31,7 +31,7 @@ export function RoleRedirect() {
 
   // Admin → admin panel
   if (hasGroup(userGroups, "admin")) {
-    return <Navigate to="/admin/dashboard" replace />
+    return <Navigate to="/admin/sessions" replace />
   }
 
   // OSAAR → osaar panel

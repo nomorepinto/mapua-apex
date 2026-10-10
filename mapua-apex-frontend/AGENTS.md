@@ -17,6 +17,12 @@ These rules apply to `mapua-apex-frontend`. Also follow the root `AGENTS.md` (cr
   - **Nest sub-sections the same way** the existing `submissions` branch nests `saaf` (parent uses a `PassThroughLayout` wrapper with `children`).
 - Consistency with the existing route conventions takes precedence over introducing a fresh routing pattern.
 
+## Frontend Route Docs
+
+- **Keep `FRONTEND_ROUTES.md` (repo root) in sync with `src/router.tsx`.** When you add, change, or remove anything in the client route tree — a path, layout, nested section, lazy page, `action`, index/wildcard redirect, `AuthGuard` group set, or a `RoleRedirect` landing — update `FRONTEND_ROUTES.md` in the **same turn**. Do not leave the doc describing the pre-change tree.
+- `src/router.tsx` is the source of truth; the doc mirrors it (path, component, source file, allowed groups, notes). Match the doc's existing table format and keep source-file paths accurate.
+- Skip the doc only for refactors that do not change the URL, the component wired to a route, or the gating groups.
+
 ## UI Components
 
 - **Use coss ui components.** For interactive UI (selects, dropdowns, dialogs, menus, inputs, toggles, etc.), use the coss ui primitives vendored in `src/components/ui` (the `@coss` registry, built on Base UI). Prefer these existing exports over hand-rolled markup or another component library, and follow each primitive's documented composition/trigger hierarchy.

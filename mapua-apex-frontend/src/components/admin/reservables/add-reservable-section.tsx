@@ -304,7 +304,7 @@ export function AddReservableSection() {
                 />
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between gap-2">
-                    <FieldLabel>Weekly availability</FieldLabel>
+                    <span className="inline-flex items-center gap-2 text-base/4.5 font-medium text-foreground sm:text-sm/4">Weekly availability</span>
                     <div className="flex items-center gap-1">
                       <Button
                         onClick={() => setSchedule(allAvailableSchedule())}
