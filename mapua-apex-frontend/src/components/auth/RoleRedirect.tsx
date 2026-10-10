@@ -41,7 +41,7 @@ export function RoleRedirect() {
 
   // CDM Reviewer → own panel
   if (hasGroup(userGroups, "cdm_reviewer")) {
-    return <Navigate to="/cdm-reviewer/dashboard" replace />
+    return <Navigate to="/cdm/dashboard" replace />
   }
 
   // Dean → own panel
@@ -51,7 +51,7 @@ export function RoleRedirect() {
 
   // Org Adviser → own panel
   if (hasGroup(userGroups, "org_adviser")) {
-    return <Navigate to="/org-adviser/dashboard" replace />
+    return <Navigate to="/adviser/dashboard" replace />
   }
 
   // Org Submitter (student orgs) → student panel

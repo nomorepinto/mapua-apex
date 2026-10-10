@@ -11,8 +11,8 @@ import { useReviewDashboardContext } from "@/components/signatories/dashboard/re
  */
 const PAGE_GROUP_ROLE: Record<string, { role: string; label: string }> = {
   dean: { role: "dean", label: "Dean" },
-  "org-adviser": { role: "adviser", label: "Adviser" },
-  "cdm-reviewer": { role: "cdm", label: "CDM" },
+  adviser: { role: "adviser", label: "Adviser" },
+  cdm: { role: "cdm", label: "CDM" },
 }
 
 export function ReviewDashboardHeader() {

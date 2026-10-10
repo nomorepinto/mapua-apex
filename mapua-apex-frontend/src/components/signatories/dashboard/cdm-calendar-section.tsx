@@ -31,6 +31,7 @@ import {
   type CalendarStatusFilter,
 } from "@/lib/calendar-utils"
 import { getDateKey, parseDateKey } from "@/lib/date-key"
+import { formatClockText } from "@/lib/time-format"
 import { cn } from "@/lib/utils"
 
 /**
@@ -357,9 +358,11 @@ export function CdmCalendarSection() {
             }
           }
 
-          const timeDisplay = room.timeNeeded
-            ? `${room.timeNeeded}${room.endTimeNeeded ? ` - ${room.endTimeNeeded}` : ""}`
-            : act.time || "All Day"
+          const timeDisplay = formatClockText(
+            room.timeNeeded
+              ? `${room.timeNeeded}${room.endTimeNeeded ? ` - ${room.endTimeNeeded}` : ""}`
+              : act.time || "All Day"
+          )
 
           list.push({
             id: `${act.id}-room-${idx}`,
@@ -386,7 +389,7 @@ export function CdmCalendarSection() {
           id: `${act.id}-venue`,
           roomName: act.venue,
           roomType: "Venue / Facility",
-          timeSlot: act.time || "All Day",
+          timeSlot: formatClockText(act.time || "All Day"),
           proposalTitle: act.title,
           organization: act.org,
           department: act.departmentCode || act.department || "General",
@@ -1125,8 +1128,10 @@ export function CdmCalendarSection() {
                                       </span>
                                       {r.timeNeeded && (
                                         <span className="text-[10px] text-neutral-400">
-                                          ({r.timeNeeded}
-                                          {r.endTimeNeeded ? ` - ${r.endTimeNeeded}` : ""})
+                                          ({formatClockText(r.timeNeeded)}
+                                          {r.endTimeNeeded
+                                            ? ` - ${formatClockText(r.endTimeNeeded)}`
+                                            : ""}
                                         </span>
                                       )}
                                     </div>
@@ -1157,7 +1162,7 @@ export function CdmCalendarSection() {
                             {act.time && (
                               <div className="flex items-center gap-1.5">
                                 <Clock className="h-3 w-3 shrink-0 text-neutral-400" />
-                                <span>{act.time}</span>
+                                <span>{formatClockText(act.time)}</span>
                               </div>
                             )}
 

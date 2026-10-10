@@ -94,13 +94,13 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "cdm-reviewer",
+    path: "cdm",
     Component: CdmReviewerLayout,
     ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
-        Component: () => <Navigate to="/cdm-reviewer/dashboard" replace />,
+        Component: () => <Navigate to="/cdm/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -148,7 +148,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "*",
-        Component: () => <Navigate to="/cdm-reviewer/dashboard" replace />,
+        Component: () => <Navigate to="/cdm/dashboard" replace />,
       },
     ],
   },
@@ -184,13 +184,13 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "org-adviser",
+    path: "adviser",
     Component: OrgAdviserLayout,
     ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
-        Component: () => <Navigate to="/org-adviser/dashboard" replace />,
+        Component: () => <Navigate to="/adviser/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -212,7 +212,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "*",
-        Component: () => <Navigate to="/org-adviser/dashboard" replace />,
+        Component: () => <Navigate to="/adviser/dashboard" replace />,
       },
     ],
   },

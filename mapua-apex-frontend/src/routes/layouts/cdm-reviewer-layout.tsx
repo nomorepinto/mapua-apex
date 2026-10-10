@@ -17,20 +17,20 @@ export function CdmReviewerLayout() {
   const cdmNav = [
     {
       label: "Dashboard",
-      to: "/cdm-reviewer/dashboard",
+      to: "/cdm/dashboard",
       icon: HomeIcon,
       end: true,
     },
     {
       label: "Reservables",
-      to: "/cdm-reviewer/reservables",
+      to: "/cdm/reservables",
       icon: BoxesIcon,
     },
     ...(hasActivityAccess
       ? [
           {
             label: "Activity Log",
-            to: "/cdm-reviewer/activities",
+            to: "/cdm/activities",
             icon: FileCheck2Icon,
           },
         ]
@@ -40,7 +40,7 @@ export function CdmReviewerLayout() {
   return (
     <AuthGuard allowedGroups={["admin", "cdm_reviewer", "cdm"]}>
       <div className={layout.frame}>
-        <AppSidebar homeTo="/cdm-reviewer/dashboard" items={cdmNav} />
+        <AppSidebar homeTo="/cdm/dashboard" items={cdmNav} />
         <main className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto">
           <Outlet />
         </main>

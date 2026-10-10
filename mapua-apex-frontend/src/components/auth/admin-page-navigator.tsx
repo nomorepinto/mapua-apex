@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils"
 const PAGE_GROUP_ROUTES = [
   { label: "Admin", path: "/admin" },
   { label: "OSAAR", path: "/osaar" },
-  { label: "CDM Reviewer", path: "/cdm-reviewer" },
+  { label: "CDM Reviewer", path: "/cdm" },
   { label: "Dean", path: "/dean" },
-  { label: "Org Adviser", path: "/org-adviser" },
+  { label: "Org Adviser", path: "/adviser" },
   { label: "Students", path: "/students" },
   { label: "Landing", path: "/" },
 ] as const

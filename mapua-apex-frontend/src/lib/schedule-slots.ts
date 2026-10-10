@@ -1,3 +1,4 @@
+import { formatMinutesOfDay } from "@/lib/time-format"
 import type { ReservableDay, ReservableSchedule, SlotSelection } from "@/lib/types"
 
 /**
@@ -72,9 +73,15 @@ export function slotEnd(slot: number): string {
   return formatMinutes(slotStartMinutes(slot) + INTERVAL_MINUTES)
 }
 
-/** Human label for a slot, e.g. `07:00-08:10`. */
+/**
+ * Human label for a slot for DISPLAY (e.g. `07:00-08:10` or `7:00 AM-8:10 AM`).
+ * The 12-/24-hour choice is env-driven via `VITE_TIME_FORMAT` (see time-format.ts).
+ * The `slotStart`/`slotEnd` values above stay canonical 24-hour because they
+ * feed persisted event times and PDFs — only this label is formatted.
+ */
 export function slotLabel(slot: number): string {
-  return `${slotStart(slot)}-${slotEnd(slot)}`
+  const start = slotStartMinutes(slot)
+  return `${formatMinutesOfDay(start)}-${formatMinutesOfDay(start + INTERVAL_MINUTES)}`
 }
 
 /** All 12 slot labels, index-aligned to slot numbers. */

@@ -41,6 +41,9 @@ export function CampusSelect({
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Select
         disabled={disabled}
+        // Provide the value→label map so the trigger shows the campus name even
+        // when the popup has not mounted yet (campus defaults to the first one).
+        items={campuses.map((campus) => ({ value: campus.campus_id, label: campus.name }))}
         onValueChange={(next) => {
           if (typeof next === "string") onChange(next)
         }}
@@ -88,6 +91,9 @@ export function ReservableSelect({
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Select
         disabled={disabled || reservables.length === 0}
+        // Value→label map keeps the trigger showing the reservable name rather
+        // than its raw id before the grouped popup renders.
+        items={reservables.map((item) => ({ value: item.reservable_id, label: item.name }))}
         onValueChange={(next) => {
           if (typeof next === "string") onChange(next)
         }}
