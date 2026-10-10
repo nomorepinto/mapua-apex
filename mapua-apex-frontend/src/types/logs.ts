@@ -121,10 +121,18 @@ export interface LoginVolumeTimeComparison {
   yearAvg: number[];
 }
 
+export interface SignatoriesBreakdown {
+  adviser: number;
+  dean: number;
+  osaar: number;
+  cdm: number;
+}
+
 export interface LoginsByRoleMap {
   student: number;
   signatory: number;
   admin: number;
+  signatoriesBreakdown?: SignatoriesBreakdown;
 }
 
 export interface HeatmapCell {

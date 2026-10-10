@@ -15,6 +15,7 @@ import type {
   NotificationType,
   HeatmapCell,
   AnalyticsAlert,
+  LoginsByRoleMap,
 } from "../types/logs";
 import {
   IS_MOCK_MODE,
@@ -26,6 +27,68 @@ import {
   getMockSessionAnalytics,
   getMockPipelineAnalytics,
 } from "../lib/mock-monitor-data";
+
+export function classifySessionRole(
+  userRole?: string,
+  userEmail?: string,
+  userName?: string
+): "student" | "signatory" | "admin" {
+  const r = (userRole || "").toLowerCase();
+  const email = (userEmail || "").toLowerCase();
+  const name = (userName || "").toLowerCase();
+
+  if (r === "admin" || r.includes("admin") || email.includes("admin") || name.includes("admin")) {
+    return "admin";
+  }
+
+  if (
+    r === "signatory" ||
+    r === "signatories" ||
+    r === "org_adviser" ||
+    r === "adviser" ||
+    r === "dean" ||
+    r === "osaar" ||
+    r === "cdm" ||
+    r.includes("adviser") ||
+    r.includes("dean") ||
+    r.includes("osaar") ||
+    r.includes("cdm") ||
+    r.includes("signat") ||
+    email.includes("adviser") ||
+    email.includes("dean") ||
+    email.includes("osaar") ||
+    email.includes("cdm") ||
+    name.includes("adviser") ||
+    name.includes("dean") ||
+    name.includes("osaar") ||
+    name.includes("director")
+  ) {
+    return "signatory";
+  }
+
+  return "student";
+}
+
+export function classifySignatorySubtype(
+  userRole?: string,
+  userEmail?: string,
+  userName?: string
+): "dean" | "osaar" | "cdm" | "adviser" {
+  const r = (userRole || "").toLowerCase();
+  const email = (userEmail || "").toLowerCase();
+  const name = (userName || "").toLowerCase();
+
+  if (r === "dean" || r.includes("dean") || email.includes("dean") || name.includes("dean")) {
+    return "dean";
+  }
+  if (r === "osaar" || r.includes("osaar") || email.includes("osaar") || name.includes("osaar")) {
+    return "osaar";
+  }
+  if (r === "cdm" || r.includes("cdm") || email.includes("cdm") || name.includes("cdm") || name.includes("director")) {
+    return "cdm";
+  }
+  return "adviser";
+}
 
 function normalizeSessionItem(item: any): Session {
   if (!item) return item;
@@ -497,11 +560,29 @@ export function useSessionAnalyticsQuery(params: LogQueryParams & { compare?: "m
         const sessions = rawSessions.map(normalizeSessionItem);
 
         // Role distribution
-        const loginsByRole = { student: 0, signatory: 0, admin: 0 };
+        const loginsByRole: LoginsByRoleMap = {
+          student: 0,
+          signatory: 0,
+          admin: 0,
+          signatoriesBreakdown: {
+            adviser: 0,
+            dean: 0,
+            osaar: 0,
+            cdm: 0,
+          },
+        };
         sessions.forEach((s) => {
-          const r = (s.userRole || "student").toLowerCase();
-          if (r in loginsByRole) {
-            loginsByRole[r as keyof typeof loginsByRole]++;
+          const roleCategory = classifySessionRole(s.userRole, s.userEmail, s.userName);
+          if (roleCategory === "admin") {
+            loginsByRole.admin++;
+          } else if (roleCategory === "signatory") {
+            loginsByRole.signatory++;
+            const subtype = classifySignatorySubtype(s.userRole, s.userEmail, s.userName);
+            if (loginsByRole.signatoriesBreakdown) {
+              loginsByRole.signatoriesBreakdown[subtype]++;
+            }
+          } else {
+            loginsByRole.student++;
           }
         });
 

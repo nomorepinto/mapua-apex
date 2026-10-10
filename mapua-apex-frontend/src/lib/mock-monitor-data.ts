@@ -380,6 +380,12 @@ export function getMockSessionAnalytics(params?: LogQueryParams): SessionAnalyti
       student: multiplier * 20 + 10,
       signatory: multiplier * 5 + 4,
       admin: multiplier * 2 + 2,
+      signatoriesBreakdown: {
+        adviser: Math.max(1, Math.round((multiplier * 5 + 4) * 0.4)),
+        dean: Math.max(1, Math.round((multiplier * 5 + 4) * 0.25)),
+        osaar: Math.max(1, Math.round((multiplier * 5 + 4) * 0.2)),
+        cdm: Math.max(1, Math.round((multiplier * 5 + 4) * 0.15)),
+      },
     },
     heatmapData,
     alerts: [
