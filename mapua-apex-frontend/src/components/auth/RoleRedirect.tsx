@@ -24,7 +24,7 @@ export function RoleRedirect() {
   }
 
   if (!auth.isAuthenticated) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/" replace />
   }
 
   const userGroups = (auth.user?.profile["cognito:groups"] as string[]) || []
