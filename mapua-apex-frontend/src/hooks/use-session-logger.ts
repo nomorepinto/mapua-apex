@@ -6,20 +6,49 @@ import type { PageVisit } from "../types/logs";
 
 const HEARTBEAT_INTERVAL_MS = 90 * 1000;
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+const SESSION_STORAGE_KEY = "apex_session_id";
+
+/** Shared across all tabs in the same browser via localStorage. */
+function getStoredSessionId(): string | null {
+  try {
+    return localStorage.getItem(SESSION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredSessionId(id: string): void {
+  try {
+    localStorage.setItem(SESSION_STORAGE_KEY, id);
+  } catch {
+    // ignore
+  }
+}
+
+function clearStoredSessionId(): void {
+  try {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 interface SessionResponse {
   sessionId: string;
   status: string;
+  isNewSession?: boolean;
 }
 
 export function useSessionLogger() {
   const location = useLocation();
-  const sessionIdRef = useRef<string | null>(
-    typeof window !== "undefined" ? sessionStorage.getItem("apex_session_id") : null
-  );
+  const sessionIdRef = useRef<string | null>(getStoredSessionId());
   const pendingPagesRef = useRef<PageVisit[]>([]);
-  const lastActiveTimestampRef = useRef<number>(Date.now());
+  const lastActiveTimestampRef = useRef<number>(0);
   const isOpeningRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    lastActiveTimestampRef.current = Date.now();
+  }, []);
 
   useEffect(() => {
     try {
@@ -71,13 +100,18 @@ export function useSessionLogger() {
         const pages = [...pendingPagesRef.current];
         pendingPagesRef.current = [];
 
+        // Pass the existing session ID so the backend can resume it (same browser)
+        // or close it and issue a new one (different device / concurrent login).
+        const existingSessionId = getStoredSessionId();
+
         const res = await apiClient.post<SessionResponse>("/sessions/start", {
           pagesVisited: pages,
+          existingSessionId: existingSessionId ?? undefined,
         });
 
         if (res && res.sessionId) {
           sessionIdRef.current = res.sessionId;
-          sessionStorage.setItem("apex_session_id", res.sessionId);
+          setStoredSessionId(res.sessionId);
         }
       } catch (err) {
         console.warn("useSessionLogger: Open session failed", err);
@@ -106,11 +140,12 @@ export function useSessionLogger() {
         await apiClient.patch(`/sessions/${currentSessionId}/heartbeat`, {
           pagesVisited: pages,
         });
-      } catch (err: any) {
-        if (err?.status === 409 || err?.status === 404) {
+      } catch (err) {
+        const status = (err as { status?: number })?.status;
+        if (status === 409 || status === 404) {
           console.warn("useSessionLogger: Session expired/ended. Re-opening session...");
           sessionIdRef.current = null;
-          sessionStorage.removeItem("apex_session_id");
+          clearStoredSessionId();
           await openSession();
         } else {
           console.warn("useSessionLogger: Heartbeat failed", err);
@@ -118,7 +153,16 @@ export function useSessionLogger() {
       }
     };
 
-    // On mount, if we already have a session ID from sessionStorage, send heartbeat; otherwise open new session
+    // Keep all tabs in this browser synced in real-time when localStorage changes
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SESSION_STORAGE_KEY) {
+        sessionIdRef.current = e.newValue;
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
+    // On mount: if we already have a session ID from localStorage, heartbeat it first
+    // (validates it's still active on the backend). Otherwise open a new session.
     if (sessionIdRef.current) {
       sendHeartbeat();
     } else {
@@ -129,6 +173,7 @@ export function useSessionLogger() {
 
     return () => {
       if (intervalId) clearInterval(intervalId);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 

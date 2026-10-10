@@ -4,11 +4,11 @@ import { apiClient } from "@/lib/api-client";
 export function useSignOut() {
   return useCallback(async () => {
     // End session in backend logger before Cognito redirect
-    const sessionId = sessionStorage.getItem("apex_session_id");
+    const sessionId = localStorage.getItem("apex_session_id");
     if (sessionId) {
       try {
         await apiClient.post(`/sessions/${sessionId}/end`, { reason: "logout" });
-        sessionStorage.removeItem("apex_session_id");
+        localStorage.removeItem("apex_session_id");
       } catch (err) {
         console.warn("useSignOut: end session call failed", err);
       }

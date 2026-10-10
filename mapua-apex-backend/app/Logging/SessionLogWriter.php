@@ -73,6 +73,9 @@ final class SessionLogWriter
     /**
      * Start or resume a session for the authenticated user.
      *
+     * @param  string|null  $existingSessionId  Session ID already held by the client (from localStorage).
+     *                                          When provided and it matches the active DynamoDB session,
+     *                                          the session is resumed rather than replaced.
      * @return array{sessionId: string, login_time: string, status: string, isNewSession: bool}
      */
     public function startSession(
@@ -83,7 +86,8 @@ final class SessionLogWriter
         string $userRole,
         string $ipAddress,
         string $userAgent,
-        array $pagesVisited = []
+        array $pagesVisited = [],
+        ?string $existingSessionId = null,
     ): array {
         $base = $this->deriveBase($sub, $authTime);
         $res = $this->resolveChain(
@@ -95,6 +99,7 @@ final class SessionLogWriter
             ipAddress: $ipAddress,
             userAgent: $userAgent,
             newPages: $pagesVisited,
+            existingSessionId: $existingSessionId,
         );
 
         return [
@@ -331,9 +336,19 @@ final class SessionLogWriter
     // ─────────────────────────────────────────────────────────────────────
 
     /**
-     * Walk the chain base → base#2 → base#3 … to find the current session state.
+     * Enforce one-active-session-per-user.
+     *
+     * Walk the chain base → base#2 → … to find the latest session.
+     * - If there is no session: create one.
+     * - If the latest session is active AND the client's existing session ID matches it: resume it
+     *   (same browser, page refresh or new tab that already inherited the localStorage ID).
+     * - If the latest session is active AND the client sent a DIFFERENT ID (or none): this is a
+     *   concurrent login from a different device/browser. Force-close the old session with
+     *   reason 'concurrent_login' and create a fresh one.
+     * - If the latest session has ended: create the next chain slot.
      *
      * @param  array<array{path: string, timestamp: string}>  $newPages
+     * @param  string|null  $existingSessionId  The session ID the client already holds.
      * @return array{sessionId: string, status: string, isNewSession: bool}
      */
     private function resolveChain(
@@ -345,6 +360,7 @@ final class SessionLogWriter
         string $ipAddress,
         string $userAgent,
         array $newPages,
+        ?string $existingSessionId = null,
     ): array {
         $table = $this->db->sessionTable();
         $latest = null;
@@ -374,13 +390,13 @@ final class SessionLogWriter
 
         // Case B: latest session is active
         if (($latest['status'] ?? '') === 'active') {
+            $existingId = (string) ($latest['session_id'] ?? $base);
+
             if ($this->isStale($latest)) {
-                $existingId = (string) ($latest['session_id'] ?? $base);
+                // Stale — close it and fall through to create a new one
                 $this->closeSession($existingId, $latest, 'timed_out');
-                // Fall through to Case C
-            } else {
-                // Healthy active: extend it
-                $existingId = (string) ($latest['session_id'] ?? $base);
+            } elseif ($existingSessionId !== null && $existingSessionId === $existingId) {
+                // ✅ Same browser / localStorage ID matches — resume this session
                 $pagesVisited = is_array($latest['pages_visited'] ?? null) ? $latest['pages_visited'] : [];
                 $truncated = (bool) ($latest['pages_visited_truncated'] ?? false);
                 [$pagesVisited, $truncated] = $this->appendPages($pagesVisited, $newPages, $truncated);
@@ -402,14 +418,23 @@ final class SessionLogWriter
                     $pk = DynamoKeys::session($existingId);
                     $this->db->patch($table, $pk, self::SK, $set);
                 } catch (\Throwable $e) {
-                    Log::warning('SessionLogWriter: extend failed', ['error' => $e->getMessage()]);
+                    Log::warning('SessionLogWriter: resume extend failed', ['error' => $e->getMessage()]);
                 }
 
                 return ['sessionId' => $existingId, 'status' => 'active', 'isNewSession' => false];
+            } else {
+                // 🔴 Different browser / missing ID — concurrent login. Kick the old session.
+                Log::info('SessionLogWriter: concurrent login detected, closing old session', [
+                    'sub' => $sub,
+                    'old_session_id' => $existingId,
+                    'client_session_id' => $existingSessionId,
+                ]);
+                $this->closeSession($existingId, $latest, 'concurrent_login');
+                // Fall through to create a new session below
             }
         }
 
-        // Case C: latest is ended/revoked/timed_out (or was stale and just closed) — create next slot
+        // Case C: latest is ended / was just closed — create next chain slot
         $newSuffix = $depth === 0 ? $base : $base.'#'.($depth + 1);
 
         return $this->createSession(
@@ -508,11 +533,12 @@ final class SessionLogWriter
 
         // Map internal reason → plan status values
         $statusMap = [
-            'logout' => 'completed',
-            'tab_closed' => 'completed',
-            'timed_out' => 'timed_out',
-            'timeout' => 'timed_out',
-            'revoked' => 'revoked',
+            'logout'           => 'completed',
+            'tab_closed'       => 'completed',
+            'timed_out'        => 'timed_out',
+            'timeout'          => 'timed_out',
+            'revoked'          => 'revoked',
+            'concurrent_login' => 'completed',
         ];
         $status = $statusMap[$reason] ?? 'completed';
 

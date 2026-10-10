@@ -165,7 +165,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     reqHeaders["X-Api-Key"] = apiKey
   }
 
-  const sessionId = typeof window !== "undefined" ? sessionStorage.getItem("apex_session_id") : null
+  const sessionId = typeof window !== "undefined" ? localStorage.getItem("apex_session_id") : null
   if (sessionId) {
     reqHeaders["X-Session-ID"] = sessionId
   }

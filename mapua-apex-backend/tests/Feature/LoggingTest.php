@@ -91,13 +91,68 @@ class LoggingTest extends TestCase
         $response = $this->withStudentAuth([
             'sub' => $sub,
             'auth_time' => $authTime,
-        ])->postJson('/api/v1/sessions/start');
+        ])->postJson('/api/v1/sessions/start', [
+            'existingSessionId' => $baseId,
+        ]);
 
         $response->assertStatus(200)
             ->assertJson([
                 'sessionId' => $baseId,
                 'status' => 'active',
                 'isNewSession' => false,
+            ]);
+    }
+
+    public function test_02b_concurrent_login_closes_old_active_session(): void
+    {
+        $sub = 'usr-123';
+        $authTime = 1700000000;
+        $baseId = hash('sha256', "{$sub}:{$authTime}");
+        $suffix2Id = "{$baseId}#2";
+        $now = date('Y-m-d\TH:i:s\Z');
+
+        // Check base session -> active
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$baseId}"))
+            ->once()
+            ->andReturn(new \Aws\Result([
+                'Item' => [
+                    'session_id' => ['S' => $baseId],
+                    'sub' => ['S' => $sub],
+                    'status' => ['S' => 'active'],
+                    'login_time' => ['S' => $now],
+                    'last_heartbeat' => ['S' => $now],
+                    'TTL' => ['N' => (string)(time() + 86400)],
+                ],
+            ]));
+
+        // Check suffix 2 -> null (empty chain slot)
+        $this->dynamoDbMock->shouldReceive('getItem')
+            ->with(Mockery::on(fn($args) => ($args['Key']['PK']['S'] ?? '') === "SESSION#{$suffix2Id}"))
+            ->once()
+            ->andReturn(new \Aws\Result(['Item' => null]));
+
+        // Old session closed via patch (updateItem)
+        $this->dynamoDbMock->shouldReceive('updateItem')
+            ->once()
+            ->andReturn(new \Aws\Result([]));
+
+        // New session created for the new browser via putItem
+        $this->dynamoDbMock->shouldReceive('putItem')
+            ->once()
+            ->andReturn(new \Aws\Result([]));
+
+        // Call without existingSessionId or with a different one -> concurrent login
+        $response = $this->withStudentAuth([
+            'sub' => $sub,
+            'auth_time' => $authTime,
+        ])->postJson('/api/v1/sessions/start');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'sessionId' => $suffix2Id,
+                'status' => 'active',
+                'isNewSession' => true,
             ]);
     }
 

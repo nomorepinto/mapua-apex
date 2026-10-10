@@ -21,6 +21,8 @@ class SessionController extends Controller
         }
 
         $pagesVisited = (array) $request->input('pagesVisited', []);
+        $existingSessionId = $request->input('existingSessionId');
+        $existingSessionId = is_string($existingSessionId) && trim($existingSessionId) !== '' ? trim($existingSessionId) : null;
 
         $res = $this->sessionLogWriter->startSession(
             sub: $user['sub'],
@@ -31,6 +33,7 @@ class SessionController extends Controller
             ipAddress: SessionLogWriter::resolveClientIp($request),
             userAgent: $request->userAgent() ?? 'Unknown',
             pagesVisited: $pagesVisited,
+            existingSessionId: $existingSessionId,
         );
 
         return response()->json($res, 200);
