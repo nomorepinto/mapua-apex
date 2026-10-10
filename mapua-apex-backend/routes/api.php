@@ -24,14 +24,6 @@ Route::middleware(['throttle:student'])->group(function (): void {
     });
 });
 
-Route::prefix('v1')->name('v1.')->group(function (): void {
-    // Session lifecycle endpoints (open to any authenticated user role)
-    Route::middleware(['cognito.jwt:any'])->prefix('sessions')->name('sessions.')->group(function (): void {
-        Route::post('start', [SessionController::class, 'start'])->name('start');
-        Route::patch('{sessionId}/heartbeat', [SessionController::class, 'heartbeat'])->name('heartbeat');
-        Route::post('{sessionId}/end', [SessionController::class, 'end'])->name('end');
-    });
-  
 // Public endpoints — readable without a Cognito JWT (e.g. the landing page).
 Route::middleware(['throttle:student'])->prefix('public')->name('public.')->group(function (): void {
     Route::get('announcements', [PublicAnnouncementController::class, 'index'])->name('announcements.index');
@@ -72,17 +64,6 @@ Route::middleware(['cognito.jwt:student', 'throttle:student', 'activity.log'])
         Route::get('organizations', [StudentOrganizationController::class, 'index'])->name('organizations.index');
     });
 
-    Route::middleware(['cognito.jwt:admin', 'throttle:admin', 'activity.log'])
-        ->prefix('admins')
-        ->name('admins.')
-        ->group(function (): void {
-            // Super Admin Log Monitoring endpoints
-            Route::middleware(['cognito.jwt:super_admin'])->prefix('monitor')->name('monitor.')->group(function (): void {
-                Route::get('sessions', [LogMonitorController::class, 'querySessions'])->name('sessions');
-                Route::get('activity', [LogMonitorController::class, 'queryActivity'])->name('activity');
-                Route::get('activity/{activityId}', [LogMonitorController::class, 'getActivityDetail'])->name('activity.show');
-                Route::get('stats', [LogMonitorController::class, 'getStats'])->name('stats');
-            });
 Route::middleware(['cognito.jwt:signatory', 'throttle:signatory', 'activity.log'])
     ->prefix('signatories')
     ->name('signatories.')
@@ -131,18 +112,6 @@ Route::middleware(['cognito.jwt:admin', 'throttle:admin', 'activity.log'])
             Route::get('bottlenecks', [LogMonitorController::class, 'getBottlenecks'])->name('bottlenecks');
         });
 
-    // Arcus companion apps — server-to-server, shared secret (not a Cognito JWT).
-    Route::middleware(['arcus.service', 'throttle:admin'])
-        ->prefix('arcus')
-        ->name('arcus.')
-        ->group(function (): void {
-            Route::get('events', [EventController::class, 'index'])
-                ->name('events.index');
-            Route::post('events/{event}/submissions/{submission}/finish', [EventController::class, 'finish'])
-                ->middleware('throttle:admin-write')
-                ->name('submissions.finish');
-        });
-});
         Route::get('submissions', [AdminSubmissionController::class, 'index'])->name('submissions.index');
         Route::get('events/{event}/submissions/{submission}', [AdminSubmissionController::class, 'show'])
             ->name('submissions.show');
@@ -181,4 +150,16 @@ Route::middleware(['cognito.jwt:admin', 'throttle:admin', 'activity.log'])
         Route::delete('signatories/{signatory}', [SignatoryController::class, 'destroy'])
             ->middleware('throttle:admin-write')
             ->name('signatories.destroy');
+    });
+
+// Arcus companion apps — server-to-server, shared secret (not a Cognito JWT).
+Route::middleware(['arcus.service', 'throttle:admin'])
+    ->prefix('arcus')
+    ->name('arcus.')
+    ->group(function (): void {
+        Route::get('events', [EventController::class, 'index'])
+            ->name('events.index');
+        Route::post('events/{event}/submissions/{submission}/finish', [EventController::class, 'finish'])
+            ->middleware('throttle:admin-write')
+            ->name('submissions.finish');
     });
