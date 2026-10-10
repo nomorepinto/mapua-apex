@@ -42,7 +42,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/students/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -89,7 +89,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "*",
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/students/dashboard" replace />,
       },
     ],
   },
@@ -100,7 +100,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/cdm-reviewer/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -148,7 +148,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "*",
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/cdm-reviewer/dashboard" replace />,
       },
     ],
   },
@@ -159,7 +159,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/dean/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -179,7 +179,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "*",
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/dean/dashboard" replace />,
       },
     ],
   },
@@ -190,7 +190,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/org-adviser/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -212,7 +212,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "*",
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/org-adviser/dashboard" replace />,
       },
     ],
   },
@@ -223,7 +223,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/signatories/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -243,7 +243,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "*",
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/signatories/dashboard" replace />,
       },
     ],
   },
@@ -254,7 +254,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/osaar/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -270,7 +270,7 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            Component: () => <Navigate to="organizations" replace />,
+            Component: () => <Navigate to="/osaar/setup/organizations" replace />,
           },
           {
             path: "organizations",
@@ -308,7 +308,7 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            Component: () => <Navigate to="dashboard" replace />,
+            Component: () => <Navigate to="/osaar/review/dashboard" replace />,
           },
           {
             path: "dashboard",
@@ -348,7 +348,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "*",
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/osaar/dashboard" replace />,
       },
     ],
   },
