@@ -88,7 +88,7 @@ function getRoomCapacity(roomIdentifier: string, campus?: string) {
  */
 export function ReservationFields() {
   const { state, actions } = useReservationFormContext()
-  const { draft, schedule, campus } = state
+  const { draft, campus } = state
   const { state: saafState, actions: saafActions } = useSaafFormContext()
   const { draft: saafDraft } = saafState
 
