@@ -23,24 +23,9 @@ final class ActivityLogWriter
         string $userEmail,
         string $userRole,
         string $ipAddress,
-        string $timestamp,
+        ?string $timestamp = null,
     ): void {
-        $this->write([
-            'sessionId'   => $sessionId,
-            'userId'      => $userId,
-            'userName'    => $userName,
-            'userEmail'   => $userEmail,
-            'userRole'    => $userRole,
-            'ipAddress'   => $ipAddress,
-            'timestamp'   => $timestamp,
-            'actionType'  => 'LOGIN',
-            'module'      => 'Session',
-            'entityId'    => $sessionId,
-            'entityName'  => $userName,
-            'description' => $userName.' logged in',
-            'before'      => null,
-            'after'       => null,
-        ]);
+        // Login events are recorded exclusively in SessionLog
     }
 
     public function writeLogout(
@@ -50,24 +35,9 @@ final class ActivityLogWriter
         string $userEmail,
         string $userRole,
         string $ipAddress,
-        string $timestamp,
+        ?string $timestamp = null,
     ): void {
-        $this->write([
-            'sessionId'   => $sessionId,
-            'userId'      => $userId,
-            'userName'    => $userName,
-            'userEmail'   => $userEmail,
-            'userRole'    => $userRole,
-            'ipAddress'   => $ipAddress,
-            'timestamp'   => $timestamp,
-            'actionType'  => 'LOGOUT',
-            'module'      => 'Session',
-            'entityId'    => $sessionId,
-            'entityName'  => $userName,
-            'description' => $userName.' logged out',
-            'before'      => null,
-            'after'       => null,
-        ]);
+        // Logout events are recorded exclusively in SessionLog
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -92,22 +62,24 @@ final class ActivityLogWriter
         string $description,
         ?array $before,
         ?array $after,
+        ?string $organizationName = null,
     ): void {
         $this->write([
-            'sessionId'   => $sessionId,
-            'userId'      => $userId,
-            'userName'    => $userName,
-            'userEmail'   => $userEmail,
-            'userRole'    => $userRole,
-            'ipAddress'   => $ipAddress,
-            'timestamp'   => $this->now(),
-            'actionType'  => $actionType,
-            'module'      => $module,
-            'entityId'    => $entityId,
-            'entityName'  => $entityName,
-            'description' => $description,
-            'before'      => $before,
-            'after'       => $after,
+            'sessionId'        => $sessionId,
+            'userId'           => $userId,
+            'userName'         => $userName,
+            'userEmail'        => $userEmail,
+            'userRole'         => $userRole,
+            'ipAddress'        => $ipAddress,
+            'timestamp'        => $this->now(),
+            'actionType'       => $actionType,
+            'module'           => $module,
+            'entityId'         => $entityId,
+            'entityName'       => $entityName,
+            'organizationName' => $organizationName,
+            'description'      => $description,
+            'before'           => $before,
+            'after'            => $after,
         ]);
     }
 
@@ -130,21 +102,22 @@ final class ActivityLogWriter
             $module     = (string) ($data['module'] ?? '');
 
             $item = [
-                'PK'          => $pk,
-                'SK'          => $pk,
-                'activityId'  => $activityId,
-                'sessionId'   => $sessionId,
-                'userId'      => $userId,
-                'userName'    => (string) ($data['userName'] ?? ''),
-                'userEmail'   => (string) ($data['userEmail'] ?? ''),
-                'userRole'    => (string) ($data['userRole'] ?? ''),
-                'timestamp'   => $timestamp,
-                'ipAddress'   => (string) ($data['ipAddress'] ?? ''),
-                'actionType'  => (string) ($data['actionType'] ?? ''),
-                'module'      => $module,
-                'entityId'    => (string) ($data['entityId'] ?? ''),
-                'entityName'  => (string) ($data['entityName'] ?? ''),
-                'description' => (string) ($data['description'] ?? ''),
+                'PK'               => $pk,
+                'SK'               => $pk,
+                'activityId'       => $activityId,
+                'sessionId'        => $sessionId,
+                'userId'           => $userId,
+                'userName'         => (string) ($data['userName'] ?? ''),
+                'userEmail'        => (string) ($data['userEmail'] ?? ''),
+                'userRole'         => (string) ($data['userRole'] ?? ''),
+                'timestamp'        => $timestamp,
+                'ipAddress'        => (string) ($data['ipAddress'] ?? ''),
+                'actionType'       => (string) ($data['actionType'] ?? ''),
+                'module'           => $module,
+                'entityId'         => (string) ($data['entityId'] ?? ''),
+                'entityName'       => (string) ($data['entityName'] ?? ''),
+                'organizationName' => (string) ($data['organizationName'] ?? ''),
+                'description'      => (string) ($data['description'] ?? ''),
                 'TTL'         => $this->ttl(),
                 'GSI1PK'      => 'SESSION#'.$sessionId,
                 'GSI1SK'      => $timestamp,
@@ -186,5 +159,20 @@ final class ActivityLogWriter
         $days = (int) config('aws.dynamodb.log_retention_days', 90);
 
         return time() + ($days * 86400);
+    }
+
+    public function logMutation(...$args): void
+    {
+        $this->writeMutation(...$args);
+    }
+
+    public function logLogin(...$args): void
+    {
+        $this->writeLogin(...$args);
+    }
+
+    public function logLogout(...$args): void
+    {
+        $this->writeLogout(...$args);
     }
 }

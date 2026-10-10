@@ -396,3 +396,77 @@ in test fixtures (DeadlineControllerTest) and screenshot mocks
 (capture-screenshots.mjs), and delete_events.py only removes them. The object
 is therefore deprecated and no longer part of the modeled schema; the dangling
 read endpoint still exists in code but returns nothing in production.
+
+________________
+
+SESSION LOG (implemented — session monitoring)
+Table: MAPUA_APEX_TABLE (single-table, no separate log table)
+Written by: App\Logging\SessionLogWriter
+Read by:    App\Logging\LogTableItems::querySessions(), getSessionItem()
+
+Key structure (plan §2.1):
+  PK:     SESSION#{session_id}
+  SK:     METADATA
+  GSI1PK: LOG#SESSION#{YYYY-MM}   GSI1SK: {login_time}   ← monthly query bucket
+  GSI2PK: USER#{sub}              GSI2SK: {login_time}   ← per-user session history
+  GSI3PK: STATUS#active|completed|timed_out|revoked   GSI3SK: {last_heartbeat}   ← sweep index
+
+Session ID derivation: sha256(sub + ":" + auth_time)
+Chain suffix (#2, #3…) appended when base session has ended, giving each
+re-authentication a fresh slot without reopening the closed one.
+
+Item fields:
+  session_id:              string (UUID-like sha256 hash, possibly with #N suffix)
+  sub:                     string (Cognito user sub)
+  user_name:               string
+  user_email:              string
+  user_role:               string
+  ip_address:              string
+  user_agent:              string
+  device_info:             map { browser: string, os: string, device_type: string }
+  status:                  "active" | "completed" | "timed_out" | "revoked"
+  login_time:              ISO-8601 UTC timestamp
+  logout_time:             ISO-8601 UTC timestamp | null
+  last_heartbeat:          ISO-8601 UTC timestamp
+  duration_seconds:        number (updated on heartbeat and close)
+  pages_visited:           list<{ path: string, timestamp: string }> (max 200 entries)
+  pages_visited_truncated: boolean
+  events_count:            number
+  revocation_reason:       string | null
+  TTL:                     unix epoch (config aws.dynamodb.log_retention_days, default 90 days)
+
+Stale threshold: 15 minutes (no heartbeat → timed_out)
+Sweep command:   sessions:sweep-stale (artisan, scheduled every 10 minutes via console.php)
+
+json
+{
+  "PK": "SESSION#d98f7e2a4b1c...",
+  "SK": "METADATA",
+  "GSI1PK": "LOG#SESSION#2026-10",
+  "GSI1SK": "2026-10-09T14:30:00Z",
+  "GSI2PK": "USER#usr_cognito_sub_123",
+  "GSI2SK": "2026-10-09T14:30:00Z",
+  "GSI3PK": "STATUS#active",
+  "GSI3SK": "2026-10-09T14:45:00Z",
+  "session_id": "d98f7e2a4b1c...",
+  "sub": "usr_cognito_sub_123",
+  "user_name": "Juan Dela Cruz",
+  "user_email": "jdelacruz@mymail.mapua.edu.ph",
+  "user_role": "student",
+  "ip_address": "120.29.74.12",
+  "user_agent": "Mozilla/5.0 ...",
+  "device_info": { "browser": "Chrome", "os": "Windows", "device_type": "desktop" },
+  "status": "active",
+  "login_time": "2026-10-09T14:30:00Z",
+  "logout_time": null,
+  "last_heartbeat": "2026-10-09T14:45:00Z",
+  "duration_seconds": 900,
+  "pages_visited": [
+    { "path": "/dashboard", "timestamp": "2026-10-09T14:30:05Z" },
+    { "path": "/submissions/new", "timestamp": "2026-10-09T14:33:10Z" }
+  ],
+  "pages_visited_truncated": false,
+  "events_count": 2,
+  "revocation_reason": null,
+  "TTL": 1736222400
+}

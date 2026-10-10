@@ -1,34 +1,33 @@
 import { useCallback } from "react";
+import { apiClient } from "@/lib/api-client";
 
 export function useSignOut() {
-  return useCallback((evtOrSessionId?: string | null | React.MouseEvent) => {
-    const sessionId = typeof evtOrSessionId === "string" ? evtOrSessionId : null;
-
-    // End session keepalive call before Cognito redirect
-    try {
-      if (sessionId) {
-        const url = `/api/v1/sessions/${sessionId}/end`;
-        const blob = new Blob([JSON.stringify({ reason: "logout" })], {
-          type: "application/json",
-        });
-        navigator.sendBeacon(url, blob);
+  return useCallback(async () => {
+    // End session in backend logger before Cognito redirect
+    const sessionId = localStorage.getItem("apex_session_id");
+    if (sessionId) {
+      try {
+        await apiClient.post(`/sessions/${sessionId}/end`, { reason: "logout" });
+        localStorage.removeItem("apex_session_id");
+      } catch (err) {
+        console.warn("useSignOut: end session call failed", err);
       }
-    } catch (err) {
-      console.warn("useSignOut: end session beacon failed", err);
     }
 
+    // Cognito's /logout endpoint expects `client_id` + `logout_uri`,
+    // NOT the standard OIDC `post_logout_redirect_uri` that oidc-client-ts sends.
     const domain = import.meta.env.VITE_COGNITO_DOMAIN;
     const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
     const authority = import.meta.env.VITE_COGNITO_AUTHORITY;
     const logoutUri = import.meta.env.VITE_COGNITO_POST_LOGOUT_REDIRECT_URI;
 
-    // Clear OIDC session storage
+    // Clear the OIDC user data directly from storage (synchronous).
     if (authority && clientId) {
       const storageKey = `oidc.user:${authority}:${clientId}`;
       sessionStorage.removeItem(storageKey);
     }
 
-    // Redirect to Cognito logout endpoint
+    // Redirect to Cognito's logout endpoint with correct params
     if (domain && clientId && logoutUri) {
       window.location.href = `${domain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
     } else {
@@ -36,3 +35,4 @@ export function useSignOut() {
     }
   }, []);
 }
+

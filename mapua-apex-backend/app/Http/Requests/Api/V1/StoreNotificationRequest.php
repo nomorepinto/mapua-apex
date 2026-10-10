@@ -65,6 +65,6 @@ class StoreNotificationRequest extends FormRequest
 
     protected function requiresSignatoryField(): bool
     {
-        return $this->routeIs('v1.students.*');
+        return $this->routeIs('students.*') || $this->routeIs('v1.students.*');
     }
 }

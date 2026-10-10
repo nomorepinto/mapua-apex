@@ -2,13 +2,23 @@ import { useMemo } from "react"
 import { AvTable } from "@/components/reservation/av-table"
 import { EquipmentTable } from "@/components/reservation/equipment-table"
 import { RoomTable } from "@/components/reservation/room-table"
-import { ScheduleSummary } from "@/components/reservation/schedule-summary"
 import { useReservationFormContext } from "@/components/students/reservations/reservation-context"
 import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
 import { EventTimeFields } from "@/components/submission/event-time-fields"
 import { FieldWarning } from "@/components/forms/field-warning"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
 import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
+import { minEventDateKey, parseDateKey } from "@/lib/date-key"
+import { CAMPUSES } from "@/components/submission/constants"
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import {
   clockFromDraft,
   combineEventTime,
@@ -33,9 +43,37 @@ const MAKATI_ROOM_CAPACITIES: Record<string, { min: number; max: number }> = {
   "4th floor outdoor": { min: 30, max: 75 },
 }
 
-function getRoomCapacity(roomIdentifier: string) {
+/**
+ * Capacity limits for rooms in the Intramuros campus.
+ */
+const INTRAMUROS_ROOM_CAPACITIES: Record<string, { min: number; max: number }> = {
+  "av room": { min: 50, max: 100 },
+  "seminar room": { min: 50, max: 150 },
+  "global class": { min: 30, max: 60 },
+  "global classroom": { min: 30, max: 60 },
+  "classroom": { min: 20, max: 50 },
+  "gymnasium": { min: 300, max: 3000 },
+  "gym": { min: 300, max: 3000 },
+}
+
+function getRoomCapacity(roomIdentifier: string, campus?: string) {
   const normalized = roomIdentifier.trim().toLowerCase()
-  for (const [key, capacity] of Object.entries(MAKATI_ROOM_CAPACITIES)) {
+  const isMakati = campus?.trim().toLowerCase().includes("makati")
+  const isIntramuros = campus?.trim().toLowerCase().includes("intramuros")
+
+  const capacities = isMakati
+    ? MAKATI_ROOM_CAPACITIES
+    : isIntramuros
+      ? INTRAMUROS_ROOM_CAPACITIES
+      : null
+
+  if (!capacities) return null
+
+  const sortedEntries = Object.entries(capacities).sort(
+    ([a], [b]) => b.length - a.length
+  )
+
+  for (const [key, capacity] of sortedEntries) {
     if (normalized.includes(key)) {
       return capacity
     }
@@ -50,16 +88,17 @@ function getRoomCapacity(roomIdentifier: string) {
  */
 export function ReservationFields() {
   const { state, actions } = useReservationFormContext()
-  const { draft, schedule, campus } = state
+  const { draft, campus } = state
   const { state: saafState, actions: saafActions } = useSaafFormContext()
   const { draft: saafDraft } = saafState
 
-  // Matches any variation like "Makati", "Makati Campus", etc.
+  // Matches any variation like "Makati", "Makati Campus", "Intramuros", etc.
   const isMakati = campus?.trim().toLowerCase().includes("makati")
+  const isIntramuros = campus?.trim().toLowerCase().includes("intramuros")
 
-  // Calculate cumulative min and max participants for selected Makati rooms
-  const makatiLimits = useMemo(() => {
-    if (!isMakati || !draft.roomItems || draft.roomItems.length === 0) {
+  // Calculate cumulative min and max participants for selected rooms based on campus
+  const roomLimits = useMemo(() => {
+    if ((!isMakati && !isIntramuros) || !draft.roomItems || draft.roomItems.length === 0) {
       return null
     }
 
@@ -69,7 +108,7 @@ export function ReservationFields() {
 
     draft.roomItems.forEach((item) => {
       const roomName = item.roomNeeded || ""
-      const capacity = getRoomCapacity(roomName)
+      const capacity = getRoomCapacity(roomName, campus)
 
       if (capacity) {
         min += capacity.min
@@ -79,23 +118,40 @@ export function ReservationFields() {
     })
 
     return matchedCount > 0 ? { min, max } : null
-  }, [isMakati, draft.roomItems])
+  }, [isMakati, isIntramuros, campus, draft.roomItems])
 
   // Validation warning check
   const rawParticipantVal = saafDraft.expectedParticipants || ""
   const participantCount = parseInt(rawParticipantVal, 10)
 
   const participantWarning = useMemo(() => {
-    if (!makatiLimits || !rawParticipantVal || isNaN(participantCount)) return null
+    if (!roomLimits || !rawParticipantVal || isNaN(participantCount)) return null
 
-    if (participantCount < makatiLimits.min) {
-      return `Minimum of ${makatiLimits.min} participants required for selected room(s).`
+    if (participantCount < roomLimits.min) {
+      return `Minimum of ${roomLimits.min} participants required for selected room(s).`
     }
-    if (participantCount > makatiLimits.max) {
-      return `Maximum capacity is ${makatiLimits.max} participants for selected room(s).`
+    if (participantCount > roomLimits.max) {
+      return `Maximum capacity is ${roomLimits.max} participants for selected room(s).`
     }
     return null
-  }, [makatiLimits, rawParticipantVal, participantCount])
+  }, [roomLimits, rawParticipantVal, participantCount])
+
+  const minStartDate = minEventDateKey()
+  const minEndDate =
+    saafDraft.dateOfEvent && saafDraft.dateOfEvent > minStartDate
+      ? saafDraft.dateOfEvent
+      : minStartDate
+
+  const handleStartDateChange = (startVal: string) => {
+    saafActions.updateField("dateOfEvent", startVal)
+    if (!saafDraft.endDateOfEvent || saafDraft.endDateOfEvent < startVal) {
+      saafActions.updateField("endDateOfEvent", startVal)
+    }
+    const weekday = parseDateKey(startVal)?.toLocaleDateString("en-US", {
+      weekday: "long",
+    })
+    if (weekday) saafActions.updateField("dayOfEvent", weekday)
+  }
 
   const storedTimes = splitEventTime(saafDraft.timeOfEvent || "")
   const startParts = clockFromDraft(
@@ -135,14 +191,52 @@ export function ReservationFields() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-4 sm:space-y-0">
-        <div className="space-y-0.5">
-          <h2 className="text-sm font-bold tracking-wide text-neutral-900 uppercase">
-            APPLICATION FORM ON USE OF FACILITIES
-          </h2>
-          <p className="text-xs font-semibold text-neutral-800">
-            (North &amp; South Circle, Hallways, Pavilions, Ground, etc.)
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="space-y-3">
+          <div className="space-y-0.5">
+            <h2 className="text-sm font-bold tracking-wide text-neutral-900 uppercase">
+              APPLICATION FORM ON USE OF FACILITIES
+            </h2>
+            <p className="text-xs font-semibold text-neutral-800">
+              (North &amp; South Circle, Hallways, Pavilions, Ground, etc.)
+            </p>
+          </div>
+
+          <div className="space-y-1.5 w-full sm:w-72">
+            <label className="block text-xs font-semibold text-neutral-800">
+              Venue Campus <span className="text-red-500">*</span>
+            </label>
+            <Select
+              value={saafDraft.activityVenue || null}
+              onValueChange={(value: string | null) =>
+                saafActions.updateField("activityVenue", value ?? "")
+              }
+            >
+              <SelectTrigger
+                aria-label="Venue Campus"
+                className={cn(
+                  "h-10 w-full truncate rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900",
+                  !saafDraft.activityVenue && "saaf-glow-invalid"
+                )}
+              >
+                <SelectValue placeholder="Select campus" />
+              </SelectTrigger>
+              <SelectPopup>
+                {CAMPUSES.map((campusOption) => (
+                  <SelectItem key={campusOption} value={campusOption}>
+                    {campusOption}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+            <input
+              type="hidden"
+              name="activityVenue"
+              value={saafDraft.activityVenue}
+              required
+            />
+            <FieldWarning name="activityVenue" />
+          </div>
         </div>
         <div className="space-y-1.5 w-full sm:w-64 shrink-0">
           <label className="block text-xs font-semibold text-neutral-800">
@@ -168,9 +262,9 @@ export function ReservationFields() {
               }
 
               // Reject additional digits if it would exceed max capacity
-              if (makatiLimits) {
+              if (roomLimits) {
                 const numeric = parseInt(sanitized, 10)
-                if (numeric > makatiLimits.max) {
+                if (numeric > roomLimits.max) {
                   return
                 }
               }
@@ -184,11 +278,11 @@ export function ReservationFields() {
           />
 
           {/* Left-aligned helper text */}
-          {makatiLimits && (
+          {roomLimits && (
             <p className="text-[11px] text-neutral-500 text-left">
               Allowed range:{" "}
               <span className="font-semibold text-neutral-700">
-                {makatiLimits.min} – {makatiLimits.max}
+                {roomLimits.min} – {roomLimits.max}
               </span>{" "}
               participants
             </p>
@@ -206,6 +300,43 @@ export function ReservationFields() {
       </div>
 
       <div className="space-y-8">
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-neutral-800">
+              Start Date of Event <span className="text-red-500">*</span>
+            </label>
+            <DatePicker
+              name="dateOfEvent"
+              value={saafDraft.dateOfEvent}
+              minDate={minStartDate}
+              onChange={handleStartDateChange}
+              placeholder="Pick start date"
+              aria-label="Start date of event"
+              required
+            />
+            <span className="block text-[10px] text-neutral-500">
+              At least 10 days from today
+            </span>
+            <FieldWarning name="dateOfEvent" />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-neutral-800">
+              End Date of Event <span className="text-red-500">*</span>
+            </label>
+            <DatePicker
+              name="endDateOfEvent"
+              value={saafDraft.endDateOfEvent || saafDraft.dateOfEvent || ""}
+              minDate={minEndDate}
+              onChange={(next) => saafActions.updateField("endDateOfEvent", next)}
+              placeholder="Pick end date"
+              aria-label="End date of event"
+              required
+            />
+            <FieldWarning name="endDateOfEvent" />
+          </div>
+        </div>
+
         <div>
           <EventTimeFields
             start={startParts}
@@ -220,7 +351,10 @@ export function ReservationFields() {
           <FieldWarning name="timeOfEvent" />
         </div>
 
-        <ScheduleSummary schedule={schedule} hideTime />
+        <input type="hidden" name="timeOfEventStart" value={format24(startParts)} />
+        <input type="hidden" name="timeOfEventEnd" value={format24(endParts)} />
+        <input type="hidden" name="timeOfEvent" value={saafDraft.timeOfEvent || ""} />
+        <input type="hidden" name="dayOfEvent" value={saafDraft.dayOfEvent || ""} />
 
         <RoomTable
           items={draft.roomItems}

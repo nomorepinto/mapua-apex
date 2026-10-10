@@ -22,25 +22,15 @@ function PassThroughLayout() {
 }
 
 import { AuthGuard } from "@/components/auth/AuthGuard"
-import { RoleRedirect } from "@/components/auth/RoleRedirect"
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: () => (
-      <AuthGuard>
-        <RoleRedirect />
-      </AuthGuard>
-    ),
-  },
-  {
-    path: "monitor",
-    children: [
-      { index: true, Component: () => <Navigate to="/admin/sessions" replace /> },
-      { path: "overview", Component: () => <Navigate to="/admin/sessions" replace /> },
-      { path: "sessions", Component: () => <Navigate to="/admin/sessions" replace /> },
-      { path: "activities", Component: () => <Navigate to="/admin/activities" replace /> },
-    ],
+    HydrateFallback: RouteFallback,
+    lazy: async () => {
+      const { LandingPage } = await import("@/routes/landing")
+      return { Component: LandingPage }
+    },
   },
   {
     path: "students",

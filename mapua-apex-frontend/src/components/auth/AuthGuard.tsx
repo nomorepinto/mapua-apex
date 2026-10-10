@@ -4,6 +4,12 @@ import { useEffect, useState } from "react"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 import { useSignOut } from "@/hooks/use-sign-out"
+import { useSessionLogger } from "@/hooks/use-session-logger"
+
+function AuthenticatedSessionTracker({ children }: { children: React.ReactNode }) {
+  useSessionLogger()
+  return <>{children}</>
+}
 
 export type AuthGuardProps = {
   children: React.ReactNode
@@ -22,9 +28,8 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
       !auth.activeNavigator &&
       !auth.isLoading
     ) {
-      // Trigger sign-in
       setHasAttemptedSignin(true)
-      auth.signinRedirect()
+      window.location.href = "/login"
     }
   }, [auth, hasAttemptedSignin])
 
@@ -89,7 +94,7 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
       }
     }
 
-    return <>{children}</>
+    return <AuthenticatedSessionTracker>{children}</AuthenticatedSessionTracker>
   }
 
   return null

@@ -14,7 +14,7 @@ import {
   MIN_STUDENT_YEAR,
   MOBILE_NUMBER_LENGTH,
   STUDENT_NUMBER_LENGTH,
-  getYearLevelOptions,
+  YEAR_LEVEL_OPTIONS,
 } from "@/components/submission/constants"
 import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
@@ -137,8 +137,7 @@ function proponentWarnings(
     warnings[key("programAndYear")] = REQUIRED
   } else {
     const trimmed = proponent.programAndYear.trim()
-    const allowedYears = getYearLevelOptions(department)
-    const hasYear = allowedYears.some((yr) =>
+    const hasYear = YEAR_LEVEL_OPTIONS.some((yr) =>
       trimmed.toLowerCase().endsWith(yr.toLowerCase())
     )
     const hasProgram =
@@ -181,8 +180,10 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   if (!draft.activityType) warnings.activityType = "Select an activity type."
   if (isBlank(draft.totalOrgMembers)) {
     warnings.totalOrgMembers = REQUIRED
-  } else if (draft.totalOrgMembers.length > 5) {
-    warnings.totalOrgMembers = "Cannot exceed 5 digits."
+  } else if (Number(draft.totalOrgMembers) < 30) {
+    warnings.totalOrgMembers = "Must be at least 30 members."
+  } else if (Number(draft.totalOrgMembers) > 3000) {
+    warnings.totalOrgMembers = "Cannot exceed 3000 members."
   }
 
   if (draft.proponents.length > MAX_PROPONENTS) {
@@ -244,12 +245,16 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
 
   if (isBlank(draft.expectedParticipants)) {
     warnings.expectedParticipants = REQUIRED
-  } else if (Number(draft.expectedParticipants) < 30) {
-    warnings.expectedParticipants = "Must be at least 30 participants."
+  } else if (Number(draft.expectedParticipants) < 20) {
+    warnings.expectedParticipants = "Must be at least 20 participants."
   } else if (Number(draft.expectedParticipants) > 3000) {
     warnings.expectedParticipants = "Cannot exceed 3000 participants."
   }
-  if (isBlank(draft.individualContribution)) warnings.individualContribution = REQUIRED
+  if (isBlank(draft.individualContribution)) {
+    warnings.individualContribution = REQUIRED
+  } else if (Number(draft.individualContribution) > 5000) {
+    warnings.individualContribution = "Cannot exceed 5000."
+  }
   if (isBlank(draft.proposedBudget)) warnings.proposedBudget = REQUIRED
 
   if (!(draft.mission1 || draft.mission2 || draft.mission3)) {
@@ -278,20 +283,23 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
 // Prefixes:
 // 0: Classification
 // 1: People
-// 2: Reservation (timeOfEvent & expectedParticipants)
+// 2: Reservation (activityVenue, dateOfEvent, endDateOfEvent, timeOfEvent & expectedParticipants)
 // 3: Activity
 // 4: Alignment & Budget
 export const STEP_PREFIXES_WITH_RESERVATION: Record<SaafStepIndex, string[]> = {
   0: ["activityType", "totalOrgMembers"],
   1: ["proponent."],
-  2: ["timeOfEvent", "expectedParticipants"],
+  2: [
+    "activityVenue",
+    "dateOfEvent",
+    "endDateOfEvent",
+    "timeOfEvent",
+    "expectedParticipants",
+  ],
   3: [
     "activityTitle",
     "activityDescription",
     "activityObjectives",
-    "activityVenue",
-    "dateOfEvent",
-    "endDateOfEvent",
     "individualContribution",
     "proposedBudget",
   ],
@@ -409,5 +417,12 @@ export const STEP_INVALID_FOCUS_SELECTOR =
 
 export function getMovedReservationFieldsIssue(draft: SaafDraft): string | null {
   const warnings = saafFieldWarnings(draft)
-  return warnings.timeOfEvent || warnings.expectedParticipants || null
+  return (
+    warnings.activityVenue ||
+    warnings.dateOfEvent ||
+    warnings.endDateOfEvent ||
+    warnings.timeOfEvent ||
+    warnings.expectedParticipants ||
+    null
+  )
 }

@@ -34,14 +34,14 @@ export const TEAM_MEMBERS: TeamMember[] = [
 ]
 
 export const TECH_STACK = [
-  { name: "React", color: "bg-sky-50 text-sky-700 border-sky-200" },
-  { name: "TypeScript", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  { name: "React Router (Data Mode)", color: "bg-violet-50 text-violet-700 border-violet-200" },
-  { name: "Tailwind CSS", color: "bg-cyan-50 text-cyan-700 border-cyan-200" },
-  { name: "Coss UI", color: "bg-neutral-100 text-neutral-700 border-neutral-300" },
-  { name: "Zustand", color: "bg-orange-50 text-orange-700 border-orange-200" },
-  { name: "AWS SES", color: "bg-amber-50 text-amber-700 border-amber-200" },
-  { name: "AWS Cognito", color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  { name: "AWS DynamoDB", color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  { name: "AWS Lambda", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  { name: "React", color: "bg-sky-50 text-sky-700 border-sky-200", url: "https://react.dev/" },
+  { name: "TypeScript", color: "bg-blue-50 text-blue-700 border-blue-200", url: "https://www.typescriptlang.org/" },
+  { name: "React Router (Data Mode)", color: "bg-violet-50 text-violet-700 border-violet-200", url: "https://reactrouter.com/" },
+  { name: "Tailwind CSS", color: "bg-cyan-50 text-cyan-700 border-cyan-200", url: "https://tailwindcss.com/" },
+  { name: "Coss UI", color: "bg-neutral-100 text-neutral-700 border-neutral-300", url: "https://ui.shadcn.com/" },
+  { name: "Zustand", color: "bg-orange-50 text-orange-700 border-orange-200", url: "https://zustand-demo.pmnd.rs/" },
+  { name: "AWS SES", color: "bg-amber-50 text-amber-700 border-amber-200", url: "https://aws.amazon.com/ses/" },
+  { name: "AWS Cognito", color: "bg-yellow-50 text-yellow-700 border-yellow-200", url: "https://aws.amazon.com/cognito/" },
+  { name: "AWS DynamoDB", color: "bg-indigo-50 text-indigo-700 border-indigo-200", url: "https://aws.amazon.com/dynamodb/" },
+  { name: "AWS Lambda", color: "bg-emerald-50 text-emerald-700 border-emerald-200", url: "https://aws.amazon.com/lambda/" },
 ]
