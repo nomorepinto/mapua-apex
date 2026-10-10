@@ -61,21 +61,16 @@ export function ActivityClassificationSection({
           name="totalOrgMembers"
           placeholder="0"
           maxLength={4}
+          min={1}
           max={MAX_TOTAL_ORG_MEMBERS}
           value={totalOrgMembers}
           onKeyDown={blockNonIntegerKeys}
           onChange={(e) => {
-            const sanitized = sanitizeIntegerInput(e.target.value)
-            if (!sanitized) {
-              onTotalOrgMembersChange("")
+            const sanitized = sanitizeIntegerInput(e.target.value).slice(0, 4)
+            if (sanitized === "0") {
               return
             }
-            const num = Number(sanitized)
-            if (num > MAX_TOTAL_ORG_MEMBERS) {
-              onTotalOrgMembersChange(String(MAX_TOTAL_ORG_MEMBERS))
-            } else {
-              onTotalOrgMembersChange(sanitized.slice(0, 4))
-            }
+            onTotalOrgMembersChange(sanitized)
           }}
           style={{ color: "#171717" }}
           className="no-spinner h-10 rounded-lg border-neutral-300 bg-white text-center !text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-red-800/20"
