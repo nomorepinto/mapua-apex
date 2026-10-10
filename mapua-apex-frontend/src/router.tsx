@@ -268,6 +268,22 @@ export const router = createBrowserRouter([
         ],
       },
       {
+        path: "activities",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorActivitiesPage } = await import(
+            "@/routes/admin/monitor-activities"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
+                <AdminMonitorActivitiesPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
         path: "about",
         HydrateFallback: RouteFallback,
         lazy: async () => {
@@ -293,7 +309,6 @@ export const router = createBrowserRouter([
           return { Component: AdminDashboard }
         },
       },
-
       {
         path: "sessions",
         HydrateFallback: RouteFallback,

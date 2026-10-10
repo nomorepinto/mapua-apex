@@ -23,14 +23,20 @@ export interface Session {
   pagesVisitedTruncated?: boolean;
 }
 
-export type NotificationType = "approved" | "fully approved" | "denied" | "returned";
+export type NotificationType = "submitted" | "approved" | "fully approved" | "denied" | "returned" | "submission_create";
 
 export interface ActivityNotification {
+  activity_id?: string;
   submission_id: string;
   sent_at: string;
   signatory: string;
   notif_type: NotificationType;
   comment: string;
+  organization_name?: string;
+  userName?: string;
+  userEmail?: string;
+  userRole?: string;
+  entityName?: string;
 }
 
 export interface LogQueryParams {

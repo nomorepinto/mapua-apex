@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import type { LucideIcon } from "lucide-react"
 import {
   ArrowRightLeftIcon,
+  Loader2Icon,
   LogOutIcon,
   MenuIcon,
   UsersIcon,
@@ -337,6 +338,7 @@ export function AppSidebar({
   const handleSignOut = useSignOut()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [signOutOpen, setSignOutOpen] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const isDesktop = useMediaQuery("lg")
   const aboutTo = `${homeTo.replace(/\/dashboard$/, "")}/about`
 
@@ -347,6 +349,16 @@ export function AppSidebar({
   const requestSignOut = () => {
     setMobileOpen(false)
     setSignOutOpen(true)
+  }
+
+  const onConfirmSignOut = async () => {
+    setIsSigningOut(true)
+    try {
+      await handleSignOut()
+    } catch (err) {
+      console.error("Sign out failed", err)
+      setIsSigningOut(false)
+    }
   }
 
   const panelProps = {
@@ -406,7 +418,12 @@ export function AppSidebar({
         </SheetPopup>
       </Sheet>
 
-      <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+      <Dialog
+        open={signOutOpen}
+        onOpenChange={(open) => {
+          if (!isSigningOut) setSignOutOpen(open)
+        }}
+      >
         <DialogPopup className={modal.dialogMd}>
           <DialogHeader>
             <DialogTitle>Sign out of APEX?</DialogTitle>
@@ -420,12 +437,25 @@ export function AppSidebar({
             <Button
               type="button"
               variant="outline"
+              disabled={isSigningOut}
               onClick={() => setSignOutOpen(false)}
             >
               Cancel
             </Button>
-            <Button type="button" onClick={handleSignOut}>
-              Sign out
+            <Button
+              type="button"
+              disabled={isSigningOut}
+              onClick={onConfirmSignOut}
+              className="inline-flex items-center gap-2"
+            >
+              {isSigningOut ? (
+                <>
+                  <Loader2Icon className="h-4 w-4 animate-spin" />
+                  <span>Signing out...</span>
+                </>
+              ) : (
+                "Sign out"
+              )}
             </Button>
           </DialogFooter>
         </DialogPopup>

@@ -264,13 +264,135 @@ Use this as the **POST** `/api/v1/students/submissions` body. For **PUT**, copy 
 
 ---
 
-## Super Admin Security & Activity Analytics
+## Session Lifecycle (Any Authenticated Role)
 
-`Authorization: Bearer <Super Admin or Admin ID token>`
+`Authorization: Bearer <Cognito JWT>` — any role
 
 | Method | Endpoint | Description |
 | :---- | :---- | :---- |
-| **GET** | `/api/v1/super-admin/analytics` | Query security metrics, login volume, privileged mutations, and security alerts for a date range. |
+| **POST** | `/api/v1/sessions/start` | Start or resume a session. Returns `sessionId` and `login_time`. |
+| **PATCH** | `/api/v1/sessions/{sessionId}/heartbeat` | Extend a session's `last_heartbeat`. Optional body `pages` array. Returns `true` or `409 SESSION_EXPIRED`. |
+| **POST** | `/api/v1/sessions/{sessionId}/end` | Terminate a session (logout). Optional body `endReason` (`logout` \| `timeout` \| `tab_closed` \| `expired`). |
+
+**POST /sessions/start — Response `200`:**
+```json
+{
+  "sessionId": "d98f7e2a4b1c...",
+  "login_time": "2026-10-09T14:30:00Z",
+  "status": "active",
+  "isNewSession": true
+}
+```
+
+---
+
+## Admin / OSAAR Log Monitor
+
+`Authorization: Bearer <Admin, OSAAR, CDM, or CDM Reviewer ID token>`  
+Middleware: `cognito.jwt:admin` (allows `admin`, `osaar`, `cdm_reviewer`, `cdm`, and `super_admin` groups)
+
+### Session Log Routes
+
+| Method | Endpoint | Description |
+| :---- | :---- | :---- |
+| **GET** | `/api/v1/admins/monitor/sessions` | Query session logs. Monthly-bucketed via GSI1 (`LOG#SESSION#YYYY-MM`). |
+| **GET** | `/api/v1/admins/monitor/sessions/{id}` | Fetch a single session log item by `session_id`. |
+| **POST** | `/api/v1/admins/monitor/sessions/{id}/revoke` | Revoke an active session. Body: `{ "reason": "string" }`. |
+
+**GET /admins/monitor/sessions — Query Parameters:**
+- `startDate` (`YYYY-MM-DD`, default: today)
+- `endDate` (`YYYY-MM-DD`, default: today)
+- `userId` (Cognito `sub`, optional)
+- `role` (`student` \| `signatory` \| `admin` etc., optional)
+- `status` (`active` \| `completed` \| `timed_out` \| `revoked`, optional)
+- `limit` (integer, max 200, default 50)
+- `nextToken` (opaque cursor, optional)
+
+**Response `200`:**
+```json
+{
+  "data": [
+    {
+      "session_id": "d98f7e2a4b1c...",
+      "sub": "usr_cognito_sub_123",
+      "user_name": "Juan Dela Cruz",
+      "user_email": "jdelacruz@mymail.mapua.edu.ph",
+      "user_role": "student",
+      "ip_address": "120.29.74.12",
+      "device_info": { "browser": "Chrome", "os": "Windows", "device_type": "desktop" },
+      "status": "active",
+      "login_time": "2026-10-09T14:30:00Z",
+      "logout_time": null,
+      "last_heartbeat": "2026-10-09T14:45:00Z",
+      "duration_seconds": 900,
+      "pages_visited": [
+        { "path": "/dashboard", "timestamp": "2026-10-09T14:30:05Z" }
+      ],
+      "events_count": 1,
+      "revocation_reason": null
+    }
+  ],
+  "nextToken": null
+}
+```
+
+**POST /admins/monitor/sessions/{id}/revoke — Body:**
+```json
+{ "reason": "suspicious_activity" }
+```
+**Response `200`:**
+```json
+{
+  "data": {
+    "sessionId": "d98f7e2a4b1c...",
+    "status": "revoked",
+    "revocation_reason": "suspicious_activity"
+  }
+}
+```
+
+### Activity Log Routes
+
+| Method | Endpoint | Description |
+| :---- | :---- | :---- |
+| **GET** | `/api/v1/admins/monitor/activity` | Query activity logs for a date range. |
+| **GET** | `/api/v1/admins/monitor/activity/{activityId}` | Fetch a single activity log item. |
+
+### Analytics Routes
+
+| Method | Endpoint | Description |
+| :---- | :---- | :---- |
+| **GET** | `/api/v1/admins/monitor/stats` | Active session count, today's session + activity totals, role distribution. |
+| **GET** | `/api/v1/admins/monitor/bottlenecks` | Sessions idle > 30 min but still marked active. |
+
+**GET /admins/monitor/stats — Response `200`:**
+```json
+{
+  "data": {
+    "activeSessionsCount": 12,
+    "totalSessionsToday": 47,
+    "totalActivityToday": 183,
+    "roleDistribution": { "student": 30, "signatory": 10, "admin": 7 }
+  }
+}
+```
+
+**GET /admins/monitor/bottlenecks — Response `200`:**
+```json
+{
+  "data": [
+    {
+      "session_id": "d98f7e2a4b1c...",
+      "user_name": "Juan Dela Cruz",
+      "user_role": "student",
+      "idle_seconds": 2400,
+      "last_heartbeat": "2026-10-09T14:10:00Z"
+    }
+  ]
+}
+```
+
+
 
 **Query Parameters:**
 - `startDate` (string, `YYYY-MM-DD`, default: today in Asia/Manila)
@@ -324,4 +446,32 @@ Use this as the **POST** `/api/v1/students/submissions` body. For **PUT**, copy 
   ]
 }
 ```
+
+---
+
+## Session Lifecycle Routes
+
+`Authorization: Bearer <Cognito ID token>` (Any authenticated user group)
+
+| Method | Endpoint | Description | Example JSON |
+| :---- | :---- | :---- | :---- |
+| **POST** | `/api/v1/sessions/start` | Start a new session or extend an active one for the auth_time. Writes LOGIN activity event. | **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "login_time": "2026-10-09T23:00:00Z",<br>  "status": "active",<br>  "isNewSession": true<br>}</pre> |
+| **PATCH** | `/api/v1/sessions/{sessionId}/heartbeat` | Extend active session heartbeat and record page visits. | **Request body** <pre>{<br>  "pagesVisited": [<br>    { "path": "/students/dashboard", "pageName": "Dashboard", "timestamp": "2026-10-09T23:01:00Z" }<br>  ]<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "active"<br>}</pre> |
+| **POST** | `/api/v1/sessions/{sessionId}/end` | Close a session explicitly (logout). Writes LOGOUT activity event. | **Request body** <pre>{<br>  "endReason": "logout"<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "completed"<br>}</pre> |
+
+---
+
+## Admin Log Monitoring Routes
+
+`Authorization: Bearer <Admin or OSAAR ID token>`
+
+| Method | Endpoint | Description |
+| :---- | :---- | :---- |
+| **GET** | `/api/v1/admins/monitor/sessions` | Query session log records filtered by `startDate`, `endDate`, `userId`, `role`, `status`. Returns `{ "data": [...], "nextToken": null }`. |
+| **GET** | `/api/v1/admins/monitor/sessions/{id}` | Get detailed session record by session ID. Returns `{ "data": { ... } }`. |
+| **POST** | `/api/v1/admins/monitor/sessions/{id}/revoke` | Revoke active user session. Returns `{ "data": { "sessionId": "{id}", "status": "revoked" } }`. |
+| **GET** | `/api/v1/admins/monitor/activity` | Query activity log records filtered by `startDate`, `endDate`, `userId`, `role`, `actionType`, `module`. Returns `{ "data": [...], "nextToken": null }`. |
+| **GET** | `/api/v1/admins/monitor/activity/{activityId}` | Get detailed activity record. Returns `{ "data": { ... } }`. |
+| **GET** | `/api/v1/admins/monitor/stats` | Aggregate session & activity metrics for today. Returns `{ "data": { "activeSessionsCount": N, "totalSessionsToday": N, "totalActivityToday": N, "roleDistribution": { ... } } }`. |
+| **GET** | `/api/v1/admins/monitor/bottlenecks` | Identify idle/stale active sessions and potential bottlenecks. Returns `{ "data": [...] }`. |
 

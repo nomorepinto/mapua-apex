@@ -65,11 +65,22 @@ function getTodayManila(): string {
   }).format(new Date());
 }
 
+function getYesterdayManila(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: MANILA_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(Date.now() - 24 * 60 * 60 * 1000));
+}
+
+
+
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function AdminMonitorSessionsPage() {
-  // Filter State (Default range = today Manila)
-  const [startDate, setStartDate] = useState<string>(getTodayManila());
+  // Filter State (Default range = yesterday to today Manila)
+  const [startDate, setStartDate] = useState<string>(getYesterdayManila());
   const [endDate, setEndDate] = useState<string>(getTodayManila());
   const [userSearch, setUserSearch] = useState<string>("");
   const [roleFilter, setRoleFilter] = useState<string>("");
@@ -84,32 +95,99 @@ export function AdminMonitorSessionsPage() {
   // Modal Selection State (Centered Floating Modal)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
-  const queryParams: LogQueryParams = useMemo(
+  const dateQueryParams: LogQueryParams = useMemo(
     () => ({
       startDate,
       endDate,
-      user: userSearch || undefined,
-      role: roleFilter || undefined,
-      status: statusFilter || undefined,
-      pageSize,
     }),
-    [startDate, endDate, userSearch, roleFilter, statusFilter, pageSize]
+    [startDate, endDate]
   );
 
-  const sessionsQuery = useSessionsQuery(queryParams);
-  const sessionAnalyticsQuery = useSessionAnalyticsQuery({ ...queryParams, compare: compareMode });
+  const analyticsParams = useMemo(
+    () => ({
+      startDate,
+      endDate,
+      compare: compareMode,
+    }),
+    [startDate, endDate, compareMode]
+  );
+
+  const sessionsQuery = useSessionsQuery(dateQueryParams);
+  const sessionAnalyticsQuery = useSessionAnalyticsQuery(analyticsParams);
   const sessionDetailQuery = useSessionDetailQuery(selectedSessionId);
 
-  const sessions = sessionsQuery.data?.data ?? [];
+  const isSessionsLoading = sessionsQuery.isLoading || sessionsQuery.isFetching;
+  const isAnalyticsLoading = sessionAnalyticsQuery.isLoading || sessionAnalyticsQuery.isFetching;
+
+  const rawSessions = sessionsQuery.data?.data ?? [];
   const sessionStats = sessionAnalyticsQuery.data;
 
+  // Instant Client-Side Filter (Zero Reload, Accurate Role Matching for Adviser & Others)
+  const filteredSessions = useMemo(() => {
+    return rawSessions.filter((s) => {
+      // 1. User Search filter
+      if (userSearch) {
+        const q = userSearch.trim().toLowerCase();
+        const matchesUser =
+          s.userName.toLowerCase().includes(q) ||
+          s.userEmail.toLowerCase().includes(q) ||
+          s.userId.toLowerCase().includes(q);
+        if (!matchesUser) return false;
+      }
+
+      // 2. Role filter
+      if (roleFilter) {
+        const r = (s.userRole || "").toLowerCase();
+        const email = (s.userEmail || "").toLowerCase();
+        const name = (s.userName || "").toLowerCase();
+
+        if (roleFilter === "org_adviser" || roleFilter === "adviser") {
+          const isAdviser =
+            r === "org_adviser" ||
+            r === "adviser" ||
+            r.includes("adviser") ||
+            email.includes("adviser") ||
+            name.includes("adviser") ||
+            r === "signatory";
+          if (!isAdviser) return false;
+        } else if (roleFilter === "dean") {
+          const isDean = r === "dean" || r.includes("dean") || email.includes("dean") || name.includes("dean");
+          if (!isDean) return false;
+        } else if (roleFilter === "osaar") {
+          const isOsaar = r === "osaar" || r.includes("osaar") || email.includes("osaar") || name.includes("osaar");
+          if (!isOsaar) return false;
+        } else if (roleFilter === "cdm") {
+          const isCdm = r === "cdm" || r.includes("cdm") || email.includes("cdm") || name.includes("cdm") || name.includes("director");
+          if (!isCdm) return false;
+        } else if (roleFilter === "admin") {
+          const isAdmin = r === "admin" || email.includes("admin") || name.includes("admin");
+          if (!isAdmin) return false;
+        } else if (roleFilter === "student") {
+          const isStudent = r === "student" || r === "students" || r.includes("submitter");
+          if (!isStudent) return false;
+        }
+      }
+
+      // 3. Status filter
+      if (statusFilter) {
+        if (statusFilter === "logged_out") {
+          if (s.status !== "logged_out" && !s.timeOut) return false;
+        } else if (statusFilter === "no_logout_recorded") {
+          if (s.status === "logged_out" || Boolean(s.timeOut)) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [rawSessions, userSearch, roleFilter, statusFilter]);
+
   // Client-side pagination slice
-  const totalSessionPages = Math.ceil(sessions.length / pageSize) || 1;
+  const totalSessionPages = Math.ceil(filteredSessions.length / pageSize) || 1;
 
   const paginatedSessions = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return sessions.slice(start, start + pageSize);
-  }, [sessions, currentPage, pageSize]);
+    return filteredSessions.slice(start, start + pageSize);
+  }, [filteredSessions, currentPage, pageSize]);
 
   // CSV Export handler
   const handleExportCsv = () => {
@@ -125,7 +203,7 @@ export function AdminMonitorSessionsPage() {
         "Status",
         "IP Address",
       ];
-      const rows = sessions.map((s) => [
+      const rows = filteredSessions.map((s) => [
         s.sessionId,
         `"${s.userName}"`,
         s.userEmail,
@@ -178,30 +256,7 @@ export function AdminMonitorSessionsPage() {
           </div>
         </div>
 
-        {/* NEEDS ATTENTION ALERTS (Rendered ONLY when alerts are present) */}
-        {sessionStats?.alerts && sessionStats.alerts.length > 0 && (
-          <div className="rounded-2xl bg-white p-5 shadow-xs border border-red-200 space-y-3">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-2">
-              <span className="text-xs font-bold text-red-700 flex items-center gap-1.5 uppercase tracking-wider">
-                <AlertTriangleIcon className="h-4 w-4 text-red-600" />
-                Needs Attention — Login & Security Anomalies ({sessionStats.alerts.length})
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {sessionStats.alerts.map((al, idx) => (
-                <div key={idx} className="rounded-xl border border-red-100 bg-red-50/60 p-3 text-xs space-y-1">
-                  <div className="font-bold text-red-900 flex items-center justify-between gap-2">
-                    <span>{al.userName}</span>
-                    <span className="rounded bg-red-200/80 px-2 py-0.5 text-[10px] font-mono text-red-800 uppercase">
-                      {al.type.replace(/_/g, " ")}
-                    </span>
-                  </div>
-                  <p className="text-neutral-700 text-[11px] leading-relaxed">{al.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+
 
         {/* SESSION ANALYTICS SECTION (Charts & Heatmap) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -244,49 +299,60 @@ export function AdminMonitorSessionsPage() {
             </div>
 
             {/* Overlaid Bar / Line Visualizer */}
-            <div className="h-44 flex items-end justify-between gap-2 pt-4 border-b border-neutral-100 pb-2">
-              {sessionStats?.loginVolume.hours.map((hr, idx) => {
-                const todayVal = sessionStats.loginVolume.today[idx] || 0;
-                const compVal =
-                  compareMode === "month"
-                    ? sessionStats.loginVolume.monthAvg[idx] || 0
-                    : sessionStats.loginVolume.yearAvg[idx] || 0;
-
-                const maxVal = Math.max(
-                  ...sessionStats.loginVolume.today,
-                  ...sessionStats.loginVolume.monthAvg,
-                  1
-                );
-                const todayPct = Math.max((todayVal / maxVal) * 100, 4);
-                const compPct = Math.max((compVal / maxVal) * 100, 4);
-
-                return (
-                  <div key={hr} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group">
-                    <div className="w-full flex items-end justify-center gap-0.5 h-full relative">
-                      {/* Today Bar */}
-                      <div
-                        style={{ height: `${todayPct}%` }}
-                        className="w-1/2 bg-[#8B0000] rounded-t transition-all group-hover:bg-[#6b0000] relative"
-                      >
-                        <span className="opacity-0 group-hover:opacity-100 absolute -top-5 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[9px] px-1 rounded z-10 whitespace-nowrap">
-                          Today: {todayVal}
-                        </span>
-                      </div>
-                      {/* Comparison Avg Bar */}
-                      <div
-                        style={{ height: `${compPct}%` }}
-                        className="w-1/2 bg-neutral-300 rounded-t transition-all group-hover:bg-neutral-400 relative"
-                      >
-                        <span className="opacity-0 group-hover:opacity-100 absolute -top-9 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[9px] px-1 rounded z-10 whitespace-nowrap">
-                          {compareMode === "month" ? "Month" : "Year"} Avg: {compVal}
-                        </span>
-                      </div>
-                    </div>
-                    <span className="text-[9px] text-neutral-400 font-mono">{hr}</span>
+            {isAnalyticsLoading ? (
+              <div className="h-44 flex items-end justify-between gap-2 pt-4 border-b border-neutral-100 pb-2 animate-pulse">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+                    <div className="w-full bg-neutral-200 rounded-t h-3/4 animate-pulse" />
+                    <span className="h-2 w-6 bg-neutral-200 rounded font-mono" />
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-44 flex items-end justify-between gap-2 pt-4 border-b border-neutral-100 pb-2">
+                {sessionStats?.loginVolume.hours.map((hr, idx) => {
+                  const todayVal = sessionStats.loginVolume.today[idx] || 0;
+                  const compVal =
+                    compareMode === "month"
+                      ? sessionStats.loginVolume.monthAvg[idx] || 0
+                      : sessionStats.loginVolume.yearAvg[idx] || 0;
+
+                  const maxVal = Math.max(
+                    ...sessionStats.loginVolume.today,
+                    ...sessionStats.loginVolume.monthAvg,
+                    1
+                  );
+                  const todayPct = todayVal > 0 ? Math.max((todayVal / maxVal) * 100, 4) : 0;
+                  const compPct = compVal > 0 ? Math.max((compVal / maxVal) * 100, 4) : 0;
+
+                  return (
+                    <div key={hr} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group">
+                      <div className="w-full flex items-end justify-center gap-0.5 h-full relative">
+                        {/* Today Bar */}
+                        <div
+                          style={{ height: `${todayPct}%` }}
+                          className="w-1/2 bg-[#8B0000] rounded-t transition-all group-hover:bg-[#6b0000] relative"
+                        >
+                          <span className="opacity-0 group-hover:opacity-100 absolute -top-5 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[9px] px-1 rounded z-10 whitespace-nowrap">
+                            Today: {todayVal}
+                          </span>
+                        </div>
+                        {/* Comparison Avg Bar */}
+                        <div
+                          style={{ height: `${compPct}%` }}
+                          className="w-1/2 bg-neutral-300 rounded-t transition-all group-hover:bg-neutral-400 relative"
+                        >
+                          <span className="opacity-0 group-hover:opacity-100 absolute -top-9 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[9px] px-1 rounded z-10 whitespace-nowrap">
+                            {compareMode === "month" ? "Month" : "Year"} Avg: {compVal}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[9px] text-neutral-400 font-mono">{hr}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-4 text-xs">
               <div className="flex items-center gap-1.5">
@@ -312,12 +378,21 @@ export function AdminMonitorSessionsPage() {
                   Average Session Duration
                 </span>
               </div>
-              <div className="text-3xl font-bold text-neutral-900">
-                {sessionStats?.avgSessionDurationMinutes ?? 0} <span className="text-sm font-semibold text-neutral-500">mins</span>
-              </div>
-              <p className="text-[11px] text-neutral-500 font-medium bg-neutral-50 rounded-lg p-2 border border-neutral-200">
-                Based on logged-out sessions (n = {sessionStats?.loggedOutSessionCount ?? 0})
-              </p>
+              {isAnalyticsLoading ? (
+                <div className="space-y-2 animate-pulse py-1">
+                  <div className="h-8 w-28 bg-neutral-200 rounded-lg" />
+                  <div className="h-6 w-full bg-neutral-100 rounded-lg" />
+                </div>
+              ) : (
+                <>
+                  <div className="text-3xl font-bold text-neutral-900">
+                    {sessionStats?.avgSessionDurationMinutes ?? 0} <span className="text-sm font-semibold text-neutral-500">mins</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 font-medium bg-neutral-50 rounded-lg p-2 border border-neutral-200">
+                    Based on logged-out sessions (n = {sessionStats?.loggedOutSessionCount ?? 0})
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Logins by Role Breakdown */}
@@ -328,37 +403,73 @@ export function AdminMonitorSessionsPage() {
                   Logins by Role
                 </span>
               </div>
-              <div className="space-y-2 text-xs">
-                <div>
-                  <div className="flex justify-between font-medium mb-1">
-                    <span className="text-neutral-700 font-semibold">Student</span>
-                    <span className="text-neutral-900 font-bold">{sessionStats?.loginsByRole.student ?? 0}</span>
-                  </div>
-                  <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
-                    <div className="bg-neutral-800 h-full rounded-full" style={{ width: "70%" }} />
-                  </div>
+              {isAnalyticsLoading ? (
+                <div className="space-y-3 animate-pulse py-1">
+                  <div className="h-4 bg-neutral-200 rounded w-full" />
+                  <div className="h-4 bg-neutral-200 rounded w-full" />
+                  <div className="h-4 bg-neutral-200 rounded w-full" />
                 </div>
+              ) : (() => {
+                const totalRoleLogins =
+                  (sessionStats?.loginsByRole.student ?? 0) +
+                  (sessionStats?.loginsByRole.signatory ?? 0) +
+                  (sessionStats?.loginsByRole.admin ?? 0);
+                const studentPct =
+                  totalRoleLogins > 0
+                    ? Math.round(((sessionStats?.loginsByRole.student ?? 0) / totalRoleLogins) * 100)
+                    : 0;
+                const signatoryPct =
+                  totalRoleLogins > 0
+                    ? Math.round(((sessionStats?.loginsByRole.signatory ?? 0) / totalRoleLogins) * 100)
+                    : 0;
+                const adminPct =
+                  totalRoleLogins > 0
+                    ? Math.round(((sessionStats?.loginsByRole.admin ?? 0) / totalRoleLogins) * 100)
+                    : 0;
 
-                <div>
-                  <div className="flex justify-between font-medium mb-1">
-                    <span className="text-amber-700 font-semibold">Signatory</span>
-                    <span className="text-neutral-900 font-bold">{sessionStats?.loginsByRole.signatory ?? 0}</span>
-                  </div>
-                  <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
-                    <div className="bg-amber-500 h-full rounded-full" style={{ width: "20%" }} />
-                  </div>
-                </div>
+                return (
+                  <div className="space-y-2 text-xs">
+                    <div>
+                      <div className="flex justify-between font-medium mb-1">
+                        <span className="text-neutral-700 font-semibold">Student</span>
+                        <span className="text-neutral-900 font-bold">{sessionStats?.loginsByRole.student ?? 0}</span>
+                      </div>
+                      <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-neutral-800 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${studentPct}%` }}
+                        />
+                      </div>
+                    </div>
 
-                <div>
-                  <div className="flex justify-between font-medium mb-1">
-                    <span className="text-blue-700 font-semibold">Admin</span>
-                    <span className="text-neutral-900 font-bold">{sessionStats?.loginsByRole.admin ?? 0}</span>
+                    <div>
+                      <div className="flex justify-between font-medium mb-1">
+                        <span className="text-amber-700 font-semibold">Signatories (Dean / Adviser / CDM)</span>
+                        <span className="text-neutral-900 font-bold">{sessionStats?.loginsByRole.signatory ?? 0}</span>
+                      </div>
+                      <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-amber-500 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${signatoryPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between font-medium mb-1">
+                        <span className="text-blue-700 font-semibold">Admin</span>
+                        <span className="text-neutral-900 font-bold">{sessionStats?.loginsByRole.admin ?? 0}</span>
+                      </div>
+                      <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-blue-500 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${adminPct}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden">
-                    <div className="bg-blue-500 h-full rounded-full" style={{ width: "10%" }} />
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -393,49 +504,57 @@ export function AdminMonitorSessionsPage() {
 
           {showHeatmap && (
             <div className="overflow-x-auto pt-2 animate-in fade-in duration-150">
-              <div className="min-w-[700px] space-y-1">
-                {/* Hours Header */}
-                <div className="flex text-[9px] font-mono text-neutral-400 pb-1">
-                  <div className="w-12 shrink-0 font-bold text-neutral-600">Day</div>
-                  {Array.from({ length: 24 }).map((_, hr) => (
-                    <div key={hr} className="flex-1 text-center">
-                      {hr.toString().padStart(2, "0")}
+              {isAnalyticsLoading ? (
+                <div className="min-w-[700px] space-y-1 py-2 animate-pulse">
+                  {Array.from({ length: 7 }).map((_, r) => (
+                    <div key={r} className="h-6 bg-neutral-100 rounded-md w-full" />
+                  ))}
+                </div>
+              ) : (
+                <div className="min-w-[700px] space-y-1">
+                  {/* Hours Header */}
+                  <div className="flex text-[9px] font-mono text-neutral-400 pb-1">
+                    <div className="w-12 shrink-0 font-bold text-neutral-600">Day</div>
+                    {Array.from({ length: 24 }).map((_, hr) => (
+                      <div key={hr} className="flex-1 text-center">
+                        {hr.toString().padStart(2, "0")}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 7 Days Rows */}
+                  {DAYS_OF_WEEK.map((dayName, dayIdx) => (
+                    <div key={dayName} className="flex items-center">
+                      <div className="w-12 shrink-0 text-xs font-bold text-neutral-600">{dayName}</div>
+                      <div className="flex-1 flex gap-1">
+                        {Array.from({ length: 24 }).map((_, hrIdx) => {
+                          const match = sessionStats?.heatmapData.find(
+                            (cell) => cell.dayOfWeek === dayIdx && cell.hour === hrIdx
+                          );
+                          const count = match?.count ?? 0;
+
+                          let colorClass = "bg-neutral-100 border-neutral-200";
+                          if (count > 40) colorClass = "bg-[#8B0000] text-white";
+                          else if (count > 25) colorClass = "bg-red-600 text-white";
+                          else if (count > 15) colorClass = "bg-red-400 text-white";
+                          else if (count > 5) colorClass = "bg-red-200 text-red-900";
+                          else if (count > 0) colorClass = "bg-red-50 text-red-800 border-red-200";
+
+                          return (
+                            <div
+                              key={hrIdx}
+                              title={`${dayName} ${hrIdx}:00 — ${count} logins`}
+                              className={`flex-1 h-6 rounded-md border text-[9px] font-mono flex items-center justify-center transition-transform hover:scale-110 cursor-pointer ${colorClass}`}
+                            >
+                              {count > 0 ? count : ""}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   ))}
                 </div>
-
-                {/* 7 Days Rows */}
-                {DAYS_OF_WEEK.map((dayName, dayIdx) => (
-                  <div key={dayName} className="flex items-center">
-                    <div className="w-12 shrink-0 text-xs font-bold text-neutral-600">{dayName}</div>
-                    <div className="flex-1 flex gap-1">
-                      {Array.from({ length: 24 }).map((_, hrIdx) => {
-                        const match = sessionStats?.heatmapData.find(
-                          (cell) => cell.dayOfWeek === dayIdx && cell.hour === hrIdx
-                        );
-                        const count = match?.count ?? 0;
-
-                        let colorClass = "bg-neutral-100 border-neutral-200";
-                        if (count > 40) colorClass = "bg-[#8B0000] text-white";
-                        else if (count > 25) colorClass = "bg-red-600 text-white";
-                        else if (count > 15) colorClass = "bg-red-400 text-white";
-                        else if (count > 5) colorClass = "bg-red-200 text-red-900";
-                        else if (count > 0) colorClass = "bg-red-50 text-red-800 border-red-200";
-
-                        return (
-                          <div
-                            key={hrIdx}
-                            title={`${dayName} ${hrIdx}:00 — ${count} logins`}
-                            className={`flex-1 h-6 rounded-md border text-[9px] font-mono flex items-center justify-center transition-transform hover:scale-110 cursor-pointer ${colorClass}`}
-                          >
-                            {count > 0 ? count : ""}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -497,7 +616,10 @@ export function AdminMonitorSessionsPage() {
             >
               <option value="">All Roles</option>
               <option value="student">Student</option>
-              <option value="signatory">Signatory</option>
+              <option value="org_adviser">Adviser</option>
+              <option value="dean">Dean</option>
+              <option value="osaar">OSAAR</option>
+              <option value="cdm">CDM</option>
               <option value="admin">Admin</option>
             </select>
           </div>
@@ -535,7 +657,37 @@ export function AdminMonitorSessionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 text-neutral-700 font-medium">
-                {paginatedSessions.length === 0 ? (
+                {sessionsQuery.isError ? (
+                  <tr>
+                    <td colSpan={7} className="py-16 text-center backdrop-blur-md bg-neutral-50/60">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600 mb-3 border border-red-200">
+                        <AlertTriangleIcon className="h-6 w-6" />
+                      </div>
+                      <div className="text-sm font-bold text-neutral-900">Failed to load session logs</div>
+                      <div className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+                        Could not fetch session records from the backend API. Please check your network connection or permissions.
+                      </div>
+                      <button
+                        onClick={() => sessionsQuery.refetch()}
+                        className="mt-4 rounded-xl bg-[#8B0000] px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#6b0000] transition-colors"
+                      >
+                        Retry Loading
+                      </button>
+                    </td>
+                  </tr>
+                ) : isSessionsLoading ? (
+                  Array.from({ length: 5 }).map((_, idx) => (
+                    <tr key={idx} className="animate-pulse">
+                      <td className="px-4 py-3.5"><div className="h-4 w-36 bg-neutral-200 rounded" /></td>
+                      <td className="px-4 py-3.5"><div className="h-4 w-16 bg-neutral-200 rounded-full" /></td>
+                      <td className="px-4 py-3.5"><div className="h-4 w-28 bg-neutral-200 rounded" /></td>
+                      <td className="px-4 py-3.5"><div className="h-4 w-28 bg-neutral-200 rounded" /></td>
+                      <td className="px-4 py-3.5"><div className="h-4 w-28 bg-neutral-200 rounded-full" /></td>
+                      <td className="px-4 py-3.5"><div className="h-4 w-20 bg-neutral-200 rounded" /></td>
+                      <td className="px-4 py-3.5 text-right"><div className="h-4 w-12 bg-neutral-200 rounded ml-auto" /></td>
+                    </tr>
+                  ))
+                ) : paginatedSessions.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-neutral-400">
                       No session records match the selected date range ({formatDateUnambiguous(startDate)} to {formatDateUnambiguous(endDate)}) or filters.
@@ -553,7 +705,7 @@ export function AdminMonitorSessionsPage() {
                         <div className="text-[11px] text-neutral-400">{s.userEmail}</div>
                       </td>
                       <td className="px-4 py-3.5">
-                        <RoleBadge role={s.userRole} />
+                        <RoleBadge role={s.userRole} email={s.userEmail} userName={s.userName} />
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap">{formatManila(s.timeIn)}</td>
                       <td className="px-4 py-3.5 whitespace-nowrap">
@@ -602,7 +754,7 @@ export function AdminMonitorSessionsPage() {
                 <option value={50}>50</option>
               </select>
               <span className="text-neutral-400 ml-2">
-                Showing {paginatedSessions.length} of {sessions.length} entries
+                Showing {paginatedSessions.length} of {filteredSessions.length} entries
               </span>
             </div>
 
@@ -663,7 +815,11 @@ export function AdminMonitorSessionsPage() {
                     </div>
                     <div>
                       <span className="text-neutral-400 block font-medium">Role</span>
-                      <RoleBadge role={sessionDetailQuery.data.session.userRole} />
+                      <RoleBadge
+                        role={sessionDetailQuery.data.session.userRole}
+                        email={sessionDetailQuery.data.session.userEmail}
+                        userName={sessionDetailQuery.data.session.userName}
+                      />
                     </div>
                     <div>
                       <span className="text-neutral-400 block font-medium">IP Address</span>
@@ -728,25 +884,78 @@ export function AdminMonitorSessionsPage() {
   );
 }
 
-function RoleBadge({ role }: { role: string }) {
-  switch (role) {
-    case "admin":
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
-          Admin
-        </span>
-      );
-    case "signatory":
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200">
-          Signatory
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-semibold text-neutral-700 border border-neutral-200">
-          Student
-        </span>
-      );
+function RoleBadge({ role, email, userName }: { role: string; email?: string; userName?: string }) {
+  const r = (role || "").toLowerCase();
+  const lowerEmail = (email || "").toLowerCase();
+  const lowerName = (userName || "").toLowerCase();
+
+  if (
+    r === "org_adviser" ||
+    r === "adviser" ||
+    r.includes("adviser") ||
+    lowerEmail.includes("adviser") ||
+    lowerName.includes("adviser")
+  ) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 border border-indigo-200">
+        Adviser
+      </span>
+    );
   }
+  if (
+    r === "dean" ||
+    r.includes("dean") ||
+    lowerEmail.includes("dean") ||
+    lowerName.includes("dean")
+  ) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-semibold text-purple-700 border border-purple-200">
+        Dean
+      </span>
+    );
+  }
+  if (
+    r === "osaar" ||
+    r.includes("osaar") ||
+    lowerEmail.includes("osaar") ||
+    lowerName.includes("osaar")
+  ) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
+        OSAAR
+      </span>
+    );
+  }
+  if (
+    r === "cdm" ||
+    r.includes("cdm") ||
+    lowerEmail.includes("cdm") ||
+    lowerName.includes("cdm") ||
+    lowerName.includes("director")
+  ) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-700 border border-teal-200">
+        CDM
+      </span>
+    );
+  }
+  if (r === "admin" || lowerEmail.includes("admin") || lowerName.includes("admin")) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+        Admin
+      </span>
+    );
+  }
+  if (r === "signatory") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 border border-indigo-200">
+        Adviser
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-semibold text-neutral-700 border border-neutral-200">
+      Student
+    </span>
+  );
 }

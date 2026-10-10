@@ -13,7 +13,12 @@ const FIXED_ROOMS: Record<Campus, string[]> = {
     "Gym",
     "4th Floor Outdoor",
   ],
-  "Intramuros Campus": ["AV Room", "Seminar Room", "Global Classroom"],
+  "Intramuros Campus": [
+    "AV Room",
+    "Seminar Room",
+    "Global Classroom",
+    "Gymnasium",
+  ],
 }
 
 /**

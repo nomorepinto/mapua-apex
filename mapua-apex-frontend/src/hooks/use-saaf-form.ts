@@ -61,9 +61,12 @@ export function useSaafForm() {
 
   // Directly select draft from Zustand with fallback to default
   const saafDraft = useOrgStore((state) => state.saafDraft)
+  const eventName = useOrgStore((state) => state.eventName)
   const draft: SaafDraft = {
     ...DEFAULT_SAAF_DRAFT,
     ...(saafDraft ?? {}),
+    activityTitle:
+      saafDraft?.activityTitle || eventName || DEFAULT_SAAF_DRAFT.activityTitle,
     proponents: saafDraft?.proponents ?? DEFAULT_SAAF_DRAFT.proponents,
     budgetItems: saafDraft?.budgetItems ?? DEFAULT_SAAF_DRAFT.budgetItems,
     departmentValues:
@@ -269,13 +272,14 @@ export function useSaafForm() {
       const panel = form.querySelector<HTMLElement>(`[data-saaf-step="${step}"]`)
       const htmlValid = panel ? isStepHtmlValid(panel) : false
       const issue =
-        step === 4
-          ? (getMovedReservationFieldsIssue(draft) || getReservationStepIssue(
-              withReservationDefaults(
-                useOrgStore.getState().reservationDraft
-              ),
-              draft.activityVenue
-            ))
+        includeReservation && (step === 2 || step === 4)
+          ? (getMovedReservationFieldsIssue(draft) ||
+              getReservationStepIssue(
+                withReservationDefaults(
+                  useOrgStore.getState().reservationDraft
+                ),
+                draft.activityVenue
+              ))
           : getSaafStepIssue(step as SaafStepIndex, draft, includeReservation)
 
       if (!htmlValid || issue) {
