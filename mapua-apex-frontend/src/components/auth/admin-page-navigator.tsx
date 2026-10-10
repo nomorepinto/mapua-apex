@@ -10,7 +10,6 @@ const PAGE_GROUP_ROUTES = [
   { label: "OSAAR", path: "/osaar" },
   { label: "CDM Reviewer", path: "/cdm-reviewer" },
   { label: "Dean", path: "/dean" },
-  { label: "Signatories", path: "/signatories" },
   { label: "Org Adviser", path: "/org-adviser" },
   { label: "Students", path: "/students" },
   { label: "Landing", path: "/" },

@@ -3,7 +3,7 @@ import type { ActionFunctionArgs } from "react-router"
 import type { SubmissionActionData } from "@/components/submission/types"
 import { apiClient, ApiError } from "@/lib/api-client"
 import { buildSaafApiPayload, omitEventIdFromPayload } from "@/lib/dynamodb-adapters"
-import { queryClient } from "@/main"
+import { queryClient } from "@/lib/query-client"
 import { SUBMISSION_KEYS } from "@/hooks/use-submissions"
 import { useOrgStore } from "@/stores/org-store"
 

@@ -21,29 +21,17 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { layout } from "@/config"
+import {
+  MONTH_NAMES,
+  WEEKDAY_NAMES,
+  getDatesInRange,
+  toLocalDateKey,
+  type CalendarDateMode,
+  type CalendarStatusFilter,
+} from "@/lib/calendar-utils"
 import { getDateKey, parseDateKey } from "@/lib/date-key"
 import type { DashboardSubmissionRow } from "@/lib/dynamodb-adapters"
 import { cn } from "@/lib/utils"
-
-export type CalendarStatusFilter = "all" | "approved" | "under_review" | "denied"
-export type CalendarDateMode = "event_date" | "submission_date"
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-]
-
-const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 /**
  * Normalizes submission status into calendar category:
@@ -57,43 +45,6 @@ export function getApplicationCalendarStatus(
   if (apiStatus === "denied" || row.status === "Denied") return "denied"
   if (apiStatus === "returned" || row.status === "Returned") return "returned"
   return "under_review"
-}
-
-function toLocalDateKey(value?: string | null): string | null {
-  if (!value) return null
-  const trimmed = value.trim()
-  const keyMatch = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed)
-  if (keyMatch) return keyMatch[1]
-
-  const date = new Date(trimmed)
-  if (isNaN(date.getTime())) return null
-  return getDateKey(date)
-}
-
-function getDatesInRange(startDateStr?: string, endDateStr?: string): string[] {
-  const startKey = toLocalDateKey(startDateStr)
-  if (!startKey) return []
-  const endKey = endDateStr ? toLocalDateKey(endDateStr) : null
-  if (!endKey || endKey === startKey) {
-    return [startKey]
-  }
-
-  const startDate = parseDateKey(startKey)
-  const endDate = parseDateKey(endKey)
-  if (!startDate || !endDate || endDate < startDate) {
-    return [startKey]
-  }
-
-  const keys: string[] = []
-  const current = new Date(startDate)
-  let count = 0
-  // Guard against runaway multi-month intervals
-  while (current <= endDate && count < 14) {
-    keys.push(getDateKey(current))
-    current.setDate(current.getDate() + 1)
-    count++
-  }
-  return keys
 }
 
 export function AdminCalendarSection() {

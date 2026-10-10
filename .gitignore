@@ -50,6 +50,7 @@ dist-ssr/
 # ─── Agent / skill caches ──────────────────────────────────────────
 .agents/
 .expo/
+.qoder/
 
 # ─── PHP / Laravel (scoped to the backend folder) ──────────────────
 # Laravel ships nested .gitignore files inside bootstrap/cache/,

@@ -38,7 +38,8 @@ No Cognito JWT.
 
 | Method | Endpoint | Example JSON |
 | :---- | :---- | :---- |
-| **GET** | `/api/ping` | **Response `200`.** Throttled with the student limiter. <pre>{<br>  "ok": true<br>}</pre> |
+| **GET** | `/api/v1/ping` | **Response `200`.** Throttled with the student limiter. <pre>{<br>  "ok": true<br>}</pre> |
+| **GET** | `/up` | **Response `200`** — Laravel's framework health endpoint, registered at the app root in `bootstrap/app.php` (`health: '/up'`), **not** under `/api/v1`. Returns `200` once the app boots; used by container/infra healthchecks. Not consumed by the frontend. |
 
 ---
 
@@ -89,6 +90,14 @@ Not Cognito-JWT routes. The arcus companion apps (arcus-attendance-system, arcus
 
 ```http
 X-Arcus-Service-Token: <ARCUS_SERVICE_TOKEN>
+```
+
+The token is compared with `hash_equals` against backend env `ARCUS_SERVICE_TOKEN` (`config('services.arcus.service_token')`). A missing or wrong token → **401**; an unconfigured token → **503**. Optionally send `X-Arcus-Organization-Id: <org uuid>` (a leading `ORGANIZATION#` is stripped) to scope the call to one organization; omit it for cross-organization scope. Both routes are throttled with the admin limiter and are **not** consumed by the mapua-apex frontend — the arcus companion apps are separate deployments (tracked in `docs/unused_api_routes.md`).
+
+| Method | Endpoint | Example JSON |
+| :---- | :---- | :---- |
+| **GET** | `/api/v1/arcus/events` | **Response `200`** — published events the arcus attendance/evaluation apps pick from, as a collection of arcus event resources. Optional `?window=attendance` \| `evaluation` (defaults to `attendance`). Scoped by `X-Arcus-Organization-Id` when present. |
+| **POST** | `/api/v1/arcus/events/{event}/submissions/{submission}/finish` | **No request body.** Marks that submission's arcus flow finished and returns the updated arcus event resource. **Response `200`**. Scoped by `X-Arcus-Organization-Id` when present. |
 
 ---
 
@@ -283,13 +292,14 @@ Use this as the **POST** `/api/v1/students/submissions` body. For **PUT**, copy 
 
 ## Session Lifecycle (Any Authenticated Role)
 
-`Authorization: Bearer <Cognito JWT>` — any role
+`Authorization: Bearer <Cognito ID token>` — any authenticated role (`cognito.jwt:any`).
 
 | Method | Endpoint | Description |
 | :---- | :---- | :---- |
-| **POST** | `/api/v1/sessions/start` | Start or resume a session. Returns `sessionId` and `login_time`. |
-| **PATCH** | `/api/v1/sessions/{sessionId}/heartbeat` | Extend a session's `last_heartbeat`. Optional body `pages` array. Returns `true` or `409 SESSION_EXPIRED`. |
-| **POST** | `/api/v1/sessions/{sessionId}/end` | Terminate a session (logout). Optional body `endReason` (`logout` \| `timeout` \| `tab_closed` \| `expired`). |
+| **POST** | `/api/v1/sessions/start` | Start a new session or extend an active one. Optional body `deviceId`, `existingSessionId`, `pagesVisited`. Response carries `sessionId`, `login_time`, `status`, `isNewSession`, and `displacedPreviousSession`. |
+| **GET** | `/api/v1/sessions/{sessionId}/validate` | Check a session is still active and not displaced. Delegates to the heartbeat handler, so it returns `200` or the same `409` codes. |
+| **PATCH** | `/api/v1/sessions/{sessionId}/heartbeat` | Extend the active session's `last_heartbeat`. Optional body `pagesVisited` (array of `{ path, pageName, timestamp }`). Returns `409 CONCURRENT_LOGIN_DISPLACED` if displaced, `409 SESSION_REVOKED` if an admin ended it, `409 SESSION_EXPIRED` if stale, or `403` on a session-id mismatch. |
+| **POST** | `/api/v1/sessions/{sessionId}/end` | Close a session explicitly (logout or tab_closed). Body `reason` (also accepts `endReason`; default `logout`). `403` on a session-id mismatch, `404` if unknown. |
 
 **POST /sessions/start — Response `200`:**
 ```json
@@ -463,33 +473,4 @@ Middleware: `cognito.jwt:admin` (allows `admin`, `osaar`, `cdm_reviewer`, `cdm`,
   ]
 }
 ```
-
----
-
-## Session Lifecycle Routes
-
-`Authorization: Bearer <Cognito ID token>` (Any authenticated user group)
-
-| Method | Endpoint | Description | Example JSON |
-| :---- | :---- | :---- | :---- |
-| **POST** | `/api/v1/sessions/start` | Start a new session or extend an active one. Accepts `deviceId` and `existingSessionId`. Returns `displacedPreviousSession: boolean`. | **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "login_time": "2026-10-09T23:00:00Z",<br>  "status": "active",<br>  "isNewSession": true,<br>  "displacedPreviousSession": false<br>}</pre> |
-| **GET** | `/api/v1/sessions/{sessionId}/validate` | Check if session is still active and not displaced. Returns `200` or `409`. | **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "active"<br>}</pre> |
-| **PATCH** | `/api/v1/sessions/{sessionId}/heartbeat` | Extend active session heartbeat. Returns `409 CONCURRENT_LOGIN_DISPLACED` if displaced, `409 SESSION_REVOKED` if revoked, `409 SESSION_EXPIRED` if stale. | **Request body** <pre>{<br>  "pagesVisited": [<br>    { "path": "/students/dashboard", "pageName": "Dashboard", "timestamp": "2026-10-09T23:01:00Z" }<br>  ]<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "active"<br>}</pre> |
-| **POST** | `/api/v1/sessions/{sessionId}/end` | Close a session explicitly (logout or tab_closed) and conditionally remove active pointer. | **Request body** <pre>{<br>  "reason": "logout"<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "completed"<br>}</pre> |
-
----
-
-## Admin Log Monitoring Routes
-
-`Authorization: Bearer <Admin or OSAAR ID token>`
-
-| Method | Endpoint | Description |
-| :---- | :---- | :---- |
-| **GET** | `/api/v1/admins/monitor/sessions` | Query session log records filtered by `startDate`, `endDate`, `userId`, `role`, `status`. Returns `{ "data": [...], "nextToken": null }`. |
-| **GET** | `/api/v1/admins/monitor/sessions/{id}` | Get detailed session record by session ID. Returns `{ "data": { ... } }`. |
-| **POST** | `/api/v1/admins/monitor/sessions/{id}/revoke` | Revoke active user session. Returns `{ "data": { "sessionId": "{id}", "status": "revoked" } }`. |
-| **GET** | `/api/v1/admins/monitor/activity` | Query activity log records filtered by `startDate`, `endDate`, `userId`, `role`, `actionType`, `module`. Returns `{ "data": [...], "nextToken": null }`. |
-| **GET** | `/api/v1/admins/monitor/activity/{activityId}` | Get detailed activity record. Returns `{ "data": { ... } }`. |
-| **GET** | `/api/v1/admins/monitor/stats` | Aggregate session & activity metrics for today. Returns `{ "data": { "activeSessionsCount": N, "totalSessionsToday": N, "totalActivityToday": N, "roleDistribution": { ... } } }`. |
-| **GET** | `/api/v1/admins/monitor/bottlenecks` | Identify idle/stale active sessions and potential bottlenecks. Returns `{ "data": [...] }`. |
 

@@ -217,37 +217,6 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "signatories",
-    Component: DeanLayout,
-    ErrorBoundary: RootErrorBoundary,
-    children: [
-      {
-        index: true,
-        Component: () => <Navigate to="/signatories/dashboard" replace />,
-      },
-      {
-        path: "dashboard",
-        HydrateFallback: RouteFallback,
-        lazy: async () => {
-          const { DeanDashboard } = await import("@/routes/dean/dashboard")
-          return { Component: DeanDashboard }
-        },
-      },
-      {
-        path: "about",
-        HydrateFallback: RouteFallback,
-        lazy: async () => {
-          const { About } = await import("@/routes/about")
-          return { Component: About }
-        },
-      },
-      {
-        path: "*",
-        Component: () => <Navigate to="/signatories/dashboard" replace />,
-      },
-    ],
-  },
-  {
     path: "osaar",
     Component: OsaarLayout,
     ErrorBoundary: RootErrorBoundary,
