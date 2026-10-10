@@ -1,5 +1,6 @@
 import { useAuth } from "react-oidc-context"
 
+import { AuthModals, useAuthModals } from "@/components/auth/AuthModals"
 import { RoleRedirect } from "@/components/auth/RoleRedirect"
 import { LandingAbout } from "@/components/landing/landing-about"
 import { LandingAnnouncements } from "@/components/landing/landing-announcements"
@@ -10,13 +11,14 @@ import { layout } from "@/config"
 
 export function LandingPage() {
   const auth = useAuth()
+  const { openSignIn } = useAuthModals()
 
   // If the user just logged in or is already logged in, hand them off to RoleRedirect
   if (auth.isAuthenticated) {
     return <RoleRedirect />
   }
 
-  // Show a spinner if Cognito is currently processing the login redirect
+  // Show a spinner while Cognito hydrates a restored session
   if (auth.isLoading || auth.activeNavigator) {
     return (
       <div className={layout.center}>
@@ -28,12 +30,10 @@ export function LandingPage() {
     )
   }
 
-  const signIn = () => auth.signinRedirect()
-
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
-      <LandingHeader onSignIn={signIn} />
-      <LandingHero onSignIn={signIn} />
+      <LandingHeader onSignIn={openSignIn} />
+      <LandingHero onSignIn={openSignIn} />
 
       {/* Main Content Area */}
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -44,6 +44,9 @@ export function LandingPage() {
       </main>
 
       <LandingFooter />
+
+      {/* In-app Cognito auth modals (sign in / sign up / verify email / forgot password) */}
+      <AuthModals />
     </div>
   )
 }

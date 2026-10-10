@@ -29,7 +29,7 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
       !auth.isLoading
     ) {
       setHasAttemptedSignin(true)
-      window.location.href = "/login"
+      window.location.href = "/"
     }
   }, [auth, hasAttemptedSignin])
 
@@ -50,7 +50,9 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
         <h2 className="text-xl font-bold text-red-700">Authentication Error</h2>
         <p className="mt-2 text-neutral-600">{auth.error.message}</p>
         <button
-          onClick={() => auth.signinRedirect()}
+          onClick={() => {
+            window.location.href = "/"
+          }}
           className="mt-4 rounded-xl bg-[#8B0000] px-4 py-2 text-sm font-medium text-white hover:bg-[#6b0000]"
         >
           Try Again
