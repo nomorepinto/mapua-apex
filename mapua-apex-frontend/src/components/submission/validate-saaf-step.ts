@@ -184,8 +184,8 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   if (!draft.activityType) warnings.activityType = "Select an activity type."
   if (isBlank(draft.totalOrgMembers)) {
     warnings.totalOrgMembers = REQUIRED
-  } else if (Number(draft.totalOrgMembers) < 1) {
-    warnings.totalOrgMembers = "Must be at least 1 member."
+  } else if (Number(draft.totalOrgMembers) < 30) {
+    warnings.totalOrgMembers = "Must be at least 30 members."
   } else if (Number(draft.totalOrgMembers) > 3000) {
     warnings.totalOrgMembers = "Cannot exceed 3000 members."
   }
