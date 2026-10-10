@@ -170,6 +170,11 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     reqHeaders["X-Session-ID"] = sessionId
   }
 
+  const deviceId = typeof window !== "undefined" ? localStorage.getItem("apex_device_id") : null
+  if (deviceId) {
+    reqHeaders["X-Device-ID"] = deviceId
+  }
+
   const response = await fetch(url, {
     ...customConfig,
     headers: reqHeaders,
@@ -181,6 +186,20 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
       errorData = await response.json()
     } catch {
       errorData = await response.text()
+    }
+
+    // Intercept displacement or revocation immediately
+    if (response.status === 409 && typeof errorData === "object" && errorData !== null) {
+      const code = (errorData as { code?: string }).code
+      if (code === "CONCURRENT_LOGIN_DISPLACED") {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("apex:session_displaced"))
+        }
+      } else if (code === "SESSION_REVOKED") {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("apex:session_revoked"))
+        }
+      }
     }
 
     const message =

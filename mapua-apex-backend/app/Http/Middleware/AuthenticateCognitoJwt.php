@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Auth\CognitoJwksUnavailable;
 use App\Auth\CognitoJwtVerifier;
 use App\Auth\InvalidCognitoJwt;
+use App\Logging\LogTableItems;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
@@ -134,6 +135,58 @@ class AuthenticateCognitoJwt
             $role,
             $mayImpersonateSignatory,
         );
+
+        // Active session enforcement on authenticated business endpoints (skip /sessions/*)
+        if (! $request->is('api/v1/sessions/*') && ! $request->is('sessions/*')) {
+            $sessionId = $request->header('X-Session-ID');
+            if (is_string($sessionId) && trim($sessionId) !== '') {
+                $sessionId = trim($sessionId);
+                try {
+                    $logTable = app(LogTableItems::class);
+                    $pointer = $logTable->getActiveSessionPointer($cognitoUser['sub']);
+
+                    if ($pointer !== null) {
+                        if (($pointer['session_id'] ?? '') !== $sessionId) {
+                            $sessionItem = $logTable->getSessionItem($sessionId);
+                            $reason = $sessionItem['end_reason'] ?? null;
+                            if ($reason === 'concurrent_login') {
+                                return response()->json([
+                                    'error' => 'This session was logged out because your account was logged into another device',
+                                    'code' => 'CONCURRENT_LOGIN_DISPLACED',
+                                ], 409);
+                            }
+                            if ($reason === 'admin_revoked') {
+                                return response()->json([
+                                    'error' => 'An administrator ended your session',
+                                    'code' => 'SESSION_REVOKED',
+                                ], 409);
+                            }
+
+                            return response()->json([
+                                'error' => 'Session expired or replaced',
+                                'code' => 'SESSION_EXPIRED',
+                            ], 409);
+                        }
+
+                        // Check lazy staleness (> 15 minutes)
+                        $lastHb = $pointer['last_heartbeat'] ?? null;
+                        if ($lastHb && (time() - strtotime($lastHb)) > (15 * 60)) {
+                            return response()->json([
+                                'error' => 'Session expired due to inactivity',
+                                'code' => 'SESSION_EXPIRED',
+                            ], 409);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('AuthenticateCognitoJwt: session check failed', ['error' => $e->getMessage()]);
+                }
+            } elseif (! app()->environment('testing')) {
+                return response()->json([
+                    'error' => 'Active session required',
+                    'code' => 'SESSION_REQUIRED',
+                ], 428);
+            }
+        }
 
         return $next($request);
     }

@@ -32,6 +32,7 @@ Route::middleware(['throttle:student'])->prefix('public')->name('public.')->grou
 // Session lifecycle endpoints (open to any authenticated user role)
 Route::middleware(['cognito.jwt:any'])->prefix('sessions')->name('sessions.')->group(function (): void {
     Route::post('start', [SessionController::class, 'start'])->name('start');
+    Route::get('{sessionId}/validate', [SessionController::class, 'validateSession'])->name('validate');
     Route::patch('{sessionId}/heartbeat', [SessionController::class, 'heartbeat'])->name('heartbeat');
     Route::post('{sessionId}/end', [SessionController::class, 'end'])->name('end');
 });

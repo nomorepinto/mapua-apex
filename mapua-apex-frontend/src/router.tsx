@@ -8,6 +8,7 @@ import { DeanLayout } from "@/routes/layouts/dean-layout"
 import { OrgAdviserLayout } from "@/routes/layouts/org-adviser-layout"
 import { OsaarLayout } from "@/routes/layouts/osaar-layout"
 import { StudentsLayout } from "@/routes/layouts/students-layout"
+import { RootErrorBoundary, NotFoundPage } from "@/components/layout/error-boundary"
 
 function RouteFallback() {
   return (
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
   {
     path: "/",
     HydrateFallback: RouteFallback,
+    ErrorBoundary: RootErrorBoundary,
     lazy: async () => {
       const { LandingPage } = await import("@/routes/landing")
       return { Component: LandingPage }
@@ -35,6 +37,7 @@ export const router = createBrowserRouter([
   {
     path: "students",
     Component: StudentsLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
@@ -83,11 +86,16 @@ export const router = createBrowserRouter([
           },
         ],
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="dashboard" replace />,
+      },
     ],
   },
   {
     path: "cdm-reviewer",
     Component: CdmReviewerLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
@@ -127,11 +135,16 @@ export const router = createBrowserRouter([
           return { Component: About }
         },
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="dashboard" replace />,
+      },
     ],
   },
   {
     path: "dean",
     Component: DeanLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
@@ -153,11 +166,16 @@ export const router = createBrowserRouter([
           return { Component: About }
         },
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="dashboard" replace />,
+      },
     ],
   },
   {
     path: "org-adviser",
     Component: OrgAdviserLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
@@ -181,11 +199,16 @@ export const router = createBrowserRouter([
           return { Component: About }
         },
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="dashboard" replace />,
+      },
     ],
   },
   {
     path: "signatories",
     Component: DeanLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
@@ -207,11 +230,16 @@ export const router = createBrowserRouter([
           return { Component: About }
         },
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="dashboard" replace />,
+      },
     ],
   },
   {
     path: "osaar",
     Component: OsaarLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
@@ -289,11 +317,16 @@ export const router = createBrowserRouter([
           return { Component: About }
         },
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="dashboard" replace />,
+      },
     ],
   },
   {
     path: "admin",
     Component: AdminLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
@@ -369,6 +402,15 @@ export const router = createBrowserRouter([
           return { Component: About }
         },
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="/admin/dashboard" replace />,
+      },
     ],
+  },
+  {
+    path: "*",
+    ErrorBoundary: RootErrorBoundary,
+    Component: NotFoundPage,
   },
 ])

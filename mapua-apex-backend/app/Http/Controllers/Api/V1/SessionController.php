@@ -23,6 +23,8 @@ class SessionController extends Controller
         $pagesVisited = (array) $request->input('pagesVisited', []);
         $existingSessionId = $request->input('existingSessionId');
         $existingSessionId = is_string($existingSessionId) && trim($existingSessionId) !== '' ? trim($existingSessionId) : null;
+        $deviceId = $request->input('deviceId');
+        $deviceId = is_string($deviceId) && trim($deviceId) !== '' ? trim($deviceId) : null;
 
         $res = $this->sessionLogWriter->startSession(
             sub: $user['sub'],
@@ -34,6 +36,7 @@ class SessionController extends Controller
             userAgent: $request->userAgent() ?? 'Unknown',
             pagesVisited: $pagesVisited,
             existingSessionId: $existingSessionId,
+            deviceId: $deviceId,
         );
 
         return response()->json($res, 200);
@@ -53,6 +56,20 @@ class SessionController extends Controller
             return response()->json(['error' => 'Forbidden: Session ID mismatch'], 403);
         }
 
+        if ($res === 'displaced') {
+            return response()->json([
+                'error' => 'This session was logged out because your account was logged into another device',
+                'code' => 'CONCURRENT_LOGIN_DISPLACED',
+            ], 409);
+        }
+
+        if ($res === 'revoked') {
+            return response()->json([
+                'error' => 'An administrator ended your session',
+                'code' => 'SESSION_REVOKED',
+            ], 409);
+        }
+
         if ($res !== 'ok') {
             return response()->json([
                 'error' => 'Session expired or invalid',
@@ -61,6 +78,11 @@ class SessionController extends Controller
         }
 
         return response()->json(['sessionId' => $sessionId, 'status' => 'active'], 200);
+    }
+
+    public function validateSession(Request $request, string $sessionId): JsonResponse
+    {
+        return $this->heartbeat($request, $sessionId);
     }
 
     public function end(Request $request, string $sessionId): JsonResponse

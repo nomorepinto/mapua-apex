@@ -5,10 +5,16 @@ import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 import { useSignOut } from "@/hooks/use-sign-out"
 import { useSessionLogger } from "@/hooks/use-session-logger"
+import { SessionDisplacementDialogs } from "./session-displacement-dialogs"
 
 function AuthenticatedSessionTracker({ children }: { children: React.ReactNode }) {
   useSessionLogger()
-  return <>{children}</>
+  return (
+    <>
+      <SessionDisplacementDialogs />
+      {children}
+    </>
+  )
 }
 
 export type AuthGuardProps = {

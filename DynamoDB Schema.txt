@@ -411,6 +411,25 @@ Key structure (plan §2.1):
   GSI2PK: USER#{sub}              GSI2SK: {login_time}   ← per-user session history
   GSI3PK: STATUS#active|completed|timed_out|revoked   GSI3SK: {last_heartbeat}   ← sweep index
 
+Active Session Pointer (Single Source of Truth per user):
+  PK: USER#{sub}
+  SK: ACTIVE_SESSION
+  Fields:
+    sub:            string (Cognito user sub)
+    session_id:     string (active session_id)
+    device_id:      string (client device UUID passed in /sessions/start)
+    status:         "active"
+    login_time:     ISO-8601 UTC timestamp
+    last_heartbeat: ISO-8601 UTC timestamp
+    TTL:            unix epoch
+
+Displacement via TransactWriteItems:
+When Device B logs in while Device A is active:
+1. Update USER#{sub} / ACTIVE_SESSION to session_id=B, device_id=B (condition: session_id = A).
+2. Put SESSION#{B} with status = active (condition: attribute_not_exists(PK)).
+3. Update SESSION#{A} with status = completed, end_reason = concurrent_login, logout_time = now (condition: status = active).
+All three writes occur in a single atomic TransactWriteItems request so Device A is immediately marked completed with zero delay.
+
 Session ID derivation: sha256(sub + ":" + auth_time)
 Chain suffix (#2, #3…) appended when base session has ended, giving each
 re-authentication a fresh slot without reopening the closed one.
@@ -418,6 +437,7 @@ re-authentication a fresh slot without reopening the closed one.
 Item fields:
   session_id:              string (UUID-like sha256 hash, possibly with #N suffix)
   sub:                     string (Cognito user sub)
+  device_id:               string | null (client device UUID)
   user_name:               string
   user_email:              string
   user_role:               string
