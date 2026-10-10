@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Admin\LogMonitorController;
 use App\Http\Controllers\Api\V1\Admin\OrganizationController;
 use App\Http\Controllers\Api\V1\Admin\SignatoryController;
 use App\Http\Controllers\Api\V1\Admin\SubmissionController as AdminSubmissionController;
+use App\Http\Controllers\Api\V1\Public\AnnouncementController as PublicAnnouncementController;
 use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\Signatory\NotificationController as SignatoryNotificationController;
 use App\Http\Controllers\Api\V1\Signatory\ProfileController as SignatoryProfileController;
@@ -20,6 +21,11 @@ Route::middleware(['throttle:student'])->group(function (): void {
     Route::get('/ping', function () {
         return ['ok' => true];
     });
+});
+
+// Public endpoints — readable without a Cognito JWT (e.g. the landing page).
+Route::middleware(['throttle:student'])->prefix('public')->name('public.')->group(function (): void {
+    Route::get('announcements', [PublicAnnouncementController::class, 'index'])->name('announcements.index');
 });
 
 // Session lifecycle endpoints (open to any authenticated user role)

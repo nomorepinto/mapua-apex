@@ -4,7 +4,7 @@ All v1 routes sit under `/api/v1`. Collections and single resources are wrapped 
 
 ## Auth
 
-Every **v1** route needs:
+Every **v1** route needs a JWT (except the unauthenticated **Public** and **Health** endpoints documented below):
 
 ```http
 Authorization: Bearer <Cognito JWT>
@@ -39,6 +39,16 @@ No Cognito JWT.
 | Method | Endpoint | Example JSON |
 | :---- | :---- | :---- |
 | **GET** | `/api/ping` | **Response `200`.** Throttled with the student limiter. <pre>{<br>  "ok": true<br>}</pre> |
+
+---
+
+## Public
+
+No Cognito JWT. Served under `/api/v1` like every other route, but open to anonymous callers — the landing page reads announcements before sign-in.
+
+| Method | Endpoint | Example JSON |
+| :---- | :---- | :---- |
+| **GET** | `/api/v1/public/announcements` | **Response `200`** — all announcements, newest `sent_at` first. Same shape as the admin/student announcement lists. Throttled with the student limiter. <pre>{<br>  "data": [<br>    {<br>      "sent_at": "2026-09-15T08:00:00Z",<br>      "content": "OSAAR office hours are 9:00–17:00."<br>    }<br>  ]<br>}</pre> |
 
 ---
 
