@@ -1,16 +1,16 @@
-import { useMemo } from "react"
-import { AvTable } from "@/components/reservation/av-table"
-import { EquipmentTable } from "@/components/reservation/equipment-table"
-import { RoomTable } from "@/components/reservation/room-table"
+import { useMemo, useState, type ReactNode } from "react"
+import { BoxesIcon, CalendarDaysIcon, Trash2Icon } from "lucide-react"
+
+import {
+  DaySlotGrid,
+  SlotLegend,
+} from "@/components/admin/reservables/schedule-grid"
+import { FieldWarning } from "@/components/forms/field-warning"
 import { useReservationFormContext } from "@/components/students/reservations/reservation-context"
 import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
-import { EventTimeFields } from "@/components/submission/event-time-fields"
-import { FieldWarning } from "@/components/forms/field-warning"
+import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
-import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
-import { minEventDateKey, parseDateKey } from "@/lib/date-key"
-import { CAMPUSES } from "@/components/submission/constants"
 import {
   Select,
   SelectItem,
@@ -18,230 +18,94 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { cn } from "@/lib/utils"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useStudentAvailabilityQuery } from "@/hooks/use-availability"
+import { useStudentCampusesQuery } from "@/hooks/use-campuses"
+import { useStudentReservablesQuery } from "@/hooks/use-reservables"
+import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
 import {
-  clockFromDraft,
-  combineEventTime,
-  format24,
-  splitEventTime,
-  withHour,
-  withPeriod,
-  type ClockParts,
-} from "@/components/submission/event-time"
+  addDays,
+  formatDisplayDate,
+  getDateKey,
+  minEventDate,
+  minEventDateKey,
+  parseDateKey,
+} from "@/lib/date-key"
+import { slotLabel } from "@/lib/schedule-slots"
+import type { ApiReservable } from "@/lib/types"
+import type { ReservationPick } from "@/components/reservation/types"
+import { cn } from "@/lib/utils"
 
 /**
- * Capacity limits for rooms in the Makati campus.
- */
-const MAKATI_ROOM_CAPACITIES: Record<string, { min: number; max: number }> = {
-  "cardinal cinema": { min: 50, max: 100 },
-  "cervantes": { min: 30, max: 60 },
-  "campus lobby": { min: 200, max: 500 },
-  "global class": { min: 30, max: 60 },
-  "global classroom": { min: 30, max: 60 },
-  "classroom": { min: 20, max: 50 },
-  "gym": { min: 100, max: 200 },
-  "4th floor outdoor": { min: 30, max: 75 },
-}
-
-/**
- * Capacity limits for rooms in the Intramuros campus.
- */
-const INTRAMUROS_ROOM_CAPACITIES: Record<string, { min: number; max: number }> = {
-  "av room": { min: 50, max: 100 },
-  "seminar room": { min: 50, max: 150 },
-  "global class": { min: 30, max: 60 },
-  "global classroom": { min: 30, max: 60 },
-  "classroom": { min: 20, max: 50 },
-  "gymnasium": { min: 300, max: 3000 },
-  "gym": { min: 300, max: 3000 },
-}
-
-function getRoomCapacity(roomIdentifier: string, campus?: string) {
-  const normalized = roomIdentifier.trim().toLowerCase()
-  const isMakati = campus?.trim().toLowerCase().includes("makati")
-  const isIntramuros = campus?.trim().toLowerCase().includes("intramuros")
-
-  const capacities = isMakati
-    ? MAKATI_ROOM_CAPACITIES
-    : isIntramuros
-      ? INTRAMUROS_ROOM_CAPACITIES
-      : null
-
-  if (!capacities) return null
-
-  const sortedEntries = Object.entries(capacities).sort(
-    ([a], [b]) => b.length - a.length
-  )
-
-  for (const [key, capacity] of sortedEntries) {
-    if (normalized.includes(key)) {
-      return capacity
-    }
-  }
-  return null
-}
-
-/**
- * The reservation fields rendered as step 5 of the SAAF wizard. This is form-less
- * (no nested `<form>`) because the wizard already wraps every step in a single
- * `fetcher.Form`; submission, dialogs, and navigation are owned by the wizard.
+ * The reservation step of the SAAF wizard. The proponent picks a campus (which
+ * is also the event venue), adds the rooms/equipment to reserve, then chooses
+ * concrete dates and 70-minute slots from live availability. The event's date
+ * and time are derived from those selections (see `use-reservation-form`), so
+ * this step owns them and the Activity step shows them read-only.
+ *
+ * This is form-less (no nested `<form>`): the wizard wraps every step in a
+ * single `fetcher.Form`, and the hidden inputs below carry the derived values
+ * so native required-field validity still gates the step.
  */
 export function ReservationFields() {
   const { state, actions } = useReservationFormContext()
-  const { draft, campus } = state
+  const { draft, campusId } = state
   const { state: saafState, actions: saafActions } = useSaafFormContext()
   const { draft: saafDraft } = saafState
 
-  // Matches any variation like "Makati", "Makati Campus", "Intramuros", etc.
-  const isMakati = campus?.trim().toLowerCase().includes("makati")
-  const isIntramuros = campus?.trim().toLowerCase().includes("intramuros")
+  const campusesQuery = useStudentCampusesQuery()
+  const campuses = campusesQuery.data ?? []
+  const selectedCampus = campuses.find((c) => c.campus_id === campusId) ?? null
 
-  // Calculate cumulative min and max participants for selected rooms based on campus
-  const roomLimits = useMemo(() => {
-    if ((!isMakati && !isIntramuros) || !draft.roomItems || draft.roomItems.length === 0) {
-      return null
-    }
-
-    let min = 0
-    let max = 0
-    let matchedCount = 0
-
-    draft.roomItems.forEach((item) => {
-      const roomName = item.roomNeeded || ""
-      const capacity = getRoomCapacity(roomName, campus)
-
-      if (capacity) {
-        min += capacity.min
-        max += capacity.max
-        matchedCount += 1
-      }
-    })
-
-    return matchedCount > 0 ? { min, max } : null
-  }, [isMakati, isIntramuros, campus, draft.roomItems])
-
-  // Validation warning check
-  const rawParticipantVal = saafDraft.expectedParticipants || ""
-  const participantCount = parseInt(rawParticipantVal, 10)
-
-  const participantWarning = useMemo(() => {
-    if (!roomLimits || !rawParticipantVal || isNaN(participantCount)) return null
-
-    if (participantCount < roomLimits.min) {
-      return `Minimum of ${roomLimits.min} participants required for selected room(s).`
-    }
-    if (participantCount > roomLimits.max) {
-      return `Maximum capacity is ${roomLimits.max} participants for selected room(s).`
-    }
-    return null
-  }, [roomLimits, rawParticipantVal, participantCount])
-
-  const minStartDate = minEventDateKey()
-  const minEndDate =
-    saafDraft.dateOfEvent && saafDraft.dateOfEvent > minStartDate
-      ? saafDraft.dateOfEvent
-      : minStartDate
-
-  const handleStartDateChange = (startVal: string) => {
-    saafActions.updateField("dateOfEvent", startVal)
-    if (!saafDraft.endDateOfEvent || saafDraft.endDateOfEvent < startVal) {
-      saafActions.updateField("endDateOfEvent", startVal)
-    }
-    const weekday = parseDateKey(startVal)?.toLocaleDateString("en-US", {
-      weekday: "long",
-    })
-    if (weekday) saafActions.updateField("dayOfEvent", weekday)
-  }
-
-  const storedTimes = splitEventTime(saafDraft.timeOfEvent || "")
-  const startParts = clockFromDraft(
-    saafDraft.timeOfEventStartHour,
-    saafDraft.timeOfEventStartMinute,
-    saafDraft.timeOfEventStartPeriod,
-    saafDraft.timeOfEventStart || storedTimes.start
-  )
-  const endParts = clockFromDraft(
-    saafDraft.timeOfEventEndHour,
-    saafDraft.timeOfEventEndMinute,
-    saafDraft.timeOfEventEndPeriod,
-    saafDraft.timeOfEventEnd || storedTimes.end
-  )
-
-  const commitTimes = (start: ClockParts, end: ClockParts) => {
-    const start24 = format24(start)
-    const end24 = format24(end)
-    saafActions.updateField("timeOfEventStartHour", start.hour)
-    saafActions.updateField("timeOfEventStartMinute", start.minute)
-    saafActions.updateField("timeOfEventStartPeriod", start.period)
-    saafActions.updateField("timeOfEventEndHour", end.hour)
-    saafActions.updateField("timeOfEventEndMinute", end.minute)
-    saafActions.updateField("timeOfEventEndPeriod", end.period)
-    saafActions.updateField("timeOfEventStart", start24)
-    saafActions.updateField("timeOfEventEnd", end24)
-    saafActions.updateField("timeOfEvent", combineEventTime(start24, end24))
-  }
-
-  const updateStart = (next: ClockParts) => {
-    commitTimes(next, endParts)
-  }
-
-  const updateEnd = (next: ClockParts) => {
-    commitTimes(startParts, next)
-  }
+  const picks = draft.picks
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div className="space-y-3">
-          <div className="space-y-0.5">
-            <h2 className="text-sm font-bold tracking-wide text-neutral-900 uppercase">
-              APPLICATION FORM ON USE OF FACILITIES
-            </h2>
-            <p className="text-xs font-semibold text-neutral-800">
-              (North &amp; South Circle, Hallways, Pavilions, Ground, etc.)
-            </p>
-          </div>
+      <div className="space-y-0.5">
+        <h2 className="text-sm font-bold tracking-wide text-neutral-900 uppercase">
+          Application form on use of facilities
+        </h2>
+        <p className="text-xs font-semibold text-neutral-800">
+          Reserve rooms and equipment by picking the dates and time slots you
+          need.
+        </p>
+      </div>
 
-          <div className="space-y-1.5 w-full sm:w-72">
-            <label className="block text-xs font-semibold text-neutral-800">
-              Venue Campus <span className="text-red-500">*</span>
-            </label>
-            <Select
-              value={saafDraft.activityVenue || null}
-              onValueChange={(value: string | null) =>
-                saafActions.updateField("activityVenue", value ?? "")
-              }
-            >
-              <SelectTrigger
-                aria-label="Venue Campus"
-                className={cn(
-                  "h-10 w-full truncate rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900",
-                  !saafDraft.activityVenue && "saaf-glow-invalid"
-                )}
-              >
-                <SelectValue placeholder="Select campus" />
-              </SelectTrigger>
-              <SelectPopup>
-                {CAMPUSES.map((campusOption) => (
-                  <SelectItem key={campusOption} value={campusOption}>
-                    {campusOption}
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
-            <input
-              type="hidden"
-              name="activityVenue"
-              value={saafDraft.activityVenue}
-              required
-            />
-            <FieldWarning name="activityVenue" />
-          </div>
-        </div>
-        <div className="space-y-1.5 w-full sm:w-64 shrink-0">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="w-full space-y-1.5 sm:w-72">
           <label className="block text-xs font-semibold text-neutral-800">
-            Number of Expected Participants{" "}
-            <span className="text-red-500">*</span>
+            Venue Campus <span className="text-red-500">*</span>
+          </label>
+          <Select
+            value={campusId || null}
+            onValueChange={(value: string | null) => {
+              const campus = campuses.find((c) => c.campus_id === value)
+              if (campus) actions.handleSelectCampus(campus.campus_id, campus.name)
+            }}
+          >
+            <SelectTrigger
+              aria-label="Venue Campus"
+              className={cn(
+                "h-10 w-full truncate rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900",
+                !campusId && "saaf-glow-invalid"
+              )}
+            >
+              <SelectValue placeholder="Select campus" />
+            </SelectTrigger>
+            <SelectPopup>
+              {campuses.map((campus) => (
+                <SelectItem key={campus.campus_id} value={campus.campus_id}>
+                  {campus.name}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+          <FieldWarning name="activityVenue" />
+        </div>
+
+        <div className="w-full shrink-0 space-y-1.5 sm:w-64">
+          <label className="block text-xs font-semibold text-neutral-800">
+            Number of Expected Participants <span className="text-red-500">*</span>
           </label>
           <Input
             type="text"
@@ -249,135 +113,361 @@ export function ReservationFields() {
             pattern="[0-9]*"
             name="expectedParticipants"
             placeholder="0"
-            maxLength={5}
+            maxLength={4}
             value={saafDraft.expectedParticipants}
             onKeyDown={blockNonIntegerKeys}
-            onChange={(e) => {
-              const sanitized = sanitizeIntegerInput(e.target.value).slice(0, 5)
-
-              // Allow backspacing and clearing the input
-              if (sanitized === "") {
-                saafActions.updateField("expectedParticipants", "")
-                return
-              }
-
-              // Reject additional digits if it would exceed max capacity
-              if (roomLimits) {
-                const numeric = parseInt(sanitized, 10)
-                if (numeric > roomLimits.max) {
-                  return
-                }
-              }
-
-              saafActions.updateField("expectedParticipants", sanitized)
-            }}
+            onChange={(e) =>
+              saafActions.updateField(
+                "expectedParticipants",
+                sanitizeIntegerInput(e.target.value).slice(0, 4)
+              )
+            }
             style={{ color: "#171717" }}
-            className={`no-spinner h-9.5 rounded-lg border-neutral-300 bg-white !text-neutral-900 placeholder:text-neutral-400 ${participantWarning ? "border-amber-500 focus-visible:ring-amber-500" : ""
-              }`}
+            className="no-spinner h-9.5 rounded-lg border-neutral-300 bg-white !text-neutral-900 placeholder:text-neutral-400"
             required
           />
-
-          {/* Left-aligned helper text */}
-          {roomLimits && (
-            <p className="text-[11px] text-neutral-500 text-left">
-              Allowed range:{" "}
-              <span className="font-semibold text-neutral-700">
-                {roomLimits.min} – {roomLimits.max}
-              </span>{" "}
-              participants
-            </p>
-          )}
-
-          {/* Left-aligned warning */}
-          {participantWarning && (
-            <p className="text-xs font-medium text-amber-600 text-left">
-              {participantWarning}
-            </p>
-          )}
-
+          <span className="block text-[10px] text-neutral-500">
+            Between 20 and 3,000 participants
+          </span>
           <FieldWarning name="expectedParticipants" />
         </div>
       </div>
 
-      <div className="space-y-8">
-        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-neutral-800">
-              Start Date of Event <span className="text-red-500">*</span>
-            </label>
-            <DatePicker
-              name="dateOfEvent"
-              value={saafDraft.dateOfEvent}
-              minDate={minStartDate}
-              onChange={handleStartDateChange}
-              placeholder="Pick start date"
-              aria-label="Start date of event"
-              required
-            />
-            <span className="block text-[10px] text-neutral-500">
-              At least 10 days from today
-            </span>
-            <FieldWarning name="dateOfEvent" />
-          </div>
+      <ReservablePicker
+        campusId={campusId}
+        campusName={selectedCampus?.name ?? ""}
+        onToggle={actions.handleTogglePick}
+        picks={picks}
+      />
 
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-neutral-800">
-              End Date of Event <span className="text-red-500">*</span>
-            </label>
-            <DatePicker
-              name="endDateOfEvent"
-              value={saafDraft.endDateOfEvent || saafDraft.dateOfEvent || ""}
-              minDate={minEndDate}
-              onChange={(next) => saafActions.updateField("endDateOfEvent", next)}
-              placeholder="Pick end date"
-              aria-label="End date of event"
-              required
+      {picks.length > 0 ? (
+        <div className="space-y-4">
+          {picks.map((pick) => (
+            <PickCard
+              campusId={campusId}
+              key={pick.id}
+              onRemove={actions.handleRemovePick}
+              onToggleSlot={actions.handleToggleSlot}
+              onUpdateRemarks={actions.handleUpdateRemarks}
+              pick={pick}
             />
-            <FieldWarning name="endDateOfEvent" />
-          </div>
+          ))}
         </div>
+      ) : null}
 
-        <div>
-          <EventTimeFields
-            start={startParts}
-            end={endParts}
-            onStartHour={(hour) => updateStart(withHour(startParts, hour))}
-            onStartMinute={(minute) => updateStart({ ...startParts, minute })}
-            onStartPeriod={(period) => updateStart(withPeriod(startParts, period))}
-            onEndHour={(hour) => updateEnd(withHour(endParts, hour))}
-            onEndMinute={(minute) => updateEnd({ ...endParts, minute })}
-            onEndPeriod={(period) => updateEnd(withPeriod(endParts, period))}
+      <EventScheduleSummary
+        dateOfEvent={saafDraft.dateOfEvent}
+        endDateOfEvent={saafDraft.endDateOfEvent}
+        timeOfEvent={saafDraft.timeOfEvent}
+      />
+
+      {/* Derived values carried for native required-field validity. */}
+      <input type="hidden" name="activityVenue" value={saafDraft.activityVenue} required />
+      <input type="hidden" name="dateOfEvent" value={saafDraft.dateOfEvent} required />
+      <input
+        type="hidden"
+        name="endDateOfEvent"
+        value={saafDraft.endDateOfEvent || saafDraft.dateOfEvent}
+        required
+      />
+      <input type="hidden" name="timeOfEvent" value={saafDraft.timeOfEvent} required />
+      <input type="hidden" name="timeOfEventStart" value={saafDraft.timeOfEventStart || ""} />
+      <input type="hidden" name="timeOfEventEnd" value={saafDraft.timeOfEventEnd || ""} />
+      <input type="hidden" name="dayOfEvent" value={saafDraft.dayOfEvent || ""} />
+      <FieldWarning name="dateOfEvent" />
+      <FieldWarning name="endDateOfEvent" />
+      <FieldWarning name="timeOfEvent" />
+    </div>
+  )
+}
+
+/** Rooms + equipment the chosen campus lends out, as add/remove toggles. */
+function ReservablePicker({
+  campusId,
+  campusName,
+  picks,
+  onToggle,
+}: {
+  campusId: string
+  campusName: string
+  picks: ReservationPick[]
+  onToggle: (reservable: ApiReservable) => void
+}) {
+  const reservablesQuery = useStudentReservablesQuery(campusId || null)
+  const reservables = reservablesQuery.data ?? []
+  const pickedIds = useMemo(
+    () => new Set(picks.map((pick) => pick.reservable_id)),
+    [picks]
+  )
+
+  if (!campusId) {
+    return (
+      <p className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
+        Select a venue campus to see the rooms and equipment you can reserve.
+      </p>
+    )
+  }
+
+  const rooms = reservables.filter((item) => item.type === "room")
+  const equipment = reservables.filter((item) => item.type === "equipment")
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <h3 className="text-xs font-semibold text-neutral-800 uppercase">
+          Rooms &amp; equipment
+        </h3>
+        <p className="text-[11px] text-neutral-500">
+          {campusName ? `${campusName} · ` : ""}
+          Tap to add or remove. You pick dates and slots for each below.
+        </p>
+      </div>
+
+      {reservablesQuery.isLoading ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : reservables.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
+          This campus has no reservables yet. Please check back later.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <ReservableGroup
+            icon={<CalendarDaysIcon aria-hidden="true" className="size-4" />}
+            label="Rooms"
+            onToggle={onToggle}
+            pickedIds={pickedIds}
+            reservables={rooms}
           />
-          <FieldWarning name="timeOfEvent" />
+          <ReservableGroup
+            icon={<BoxesIcon aria-hidden="true" className="size-4" />}
+            label="Equipment"
+            onToggle={onToggle}
+            pickedIds={pickedIds}
+            reservables={equipment}
+          />
         </div>
+      )}
+    </div>
+  )
+}
 
-        <input type="hidden" name="timeOfEventStart" value={format24(startParts)} />
-        <input type="hidden" name="timeOfEventEnd" value={format24(endParts)} />
-        <input type="hidden" name="timeOfEvent" value={saafDraft.timeOfEvent || ""} />
-        <input type="hidden" name="dayOfEvent" value={saafDraft.dayOfEvent || ""} />
-
-        <RoomTable
-          items={draft.roomItems}
-          campus={campus}
-          onUpdate={actions.handleUpdateRoomItem}
-          onRemove={actions.handleRemoveRoomItem}
-          onAdd={actions.handleAddRoomItem}
-        />
-
-        <EquipmentTable
-          items={draft.equipmentItems}
-          onUpdate={actions.handleUpdateEquipmentItem}
-          onRemove={actions.handleRemoveEquipmentItem}
-          onAdd={actions.handleAddEquipmentItem}
-        />
-
-        <AvTable
-          items={draft.avItems}
-          onUpdate={actions.handleUpdateAvItem}
-          onRemove={actions.handleRemoveAvItem}
-          onAdd={actions.handleAddAvItem}
-        />
+function ReservableGroup({
+  label,
+  icon,
+  reservables,
+  pickedIds,
+  onToggle,
+}: {
+  label: string
+  icon: ReactNode
+  reservables: ApiReservable[]
+  pickedIds: Set<string>
+  onToggle: (reservable: ApiReservable) => void
+}) {
+  if (reservables.length === 0) return null
+  return (
+    <div className="space-y-2">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-neutral-600 uppercase tracking-wide">
+        {icon}
+        {label}
+      </span>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {reservables.map((reservable) => {
+          const picked = pickedIds.has(reservable.reservable_id)
+          return (
+            <button
+              aria-pressed={picked}
+              className={cn(
+                "flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                picked
+                  ? "border-emerald-600 bg-emerald-500 text-white hover:bg-emerald-600"
+                  : "border-neutral-300 bg-white text-neutral-800 hover:border-neutral-400 hover:bg-neutral-50"
+              )}
+              key={reservable.reservable_id}
+              onClick={() => onToggle(reservable)}
+              type="button"
+            >
+              <span className="truncate">{reservable.name}</span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
+}
+
+/** Date + slot picker for one reservable, driven by its live availability. */
+function PickCard({
+  pick,
+  campusId,
+  onToggleSlot,
+  onUpdateRemarks,
+  onRemove,
+}: {
+  pick: ReservationPick
+  campusId: string
+  onToggleSlot: (pickId: string, date: string, slot: number) => void
+  onUpdateRemarks: (pickId: string, remarks: string) => void
+  onRemove: (pickId: string) => void
+}) {
+  const [date, setDate] = useState<string>(() => minEventDateKey())
+
+  // Reserve from the earliest allowed event date through ~6 months out.
+  const window = useMemo(() => {
+    const start = minEventDate()
+    return { start: getDateKey(start), end: getDateKey(addDays(start, 180)) }
+  }, [])
+
+  const availabilityQuery = useStudentAvailabilityQuery(
+    campusId || null,
+    pick.reservable_id,
+    window
+  )
+  const availability = availabilityQuery.data ?? null
+
+  const selectedForDate = pick.selections.find((s) => s.date === date)?.slots ?? []
+  const totalSlots = pick.selections.reduce(
+    (sum, selection) => sum + selection.slots.length,
+    0
+  )
+
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-xs">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-semibold text-neutral-900">
+            {pick.name}
+          </h4>
+          <p className="text-[11px] text-neutral-500 capitalize">{pick.type}</p>
+        </div>
+        <Button
+          aria-label={`Remove ${pick.name}`}
+          onClick={() => onRemove(pick.id)}
+          size="sm"
+          type="button"
+          variant="destructive-outline"
+        >
+          <Trash2Icon />
+          Remove
+        </Button>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
+        <div className="space-y-3">
+          <DatePicker
+            aria-label={`Reservation date for ${pick.name}`}
+            minDate={minEventDate()}
+            onChange={setDate}
+            value={date}
+          />
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold text-neutral-600">
+              Purpose (optional)
+            </label>
+            <Input
+              autoComplete="off"
+              maxLength={120}
+              onChange={(e) => onUpdateRemarks(pick.id, e.currentTarget.value)}
+              placeholder="Rehearsal, seminar, …"
+              type="text"
+              value={pick.remarks}
+            />
+          </div>
+          <SelectedSummary pick={pick} />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-neutral-700">
+              {formatDateLabel(date)}
+            </span>
+            <SlotLegend />
+          </div>
+          {availabilityQuery.isLoading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : (
+            <DaySlotGrid
+              availability={availability}
+              date={date}
+              mode="select"
+              onToggleSlot={(slot) => onToggleSlot(pick.id, date, slot)}
+              selectedSlots={selectedForDate}
+            />
+          )}
+          <p className="text-[11px] text-neutral-500">
+            {totalSlots} slot{totalSlots === 1 ? "" : "s"} reserved for{" "}
+            {pick.name}.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SelectedSummary({ pick }: { pick: ReservationPick }) {
+  if (pick.selections.length === 0) {
+    return (
+      <p className="text-[11px] text-neutral-400">
+        No slots selected yet — pick a date and time on the right.
+      </p>
+    )
+  }
+  return (
+    <ul className="space-y-1">
+      {pick.selections.map((selection) => (
+        <li className="text-[11px] text-neutral-600" key={selection.date}>
+          <span className="font-semibold text-neutral-800">
+            {formatDateLabel(selection.date)}
+          </span>{" "}
+          · {[...selection.slots].sort((a, b) => a - b).map(slotLabel).join(", ")}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function EventScheduleSummary({
+  dateOfEvent,
+  endDateOfEvent,
+  timeOfEvent,
+}: {
+  dateOfEvent: string
+  endDateOfEvent?: string
+  timeOfEvent: string
+}) {
+  const hasSchedule = Boolean(dateOfEvent && timeOfEvent)
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+      <p className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wide">
+        Derived event schedule
+      </p>
+      {hasSchedule ? (
+        <p className="mt-1 text-sm text-neutral-900">
+          <span className="font-semibold">
+            {formatRangeLabel(dateOfEvent, endDateOfEvent)}
+          </span>
+          {timeOfEvent ? <span> · {timeOfEvent}</span> : null}
+        </p>
+      ) : (
+        <p className="mt-1 text-sm text-neutral-500">
+          Reserve at least one slot to set the event date and time.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function formatDateLabel(dateKey: string): string {
+  const date = parseDateKey(dateKey)
+  return date ? formatDisplayDate(date, "long") : dateKey
+}
+
+function formatRangeLabel(start: string, end?: string): string {
+  if (!end || end === start) return formatDateLabel(start)
+  return `${formatDateLabel(start)} – ${formatDateLabel(end)}`
 }

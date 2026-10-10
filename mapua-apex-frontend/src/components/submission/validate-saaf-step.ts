@@ -8,7 +8,6 @@ import {
   splitEventTime,
 } from "@/components/submission/event-time"
 import {
-  isVenue,
   MAX_PROPONENTS,
   MAX_STUDENT_YEAR,
   MIN_STUDENT_YEAR,
@@ -19,7 +18,6 @@ import {
 import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
-import { isRoomOfferedAtCampus } from "@/lib/campus-rooms"
 import {
   EVENT_DATE_TOO_SOON_MESSAGE,
   minEventDateKey,
@@ -213,8 +211,6 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   }
   if (isBlank(draft.activityVenue)) {
     warnings.activityVenue = "Select a venue."
-  } else if (!isVenue(draft.activityVenue)) {
-    warnings.activityVenue = "Select a venue from the list."
   }
 
   const startDate = draft.dateOfEvent
@@ -358,35 +354,27 @@ export function isSaafDraftComplete(draft: SaafDraft, includeReservation: boolea
 }
 
 const RESERVATION_EMPTY_MESSAGE =
-  "Add at least one equipment, room, or audiovisual item."
+  "Select at least one room or equipment to reserve."
 
 export function getReservationStepIssue(
   draft: ReservationDraft,
   campus: string
 ): string | null {
-  const hasItems =
-    draft.equipmentItems.length > 0 ||
-    draft.roomItems.length > 0 ||
-    draft.avItems.length > 0
-  if (!hasItems) return RESERVATION_EMPTY_MESSAGE
+  const picks = Array.isArray(draft?.picks) ? draft.picks : []
+  if (isBlank(campus)) {
+    return "Select a campus for the facility reservation."
+  }
+  if (picks.length === 0) return RESERVATION_EMPTY_MESSAGE
 
-  if (draft.equipmentItems.some((item) => item.isOther && isBlank(item.name))) {
-    return "Enter a name for the custom equipment item."
+  const missingSelection = picks.find((pick) => pick.selections.length === 0)
+  if (missingSelection) {
+    return `Pick a date and at least one time slot for "${missingSelection.name}".`
   }
-  if (
-    draft.avItems.some((item) => item.isOther && isBlank(item.equipmentNeeded))
-  ) {
-    return "Enter a name for the custom audiovisual equipment."
-  }
-  if (draft.roomItems.some((item) => item.isOther && isBlank(item.roomNeeded))) {
-    return "Enter a name for the custom room."
-  }
-
-  const offCampus = draft.roomItems.find(
-    (item) => !item.isOther && !isRoomOfferedAtCampus(campus, item.roomNeeded)
+  const hasEmptySlotList = picks.some((pick) =>
+    pick.selections.some((selection) => selection.slots.length === 0)
   )
-  if (offCampus) {
-    return `Remove "${offCampus.roomNeeded}" — it is not offered at ${campus || "the selected campus"}.`
+  if (hasEmptySlotList) {
+    return "Select at least one time slot for each chosen date."
   }
 
   return null

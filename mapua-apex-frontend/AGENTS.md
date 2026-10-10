@@ -22,6 +22,11 @@ These rules apply to `mapua-apex-frontend`. Also follow the root `AGENTS.md` (cr
 - **Use coss ui components.** For interactive UI (selects, dropdowns, dialogs, menus, inputs, toggles, etc.), use the coss ui primitives vendored in `src/components/ui` (the `@coss` registry, built on Base UI). Prefer these existing exports over hand-rolled markup or another component library, and follow each primitive's documented composition/trigger hierarchy.
 - **Light mode only.** This app ships a single light theme. Do not add dark-mode variants, `dark:` styling, or theme toggles; use coss components in their light-mode presentation.
 
+## Design Conventions (Impeccable)
+
+- **Follow the design conventions set by `impeccable`.** This project's UI is designed and critiqued through the `impeccable` skill; its conventions are the source of truth for visual decisions. Before designing, building, or restyling any interface, invoke/consult the `impeccable` skill and align with its standards (typography, color, spacing, visual hierarchy, states, accessibility, motion).
+- **Respect the recorded design context.** Read `PRODUCT.md` (product/users/positioning brief) and the latest design critiques under `.impeccable/critique/` before making UI changes; keep `.impeccable/` state (config, live definitions) consistent with what you change. Do not introduce visual patterns that contradict these conventions — if a change genuinely requires breaking one, surface it and consult the user first.
+
 ## Data Fetching & Caching
 
 - **Follow the existing query-key convention and reuse the established keys**; when you mutate, invalidate the correct key(s) (including the shared/global keys that other panels read) so lists don't go stale. Copy the invalidation pattern from a sibling mutation hook.

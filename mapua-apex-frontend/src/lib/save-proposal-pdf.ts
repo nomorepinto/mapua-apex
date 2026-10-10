@@ -1,8 +1,9 @@
 import type { Activity } from "@/components/ui/activity.types"
 import type { ReservationPdfData, SAAFPdfData } from "@/lib/pdf-generator"
 import { apiSubmissionToDrafts, type ApiSubmission } from "@/lib/dynamodb-adapters"
-import { getEventSchedule, withEventSchedule } from "@/lib/event-schedule"
 import { withReservationDefaults } from "@/components/reservation/constants"
+import type { ReservationDraft } from "@/components/reservation/types"
+import { slotEnd, slotStart } from "@/lib/schedule-slots"
 
 export async function saveProposalPdf(
   saafData: SAAFPdfData,
@@ -10,6 +11,46 @@ export async function saveProposalPdf(
 ) {
   const { generateProposalPdf } = await import("@/lib/pdf-generator")
   generateProposalPdf(saafData, reservationData)
+}
+
+/**
+ * Project the reservable-based reservation draft onto the PDF's room / equipment
+ * tables. Room picks expand to one Function Room row per reserved date (its slot
+ * range becomes the start/end time); equipment picks become Equipment Requested
+ * rows. Returns null when nothing is reserved so the facilities page is skipped.
+ */
+export function reservationDraftToPdfData(
+  draft: ReservationDraft
+): ReservationPdfData | null {
+  const picks = withReservationDefaults(draft).picks
+  if (picks.length === 0) return null
+
+  const roomItems = picks
+    .filter((pick) => pick.type === "room")
+    .flatMap((pick) =>
+      pick.selections.map((selection) => {
+        const slots = [...selection.slots].sort((a, b) => a - b)
+        return {
+          roomNeeded: pick.name,
+          classroomName: "",
+          dateNeeded: selection.date,
+          endDateNeeded: selection.date,
+          timeNeeded: slots.length ? slotStart(slots[0]) : "",
+          endTimeNeeded: slots.length ? slotEnd(slots[slots.length - 1]) : "",
+          remarks: pick.remarks || "",
+        }
+      })
+    )
+
+  const equipmentItems = picks
+    .filter((pick) => pick.type === "equipment")
+    .map((pick) => ({
+      name: pick.name,
+      purpose: pick.remarks || "",
+      remark: pick.remarks || "",
+    }))
+
+  return { roomItems, equipmentItems, avItems: [] }
 }
 
 export async function saveSubmissionAsPdf(submission: ApiSubmission) {
@@ -39,7 +80,7 @@ export async function saveSubmissionAsPdf(submission: ApiSubmission) {
       proponents: saaf.proponents || [],
       budgetItems: saaf.budgetItems || [],
     },
-    hasReservation ? withEventSchedule(currentDraft, getEventSchedule(saaf)) : null
+    hasReservation ? reservationDraftToPdfData(currentDraft) : null
   )
 }
 

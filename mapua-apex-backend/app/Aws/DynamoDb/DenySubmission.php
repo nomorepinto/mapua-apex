@@ -8,6 +8,7 @@ final class DenySubmission
         private DynamoDbItems $items,
         private GetSubmission $submissions,
         private NotificationRecords $notifications,
+        private BookingRecords $bookings,
     ) {}
 
     /**
@@ -20,15 +21,19 @@ final class DenySubmission
         $submission = $this->submissions->require($eventId, $submissionId);
         SignatoryDesk::requireOpen($submission, $signatoryId);
 
+        // Release the paper's reserved slots so other submitters can take them.
+        $bookingRefs = is_array($submission['booking_refs'] ?? null) ? $submission['booking_refs'] : [];
+        $this->bookings->releaseRefs($bookingRefs);
+
         $this->items->patch(
             DynamoKeys::event($eventId),
             DynamoKeys::submission($submissionId),
             ['status' => 'denied'],
-            ['GSI2PK', 'GSI2SK'],
+            ['GSI2PK', 'GSI2SK', 'booking_refs'],
         );
 
         $submission['status'] = 'denied';
-        unset($submission['GSI2PK'], $submission['GSI2SK']);
+        unset($submission['GSI2PK'], $submission['GSI2SK'], $submission['booking_refs']);
 
         $this->notifications->create($submissionId, $signatoryId, 'denied', $comment, submission: $submission);
 

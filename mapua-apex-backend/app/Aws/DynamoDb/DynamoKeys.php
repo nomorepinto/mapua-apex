@@ -36,6 +36,33 @@ final class DynamoKeys
         return 'DEADLINE#'.self::strip($id, 'DEADLINE#');
     }
 
+    public static function campus(string $id): string
+    {
+        return 'CAMPUS#'.self::strip($id, 'CAMPUS#');
+    }
+
+    /**
+     * Globally unique sort key for a reservable (room|equipment) inside a CAMPUS partition.
+     * Doubles as the BOOKING partition key (RESERVABLE#uuid).
+     */
+    public static function reservable(string $id): string
+    {
+        return 'RESERVABLE#'.self::strip($id, 'RESERVABLE#');
+    }
+
+    public static function booking(string $id): string
+    {
+        return 'BOOKING#'.self::strip($id, 'BOOKING#');
+    }
+
+    /**
+     * GSI5PK for a booking: the owning organization (only submission-sourced bookings).
+     */
+    public static function organizationIndex(string $organizationId): string
+    {
+        return 'ORGANIZATION#'.self::strip($organizationId, 'ORGANIZATION#');
+    }
+
     /**
      * Index-only sort key for a collaboration pointer in a dependent's ORGANIZATION partition.
      */

@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from "react-router"
 
 import type { SubmissionActionData } from "@/components/submission/types"
-import { apiClient } from "@/lib/api-client"
+import { apiClient, ApiError } from "@/lib/api-client"
 import { buildSaafApiPayload, omitEventIdFromPayload } from "@/lib/dynamodb-adapters"
 import { queryClient } from "@/main"
 import { SUBMISSION_KEYS } from "@/hooks/use-submissions"
@@ -71,6 +71,17 @@ export async function action({
     }
   } catch (error) {
     console.error("Submission failed:", error)
+    // A 409 means a chosen slot was taken between availability check and write.
+    // Nothing was persisted, so surface the conflict through the same failure
+    // channel and keep the draft intact for the submitter to pick another time.
+    if (error instanceof ApiError && error.status === 409) {
+      return {
+        success: false,
+        message:
+          error.message ||
+          "A selected slot was just booked by someone else. Your submission was not created — pick another time and try again.",
+      }
+    }
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to submit application. Please try again.",

@@ -104,6 +104,16 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "reservables",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminReservablesPage } = await import(
+            "@/routes/cdm-reviewer/reservables"
+          )
+          return { Component: AdminReservablesPage }
+        },
+      },
+      {
         path: "activities",
         HydrateFallback: RouteFallback,
         lazy: async () => {
@@ -243,6 +253,14 @@ export const router = createBrowserRouter([
             "@/routes/osaar/signatories"
           )
           return { Component: AdminSignatoriesPage }
+        },
+      },
+      {
+        path: "campus",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminCampusPage } = await import("@/routes/osaar/campus")
+          return { Component: AdminCampusPage }
         },
       },
       {

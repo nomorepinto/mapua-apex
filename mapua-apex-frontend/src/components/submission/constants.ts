@@ -334,29 +334,14 @@ export const DAYS_OF_WEEK = [
   "Sunday",
 ] as const
 
-/** Campuses activities can be held in */
-export const CAMPUSES = ["Makati Campus", "Intramuros Campus"] as const
-
-export type Campus = (typeof CAMPUSES)[number]
-
-export function isCampus(value: string): value is Campus {
-  return (CAMPUSES as readonly string[]).includes(value)
-}
-
-/** Venue for an activity held digitally instead of at a physical campus. */
-export const ONLINE_VENUE = "Online"
-
 /**
- * Every venue the SAAF offers: the physical campuses plus "Online". "Online" is
- * a valid venue but not a campus, so it lends out no rooms to reserve.
+ * Venue for an activity held digitally instead of at a physical campus. The
+ * list of physical venues is no longer hardcoded here: campuses live in
+ * DynamoDB and are fetched via `useStudentCampusesQuery`, with "Online" appended
+ * for the no-reservation flow. "Online" is a valid venue but never a reservable
+ * campus, so it implies `has_reservation = false`.
  */
-export const VENUES = [...CAMPUSES, ONLINE_VENUE] as const
-
-export type Venue = (typeof VENUES)[number]
-
-export function isVenue(value: string): value is Venue {
-  return isCampus(value) || value === ONLINE_VENUE
-}
+export const ONLINE_VENUE = "Online"
 
 /** Fixed digit-length for the proponent's institutional student number. */
 export const STUDENT_NUMBER_LENGTH = 10

@@ -70,32 +70,35 @@ final class SaafPayload
             ],
             'venue_reservation' => [
                 'has_reservation' => true,
-                'equipment_requested' => [
-                    'items' => [
-                        [
-                            'name' => 'Monoblock Chairs',
-                            'purpose' => 'Participant seating',
-                            'remark' => '60 units',
-                        ],
-                        [
-                            'name' => 'Tables',
-                            'purpose' => 'Workshop tables',
-                            'remark' => '',
-                        ],
-                    ],
-                ],
-                'function_rooms' => [
-                    'items' => [],
-                ],
-                'audiovisual_equipment' => [
-                    'items' => [[
-                        'date_needed' => $eventDate,
-                        'time_needed' => '17:00',
-                        'equipment_needed' => 'Projector',
-                        'remarks' => '1 unit',
-                    ]],
-                ],
+                'reservations' => [],
             ],
         ], $overrides);
+    }
+
+    /**
+     * A single reservable reservation entry for the new venue_reservation shape.
+     *
+     * @param  list<int>  $slots
+     * @return array<string, mixed>
+     */
+    public static function reservation(
+        string $campusId,
+        string $reservableId,
+        string $date,
+        array $slots = [0],
+        string $type = 'room',
+        string $name = 'Room 1',
+        ?string $remarks = null,
+    ): array {
+        return [
+            'reservable_id' => $reservableId,
+            'campus_id' => $campusId,
+            'name' => $name,
+            'type' => $type,
+            'remarks' => $remarks,
+            'selections' => [
+                ['date' => $date, 'slots' => $slots],
+            ],
+        ];
     }
 }

@@ -175,7 +175,27 @@ function makeSubmission({
       ],
       grand_total: 4000,
     },
-    venue_reservation: { has_reservation: true },
+    venue_reservation: {
+      has_reservation: true,
+      reservations: [
+        {
+          reservable_id: "res-av-room",
+          campus_id: "campus-intramuros",
+          name: "AV Room",
+          type: "room",
+          selections: [{ date: daysFromNow(21), slots: [2, 3, 4] }],
+          remarks: "Keynote",
+        },
+        {
+          reservable_id: "res-lcd",
+          campus_id: "campus-intramuros",
+          name: "LCD Projector",
+          type: "equipment",
+          selections: [{ date: daysFromNow(21), slots: [2, 3, 4] }],
+          remarks: "",
+        },
+      ],
+    },
   }
 }
 
@@ -280,6 +300,73 @@ function json(data) {
   return { status: 200, contentType: "application/json", body: JSON.stringify({ data }) }
 }
 
+// ─── Room-reservation mocks (CAMPUS / RESERVABLE / availability) ──────────────
+// The SAAF reservation step now sources its venue campus list, reservable
+// catalog, and per-date availability from the API instead of a hardcoded room /
+// equipment table, so these endpoints must be mocked for the screenshots.
+const RESERVABLE_DAYS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+]
+
+function fullSchedule() {
+  const schedule = {}
+  for (const day of RESERVABLE_DAYS) schedule[day] = Array(12).fill(true)
+  return schedule
+}
+
+const RESERVATION_CAMPUSES = [
+  { campus_id: "campus-intramuros", name: "Intramuros Campus" },
+  { campus_id: "campus-makati", name: "Makati Campus" },
+]
+
+const RESERVATION_RESERVABLES = [
+  {
+    reservable_id: "res-av-room",
+    campus_id: "campus-intramuros",
+    name: "AV Room",
+    type: "room",
+    schedule: fullSchedule(),
+  },
+  {
+    reservable_id: "res-seminar-room",
+    campus_id: "campus-intramuros",
+    name: "Seminar Room",
+    type: "room",
+    schedule: fullSchedule(),
+  },
+  {
+    reservable_id: "res-lcd",
+    campus_id: "campus-intramuros",
+    name: "LCD Projector",
+    type: "equipment",
+    schedule: fullSchedule(),
+  },
+  {
+    reservable_id: "res-function-hall",
+    campus_id: "campus-makati",
+    name: "Function Hall",
+    type: "room",
+    schedule: fullSchedule(),
+  },
+]
+
+// No bookings in the mock window => every template slot reads as free.
+function availabilityFor(reservable) {
+  return {
+    reservable_id: reservable.reservable_id,
+    campus_id: reservable.campus_id,
+    name: reservable.name,
+    type: reservable.type,
+    schedule: reservable.schedule,
+    dates: {},
+  }
+}
+
 function matchApi(url, method = "GET") {
   const parsed = new URL(url)
   return `${method} ${parsed.pathname}${parsed.search}`
@@ -364,6 +451,36 @@ async function mockNetwork(page) {
     }
     if (key === "GET /api/v1/admins/signatories") {
       await route.fulfill(json(SIGNATORIES))
+      return
+    }
+
+    // Room-reservation read endpoints for the SAAF reservation step.
+    if (key === "GET /api/v1/students/campuses") {
+      await route.fulfill(json(RESERVATION_CAMPUSES))
+      return
+    }
+    const reservablesMatch = path.match(
+      /^\/api\/v1\/students\/campuses\/([^/]+)\/reservables$/,
+    )
+    if (reservablesMatch && method === "GET") {
+      const campusId = reservablesMatch[1]
+      await route.fulfill(
+        json(
+          RESERVATION_RESERVABLES.filter(
+            (reservable) => reservable.campus_id === campusId,
+          ),
+        ),
+      )
+      return
+    }
+    const availabilityMatch = path.match(
+      /^\/api\/v1\/students\/campuses\/([^/]+)\/reservables\/([^/]+)\/availability$/,
+    )
+    if (availabilityMatch && method === "GET") {
+      const reservable = RESERVATION_RESERVABLES.find(
+        (item) => item.reservable_id === availabilityMatch[2],
+      )
+      await route.fulfill(json(reservable ? availabilityFor(reservable) : null))
       return
     }
 
@@ -478,60 +595,33 @@ function saafDraft(eventName) {
 function reservationDraft() {
   const date = daysFromNow(21)
   return {
-    equipmentItems: [
+    campusId: "campus-intramuros",
+    picks: [
       {
-        id: "1",
-        name: "Monoblock Chairs",
-        purpose: "Participant seating",
-        remark: "50 units",
-      },
-      {
-        id: "2",
-        name: "Tables",
-        purpose: "Workshop tables",
-        remark: "",
-      },
-    ],
-    roomItems: [
-      {
-        id: "1",
-        dateNeeded: date,
-        endDateNeeded: date,
-        timeNeeded: "09:00",
-        endTimeNeeded: "12:00",
-        roomNeeded: "AV Room",
-        classroomName: "",
+        id: "res-av-room",
+        reservable_id: "res-av-room",
+        campus_id: "campus-intramuros",
+        name: "AV Room",
+        type: "room",
+        selections: [{ date, slots: [2, 3, 4] }],
         remarks: "Keynote",
       },
       {
-        id: "2",
-        dateNeeded: date,
-        endDateNeeded: date,
-        timeNeeded: "13:00",
-        endTimeNeeded: "17:00",
-        roomNeeded: "Seminar Room",
-        classroomName: "",
+        id: "res-seminar-room",
+        reservable_id: "res-seminar-room",
+        campus_id: "campus-intramuros",
+        name: "Seminar Room",
+        type: "room",
+        selections: [{ date, slots: [6, 7, 8, 9] }],
         remarks: "Breakout",
       },
       {
-        id: "3",
-        dateNeeded: date,
-        endDateNeeded: date,
-        timeNeeded: "13:00",
-        endTimeNeeded: "17:00",
-        roomNeeded: "Classroom",
-        classroomName: "N101",
-        remarks: "Workshop",
-      },
-    ],
-    avItems: [
-      {
-        id: "1",
-        dateNeeded: date,
-        endDateNeeded: date,
-        timeNeeded: "08:00",
-        endTimeNeeded: "18:00",
-        equipmentNeeded: "LCD",
+        id: "res-lcd",
+        reservable_id: "res-lcd",
+        campus_id: "campus-intramuros",
+        name: "LCD Projector",
+        type: "equipment",
+        selections: [{ date, slots: [1, 2, 3] }],
         remarks: "",
       },
     ],

@@ -102,16 +102,33 @@ detailed_budget_proposal: {
 }
 venue_reservation: {
   has_reservation: boolean
-  equipment_requested: { items: [{ name, purpose, remark }] }
-  function_rooms: { items: [{ date_needed, end_date_needed, time_needed, end_time_needed, room_needed, classroom_name, remarks }] }
-  audiovisual_equipment: { items: [{ date_needed, end_date_needed, time_needed, end_time_needed, equipment_needed, remarks }] }
+  reservations: [{
+    reservable_id: RESERVABLE#uuid (or bare uuid)
+    campus_id: CAMPUS#uuid (or bare uuid)
+    name: string                 (snapshot of the reservable name at submit time)
+    type: "room" | "equipment"
+    selections: [{ date: "YYYY-MM-DD", slots: [int 0-11] }]
+    remarks: string
+  }]
 }
-room_needed is either a fixed room of the venue campus or "Classroom".
-classroom_name is only sent on a "Classroom" row and holds that campus's room
-code: Makati is "MPO" + 3 digits (MPO101), Intramuros is a direction
-(N, W, S, E, NW, NE, SW, SE) + 3 digits (N101, SW204). The room list follows
-activity_details.venue, which the student form offers as "Makati Campus" or
-"Intramuros Campus" only; the API stores venue as sent.
+booking_refs: [{ pk: "RESERVABLE#uuid", sk: "BOOKING#uuid" }]
+  (sparse: present only while the paper holds bookings; removed on deny/return)
+has_reservation true routes the paper through the CDM desk. Each reservations[]
+entry is one picked RESERVABLE (a room or equipment item under a campus) with
+its concrete selections. On submit the API validates every { date, slots }
+against the reservable's weekly template and the existing BOOKINGs, then writes
+source:"submission" BOOKING holds and stores their keys on booking_refs (see
+BOOKING). A slot taken in the meantime aborts the write with 409 and persists
+nothing. Deny and Return release booking_refs and remove the attribute; a
+student re-edit reconciles them (releases removed, plans added). slots are
+0-based indices into the canonical 07:00-21:00 day split into 70-minute slots
+(exactly 12; slot i starts 07:00 + i*70min, slot 11 = 19:50-21:00); Sunday is
+never reservable. activity_details.venue is stored as sent: when a paper
+includes a reservation the venue is the chosen CAMPUS name (the campus list now
+comes from the CAMPUS objects, no longer a hardcoded pair); "Online" is a valid
+venue for the no-reservation flow and implies has_reservation false. Items
+stored before this shape may still carry the legacy equipment_requested /
+function_rooms / audiovisual_equipment objects; reads tolerate both.
 GSI1 on SUBMISSION is written on create/update (org + submission id).
 Admin GET /admins/submissions lists organizations, then queries GSI1 for each
 one with GSI1SK beginning SUBMISSION#. Event rows on the same partition are
@@ -195,6 +212,87 @@ on that PK + SK. SK is the identity (`sent_at` in the API). POST writes
 SK = now (UTC, second precision). PUT replaces content in place; it does
 not change SK. Admin Cognito group only.
 
+CAMPUS
+PK: CAMPUS#uuid
+SK: CAMPUS#uuid   (same as PK)
+name: string
+
+A reservable campus (e.g. "Intramuros Campus", "Makati Campus"), seeded by
+osaar on the /campus page. The SAAF reservation step and the
+activity_details.venue dropdown read the list (GET /students/campuses). List
+scans PK begins_with CAMPUS# AND PK = SK. DELETE /admins/campuses/{id} is
+guarded: 409 if any RESERVABLE still lives under PK = CAMPUS#id (delete those
+first); otherwise it removes the item. Rename in place (PUT) to keep the same
+uuid so RESERVABLE children and stored booking campus_id snapshots stay valid.
+
+RESERVABLE (a bookable room or equipment item under a campus)
+PK: CAMPUS#uuid
+SK: RESERVABLE#uuid   (globally unique; doubles as the BOOKING partition key)
+name: string
+type: "room" | "equipment"
+schedule: {
+  monday:    [bool x12]
+  tuesday:   [bool x12]
+  wednesday: [bool x12]
+  thursday: [bool x12]
+  friday:    [bool x12]
+  saturday:  [bool x12]
+}
+
+The recurring weekly availability template. Days run monday..saturday (Sunday
+is never reservable and is not stored); each present day is exactly 12
+booleans, one per 70-minute slot of the 07:00-21:00 window (true = available),
+and an absent day is all-unavailable. Added/edited by cdm on the /reservables
+page (CSV for name+type, a grid for the schedule). listByCampus queries
+PK = CAMPUS#id, SK begins_with RESERVABLE#. DELETE
+/admins/campuses/{campus}/reservables/{id} is guarded: 409 if any BOOKING still
+occupies PK = RESERVABLE#id (release those first). Canonical slot math lives in
+App\Aws\DynamoDb\ReservableSchedule (backend) and lib/schedule-slots.ts
+(frontend) so indices/times never drift.
+
+BOOKING (a concrete hold on a reservable's slots for specific dates)
+PK: RESERVABLE#uuid
+SK: BOOKING#uuid
+timestamp: string   (create time, UTC "Y-m-d\TH:i:s\Z")
+schedule_selected: [{ date: "YYYY-MM-DD", slots: [int 0-11] }]   (normalized: unique sorted slots, dates sorted)
+source: "submission" | "cdm"
+campus_id: string                       (as sent; bare uuid)
+reservable_name: string                 (snapshot at write time)
+reservable_type: "room" | "equipment"   (snapshot at write time)
+
+One BOOKING per (reservable, submission) or per (reservable, CDM reserve
+action); schedule_selected lists every selected date+slots for that reservable.
+Two flavors share the item type, distinguished by source:
+
+Submission-sourced (source "submission") — written by the SAAF create/update
+path (BookingRecords::planForSubmission then commit). Adds GSI5 + traceability
+so the owning org can list its holds and CDM can label them read-only:
+  GSI5PK: ORGANIZATION#uuid
+  GSI5SK: timestamp
+  event_id: string          (bare EVENT uuid)
+  submission_id: string     (bare SUBMISSION uuid)
+  organization_id: string   (bare ORGANIZATION uuid)
+Released (deleted) when the paper is denied or returned, or reconciled on a
+student re-edit — all driven by the SUBMISSION's booking_refs. The CDM
+manual-delete route refuses source "submission" with 409 so a live paper's hold
+is never deleted out from under it.
+
+Manual (source "cdm") — created by CDM on the /reservables Reserve section
+(BookingRecords::createManual). Carries NO GSI5 and NO submission linkage, so it
+never surfaces in an org's booking list; it only blocks slots. Adds:
+  booked_by: SIGNATORY#uuid   (the CDM signatory, from the JWT)
+  reason: string              (optional purpose note; omitted when blank)
+Released only by CDM: DELETE
+/admins/campuses/{campus}/reservables/{reservable}/bookings/{booking}.
+
+Both flavors share one availability engine (BookingRecords): a slot is free only
+when the weekly template allows it AND no BOOKING (either source) occupies that
+concrete date+slot. Conflict detection queries the base RESERVABLE partition
+(PK = RESERVABLE#id, SK begins_with BOOKING#) — never GSI5 — so it works before
+the organization index exists. GSI5 is provisioned in AWS by the operator; the
+code writes GSI5PK/GSI5SK on submission-sourced bookings but does not depend on
+the index for correctness. There is no automatic expiry on a manual hold.
+
 ________________
 
 
@@ -262,7 +360,7 @@ json
     "title_and_nature": "Hack Night: Intro to Web Dev",
     "description": "A beginner-friendly hackathon night.",
     "objectives": "Introduce first-year students to web development.",
-    "venue": "MPH 2nd Floor",
+    "venue": "Intramuros Campus",
     "date_of_event": "2026-10-05",
     "day_of_event": "Monday",
     "time_of_event": "17:00 - 21:00",
@@ -282,15 +380,29 @@ json
   },
   "venue_reservation": {
     "has_reservation": true,
-    "equipment_requested": {
-      "items": [
-        { "name": "Monoblock Chairs", "purpose": "Participant seating", "remark": "60 units" },
-        { "name": "Tables", "purpose": "Workshop tables", "remark": "" }
-      ]
-    },
-    "function_rooms": { "items": [{ "date_needed": "2026-10-05", "end_date_needed": "2026-10-05", "time_needed": "17:00", "end_time_needed": "21:00", "room_needed": "Classroom", "classroom_name": "N101", "remarks": "Workshop room" }] },
-    "audiovisual_equipment": { "items": [{ "date_needed": "2026-10-05", "end_date_needed": "2026-10-05", "time_needed": "17:00", "end_time_needed": "21:00", "equipment_needed": "Projector", "remarks": "1 unit" }] }
-  }
+    "reservations": [
+      {
+        "reservable_id": "r1",
+        "campus_id": "a1b2",
+        "name": "AV Room",
+        "type": "room",
+        "selections": [{ "date": "2026-10-05", "slots": [8, 9, 10, 11] }],
+        "remarks": "Workshop room"
+      },
+      {
+        "reservable_id": "r2",
+        "campus_id": "a1b2",
+        "name": "Projector",
+        "type": "equipment",
+        "selections": [{ "date": "2026-10-05", "slots": [8, 9, 10, 11] }],
+        "remarks": "1 unit"
+      }
+    ]
+  },
+  "booking_refs": [
+    { "pk": "RESERVABLE#r1", "sk": "BOOKING#b001" },
+    { "pk": "RESERVABLE#r2", "sk": "BOOKING#b002" }
+  ]
 }
 Routing is snapshotted onto SUBMISSION at write time. On create (and on a
 student PUT that re-routes), the resolver builds an ordered signatory_sequence
@@ -379,6 +491,60 @@ json
   "PK": "ANNOUNCEMENT",
   "SK": "2026-09-15T08:00:00Z",
   "content": "OSAAR office hours are 9:00–17:00."
+}
+CAMPUS
+json
+{
+  "PK": "CAMPUS#a1b2",
+  "SK": "CAMPUS#a1b2",
+  "name": "Intramuros Campus"
+}
+RESERVABLE (a room under the campus; each day is 12 booleans, monday..saturday)
+json
+{
+  "PK": "CAMPUS#a1b2",
+  "SK": "RESERVABLE#r1",
+  "name": "AV Room",
+  "type": "room",
+  "schedule": {
+    "monday":    [true, true, true, true, true, true, true, true, true, true, true, true],
+    "tuesday":   [true, true, true, true, true, true, true, true, true, true, true, true],
+    "wednesday": [true, true, true, true, true, true, true, true, true, true, true, true],
+    "thursday":  [true, true, true, true, true, true, true, true, true, true, true, true],
+    "friday":    [true, true, true, true, true, true, true, true, true, true, true, true],
+    "saturday":  [false, false, false, false, false, false, false, false, false, false, false, false]
+  }
+}
+BOOKING (submission-sourced hold; has GSI5 + traceability, released on deny/return)
+json
+{
+  "PK": "RESERVABLE#r1",
+  "SK": "BOOKING#b001",
+  "GSI5PK": "ORGANIZATION#a1b2",
+  "GSI5SK": "2026-09-10T14:00:00Z",
+  "timestamp": "2026-09-10T14:00:00Z",
+  "schedule_selected": [{ "date": "2026-10-05", "slots": [8, 9, 10, 11] }],
+  "source": "submission",
+  "campus_id": "a1b2",
+  "reservable_name": "AV Room",
+  "reservable_type": "room",
+  "event_id": "e001",
+  "submission_id": "s001",
+  "organization_id": "a1b2"
+}
+BOOKING (CDM manual hold; no GSI5, no submission linkage, released only by CDM)
+json
+{
+  "PK": "RESERVABLE#r1",
+  "SK": "BOOKING#b900",
+  "timestamp": "2026-09-12T09:00:00Z",
+  "schedule_selected": [{ "date": "2026-10-06", "slots": [0, 1] }],
+  "source": "cdm",
+  "campus_id": "a1b2",
+  "reservable_name": "AV Room",
+  "reservable_type": "room",
+  "booked_by": "SIGNATORY#cdm001",
+  "reason": "Department retreat"
 }
 
 ________________

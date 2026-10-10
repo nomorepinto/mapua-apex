@@ -11,20 +11,18 @@ type ReservationFormModel = ReturnType<typeof useReservationForm>
 interface ReservationFormState {
   draft: ReservationDraft
   schedule: EventSchedule
-  /** Venue campus from the SAAF draft; drives the room catalog and code format. */
-  campus: string
+  /** Campus id chosen in the reservation step; drives the reservable catalog. */
+  campusId: string
+  /** Earliest reservable date key (today). */
+  todayKey: string
 }
 
 interface ReservationFormActions {
-  handleUpdateRoomItem: ReservationFormModel["handleUpdateRoomItem"]
-  handleRemoveRoomItem: ReservationFormModel["handleRemoveRoomItem"]
-  handleAddRoomItem: ReservationFormModel["handleAddRoomItem"]
-  handleUpdateAvItem: ReservationFormModel["handleUpdateAvItem"]
-  handleRemoveAvItem: ReservationFormModel["handleRemoveAvItem"]
-  handleAddAvItem: ReservationFormModel["handleAddAvItem"]
-  handleUpdateEquipmentItem: ReservationFormModel["handleUpdateEquipmentItem"]
-  handleRemoveEquipmentItem: ReservationFormModel["handleRemoveEquipmentItem"]
-  handleAddEquipmentItem: ReservationFormModel["handleAddEquipmentItem"]
+  handleSelectCampus: ReservationFormModel["handleSelectCampus"]
+  handleTogglePick: ReservationFormModel["handleTogglePick"]
+  handleRemovePick: ReservationFormModel["handleRemovePick"]
+  handleToggleSlot: ReservationFormModel["handleToggleSlot"]
+  handleUpdateRemarks: ReservationFormModel["handleUpdateRemarks"]
   handleSavePdf: ReservationFormModel["handleSavePdf"]
   handleClearForm: ReservationFormModel["handleClearForm"]
 }
@@ -55,18 +53,15 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
     state: {
       draft: form.draft,
       schedule: form.schedule,
-      campus: form.campus,
+      campusId: form.campusId,
+      todayKey: form.todayKey,
     },
     actions: {
-      handleUpdateRoomItem: form.handleUpdateRoomItem,
-      handleRemoveRoomItem: form.handleRemoveRoomItem,
-      handleAddRoomItem: form.handleAddRoomItem,
-      handleUpdateAvItem: form.handleUpdateAvItem,
-      handleRemoveAvItem: form.handleRemoveAvItem,
-      handleAddAvItem: form.handleAddAvItem,
-      handleUpdateEquipmentItem: form.handleUpdateEquipmentItem,
-      handleRemoveEquipmentItem: form.handleRemoveEquipmentItem,
-      handleAddEquipmentItem: form.handleAddEquipmentItem,
+      handleSelectCampus: form.handleSelectCampus,
+      handleTogglePick: form.handleTogglePick,
+      handleRemovePick: form.handleRemovePick,
+      handleToggleSlot: form.handleToggleSlot,
+      handleUpdateRemarks: form.handleUpdateRemarks,
       handleSavePdf: form.handleSavePdf,
       handleClearForm: form.handleClearForm,
     },

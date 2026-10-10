@@ -1,8 +1,11 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Admin\AnnouncementController;
+use App\Http\Controllers\Api\V1\Admin\BookingController;
+use App\Http\Controllers\Api\V1\Admin\CampusController;
 use App\Http\Controllers\Api\V1\Admin\LogMonitorController;
 use App\Http\Controllers\Api\V1\Admin\OrganizationController;
+use App\Http\Controllers\Api\V1\Admin\ReservableController;
 use App\Http\Controllers\Api\V1\Admin\SignatoryController;
 use App\Http\Controllers\Api\V1\Admin\SubmissionController as AdminSubmissionController;
 use App\Http\Controllers\Api\V1\Arcus\EventController;
@@ -15,6 +18,7 @@ use App\Http\Controllers\Api\V1\Student\AnnouncementController as StudentAnnounc
 use App\Http\Controllers\Api\V1\Student\DeadlineController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\OrganizationController as StudentOrganizationController;
+use App\Http\Controllers\Api\V1\Student\ReservableController as StudentReservableController;
 use App\Http\Controllers\Api\V1\Student\SubmissionController as StudentSubmissionController;
 use Illuminate\Support\Facades\Route;
 
@@ -62,6 +66,10 @@ Route::middleware(['cognito.jwt:student', 'throttle:student', 'activity.log'])
         Route::get('announcements', [StudentAnnouncementController::class, 'index'])->name('announcements.index');
         Route::get('organization', [StudentOrganizationController::class, 'show'])->name('organization.show');
         Route::get('organizations', [StudentOrganizationController::class, 'index'])->name('organizations.index');
+        // Read-only reservable catalog for the SAAF reservation step.
+        Route::get('campuses', [StudentReservableController::class, 'campuses'])->name('campuses.index');
+        Route::get('campuses/{campus}/reservables', [StudentReservableController::class, 'index'])->name('reservables.index');
+        Route::get('campuses/{campus}/reservables/{reservable}/availability', [StudentReservableController::class, 'availability'])->name('reservables.availability');
     });
 
 Route::middleware(['cognito.jwt:signatory', 'throttle:signatory', 'activity.log'])
@@ -150,6 +158,38 @@ Route::middleware(['cognito.jwt:admin', 'throttle:admin', 'activity.log'])
         Route::delete('signatories/{signatory}', [SignatoryController::class, 'destroy'])
             ->middleware('throttle:admin-write')
             ->name('signatories.destroy');
+
+        // Campuses (osaar) — top-level reservable parents.
+        Route::get('campuses', [CampusController::class, 'index'])->name('campuses.index');
+        Route::post('campuses', [CampusController::class, 'store'])
+            ->middleware('throttle:admin-write')
+            ->name('campuses.store');
+        Route::put('campuses/{campus}', [CampusController::class, 'update'])
+            ->middleware('throttle:admin-write')
+            ->name('campuses.update');
+        Route::delete('campuses/{campus}', [CampusController::class, 'destroy'])
+            ->middleware('throttle:admin-write')
+            ->name('campuses.destroy');
+
+        // Reservables (cdm) — rooms/equipment under a campus + manual bookings.
+        Route::get('campuses/{campus}/reservables', [ReservableController::class, 'index'])->name('reservables.index');
+        Route::post('campuses/{campus}/reservables', [ReservableController::class, 'store'])
+            ->middleware('throttle:admin-write')
+            ->name('reservables.store');
+        Route::put('campuses/{campus}/reservables/{reservable}', [ReservableController::class, 'update'])
+            ->middleware('throttle:admin-write')
+            ->name('reservables.update');
+        Route::delete('campuses/{campus}/reservables/{reservable}', [ReservableController::class, 'destroy'])
+            ->middleware('throttle:admin-write')
+            ->name('reservables.destroy');
+        Route::get('campuses/{campus}/reservables/{reservable}/availability', [BookingController::class, 'availability'])->name('reservables.availability');
+        Route::get('campuses/{campus}/reservables/{reservable}/bookings', [BookingController::class, 'index'])->name('reservables.bookings.index');
+        Route::post('campuses/{campus}/reservables/{reservable}/bookings', [BookingController::class, 'store'])
+            ->middleware('throttle:admin-write')
+            ->name('reservables.bookings.store');
+        Route::delete('campuses/{campus}/reservables/{reservable}/bookings/{booking}', [BookingController::class, 'destroy'])
+            ->middleware('throttle:admin-write')
+            ->name('reservables.bookings.destroy');
     });
 
 // Arcus companion apps — server-to-server, shared secret (not a Cognito JWT).

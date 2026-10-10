@@ -1,4 +1,4 @@
-import { Building2Icon, ClipboardCheckIcon, FileCheck2Icon, HomeIcon, StampIcon } from "lucide-react"
+import { Building2Icon, ClipboardCheckIcon, FileCheck2Icon, HomeIcon, MapPinIcon, StampIcon } from "lucide-react"
 import { Outlet } from "react-router"
 
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -21,6 +21,11 @@ const OSAAR_NAV = [
     label: "Signatories",
     to: "/osaar/signatories",
     icon: StampIcon,
+  },
+  {
+    label: "Campuses",
+    to: "/osaar/campus",
+    icon: MapPinIcon,
   },
   {
     label: "Review",

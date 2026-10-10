@@ -36,6 +36,72 @@ final class DynamoFixtures
         ]);
     }
 
+    public static function campus(InMemoryDynamoDb $db, string $id = 'c001', string $name = 'Intramuros'): void
+    {
+        $db->seed([
+            'PK' => 'CAMPUS#'.$id,
+            'SK' => 'CAMPUS#'.$id,
+            'name' => $name,
+        ]);
+    }
+
+    /**
+     * @param  array<string, list<bool>>|null  $schedule  defaults to all-available Mon-Sat
+     */
+    public static function reservable(
+        InMemoryDynamoDb $db,
+        string $campusId = 'c001',
+        string $id = 'r001',
+        string $name = 'Room 1',
+        string $type = 'room',
+        ?array $schedule = null,
+    ): void {
+        $db->seed([
+            'PK' => 'CAMPUS#'.$campusId,
+            'SK' => 'RESERVABLE#'.$id,
+            'name' => $name,
+            'type' => $type,
+            'schedule' => $schedule ?? self::fullSchedule(),
+        ]);
+    }
+
+    /**
+     * @param  list<array{date: string, slots: list<int>}>  $selections
+     * @param  array<string, mixed>  $extra
+     */
+    public static function booking(
+        InMemoryDynamoDb $db,
+        string $reservableId,
+        string $id,
+        array $selections,
+        string $source = 'submission',
+        array $extra = [],
+    ): void {
+        $db->seed(array_merge([
+            'PK' => 'RESERVABLE#'.$reservableId,
+            'SK' => 'BOOKING#'.$id,
+            'timestamp' => '2026-10-01T00:00:00Z',
+            'schedule_selected' => $selections,
+            'source' => $source,
+        ], $extra));
+    }
+
+    /**
+     * All 12 slots available across Mon-Sat.
+     *
+     * @return array<string, list<bool>>
+     */
+    public static function fullSchedule(): array
+    {
+        $schedule = [];
+
+        foreach (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as $day) {
+            $schedule[$day] = array_fill(0, 12, true);
+        }
+
+        return $schedule;
+    }
+
     public static function signatory(
         InMemoryDynamoDb $db,
         string $id,

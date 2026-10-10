@@ -100,14 +100,21 @@ and 9:00 PM, end not earlier than start, and start ≠ end.
 
 `items[] { item_no, unit, quantity, price_per_unit, total }`, `grand_total`.
 
-### venue_reservation
+### venue_reservation & booking_refs
 
 | Property | Type | Notes |
 |---|---|---|
 | `has_reservation` | boolean | Drives whether the CDM desk joins the routing chain |
-| `equipment_requested` | object | `{ items[] { name, purpose, remark } }` |
-| `function_rooms` | object | `{ items[] { date_needed, time_needed, room_needed, remarks } }` |
-| `audiovisual_equipment` | object | `{ items[] { date_needed, time_needed, equipment_needed, remarks } }` |
+| `reservations[]` | list | One entry per picked reservable: `{ reservable_id, campus_id, name, type, selections[], remarks }` |
+| `reservations[].type` | string | `room` \| `equipment` |
+| `reservations[].selections[]` | list | `{ date: "YYYY-MM-DD", slots: [int 0-11] }` — 0-based indices into the 07:00–21:00 / 70-min day (12 slots) |
+| `booking_refs[]` | list | Sparse reverse index `{ pk: "RESERVABLE#uuid", sk: "BOOKING#uuid" }`; present only while the paper holds BOOKINGs. Released + removed on deny/return, reconciled on re-edit |
+
+Legacy items stored before this shape may still carry `equipment_requested` /
+`function_rooms` / `audiovisual_equipment`; reads tolerate both. On submit each
+selection is validated against the reservable's weekly template and existing
+BOOKINGs, then written as `source:"submission"` holds — a slot taken in the
+meantime aborts with **409** and persists nothing.
 
 ---
 
@@ -184,3 +191,82 @@ A campus-wide announcement. All announcements share one partition; the SK
 | `content` | string | |
 
 A PUT replaces `content` in place and does not change the SK.
+
+---
+
+## CAMPUS
+
+A reservable campus (e.g. `Intramuros Campus`, `Makati Campus`), seeded by osaar
+on the `/campus` page. The SAAF reservation step and the `activity_details.venue`
+dropdown read the list.
+
+| Property | Type | Notes |
+|---|---|---|
+| `PK` | string | `CAMPUS#uuid` |
+| `SK` | string | `CAMPUS#uuid` (same as PK) |
+| `name` | string | Display name |
+
+List scans `PK` begins `CAMPUS#` AND `PK = SK`. Delete is guarded: **409** if any
+RESERVABLE still lives under `PK = CAMPUS#id`. Rename in place (PUT) to keep the
+same uuid so RESERVABLE children and stored booking `campus_id` snapshots stay
+valid.
+
+---
+
+## RESERVABLE
+
+A bookable room or equipment item under a campus. Its `SK` is globally unique and
+doubles as the BOOKING partition key.
+
+| Property | Type | Notes |
+|---|---|---|
+| `PK` | string | `CAMPUS#uuid` (parent campus) |
+| `SK` | string | `RESERVABLE#uuid` |
+| `name` | string | |
+| `type` | string | `room` \| `equipment` |
+| `schedule` | object | Recurring weekly template: `monday`..`saturday`, each exactly 12 booleans (one per 07:00–21:00 / 70-min slot; `true` = available). Sunday is never reservable; an absent day is all-unavailable |
+
+Added/edited by cdm on the `/reservables` page (CSV for name+type, a grid for the
+schedule). Delete is guarded: **409** if any BOOKING still occupies
+`PK = RESERVABLE#id`.
+
+---
+
+## BOOKING
+
+A concrete hold on a reservable's slots for specific dates. One BOOKING per
+(reservable, submission) or per (reservable, CDM reserve action). Two flavors
+share the item type, distinguished by `source`.
+
+| Property | Type | Notes |
+|---|---|---|
+| `PK` | string | `RESERVABLE#uuid` |
+| `SK` | string | `BOOKING#uuid` |
+| `timestamp` | timestamp | Create time (UTC) |
+| `schedule_selected` | list | `[{ date: "YYYY-MM-DD", slots: [int 0-11] }]` (normalized) |
+| `source` | string | `submission` (SAAF-created hold) \| `cdm` (manual CDM hold) |
+| `campus_id` | string | Bare campus uuid (snapshot) |
+| `reservable_name` | string | Snapshot at write time |
+| `reservable_type` | string | `room` \| `equipment` (snapshot) |
+
+Submission-sourced (`source: "submission"`) adds GSI5 + traceability, and is
+released on deny/return/re-edit via the SUBMISSION's `booking_refs`:
+
+| Property | Type | Notes |
+|---|---|---|
+| `GSI5PK` | string | `ORGANIZATION#uuid` — owning org (org booking list) |
+| `GSI5SK` | timestamp | `timestamp` |
+| `event_id` / `submission_id` / `organization_id` | string | Bare uuids for traceability and read-only CDM labelling |
+
+Manual (`source: "cdm"`) carries **no** GSI5 and **no** submission linkage (so it
+never surfaces in an org's list); it is released only by CDM delete:
+
+| Property | Type | Notes |
+|---|---|---|
+| `booked_by` | string | `SIGNATORY#uuid` (the CDM signatory) |
+| `reason` | string | Optional purpose note (omitted when blank) |
+
+Both flavors share one availability engine: a slot is free only when the weekly
+template allows it AND no BOOKING (either source) occupies that date+slot.
+Conflict detection runs on the base RESERVABLE partition — never GSI5 — so it
+works before the (operator-provisioned) organization index exists.

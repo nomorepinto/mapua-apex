@@ -2,200 +2,172 @@ import { useCallback } from "react"
 
 import {
   DEFAULT_RESERVATION_DRAFT,
-  OTHER_OPTION,
   withReservationDefaults,
 } from "@/components/reservation/constants"
-import { DEFAULT_SAAF_DRAFT } from "@/components/submission/constants"
 import type {
-  AVItem,
-  EquipmentItem,
   ReservationDraft,
-  RoomItem,
+  ReservationPick,
 } from "@/components/reservation/types"
-import { sanitizeClassroomName } from "@/lib/campus-rooms"
-import { getEventSchedule, withEventSchedule } from "@/lib/event-schedule"
-import { saveProposalPdf } from "@/lib/save-proposal-pdf"
+import { DEFAULT_SAAF_DRAFT } from "@/components/submission/constants"
+import { combineEventTime } from "@/components/submission/event-time"
+import type { SaafDraft } from "@/components/submission/types"
+import { getDateKey, parseDateKey, startOfLocalDay } from "@/lib/date-key"
+import { getEventSchedule } from "@/lib/event-schedule"
+import {
+  reservationDraftToPdfData,
+  saveProposalPdf,
+} from "@/lib/save-proposal-pdf"
+import {
+  selectionDateRange,
+  selectionTimeRange,
+  toggleSlot,
+} from "@/lib/schedule-slots"
+import type { ApiReservable } from "@/lib/types"
 import { useOrgStore } from "@/stores/org-store"
 
 /**
  * Reservation draft management for the wizard's reservation step.
  *
- * The wizard (SAAF form) owns submission, navigation, and dialogs, so this hook
- * only manages the reservation draft, its derived event schedule, clearing, and
- * the full-proposal PDF export.
+ * The step now books real RESERVABLE records: the proponent picks a campus
+ * (which is also the event venue), adds rooms/equipment, and reserves concrete
+ * dates + 70-minute slots on each. The event's date and time are *derived* from
+ * those selections and written back into the SAAF draft, so the reservation is
+ * the single source of truth for the event schedule in this flow.
  */
+
+/** Recompute the SAAF event date/time from every pick's slot selections. */
+function derivedSchedulePatch(picks: ReservationPick[]): Partial<SaafDraft> {
+  const selections = picks.flatMap((pick) => pick.selections)
+  const dates = selectionDateRange(selections)
+  const times = selectionTimeRange(selections)
+
+  const patch: Partial<SaafDraft> = {
+    dateOfEvent: dates?.start ?? "",
+    endDateOfEvent: dates?.end ?? "",
+    timeOfEventStart: times?.start ?? "",
+    timeOfEventEnd: times?.end ?? "",
+    timeOfEvent: times ? combineEventTime(times.start, times.end) : "",
+  }
+  if (dates) {
+    const weekday = parseDateKey(dates.start)?.toLocaleDateString("en-US", {
+      weekday: "long",
+    })
+    patch.dayOfEvent = weekday ?? ""
+  } else {
+    patch.dayOfEvent = ""
+  }
+  return patch
+}
+
+/** Persist a new pick list plus the event schedule it implies, in one shot. */
+function commitPicks(picks: ReservationPick[]): void {
+  useOrgStore.getState().patchReservationDraft({ picks })
+  useOrgStore.getState().patchSaafDraft(derivedSchedulePatch(picks))
+}
+
 export function useReservationForm() {
-  // Ensure every nested array always falls back to defaults.
   const storedDraft = useOrgStore((state) => state.reservationDraft)
   const draft: ReservationDraft = withReservationDefaults(storedDraft)
 
-  // Reservation date/time is always locked to the SAAF event schedule so it can
-  // never be entered inconsistently with the event details captured earlier.
   const saafDraft = useOrgStore((state) => state.saafDraft)
+  // The reservation schedule is derived from the picks and stored on the SAAF
+  // draft, so the read-only summary and the PDF path both read it from there.
   const schedule = getEventSchedule(saafDraft)
 
-  // Rooms are campus-specific, so the reservation step reads the campus from the
-  // same draft that owns the venue field instead of asking for it again.
-  const campus = saafDraft?.activityVenue ?? ""
+  // The campus chosen in the reservation step is the event venue's id.
+  const campusId = draft.campusId
 
-  const handleAddRoomItem = useCallback((roomNeeded: string) => {
-    const current =
-      useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-    const roomItems = current.roomItems ?? DEFAULT_RESERVATION_DRAFT.roomItems
-    // "Others" adds an open-ended row whose name is typed into the table cell.
-    const isOther = roomNeeded === OTHER_OPTION
-    useOrgStore.getState().patchReservationDraft({
-      roomItems: [
-        ...roomItems,
-        {
-          id: String(Date.now()),
-          dateNeeded: "",
-          endDateNeeded: "",
-          timeNeeded: "",
-          endTimeNeeded: "",
-          roomNeeded: isOther ? "" : roomNeeded,
-          classroomName: "",
-          remarks: "",
-          isOther,
-        },
-      ],
-    })
-  }, [])
+  const currentPicks = useCallback(
+    (): ReservationPick[] =>
+      withReservationDefaults(useOrgStore.getState().reservationDraft).picks,
+    []
+  )
 
-  const handleRemoveRoomItem = useCallback((id: string) => {
-    const current =
-      useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-    const roomItems = current.roomItems ?? DEFAULT_RESERVATION_DRAFT.roomItems
-    useOrgStore.getState().patchReservationDraft({
-      roomItems: roomItems.filter((i) => i.id !== id),
-    })
-  }, [])
-
-  const handleUpdateRoomItem = useCallback(
-    (id: string, field: keyof RoomItem, value: string) => {
-      let sanitized = value
-      if (field === "classroomName") {
-        // Classroom codes are uppercase alphanumerics, normalized as typed so
-        // the campus regex only ever sees a canonical value.
-        sanitized = sanitizeClassroomName(value)
-      } else if (field === "roomNeeded" || field === "remarks") {
-        sanitized = value.slice(0, 40)
-      }
-      const current =
-        useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-      const roomItems = current.roomItems ?? DEFAULT_RESERVATION_DRAFT.roomItems
+  /** Choose the venue campus. Reservables are campus-scoped, so picks reset. */
+  const handleSelectCampus = useCallback(
+    (nextCampusId: string, campusName: string) => {
       useOrgStore.getState().patchReservationDraft({
-        roomItems: roomItems.map((i) =>
-          i.id === id ? { ...i, [field]: sanitized } : i
-        ),
+        campusId: nextCampusId,
+        picks: [],
+      })
+      // Venue name plus a cleared schedule: the event date/time are owned by the
+      // slot selections, which are empty again after a campus change.
+      useOrgStore.getState().patchSaafDraft({
+        activityVenue: campusName,
+        ...derivedSchedulePatch([]),
       })
     },
     []
   )
 
-  const handleAddAvItem = useCallback((equipmentNeeded: string) => {
-    const current =
-      useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-    const avItems = current.avItems ?? DEFAULT_RESERVATION_DRAFT.avItems
-    // "Others" adds an open-ended row whose name is typed into the table cell.
-    const isOther = equipmentNeeded === OTHER_OPTION
-    useOrgStore.getState().patchReservationDraft({
-      avItems: [
-        ...avItems,
-        {
-          id: String(Date.now()),
-          dateNeeded: "",
-          endDateNeeded: "",
-          timeNeeded: "",
-          endTimeNeeded: "",
-          equipmentNeeded: isOther ? "" : equipmentNeeded,
-          remarks: "",
-          isOther,
-        },
-      ],
-    })
-  }, [])
+  /** Add a reservable to the pick list, or remove it when already picked. */
+  const handleTogglePick = useCallback((reservable: ApiReservable) => {
+    const picks = currentPicks()
+    const exists = picks.some(
+      (pick) => pick.reservable_id === reservable.reservable_id
+    )
+    const next = exists
+      ? picks.filter(
+          (pick) => pick.reservable_id !== reservable.reservable_id
+        )
+      : [
+          ...picks,
+          {
+            id: reservable.reservable_id,
+            reservable_id: reservable.reservable_id,
+            campus_id: reservable.campus_id,
+            name: reservable.name,
+            type: reservable.type,
+            selections: [],
+            remarks: "",
+          },
+        ]
+    commitPicks(next)
+  }, [currentPicks])
 
-  const handleRemoveAvItem = useCallback((id: string) => {
-    const current =
-      useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-    const avItems = current.avItems ?? DEFAULT_RESERVATION_DRAFT.avItems
-    useOrgStore.getState().patchReservationDraft({
-      avItems: avItems.filter((i) => i.id !== id),
-    })
-  }, [])
-
-  const handleUpdateAvItem = useCallback(
-    (id: string, field: keyof AVItem, value: string) => {
-      let sanitized = value
-      if (field === "equipmentNeeded" || field === "remarks") {
-        sanitized = value.slice(0, 40)
-      }
-      const current =
-        useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-      const avItems = current.avItems ?? DEFAULT_RESERVATION_DRAFT.avItems
-      useOrgStore.getState().patchReservationDraft({
-        avItems: avItems.map((i) =>
-          i.id === id ? { ...i, [field]: sanitized } : i
-        ),
-      })
+  const handleRemovePick = useCallback(
+    (pickId: string) => {
+      commitPicks(currentPicks().filter((pick) => pick.id !== pickId))
     },
-    []
+    [currentPicks]
   )
 
-  const handleAddEquipmentItem = useCallback((name: string) => {
-    const current =
-      useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-    const equipmentItems =
-      current.equipmentItems ?? DEFAULT_RESERVATION_DRAFT.equipmentItems
-    // "Others" adds an open-ended row whose name is typed into the table cell.
-    const isOther = name === OTHER_OPTION
-    useOrgStore.getState().patchReservationDraft({
-      equipmentItems: [
-        ...equipmentItems,
-        { id: String(Date.now()), name: isOther ? "" : name, purpose: "", remark: "", isOther },
-      ],
-    })
-  }, [])
-
-  const handleRemoveEquipmentItem = useCallback((id: string) => {
-    const current =
-      useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-    const equipmentItems =
-      current.equipmentItems ?? DEFAULT_RESERVATION_DRAFT.equipmentItems
-    useOrgStore.getState().patchReservationDraft({
-      equipmentItems: equipmentItems.filter((i) => i.id !== id),
-    })
-  }, [])
-
-  const handleUpdateEquipmentItem = useCallback(
-    (id: string, field: keyof EquipmentItem, value: string) => {
-      let sanitized = value
-      if (field === "name" || field === "purpose" || field === "remark") {
-        sanitized = value.slice(0, 40)
-      }
-      const current =
-        useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-      const equipmentItems =
-        current.equipmentItems ?? DEFAULT_RESERVATION_DRAFT.equipmentItems
-      useOrgStore.getState().patchReservationDraft({
-        equipmentItems: equipmentItems.map((i) =>
-          i.id === id ? { ...i, [field]: sanitized } : i
-        ),
-      })
+  /** Toggle one slot on one date for a pick. */
+  const handleToggleSlot = useCallback(
+    (pickId: string, date: string, slot: number) => {
+      const next = currentPicks().map((pick) =>
+        pick.id === pickId
+          ? { ...pick, selections: toggleSlot(pick.selections, date, slot) }
+          : pick
+      )
+      commitPicks(next)
     },
-    []
+    [currentPicks]
+  )
+
+  const handleUpdateRemarks = useCallback(
+    (pickId: string, remarks: string) => {
+      const next = currentPicks().map((pick) =>
+        pick.id === pickId
+          ? { ...pick, remarks: remarks.slice(0, 120) }
+          : pick
+      )
+      // Remarks never affect the event schedule, so skip the derived patch.
+      useOrgStore.getState().patchReservationDraft({ picks: next })
+    },
+    [currentPicks]
   )
 
   const handleClearForm = useCallback(() => {
     useOrgStore.getState().clearReservationDraft()
+    useOrgStore.getState().patchSaafDraft(derivedSchedulePatch([]))
   }, [])
 
   const handleSavePdf = useCallback(() => {
     const saafDraft = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
-    const current =
+    const current = withReservationDefaults(
       useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
-    const currentDraft: ReservationDraft = withReservationDefaults(current)
+    )
 
     void saveProposalPdf(
       {
@@ -220,23 +192,21 @@ export function useReservationForm() {
         proponents: saafDraft.proponents || [],
         budgetItems: saafDraft.budgetItems || [],
       },
-      withEventSchedule(currentDraft, getEventSchedule(saafDraft))
+      reservationDraftToPdfData(current)
     )
   }, [])
 
   return {
     draft,
     schedule,
-    campus,
-    handleAddRoomItem,
-    handleRemoveRoomItem,
-    handleUpdateRoomItem,
-    handleAddAvItem,
-    handleRemoveAvItem,
-    handleUpdateAvItem,
-    handleAddEquipmentItem,
-    handleRemoveEquipmentItem,
-    handleUpdateEquipmentItem,
+    campusId,
+    /** Today's date key — the earliest a slot can be reserved. */
+    todayKey: getDateKey(startOfLocalDay()),
+    handleSelectCampus,
+    handleTogglePick,
+    handleRemovePick,
+    handleToggleSlot,
+    handleUpdateRemarks,
     handleClearForm,
     handleSavePdf,
   }

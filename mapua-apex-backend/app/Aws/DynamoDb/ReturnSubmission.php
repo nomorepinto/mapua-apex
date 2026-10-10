@@ -8,6 +8,7 @@ final class ReturnSubmission
         private DynamoDbItems $items,
         private GetSubmission $submissions,
         private NotificationRecords $notifications,
+        private BookingRecords $bookings,
     ) {}
 
     /**
@@ -20,13 +21,20 @@ final class ReturnSubmission
         $submission = $this->submissions->require($eventId, $submissionId);
         SignatoryDesk::requireOpen($submission, $signatoryId);
 
+        // Release the held slots while the paper is being revised; a resubmit
+        // re-plans fresh bookings.
+        $bookingRefs = is_array($submission['booking_refs'] ?? null) ? $submission['booking_refs'] : [];
+        $this->bookings->releaseRefs($bookingRefs);
+
         $this->items->patch(
             DynamoKeys::event($eventId),
             DynamoKeys::submission($submissionId),
             ['status' => 'returned'],
+            ['booking_refs'],
         );
 
         $submission['status'] = 'returned';
+        unset($submission['booking_refs']);
 
         $this->notifications->create($submissionId, $signatoryId, 'returned', $comment, submission: $submission);
 

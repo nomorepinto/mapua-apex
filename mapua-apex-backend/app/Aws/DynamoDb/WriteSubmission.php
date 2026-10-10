@@ -13,6 +13,7 @@ final class WriteSubmission
         private SignatorySequenceResolver $sequence,
         private OrganizationRecords $organizations,
         private CollaborationRecords $collaborations,
+        private BookingRecords $bookings,
     ) {}
 
     /**
@@ -32,8 +33,14 @@ final class WriteSubmission
         $sentAt = DynamoKeys::now();
         $submissionId = (string) Str::uuid();
 
-        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sequence, $sentAt, 'pending', $dependents);
+        // Validate + plan bookings BEFORE the submission is written, so a slot
+        // conflict aborts 409 with nothing persisted.
+        $plan = $this->planBookings($organizationId, $eventId, $submissionId, $payload, []);
+
+        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sequence, $sentAt, 'pending', $dependents, $plan['refs']);
         $this->items->put($item, 'attribute_not_exists(PK)');
+
+        $this->bookings->commit($plan['items']);
 
         foreach ($dependents as $dependentId) {
             $this->collaborations->put($dependentId, $eventId, $submissionId, $sentAt);
@@ -80,8 +87,17 @@ final class WriteSubmission
             : $sequence[0];
         $sentAt = DynamoKeys::now();
 
-        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sequence, $sentAt, 'pending', $dependents);
+        // Re-plan bookings against everything except this submission's own holds,
+        // validating before any write. On success release the old holds and commit
+        // the new ones.
+        $oldRefs = $this->existingBookingRefs($existing);
+        $plan = $this->planBookings($organizationId, $eventId, $submissionId, $payload, $oldRefs);
+
+        $item = $this->submissionItem($organizationId, $eventId, $submissionId, $payload, $currentSignatory, $sequence, $sentAt, 'pending', $dependents, $plan['refs']);
         $this->items->put($item);
+
+        $this->bookings->releaseRefs($oldRefs);
+        $this->bookings->commit($plan['items']);
 
         $this->reconcileCollaborators($eventId, $submissionId, $sentAt, $this->existingDependents($existing), $dependents);
 
@@ -197,6 +213,7 @@ final class WriteSubmission
      * @param  array<string, mixed>  $payload
      * @param  list<string>  $signatorySequence
      * @param  list<string>  $dependentOrgIds
+     * @param  list<array{pk: string, sk: string}>  $bookingRefs
      * @return array<string, mixed>
      */
     private function submissionItem(
@@ -209,8 +226,9 @@ final class WriteSubmission
         string $sentAt,
         string $status,
         array $dependentOrgIds,
+        array $bookingRefs = [],
     ): array {
-        return [
+        $item = [
             'PK' => DynamoKeys::event($eventId),
             'SK' => DynamoKeys::submission($submissionId),
             'submission_type' => $payload['submission_type'],
@@ -235,5 +253,52 @@ final class WriteSubmission
             'detailed_budget_proposal' => $payload['detailed_budget_proposal'],
             'venue_reservation' => $payload['venue_reservation'],
         ];
+
+        if ($bookingRefs !== []) {
+            $item['booking_refs'] = $bookingRefs;
+        }
+
+        return $item;
+    }
+
+    /**
+     * Validate the payload's reservable selections and build (without writing) the
+     * submission-sourced bookings plus their refs. Returns empty when the paper has
+     * no reservation.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  list<array<string, mixed>>  $oldRefs
+     * @return array{refs: list<array{pk: string, sk: string}>, items: list<array<string, mixed>>}
+     */
+    private function planBookings(string $organizationId, string $eventId, string $submissionId, array $payload, array $oldRefs): array
+    {
+        $venue = $payload['venue_reservation'] ?? [];
+        $hasReservation = is_array($venue) && ($venue['has_reservation'] ?? false) === true;
+        $reservations = $hasReservation && is_array($venue['reservations'] ?? null) ? $venue['reservations'] : [];
+
+        if ($reservations === []) {
+            return ['refs' => [], 'items' => []];
+        }
+
+        return $this->bookings->planForSubmission(
+            [
+                'organization_id' => $organizationId,
+                'event_id' => $eventId,
+                'submission_id' => $submissionId,
+            ],
+            $reservations,
+            $oldRefs,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $existing
+     * @return list<array<string, mixed>>
+     */
+    private function existingBookingRefs(array $existing): array
+    {
+        $refs = $existing['booking_refs'] ?? [];
+
+        return is_array($refs) ? array_values($refs) : [];
     }
 }

@@ -64,11 +64,17 @@ final class SaafSubmissionRules
             'detailed_budget_proposal.grand_total' => ['required', 'numeric', 'min:0'],
             'venue_reservation' => ['required', 'array'],
             'venue_reservation.has_reservation' => ['required', 'boolean'],
-            'venue_reservation.equipment_requested' => ['required', 'array'],
-            'venue_reservation.equipment_requested.items' => ['sometimes', 'array'],
-            'venue_reservation.equipment_requested.items.*.name' => ['required', 'string', 'max:100'],
-            'venue_reservation.function_rooms' => ['required', 'array'],
-            'venue_reservation.audiovisual_equipment' => ['required', 'array'],
+            // Reservable-based reservations (rooms + AV + equipment are all reservables).
+            'venue_reservation.reservations' => ['sometimes', 'array'],
+            'venue_reservation.reservations.*.reservable_id' => ['required', 'string', 'max:64'],
+            'venue_reservation.reservations.*.campus_id' => ['required', 'string', 'max:64'],
+            'venue_reservation.reservations.*.name' => ['nullable', 'string', 'max:150'],
+            'venue_reservation.reservations.*.type' => ['required', 'in:room,equipment'],
+            'venue_reservation.reservations.*.remarks' => ['nullable', 'string', 'max:255'],
+            'venue_reservation.reservations.*.selections' => ['required', 'array', 'min:1'],
+            'venue_reservation.reservations.*.selections.*.date' => ['required', 'date_format:Y-m-d'],
+            'venue_reservation.reservations.*.selections.*.slots' => ['required', 'array', 'min:1'],
+            'venue_reservation.reservations.*.selections.*.slots.*' => ['integer', 'between:0,'.(\App\Aws\DynamoDb\ReservableSchedule::SLOTS - 1)],
         ];
 
         if ($requireEventId) {

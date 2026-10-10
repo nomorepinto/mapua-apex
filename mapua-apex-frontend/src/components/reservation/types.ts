@@ -1,46 +1,31 @@
-export interface RoomItem {
-  id: string
-  dateNeeded: string
-  endDateNeeded: string
-  timeNeeded: string
-  endTimeNeeded: string
-  roomNeeded: string
-  /**
-   * Classroom code typed by the proponent; only meaningful on a "Classroom"
-   * row and validated against the venue campus format.
-   */
-  classroomName: string
-  remarks: string
-  /**
-   * True when the row came from the "Others" option, so `roomNeeded` is a
-   * free-text name typed by the proponent instead of a fixed campus room.
-   */
-  isOther?: boolean
-}
+import type { ReservableType, SlotSelection } from "@/lib/types"
 
-export interface AVItem {
+/**
+ * One reservable picked in the SAAF reservation step, together with the concrete
+ * dates and 70-minute slots reserved on it. Replaces the old free-text room /
+ * audiovisual / equipment rows: every pick maps to a RESERVABLE record owned by
+ * a campus, and its `selections` become BOOKING `schedule_selected` entries.
+ */
+export interface ReservationPick {
+  /** Client-only row key used for list rendering; never persisted. */
   id: string
-  dateNeeded: string
-  endDateNeeded: string
-  timeNeeded: string
-  endTimeNeeded: string
-  equipmentNeeded: string
-  remarks: string
-  /** True when `equipmentNeeded` is a free-text "Others" entry. */
-  isOther?: boolean
-}
-
-export interface EquipmentItem {
-  id: string
+  reservable_id: string
+  campus_id: string
   name: string
-  purpose: string
-  remark: string
-  /** True when `name` is a free-text "Others" entry. */
-  isOther?: boolean
+  type: ReservableType
+  /** Concrete dates + slot indices reserved on this reservable. */
+  selections: SlotSelection[]
+  /** Optional purpose note carried through to the booking. */
+  remarks: string
 }
 
+/**
+ * The reservation step's draft. The chosen campus drives which reservables can
+ * be picked and doubles as the event venue; the picks carry the date/slot
+ * selections from which the event's date and time are derived.
+ */
 export interface ReservationDraft {
-  equipmentItems: EquipmentItem[]
-  roomItems: RoomItem[]
-  avItems: AVItem[]
+  /** Campus id chosen in the reservation step ("" until one is picked). */
+  campusId: string
+  picks: ReservationPick[]
 }

@@ -13,6 +13,7 @@ Index summary:
 | GSI1 | `GSI1PK` / `GSI1SK` | EVENT, SUBMISSION | Org-scoped event list & admin submission list |
 | GSI2 | `GSI2PK` / `GSI2SK` | SUBMISSION | Sparse signatory inbox (`pending` / `returned`) |
 | GSI4 | `GSI4PK` / `GSI4SK` | SIGNATORY | Role directory (`ROLE#...`) |
+| GSI5 | `GSI5PK` / `GSI5SK` | BOOKING | Org-scoped booking list (submission-sourced holds only; operator-provisioned) |
 
 ---
 
@@ -38,6 +39,14 @@ Index summary:
 | 16 | Approve / return / deny | UpdateItem | advance `current_signatory` / `GSI2PK` from stored `signatory_sequence`; write NOTIFICATION | Base |
 | 17 | Admin: delete organization (guarded) | Query → DeleteItem | block (**409**) if `GSI1PK = ORGANIZATION#id` has events/submissions or base `PK = ORGANIZATION#id`, `SK` begins `COLLAB#`; else DeleteItem `PK = SK = ORGANIZATION#id` | GSI1 + Base |
 | 18 | Admin: delete signatory (guarded) | Scan/Query → DeleteItem | block (**409**) if any `ORGANIZATION.signatories` desk holds the id or `GSI2PK = SIGNATORY#id` (open inbox); else DeleteItem `PK = SK = SIGNATORY#id` | GSI2 + Base |
+| 19 | Campus list (osaar `/campus`, SAAF venue dropdown) | Scan | `PK` begins `CAMPUS#` AND `PK = SK` | Base |
+| 20 | Reservables under a campus | Query | `PK = CAMPUS#id`, `SK` begins `RESERVABLE#` | Base |
+| 21 | Reservable availability (template + per-date free/booked slots) | Query | `PK = RESERVABLE#id`, `SK` begins `BOOKING#`; overlay bookings on the weekly template across the window | Base |
+| 22 | CDM View/Reserve calendar (raw bookings, both sources) | Query | `PK = RESERVABLE#id`, `SK` begins `BOOKING#` (filtered to dates in window) | Base |
+| 23 | Create booking (submission hold or CDM manual) | Query → PutItem | validate selections vs template + existing bookings (**409** on conflict), then PutItem `PK = RESERVABLE#id`, `SK = BOOKING#id` | Base |
+| 24 | Release holds on deny / return / re-edit | DeleteItem | delete each `booking_refs[]` `{pk, sk}` (submission holds) | Base |
+| 25 | Delete a manual booking (CDM) | GetItem → DeleteItem | **409** if `source` is `submission`; else DeleteItem `PK = RESERVABLE#id`, `SK = BOOKING#id` | Base |
+| 26 | Admin: delete campus / reservable (guarded) | Query → DeleteItem | block (**409**) if a campus owns any RESERVABLE, or a reservable owns any BOOKING; else DeleteItem | Base |
 
 ---
 
@@ -47,10 +56,12 @@ Index summary:
 |---|---|---|
 | Student dashboard | ORGANIZATION, EVENT, SUBMISSION, ANNOUNCEMENT, COLLAB POINTER | 1, 2, 3, 4, 11, 13 |
 | Submission tracker / detail | SUBMISSION, NOTIFICATION, SIGNATORY (by copied id) | 5, 6 |
-| New / edit submission (SAAF) | SUBMISSION, COLLAB POINTER, ORGANIZATION (directory) | 12, 15 |
+| New / edit submission (SAAF) | SUBMISSION, COLLAB POINTER, ORGANIZATION (directory), CAMPUS, RESERVABLE, BOOKING (holds + `booking_refs`) | 12, 15, 19, 20, 21, 23, 24 |
 | Signatory desk (inbox) | SUBMISSION, SIGNATORY | 7, 9 |
-| Signatory review (approve/return/deny/classify) | SUBMISSION, NOTIFICATION | 6, 16 |
+| Signatory review (approve/return/deny/classify) | SUBMISSION, NOTIFICATION, BOOKING (release holds on deny/return) | 6, 16, 24 |
 | Admin dashboard (submissions) | ORGANIZATION, SUBMISSION | 10 |
 | Admin → Organizations | ORGANIZATION, SIGNATORY | 11, 12, 17 |
 | Admin → Signatories | SIGNATORY, ORGANIZATION (desk guard) | 8, 18 |
+| osaar → Campus | CAMPUS, RESERVABLE (delete guard) | 19, 20, 26 |
+| cdm → Reservables (Add/View/Reserve) | CAMPUS, RESERVABLE, BOOKING | 20, 21, 22, 23, 25, 26 |
 | About / Announcements | ANNOUNCEMENT | 13, 14 |

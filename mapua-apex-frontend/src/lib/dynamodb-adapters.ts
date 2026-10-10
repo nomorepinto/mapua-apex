@@ -1,13 +1,5 @@
-import {
-  AV_EQUIPMENT_OPTIONS,
-  DEFAULT_RESERVATION_DRAFT,
-  EQUIPMENT_OPTIONS,
-} from "@/components/reservation/constants"
-import type { EquipmentItem, ReservationDraft } from "@/components/reservation/types"
-import {
-  CLASSROOM_ROOM,
-  isRoomOfferedAtCampus,
-} from "@/lib/campus-rooms"
+import type { ReservationDraft } from "@/components/reservation/types"
+import type { VenueReservationPick } from "@/lib/types"
 import {
   createEmptyProponent,
   DEFAULT_BUDGET_ITEMS,
@@ -15,7 +7,7 @@ import {
 } from "@/components/submission/constants"
 import type { SaafDraft } from "@/components/submission/types"
 import type { Activity } from "@/components/ui/activity.types"
-import { getEventSchedule } from "@/lib/event-schedule"
+import { slotEnd, slotStart } from "@/lib/schedule-slots"
 import { departmentAbbreviation } from "@/lib/departments"
 
 /**
@@ -105,6 +97,12 @@ export interface ApiSubmission {
   }
   venue_reservation?: {
     has_reservation: boolean
+    /**
+     * New reservable-based shape: one entry per picked reservable, each carrying
+     * its concrete date+slot selections. Written by `buildSaafApiPayload`.
+     */
+    reservations?: VenueReservationPick[]
+    /** Legacy shape retained for tolerance with pre-migration stored items. */
     equipment_requested?: {
       items?: Array<{
         name: string
@@ -241,21 +239,16 @@ export function buildSaafApiPayload(
   existingEventId?: string
 ) {
   const event_id = existingEventId || crypto.randomUUID()
-  // Reservation date/time is locked to the event schedule so the stored
-  // room/AV items can never disagree with the activity details.
-  const schedule = getEventSchedule(saafDraft)
   // Proposed budget is locked to the itemized Detailed Budget grand total so the
   // summary figure and the line-item sum can never disagree.
   const grandTotal = (saafDraft.budgetItems || []).reduce(
     (sum, b) => sum + (Number(b.quantity) || 0) * (Number(b.pricePerUnit) || 0),
     0
   )
-  const hasReservation = Boolean(
-    reservationDraft &&
-    (reservationDraft.roomItems?.length > 0 ||
-      reservationDraft.avItems?.length > 0 ||
-      reservationDraft.equipmentItems?.length > 0)
-  )
+  // Each picked reservable carries its own concrete date+slot selections, so the
+  // event schedule is derived from the picks (never free-text).
+  const picks = reservationDraft?.picks ?? []
+  const hasReservation = picks.length > 0
 
   return {
     event_id,
@@ -320,35 +313,17 @@ export function buildSaafApiPayload(
     },
     venue_reservation: {
       has_reservation: hasReservation,
-      equipment_requested: {
-        items: (reservationDraft?.equipmentItems || []).map((e) => ({
-          name: e.name,
-          purpose: e.purpose || "",
-          remark: e.remark || "",
+      reservations: picks.map((pick) => ({
+        reservable_id: pick.reservable_id,
+        campus_id: pick.campus_id,
+        name: pick.name,
+        type: pick.type,
+        selections: pick.selections.map((selection) => ({
+          date: selection.date,
+          slots: [...selection.slots].sort((a, b) => a - b),
         })),
-      },
-      function_rooms: {
-        items: (reservationDraft?.roomItems || []).map((r) => ({
-          date_needed: schedule.startDate,
-          end_date_needed: schedule.endDate,
-          time_needed: schedule.startTime,
-          end_time_needed: schedule.endTime,
-          room_needed: r.roomNeeded,
-          // Only "Classroom" rows carry a code; fixed rooms are named already.
-          ...(r.classroomName ? { classroom_name: r.classroomName } : {}),
-          remarks: r.remarks || "",
-        })),
-      },
-      audiovisual_equipment: {
-        items: (reservationDraft?.avItems || []).map((a) => ({
-          date_needed: schedule.startDate,
-          end_date_needed: schedule.endDate,
-          time_needed: schedule.startTime,
-          end_time_needed: schedule.endTime,
-          equipment_needed: a.equipmentNeeded,
-          remarks: a.remarks || "",
-        })),
-      },
+        remarks: pick.remarks || "",
+      })),
     },
   }
 }
@@ -780,6 +755,64 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
           ? "Returned"
           : "Review"
 
+  // Derive the display arrays from the new reservable-based `reservations`
+  // shape when present; fall back to the legacy free-text shape for stored
+  // items that predate the migration.
+  const reservations = submission.venue_reservation?.reservations
+  const hasNewReservations = Array.isArray(reservations) && reservations.length > 0
+
+  const derivedRooms = hasNewReservations
+    ? (reservations ?? [])
+        .filter((pick) => pick.type === "room")
+        .flatMap((pick) =>
+          (pick.selections ?? []).map((selection) => {
+            const slots = [...(selection.slots ?? [])].sort((a, b) => a - b)
+            return {
+              roomNeeded: pick.name,
+              classroomName: undefined,
+              remarks: pick.remarks || "",
+              dateNeeded: selection.date,
+              endDateNeeded: selection.date,
+              timeNeeded: slots.length ? slotStart(slots[0]) : "",
+              endTimeNeeded: slots.length ? slotEnd(slots[slots.length - 1]) : "",
+            }
+          })
+        )
+    : (submission.venue_reservation?.function_rooms?.items || []).map((item) => ({
+        roomNeeded: item.room_needed,
+        classroomName: item.classroom_name,
+        remarks: item.remarks || "",
+        dateNeeded: item.date_needed,
+        endDateNeeded: item.end_date_needed,
+        timeNeeded: item.time_needed,
+        endTimeNeeded: item.end_time_needed,
+      }))
+
+  const derivedEquipment = hasNewReservations
+    ? (reservations ?? [])
+        .filter((pick) => pick.type === "equipment")
+        .map((pick) => ({
+          name: pick.name,
+          purpose: pick.remarks || "",
+          remark: "",
+        }))
+    : (submission.venue_reservation?.equipment_requested?.items || []).map((item) => ({
+        name: item.name,
+        purpose: item.purpose || "",
+        remark: item.remark || "",
+      }))
+
+  const derivedAv = hasNewReservations
+    ? []
+    : (submission.venue_reservation?.audiovisual_equipment?.items || []).map(
+        (item) => ({
+          equipmentNeeded: item.equipment_needed,
+          remarks: item.remarks || "",
+          dateNeeded: item.date_needed,
+          timeNeeded: item.time_needed,
+        })
+      )
+
   return {
     id: `${submission.event_id}:${submission.submission_id}`,
     eventId: submission.event_id,
@@ -813,30 +846,9 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
       objectives.length > 0
         ? objectives
         : [{ title: "Objective", description: "No objectives listed." }],
-    equipmentRequested: (submission.venue_reservation?.equipment_requested?.items || []).map(
-      (item) => ({
-        name: item.name,
-        purpose: item.purpose || "",
-        remark: item.remark || "",
-      })
-    ),
-    roomsRequested: (submission.venue_reservation?.function_rooms?.items || []).map((item) => ({
-      roomNeeded: item.room_needed,
-      classroomName: item.classroom_name,
-      remarks: item.remarks || "",
-      dateNeeded: item.date_needed,
-      endDateNeeded: item.end_date_needed,
-      timeNeeded: item.time_needed,
-      endTimeNeeded: item.end_time_needed,
-    })),
-    avEquipmentRequested: (
-      submission.venue_reservation?.audiovisual_equipment?.items || []
-    ).map((item) => ({
-      equipmentNeeded: item.equipment_needed,
-      remarks: item.remarks || "",
-      dateNeeded: item.date_needed,
-      timeNeeded: item.time_needed,
-    })),
+    equipmentRequested: derivedEquipment,
+    roomsRequested: derivedRooms,
+    avEquipmentRequested: derivedAv,
     budgetItems: (submission.detailed_budget_proposal?.items || []).map(
       (item, idx) => {
         const qty = Number(item.quantity) || 0
@@ -1123,79 +1135,30 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
       pricePerUnit: String(item.price_per_unit ?? 0),
     })) || DEFAULT_BUDGET_ITEMS
 
-  const reservationSource = submission.venue_reservation
-  const equipment = reservationSource?.equipment_requested
-  // Legacy submissions stored `equipment_requested` as a flat boolean record;
-  // newer ones store `{ items: [{ name, purpose, remark }] }`. Rehydrate both,
-  // mapping legacy flags to name-only rows (empty purpose/remark).
-  const legacyEquipmentLabels: Record<string, string> = {
-    monoblock_chairs: "Monoblock Chairs",
-    whiteboards: "White Boards",
-    tables: "Tables",
-    rostrum: "Rostrum",
-    flags_with_stand: "Flags (w/ Poles & Stand)",
-    panel_boards: "Panel Boards",
-  }
-  const legacyEquipment = (equipment ?? {}) as Record<string, unknown>
-  const legacyOthers =
-    typeof legacyEquipment.others_specified === "string"
-      ? legacyEquipment.others_specified.trim()
-      : ""
-  const legacyNames = [
-    ...Object.keys(legacyEquipmentLabels)
-      .filter((key) => Boolean(legacyEquipment[key]))
-      .map((key) => legacyEquipmentLabels[key]),
-    ...(legacyOthers ? [legacyOthers] : []),
-  ]
-  const equipmentItems: EquipmentItem[] = Array.isArray(equipment?.items)
-    ? (equipment?.items ?? []).map((item, index) => ({
-        id: String(index + 1),
-        name: item.name || "",
-        purpose: item.purpose || "",
-        remark: item.remark || "",
-        // A stored name outside the fixed catalog was typed via "Others", so it
-        // reopens as an editable custom row.
-        isOther: !EQUIPMENT_OPTIONS.includes(item.name || ""),
-      }))
-    : legacyNames.map((name, index) => ({
-        id: String(index + 1),
-        name,
-        purpose: "",
-        remark: "",
-        isOther: !EQUIPMENT_OPTIONS.includes(name),
-      }))
-  const roomCampus = submission.activity_details?.venue || ""
-  const reservation: ReservationDraft = {
-    equipmentItems,
-    roomItems: reservationSource?.function_rooms?.items?.length
-      ? reservationSource.function_rooms.items.map((item, index) => ({
-        id: String(index + 1),
-        dateNeeded: item.date_needed,
-        endDateNeeded: item.end_date_needed || item.date_needed,
-        timeNeeded: item.time_needed,
-        endTimeNeeded: item.end_time_needed || item.time_needed,
-        roomNeeded: item.room_needed,
-        classroomName: item.classroom_name || "",
-        remarks: item.remarks || "",
-        // Neither a fixed campus room nor "Classroom" => a custom "Others" row.
-        isOther:
-          item.room_needed !== CLASSROOM_ROOM &&
-          !isRoomOfferedAtCampus(roomCampus, item.room_needed),
-      }))
-      : DEFAULT_RESERVATION_DRAFT.roomItems,
-    avItems: reservationSource?.audiovisual_equipment?.items?.length
-      ? reservationSource.audiovisual_equipment.items.map((item, index) => ({
-        id: String(index + 1),
-        dateNeeded: item.date_needed,
-        endDateNeeded: item.end_date_needed || item.date_needed,
-        timeNeeded: item.time_needed,
-        endTimeNeeded: item.end_time_needed || item.time_needed,
-        equipmentNeeded: item.equipment_needed,
-        remarks: item.remarks || "",
-        isOther: !AV_EQUIPMENT_OPTIONS.includes(item.equipment_needed || ""),
-      }))
-      : DEFAULT_RESERVATION_DRAFT.avItems,
-  }
+  // Rehydrate the reservation draft from the new reservable-based shape. Each
+  // stored reservation becomes a pick carrying its concrete date+slot
+  // selections. Legacy free-text items cannot be mapped back to reservable ids,
+  // so they rehydrate to an empty pick list (the activity dates still populate
+  // the SAAF draft from `activity_details` below).
+  const storedReservations = submission.venue_reservation?.reservations
+  const reservation: ReservationDraft =
+    Array.isArray(storedReservations) && storedReservations.length > 0
+      ? {
+          campusId: storedReservations[0]?.campus_id ?? "",
+          picks: storedReservations.map((pick, index) => ({
+            id: pick.reservable_id || String(index + 1),
+            reservable_id: pick.reservable_id,
+            campus_id: pick.campus_id,
+            name: pick.name,
+            type: pick.type,
+            selections: (pick.selections ?? []).map((selection) => ({
+              date: selection.date,
+              slots: [...(selection.slots ?? [])].sort((a, b) => a - b),
+            })),
+            remarks: pick.remarks ?? "",
+          })),
+        }
+      : { campusId: "", picks: [] }
 
   return {
     saaf: {
@@ -1228,7 +1191,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
       dependentOrgs: submission.collaboration?.dependent_organization_ids || [],
     },
     reservation,
-    hasReservation: Boolean(reservationSource?.has_reservation),
+    hasReservation: Boolean(submission.venue_reservation?.has_reservation),
   }
 }
 

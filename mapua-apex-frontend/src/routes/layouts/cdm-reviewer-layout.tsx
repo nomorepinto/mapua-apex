@@ -1,4 +1,4 @@
-import { FileCheck2Icon, HomeIcon } from "lucide-react"
+import { BoxesIcon, FileCheck2Icon, HomeIcon } from "lucide-react"
 import { Outlet } from "react-router"
 import { useAuth } from "react-oidc-context"
 
@@ -20,6 +20,11 @@ export function CdmReviewerLayout() {
       to: "/cdm-reviewer/dashboard",
       icon: HomeIcon,
       end: true,
+    },
+    {
+      label: "Reservables",
+      to: "/cdm-reviewer/reservables",
+      icon: BoxesIcon,
     },
     ...(hasActivityAccess
       ? [

@@ -1,7 +1,8 @@
 import { useEffect } from "react"
 import { FieldWarning } from "@/components/forms/field-warning"
 import { EventTimeFields } from "@/components/submission/event-time-fields"
-import { CAMPUSES, VENUES } from "@/components/submission/constants"
+import { ONLINE_VENUE } from "@/components/submission/constants"
+import { useStudentCampusesQuery } from "@/hooks/use-campuses"
 import {
   clockFromDraft,
   combineEventTime,
@@ -130,11 +131,16 @@ export function ActivityDetailsSection({
     commitTimes(startParts, next)
   }
 
+  // Venue options come from the registered campuses (DynamoDB) plus "Online".
   // Reserving facilities books a physical room, so "Online" is not a valid venue
-  // in that flow: it lends out no rooms, which would leave the CDM room catalog
-  // empty and block every room row. Without a reservation, "Online" stays an
+  // in that flow: the venue is locked to the campus picked in the reservation
+  // step and rendered read-only below. Without a reservation, "Online" stays an
   // option. See the matching guard in `useSaafForm` that clears a stale value.
-  const venueOptions = includeReservation ? CAMPUSES : VENUES
+  const campusesQuery = useStudentCampusesQuery()
+  const campusNames = (campusesQuery.data ?? []).map((campus) => campus.name)
+  const venueOptions = includeReservation
+    ? campusNames
+    : [...campusNames, ONLINE_VENUE]
 
   return (
     <div className="space-y-6 pt-4">
