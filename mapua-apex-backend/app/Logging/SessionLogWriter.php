@@ -40,6 +40,23 @@ final class SessionLogWriter
     // Public API
     // ─────────────────────────────────────────────────────────────────────
 
+    public static function resolveClientIp(Request $request): string
+    {
+        $forwarded = $request->header('X-Forwarded-For');
+
+        if (is_string($forwarded) && trim($forwarded) !== '') {
+            $ip = trim(explode(',', $forwarded)[0]);
+        } else {
+            $ip = $request->header('X-Real-IP') ?? $request->ip() ?? '127.0.0.1';
+        }
+
+        if ($ip === '::1') {
+            return '127.0.0.1';
+        }
+
+        return $ip;
+    }
+
     /**
      * Helper to verify that a session ID belongs to a given user (base hash or base#N suffix).
      * The base hash is sha256(sub:auth_time), so we cannot invert it — ownership is
@@ -128,6 +145,7 @@ final class SessionLogWriter
         $set = [
             'last_heartbeat' => $now,
             'duration_seconds' => max(0, strtotime($now) - strtotime($loginTime)),
+            'GSI3SK' => $now,
         ];
 
         if ($newPages !== []) {
@@ -149,11 +167,11 @@ final class SessionLogWriter
     }
 
     /**
-     * End a session explicitly (logout).
+     * End a session explicitly (logout or tab_closed).
      *
      * @return array{0: string}
      */
-    public function end(string $sessionId, string $sub): array
+    public function end(string $sessionId, string $sub, string $reason = 'logout'): array
     {
         $table = $this->db->sessionTable();
         $pk = DynamoKeys::session($sessionId);
@@ -171,7 +189,7 @@ final class SessionLogWriter
             return ['ok']; // idempotent
         }
 
-        $this->closeSession($sessionId, $item, 'logout');
+        $this->closeSession($sessionId, $item, $reason);
 
         return ['ok'];
     }
@@ -486,19 +504,24 @@ final class SessionLogWriter
     {
         $table = $this->db->sessionTable();
         $pk = DynamoKeys::session($sessionId);
-        $logoutTime = (string) ($item['last_heartbeat'] ?? $this->now());
-
-        $loginTime = (string) ($item['login_time'] ?? $logoutTime);
-        $durationSeconds = max(0, strtotime($logoutTime) - strtotime($loginTime));
 
         // Map internal reason → plan status values
         $statusMap = [
             'logout' => 'completed',
+            'tab_closed' => 'completed',
             'timed_out' => 'timed_out',
             'timeout' => 'timed_out',
             'revoked' => 'revoked',
         ];
         $status = $statusMap[$reason] ?? 'completed';
+
+        $isStaleTimeout = in_array($status, ['timed_out', 'revoked'], true);
+        $logoutTime = $isStaleTimeout
+            ? (string) ($item['last_heartbeat'] ?? $this->now())
+            : $this->now();
+
+        $loginTime = (string) ($item['login_time'] ?? $logoutTime);
+        $durationSeconds = max(0, strtotime($logoutTime) - strtotime($loginTime));
 
         try {
             $this->db->patch($table, $pk, self::SK, [
@@ -619,13 +642,7 @@ final class SessionLogWriter
 
     private function clientIp(Request $request): string
     {
-        $forwarded = $request->header('X-Forwarded-For', '');
-
-        if (is_string($forwarded) && $forwarded !== '') {
-            return trim(explode(',', $forwarded)[0]);
-        }
-
-        return $request->ip() ?? 'unknown';
+        return self::resolveClientIp($request);
     }
 
     private function now(): string

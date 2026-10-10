@@ -457,7 +457,7 @@ Middleware: `cognito.jwt:admin` (allows `admin`, `osaar`, `cdm_reviewer`, `cdm`,
 | :---- | :---- | :---- | :---- |
 | **POST** | `/api/v1/sessions/start` | Start a new session or extend an active one for the auth_time. Writes LOGIN activity event. | **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "login_time": "2026-10-09T23:00:00Z",<br>  "status": "active",<br>  "isNewSession": true<br>}</pre> |
 | **PATCH** | `/api/v1/sessions/{sessionId}/heartbeat` | Extend active session heartbeat and record page visits. | **Request body** <pre>{<br>  "pagesVisited": [<br>    { "path": "/students/dashboard", "pageName": "Dashboard", "timestamp": "2026-10-09T23:01:00Z" }<br>  ]<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "active"<br>}</pre> |
-| **POST** | `/api/v1/sessions/{sessionId}/end` | Close a session explicitly (logout). Writes LOGOUT activity event. | **Request body** <pre>{<br>  "endReason": "logout"<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "completed"<br>}</pre> |
+| **POST** | `/api/v1/sessions/{sessionId}/end` | Close a session explicitly (logout or tab_closed). Writes LOGOUT activity event. | **Request body** <pre>{<br>  "reason": "tab_closed"<br>}</pre> **Response `200`** <pre>{<br>  "sessionId": "a8f3b...12c",<br>  "status": "completed"<br>}</pre> |
 
 ---
 

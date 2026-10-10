@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Logging\ActivityLoggingConfig;
 use App\Logging\ActivityLogWriter;
+use App\Logging\SessionLogWriter;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -49,7 +50,7 @@ class ActivityLogMiddleware
                 userName: $user['name'] ?? $user['email'] ?? 'Unknown User',
                 userEmail: $user['email'] ?? 'unknown@mapua.edu.ph',
                 userRole: $user['role'] ?? 'unknown',
-                ipAddress: $request->ip() ?? '127.0.0.1',
+                ipAddress: SessionLogWriter::resolveClientIp($request),
                 actionType: $details['actionType'],
                 module: $details['module'],
                 entityId: $details['entityId'] ?? 'N/A',

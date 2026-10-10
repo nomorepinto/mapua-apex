@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router";
-import { apiClient } from "../lib/api-client";
+import { apiClient, getCognitoIdToken, getApiKeyForRequest } from "../lib/api-client";
 import { getPageName } from "../lib/page-names";
 import type { PageVisit } from "../types/logs";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 const HEARTBEAT_INTERVAL_MS = 90 * 1000;
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -124,13 +125,27 @@ export function useSessionLogger() {
       if (!currentSessionId) return;
 
       try {
-        const url = `/api/v1/sessions/${currentSessionId}/end`;
-        const blob = new Blob([JSON.stringify({ reason: "tab_closed" })], {
-          type: "application/json",
-        });
-        navigator.sendBeacon(url, blob);
+        const token = getCognitoIdToken();
+        const endpoint = `sessions/${currentSessionId}/end`;
+        const apiKey = getApiKeyForRequest(endpoint, token);
+        const url = `${API_BASE_URL.replace(/\/$/, "")}/${endpoint}`;
+
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        if (apiKey) headers["X-Api-Key"] = apiKey;
+        if (currentSessionId) headers["X-Session-ID"] = currentSessionId;
+
+        fetch(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ reason: "tab_closed" }),
+          keepalive: true,
+        }).catch(() => {});
       } catch (err) {
-        console.warn("useSessionLogger: sendBeacon failed", err);
+        console.warn("useSessionLogger: end session fetch failed", err);
       }
     };
 

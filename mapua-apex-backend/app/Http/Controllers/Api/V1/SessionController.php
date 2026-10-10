@@ -16,7 +16,7 @@ class SessionController extends Controller
     public function start(Request $request): JsonResponse
     {
         $user = $request->attributes->get('cognito_user');
-        if (!$user) {
+        if (! $user) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
@@ -28,7 +28,7 @@ class SessionController extends Controller
             userName: $user['name'] ?? $user['email'] ?? 'Unknown User',
             userEmail: $user['email'] ?? 'unknown@mapua.edu.ph',
             userRole: $user['role'] ?? 'unknown',
-            ipAddress: $request->ip() ?? '127.0.0.1',
+            ipAddress: SessionLogWriter::resolveClientIp($request),
             userAgent: $request->userAgent() ?? 'Unknown',
             pagesVisited: $pagesVisited,
         );
@@ -39,7 +39,7 @@ class SessionController extends Controller
     public function heartbeat(Request $request, string $sessionId): JsonResponse
     {
         $user = $request->attributes->get('cognito_user');
-        if (!$user) {
+        if (! $user) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
@@ -63,11 +63,13 @@ class SessionController extends Controller
     public function end(Request $request, string $sessionId): JsonResponse
     {
         $user = $request->attributes->get('cognito_user');
-        if (!$user) {
+        if (! $user) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
-        $res = $this->sessionLogWriter->end($sessionId, $user['sub']);
+        $reason = (string) ($request->input('reason') ?? $request->input('endReason') ?? 'logout');
+
+        $res = $this->sessionLogWriter->end($sessionId, $user['sub'], $reason);
         if (isset($res[0])) {
             if ($res[0] === 'forbidden') {
                 return response()->json(['error' => 'Forbidden: Session ID mismatch'], 403);
