@@ -36,12 +36,33 @@ Org event list queries GSI1 (first 25 EVENT items), then each event's
 SUBMISSION# children. Student GET /organization reads this
 ORGANIZATION item directly.
 
+Deny sets status
+"denied", drops GSI2, and the student cannot edit. GSI2 is also dropped
+on the last approve (status stays "approved" / "denied", current_signatory
+is left as the last desk).
+"finished" is a terminal, post-approval status set only when the event's
+post-evaluation is completed via the arcus-evaluation system; like "approved"
+and "denied" it is not editable. There is no "ongoing" status — an event
+starting is recorded in the activity log only (deferred until logging ships).
+On the last approve the backend also writes an "event scheduled" NOTIFICATION
+(system-created, not client-postable) that surfaces in the org_submitter
+Timeline Reminders and triggers an SES email with the arcus attendance and
+evaluation links.
+The arcus apps reach the backend over server-to-server endpoints (shared secret
+ARCUS_SERVICE_TOKEN, not a Cognito JWT): GET /api/v1/arcus/events lists
+approved/finished submissions whose stateless visibility window is open (derived
+per request from activity_details.date_of_event in Asia/Manila — attendance opens
+at the start of the event day, evaluation stays open
+ARCUS_POST_EVALUATION_WINDOW_DAYS days after), and
+POST /api/v1/arcus/events/{event}/submissions/{submission}/finish transitions
+approved -> finished (writing finished_at) only inside that evaluation window.
+
 SUBMISSION
 PK: EVENT#uuid
 SK: SUBMISSION#uuid
 submission_type: string
 sent_at: timestamp
-status: "pending" | "approved" | "denied" | "returned"
+status: "pending" | "approved" | "denied" | "returned" | "finished"
 current_signatory: SIGNATORY#uuid
 signatory_sequence: [ SIGNATORY#uuid ]   (ordered routing snapshot, written at submit time; the ONLY stored form of the chain — signatory_chain is derived at read time, never persisted)
 collaboration: {
@@ -51,6 +72,7 @@ GSI1PK: ORGANIZATION#uuid
 GSI1SK: SUBMISSION#uuid
 GSI2PK: SIGNATORY#uuid   (sparse: present while pending or returned on a desk)
 GSI2SK: timestamp
+finished_at: timestamp   (sparse: stamped when status becomes "finished" via the arcus-evaluation finish endpoint)
 
 activity_classification: {
   activity_type: "co-curricular" | "extra-curricular"
@@ -126,7 +148,7 @@ NOTIFICATION
 PK: SUBMISSION#uuid
 SK: NOTIFICATION#timestamp
 signatory: SIGNATORY#uuid
-notif_type: "approved" | "fully approved" | "denied" | "returned"
+notif_type: "approved" | "fully approved" | "denied" | "returned" | "event scheduled"
 comment: string (mandatory if denied or returned)
 
 Students GET / POST / PUT the timeline for their org's paper.

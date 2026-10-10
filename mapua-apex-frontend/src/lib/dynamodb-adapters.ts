@@ -141,7 +141,12 @@ export interface ApiNotification {
   submission_id: string
   sent_at: string
   signatory: string
-  notif_type: "approved" | "fully approved" | "denied" | "returned"
+  notif_type:
+    | "approved"
+    | "fully approved"
+    | "denied"
+    | "returned"
+    | "event scheduled"
   comment?: string
 }
 
@@ -440,7 +445,12 @@ export interface ReviewNotice {
   sentAt: string
   dateStr: string
   title: string
-  notifType: "denied" | "returned" | "approved" | "fully approved"
+  notifType:
+    | "denied"
+    | "returned"
+    | "approved"
+    | "fully approved"
+    | "event scheduled"
   comment: string
   signatoryLabel: string
 }

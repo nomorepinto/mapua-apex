@@ -70,6 +70,7 @@ final class SubmissionEmailer
             match ($notifType) {
                 'approved' => $this->notifyStudentApproved($submission, $signatoryId),
                 'fully approved' => $this->notifyStudentFinal($submission),
+                'event scheduled' => $this->notifyStudentEventScheduled($submission),
                 'denied' => $this->notifyStudentDecision($submission, $signatoryId, $comment, denied: true),
                 'returned' => $this->notifyStudentDecision($submission, $signatoryId, $comment, denied: false),
                 default => $this->notifyStudentDeskReminder($submission, $signatoryId, $notifType, $comment),
@@ -121,6 +122,51 @@ final class SubmissionEmailer
             'Your submission has been fully approved',
             'Your submission for "'.$this->activityTitle($submission).'" has been fully approved by the final signatory.',
         );
+    }
+
+    /**
+     * Fully approved: tell the org_submitter when the event happens, the
+     * post-evaluation window, and hand them the attendance + evaluation links.
+     *
+     * @param  array<string, mixed>  $submission
+     */
+    private function notifyStudentEventScheduled(array $submission): void
+    {
+        $email = $this->studentEmail($submission);
+
+        if ($email === null) {
+            return;
+        }
+
+        $windowDays = (int) config('services.arcus.post_evaluation_window_days', 3);
+        $attendanceUrl = (string) config('services.arcus.attendance_url', '');
+        $evaluationUrl = (string) config('services.arcus.evaluation_url', '');
+
+        $body = 'Your proposal for "'.$this->activityTitle($submission).'" has been fully approved.'
+            ."\n\n"
+            .'The event will happen on '.$this->eventDate($submission)
+            .'. Attendance check-in opens on the day of the event, and you have '
+            .$windowDays.' days after the event to submit your post-evaluation.';
+
+        if ($attendanceUrl !== '') {
+            $body .= "\n\nAttendance: ".$attendanceUrl;
+        }
+
+        if ($evaluationUrl !== '') {
+            $body .= "\n".'Post-evaluation: '.$evaluationUrl;
+        }
+
+        $this->mailer->send($email, 'Your event is approved — attendance & post-evaluation', $body);
+    }
+
+    /**
+     * @param  array<string, mixed>  $submission
+     */
+    private function eventDate(array $submission): string
+    {
+        $date = data_get($submission, 'activity_details.date_of_event');
+
+        return is_string($date) && $date !== '' ? $date : 'the scheduled date';
     }
 
     /**

@@ -43,6 +43,7 @@ interface StudentDashboardState {
   deniedNotices: ReviewNotice[]
   returnedNotices: ReviewNotice[]
   approvedNotices: ReviewNotice[]
+  scheduledNotices: ReviewNotice[]
   remindersLoading: boolean
   remindersExpanded: boolean
   trackerOpen: boolean
@@ -231,6 +232,9 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
     (notice) =>
       notice.notifType === "approved" || notice.notifType === "fully approved"
   )
+  const scheduledNotices = reviewNotices.filter(
+    (notice) => notice.notifType === "event scheduled"
+  )
 
   const reminders = useMemo(() => {
     const items = apiDeadlinesToReminders(
@@ -261,6 +265,7 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
       deniedNotices,
       returnedNotices,
       approvedNotices,
+      scheduledNotices,
       remindersLoading: deadlinesQuery.isLoading || reviewNoticesQuery.isLoading,
       remindersExpanded,
       trackerOpen,
