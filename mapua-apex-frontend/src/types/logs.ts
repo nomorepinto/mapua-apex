@@ -1,5 +1,5 @@
-export type EndReason = "logout" | "timeout" | "tab_closed" | "expired";
-export type SessionStatus = "logged_out" | "no_logout_recorded";
+export type EndReason = "logout" | "timeout" | "timed_out" | "tab_closed" | "expired" | "admin_revoked";
+export type SessionStatus = "active" | "logged_out" | "timed_out" | "revoked" | "completed" | "no_logout_recorded";
 
 export interface PageVisit {
   path: string;

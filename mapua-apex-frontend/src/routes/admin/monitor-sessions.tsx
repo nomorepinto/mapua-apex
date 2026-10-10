@@ -170,10 +170,14 @@ export function AdminMonitorSessionsPage() {
 
       // 3. Status filter
       if (statusFilter) {
-        if (statusFilter === "logged_out") {
-          if (s.status !== "logged_out" && !s.timeOut) return false;
-        } else if (statusFilter === "no_logout_recorded") {
-          if (s.status === "logged_out" || Boolean(s.timeOut)) return false;
+        if (statusFilter === "active") {
+          if (s.status !== "active" && s.status !== "no_logout_recorded") return false;
+        } else if (statusFilter === "logged_out") {
+          if (s.status !== "logged_out") return false;
+        } else if (statusFilter === "timed_out") {
+          if (s.status !== "timed_out") return false;
+        } else if (statusFilter === "revoked") {
+          if (s.status !== "revoked") return false;
         }
       }
 
@@ -210,8 +214,14 @@ export function AdminMonitorSessionsPage() {
         s.userRole,
         formatManila(s.timeIn),
         s.timeOut ? formatManila(s.timeOut) : "N/A",
-        s.endReason || "N/A",
-        s.status === "logged_out" ? `Logged out (${s.endReason || "logout"})` : "No logout recorded",
+        s.endReason || (s.status === "active" ? "N/A" : "logout"),
+        s.status === "active"
+          ? "Active"
+          : s.status === "timed_out"
+          ? `Timed out (${s.endReason || "timed_out"})`
+          : s.status === "revoked"
+          ? `Revoked (${s.endReason || "admin_revoked"})`
+          : `Logged out (${s.endReason || "logout"})`,
         s.ipAddress,
       ]);
       const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
@@ -635,8 +645,10 @@ export function AdminMonitorSessionsPage() {
               className="w-full rounded-xl border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 focus:border-[#8B0000] focus:ring-[#8B0000]"
             >
               <option value="">All Statuses</option>
+              <option value="active">Active</option>
               <option value="logged_out">Logged out</option>
-              <option value="no_logout_recorded">No logout recorded</option>
+              <option value="timed_out">Timed out</option>
+              <option value="revoked">Revoked</option>
             </select>
           </div>
         </div>
@@ -712,15 +724,25 @@ export function AdminMonitorSessionsPage() {
                         {s.timeOut ? formatManila(s.timeOut) : "—"}
                       </td>
                       <td className="px-4 py-3.5">
-                        {s.status === "logged_out" || s.timeOut ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600 border border-neutral-200">
-                            <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
-                            Logged out ({s.endReason || "logout"})
+                        {s.status === "active" || s.status === "no_logout_recorded" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Active
+                          </span>
+                        ) : s.status === "timed_out" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            Timed out ({s.endReason || "timed_out"})
+                          </span>
+                        ) : s.status === "revoked" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700 border border-red-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                            Revoked ({s.endReason || "admin_revoked"})
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600 border border-neutral-200">
                             <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
-                            No logout recorded
+                            Logged out ({s.endReason || "logout"})
                           </span>
                         )}
                       </td>
@@ -840,9 +862,13 @@ export function AdminMonitorSessionsPage() {
                     <div className="col-span-2 border-t border-neutral-200/60 pt-2">
                       <span className="text-neutral-400 block font-medium">Session Status</span>
                       <span className="font-semibold text-neutral-700">
-                        {sessionDetailQuery.data.session.status === "logged_out" || sessionDetailQuery.data.session.timeOut
-                          ? `Logged out (${sessionDetailQuery.data.session.endReason || "logout"})`
-                          : "No logout recorded"}
+                        {sessionDetailQuery.data.session.status === "active" || sessionDetailQuery.data.session.status === "no_logout_recorded"
+                          ? "Active Session"
+                          : sessionDetailQuery.data.session.status === "timed_out"
+                          ? `Timed out (${sessionDetailQuery.data.session.endReason || "timed_out"})`
+                          : sessionDetailQuery.data.session.status === "revoked"
+                          ? `Revoked (${sessionDetailQuery.data.session.endReason || "admin_revoked"})`
+                          : `Logged out (${sessionDetailQuery.data.session.endReason || "logout"})`}
                       </span>
                     </div>
                   </div>

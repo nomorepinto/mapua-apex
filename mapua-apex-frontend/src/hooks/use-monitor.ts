@@ -11,6 +11,7 @@ import type {
   PipelineAnalyticsResponse,
   LogQueryParams,
   Session,
+  SessionStatus,
   NotificationType,
   HeatmapCell,
   AnalyticsAlert,
@@ -28,13 +29,22 @@ import {
 
 function normalizeSessionItem(item: any): Session {
   if (!item) return item;
-  const isLoggedOut =
-    item.status === "completed" ||
-    item.status === "logged_out" ||
-    item.status === "timed_out" ||
-    item.status === "revoked" ||
-    Boolean(item.logout_time) ||
-    Boolean(item.timeOut);
+
+  const rawStatus = String(item.status || "").toLowerCase();
+  const timeOut = item.timeOut ?? item.time_out ?? item.logout_time ?? undefined;
+
+  let status: SessionStatus = "active";
+  if (rawStatus === "revoked") {
+    status = "revoked";
+  } else if (rawStatus === "timed_out" || item.end_reason === "timed_out" || item.end_reason === "timeout") {
+    status = "timed_out";
+  } else if (rawStatus === "completed" || rawStatus === "logged_out" || (Boolean(timeOut) && rawStatus !== "active")) {
+    status = "logged_out";
+  } else if (rawStatus === "active") {
+    status = "active";
+  } else {
+    status = timeOut ? "logged_out" : "active";
+  }
 
   let userRole = item.userRole ?? item.user_role ?? "student";
   const lowerEmail = String(item.userEmail ?? item.user_email ?? "").toLowerCase();
@@ -48,6 +58,8 @@ function normalizeSessionItem(item: any): Session {
     else userRole = "org_adviser";
   }
 
+  const endReason = item.endReason ?? item.end_reason ?? item.revocation_reason ?? (status === "timed_out" ? "timed_out" : undefined);
+
   return {
     sessionId: item.sessionId ?? item.session_id ?? "",
     userId: item.userId ?? item.user_id ?? item.sub ?? "",
@@ -55,11 +67,11 @@ function normalizeSessionItem(item: any): Session {
     userEmail: item.userEmail ?? item.user_email ?? "",
     userRole,
     timeIn: item.timeIn ?? item.time_in ?? item.login_time ?? item.created_at ?? "",
-    timeOut: item.timeOut ?? item.time_out ?? item.logout_time ?? undefined,
-    endReason: item.endReason ?? item.end_reason ?? item.revocation_reason ?? undefined,
+    timeOut,
+    endReason,
     ipAddress: item.ipAddress ?? item.ip_address ?? "N/A",
     userAgent: item.userAgent ?? item.user_agent ?? "N/A",
-    status: isLoggedOut ? "logged_out" : "no_logout_recorded",
+    status,
     pagesVisited: Array.isArray(item.pagesVisited ?? item.pages_visited)
       ? (item.pagesVisited ?? item.pages_visited).map((p: any) => ({
           path: typeof p === "string" ? p : (p.path ?? ""),
@@ -494,7 +506,7 @@ export function useSessionAnalyticsQuery(params: LogQueryParams & { compare?: "m
         });
 
         // Logged out sessions & duration
-        const loggedOutSessions = sessions.filter((s) => s.status === "logged_out");
+        const loggedOutSessions = sessions.filter((s) => s.status === "logged_out" || s.status === "timed_out" || s.status === "revoked");
         const loggedOutSessionCount = loggedOutSessions.length;
 
         let avgDuration = 0;
@@ -556,7 +568,7 @@ export function useSessionAnalyticsQuery(params: LogQueryParams & { compare?: "m
         const alerts: AnalyticsAlert[] = [];
         const activeByUser = new Map<string, Session[]>();
         sessions.forEach((s) => {
-          if (s.status === "no_logout_recorded") {
+          if (s.status === "active" || s.status === "no_logout_recorded") {
             const list = activeByUser.get(s.userId) || [];
             list.push(s);
             activeByUser.set(s.userId, list);

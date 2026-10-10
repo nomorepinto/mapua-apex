@@ -437,7 +437,7 @@ class LoggingTest extends TestCase
     public function test_15_query_sessions_filters_and_returns_paginated_list(): void
     {
         $this->dynamoDbMock->shouldReceive('query')
-            ->once()
+            ->atLeast()->once()
             ->andReturn(new \Aws\Result([
                 'Items' => [
                     [

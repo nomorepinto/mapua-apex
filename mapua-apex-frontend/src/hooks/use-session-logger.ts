@@ -1,10 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router";
-import { apiClient, getCognitoIdToken, getApiKeyForRequest } from "../lib/api-client";
+import { apiClient } from "../lib/api-client";
 import { getPageName } from "../lib/page-names";
 import type { PageVisit } from "../types/logs";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 const HEARTBEAT_INTERVAL_MS = 90 * 1000;
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -15,7 +14,9 @@ interface SessionResponse {
 
 export function useSessionLogger() {
   const location = useLocation();
-  const sessionIdRef = useRef<string | null>(null);
+  const sessionIdRef = useRef<string | null>(
+    typeof window !== "undefined" ? sessionStorage.getItem("apex_session_id") : null
+  );
   const pendingPagesRef = useRef<PageVisit[]>([]);
   const lastActiveTimestampRef = useRef<number>(Date.now());
   const isOpeningRef = useRef<boolean>(false);
@@ -106,8 +107,8 @@ export function useSessionLogger() {
           pagesVisited: pages,
         });
       } catch (err: any) {
-        if (err?.status === 409) {
-          console.warn("useSessionLogger: 409 Session expired/ended. Re-opening session...");
+        if (err?.status === 409 || err?.status === 404) {
+          console.warn("useSessionLogger: Session expired/ended. Re-opening session...");
           sessionIdRef.current = null;
           sessionStorage.removeItem("apex_session_id");
           await openSession();
@@ -117,43 +118,17 @@ export function useSessionLogger() {
       }
     };
 
-    openSession();
+    // On mount, if we already have a session ID from sessionStorage, send heartbeat; otherwise open new session
+    if (sessionIdRef.current) {
+      sendHeartbeat();
+    } else {
+      openSession();
+    }
+
     intervalId = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
-
-    const handleUnload = () => {
-      const currentSessionId = sessionIdRef.current;
-      if (!currentSessionId) return;
-
-      try {
-        const token = getCognitoIdToken();
-        const endpoint = `sessions/${currentSessionId}/end`;
-        const apiKey = getApiKeyForRequest(endpoint, token);
-        const url = `${API_BASE_URL.replace(/\/$/, "")}/${endpoint}`;
-
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        if (apiKey) headers["X-Api-Key"] = apiKey;
-        if (currentSessionId) headers["X-Session-ID"] = currentSessionId;
-
-        fetch(url, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ reason: "tab_closed" }),
-          keepalive: true,
-        }).catch(() => {});
-      } catch (err) {
-        console.warn("useSessionLogger: end session fetch failed", err);
-      }
-    };
-
-    window.addEventListener("pagehide", handleUnload);
 
     return () => {
       if (intervalId) clearInterval(intervalId);
-      window.removeEventListener("pagehide", handleUnload);
     };
   }, []);
 

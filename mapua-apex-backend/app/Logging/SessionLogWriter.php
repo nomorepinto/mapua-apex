@@ -470,6 +470,7 @@ final class SessionLogWriter
                 'pages_visited' => $pagesVisited,
                 'pages_visited_truncated' => $truncated,
                 'events_count' => count($newPages),
+                'end_reason' => null,
                 'revocation_reason' => null,
                 'TTL' => $ttl,
                 // GSI1: monthly-bucketed session log (plan §2.1)
@@ -528,6 +529,7 @@ final class SessionLogWriter
                 'status' => $status,
                 'logout_time' => $logoutTime,
                 'duration_seconds' => $durationSeconds,
+                'end_reason' => $reason,
                 'GSI3PK' => 'STATUS#'.$status,
                 'GSI3SK' => $logoutTime,
             ]);

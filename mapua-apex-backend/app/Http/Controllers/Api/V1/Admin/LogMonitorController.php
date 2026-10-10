@@ -39,6 +39,9 @@ class LogMonitorController extends Controller
         $limit = min((int) $request->query('limit', 50), 200);
         $nextToken = $request->query('nextToken');
 
+        // Sweep stale active sessions (>15m no heartbeat) before querying
+        $this->sessionLogWriter->sweepAndCount();
+
         $result = $this->logTableItems->querySessions(
             startDate: $startDate,
             endDate: $endDate,
