@@ -44,9 +44,6 @@ export function AdminLayout() {
         <AppSidebar
           homeTo="/admin/sessions"
           items={adminNav}
-          panelSwitches={[
-            { label: "OSAAR Dashboard", to: "/osaar/dashboard" },
-          ]}
         />
         <main className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto">
           <Outlet />

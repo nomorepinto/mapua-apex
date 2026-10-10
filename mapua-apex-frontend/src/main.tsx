@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ForceLightMode } from "@/components/layout/force-light-mode"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { AnchoredToastProvider, ToastProvider } from "@/components/ui/toast"
+import { AdminPageNavigator } from "@/components/auth/admin-page-navigator"
 import { router } from "@/router.tsx"
 import { oidcConfig } from "@/auth-config.ts"
 
@@ -31,6 +32,7 @@ createRoot(document.getElementById("root")!).render(
             <ToastProvider>
               <AnchoredToastProvider>
                 <RouterProvider router={router} />
+                <AdminPageNavigator />
               </AnchoredToastProvider>
             </ToastProvider>
           </ForceLightMode>
