@@ -28,11 +28,11 @@ import { LoginPage } from "@/routes/login"
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: () => (
-      <AuthGuard>
-        <RoleRedirect />
-      </AuthGuard>
-    ),
+    HydrateFallback: RouteFallback,
+    lazy: async () => {
+      const { LandingPage } = await import("@/routes/landing")
+      return { Component: LandingPage }
+    },
   },
   {
     path: "students",
