@@ -1,4 +1,3 @@
-import { Link } from "react-router"
 import { format } from "date-fns"
 import { Megaphone, LogIn, ArrowRight, Bug, Mail } from "lucide-react"
 

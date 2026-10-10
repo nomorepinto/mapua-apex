@@ -22,8 +22,6 @@ function PassThroughLayout() {
 }
 
 import { AuthGuard } from "@/components/auth/AuthGuard"
-import { RoleRedirect } from "@/components/auth/RoleRedirect"
-import { LoginPage } from "@/routes/login"
 
 export const router = createBrowserRouter([
   {
