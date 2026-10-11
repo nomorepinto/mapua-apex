@@ -6,11 +6,20 @@ export function SessionDisplacementDialogs() {
   const handleSignOut = useSignOut();
   const [isDisplaced, setIsDisplaced] = useState(false);
   const [isRevoked, setIsRevoked] = useState(false);
+  const [isTimedOut, setIsTimedOut] = useState(false);
   const [showNewDeviceToast, setShowNewDeviceToast] = useState(false);
 
   useEffect(() => {
     const handleDisplaced = () => setIsDisplaced(true);
     const handleRevoked = () => setIsRevoked(true);
+    const handleTimedOut = () => {
+      setIsTimedOut(true);
+      try {
+        localStorage.removeItem("apex_session_id");
+      } catch {
+        // ignore
+      }
+    };
     const handleNewDevice = () => {
       setShowNewDeviceToast(true);
       const timer = setTimeout(() => setShowNewDeviceToast(false), 7000);
@@ -19,11 +28,13 @@ export function SessionDisplacementDialogs() {
 
     window.addEventListener("apex:session_displaced", handleDisplaced);
     window.addEventListener("apex:session_revoked", handleRevoked);
+    window.addEventListener("apex:session_timed_out", handleTimedOut);
     window.addEventListener("apex:session_displaced_previous", handleNewDevice);
 
     return () => {
       window.removeEventListener("apex:session_displaced", handleDisplaced);
       window.removeEventListener("apex:session_revoked", handleRevoked);
+      window.removeEventListener("apex:session_timed_out", handleTimedOut);
       window.removeEventListener("apex:session_displaced_previous", handleNewDevice);
     };
   }, []);
@@ -96,6 +107,36 @@ export function SessionDisplacementDialogs() {
 
             <p className="mt-4 text-sm text-neutral-600 leading-relaxed">
               An administrator has terminated your active session. Please sign in again to continue.
+            </p>
+
+            <div className="mt-6">
+              <button
+                onClick={() => handleSignOut({ skipSessionEnd: true })}
+                className="w-full rounded-xl bg-[#8B0000] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#6b0000] transition-colors"
+              >
+                Sign In Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Timed Out Modal */}
+      {!isDisplaced && !isRevoked && isTimedOut && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-neutral-900">Session Timed Out</h3>
+                <p className="text-xs text-neutral-500">Inactivity timeout</p>
+              </div>
+            </div>
+
+            <p className="mt-4 text-sm text-neutral-600 leading-relaxed">
+              You have been logged out due to 15 minutes of inactivity. Please sign in again to continue.
             </p>
 
             <div className="mt-6">

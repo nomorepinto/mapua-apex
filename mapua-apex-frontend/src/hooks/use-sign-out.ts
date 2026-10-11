@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { apiClient } from "@/lib/api-client";
+import { clearStoredLastActive } from "@/hooks/use-session-logger";
 
 export function useSignOut() {
   return useCallback(async (options?: { skipSessionEnd?: boolean }) => {
@@ -13,6 +14,7 @@ export function useSignOut() {
       }
     }
     localStorage.removeItem("apex_session_id");
+    clearStoredLastActive();
 
     // Cognito's /logout endpoint expects `client_id` + `logout_uri`,
     // NOT the standard OIDC `post_logout_redirect_uri` that oidc-client-ts sends.

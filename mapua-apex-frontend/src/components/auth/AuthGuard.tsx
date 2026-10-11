@@ -3,8 +3,9 @@ import { useEffect, useState } from "react"
 
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
+import { apiClient } from "@/lib/api-client"
 import { useSignOut } from "@/hooks/use-sign-out"
-import { useSessionLogger } from "@/hooks/use-session-logger"
+import { useSessionLogger, isIdleExpired } from "@/hooks/use-session-logger"
 import { SessionDisplacementDialogs } from "./session-displacement-dialogs"
 
 function AuthenticatedSessionTracker({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,35 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
   const handleSignOut = useSignOut()
   const [hasAttemptedSignin, setHasAttemptedSignin] = useState(false)
 
+  const expired = auth.isAuthenticated && isIdleExpired()
+  useEffect(() => {
+    if (!expired) return
+
+    let isMounted = true
+    const terminateAndSignOut = async () => {
+      const sessionId = localStorage.getItem("apex_session_id")
+      if (sessionId) {
+        try {
+          const endPromise = apiClient.post(`/sessions/${sessionId}/end`, { reason: "timed_out" })
+          const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 3000))
+          await Promise.race([endPromise, timeoutPromise])
+        } catch {
+          // Ignore failure; next login or sweeper will close if this fails
+        }
+      }
+
+      if (isMounted) {
+        handleSignOut({ skipSessionEnd: true })
+      }
+    }
+
+    terminateAndSignOut()
+
+    return () => {
+      isMounted = false
+    }
+  }, [expired, handleSignOut])
+
   useEffect(() => {
     if (
       !hasAttemptedSignin &&
@@ -38,6 +68,10 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
       window.location.href = "/"
     }
   }, [auth, hasAttemptedSignin])
+
+  if (expired) {
+    return null
+  }
 
   if (auth.isLoading || (!auth.isAuthenticated && !hasAttemptedSignin) || auth.activeNavigator) {
     return (

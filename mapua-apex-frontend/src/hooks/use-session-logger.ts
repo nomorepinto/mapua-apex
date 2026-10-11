@@ -5,7 +5,7 @@ import { getPageName } from "../lib/page-names";
 import type { PageVisit } from "../types/logs";
 
 const HEARTBEAT_INTERVAL_MS = 90 * 1000;
-const IDLE_TIMEOUT_MS = 12 * 60 * 1000;
+export const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const SESSION_STORAGE_KEY = "apex_session_id";
 const DEVICE_STORAGE_KEY = "apex_device_id";
 const LAST_ACTIVE_STORAGE_KEY = "apex_last_active_at";
@@ -50,7 +50,7 @@ function clearStoredSessionId(): void {
   }
 }
 
-function getStoredLastActive(): number {
+export function getStoredLastActive(): number {
   try {
     const raw = localStorage.getItem(LAST_ACTIVE_STORAGE_KEY);
     return raw ? parseInt(raw, 10) || Date.now() : Date.now();
@@ -59,13 +59,24 @@ function getStoredLastActive(): number {
   }
 }
 
-function setStoredLastActive(ts: number): void {
+export function setStoredLastActive(ts: number): void {
   try {
     localStorage.setItem(LAST_ACTIVE_STORAGE_KEY, ts.toString());
   } catch {
     // ignore
   }
 }
+
+export const isIdleExpired = (): boolean =>
+  Date.now() - getStoredLastActive() > IDLE_TIMEOUT_MS;
+
+export const clearStoredLastActive = (): void => {
+  try {
+    localStorage.removeItem(LAST_ACTIVE_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+};
 
 interface SessionResponse {
   sessionId: string;
@@ -84,9 +95,9 @@ export function useSessionLogger() {
   const isTerminatedRef = useRef<boolean>(false);
 
   useEffect(() => {
-    const now = Date.now();
-    lastActiveTimestampRef.current = now;
-    setStoredLastActive(now);
+    if (!localStorage.getItem(LAST_ACTIVE_STORAGE_KEY)) {
+      setStoredLastActive(Date.now());
+    }
   }, []);
 
   useEffect(() => {
@@ -112,6 +123,7 @@ export function useSessionLogger() {
 
   useEffect(() => {
     const handleUserActivity = () => {
+      if (isTerminatedRef.current || isIdleExpired()) return;
       const now = Date.now();
       lastActiveTimestampRef.current = now;
       if (now - lastStorageWriteRef.current > 5000) {
@@ -135,6 +147,7 @@ export function useSessionLogger() {
 
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | null = null;
+    let idleCheckId: ReturnType<typeof setInterval> | null = null;
 
     const openSession = async () => {
       if (isOpeningRef.current || isTerminatedRef.current) return;
@@ -181,7 +194,7 @@ export function useSessionLogger() {
       const lastActive = Math.max(lastActiveTimestampRef.current, storedLastActive);
       const idleTime = Date.now() - lastActive;
       if (idleTime > IDLE_TIMEOUT_MS) {
-        console.warn("useSessionLogger: User idle for 12+ min, skipping heartbeat");
+        console.warn("useSessionLogger: User idle for 15+ min, skipping heartbeat");
         return;
       }
 
@@ -201,6 +214,7 @@ export function useSessionLogger() {
           console.warn("useSessionLogger: Session displaced by login on another device.");
           isTerminatedRef.current = true;
           if (intervalId) clearInterval(intervalId);
+          if (idleCheckId) clearInterval(idleCheckId);
           window.dispatchEvent(new CustomEvent("apex:session_displaced"));
           return; // keep the stored ID so other tabs get their own 409 and modal
         }
@@ -209,6 +223,7 @@ export function useSessionLogger() {
           console.warn("useSessionLogger: Session revoked by administrator.");
           isTerminatedRef.current = true;
           if (intervalId) clearInterval(intervalId);
+          if (idleCheckId) clearInterval(idleCheckId);
           window.dispatchEvent(new CustomEvent("apex:session_revoked"));
           return;
         }
@@ -247,8 +262,25 @@ export function useSessionLogger() {
 
     intervalId = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
+    idleCheckId = setInterval(() => {
+      if (isTerminatedRef.current) return;
+      if (isIdleExpired()) {
+        isTerminatedRef.current = true;
+        if (intervalId) clearInterval(intervalId);
+        if (idleCheckId) clearInterval(idleCheckId);
+
+        const sid = sessionIdRef.current;
+        if (sid) {
+          apiClient.post(`/sessions/${sid}/end`, { reason: "timed_out" }).catch(() => {});
+        }
+
+        window.dispatchEvent(new CustomEvent("apex:session_timed_out"));
+      }
+    }, 15_000);
+
     return () => {
       if (intervalId) clearInterval(intervalId);
+      if (idleCheckId) clearInterval(idleCheckId);
       window.removeEventListener("storage", onStorage);
     };
   }, []);
