@@ -17,18 +17,18 @@ Sign-in is Amazon Cognito (OIDC). Unauthenticated hits on a guarded layout redir
 | Layout | Allowed Cognito groups | Landing page |
 | :---- | :---- | :---- |
 | `StudentsLayout` | `admin`, `org_adviser`, `org_submitter`, `student` | `/students/dashboard` |
-| `CdmReviewerLayout` | `admin`, `cdm_reviewer`, `cdm` | `/cdm-reviewer/dashboard` |
+| `CdmReviewerLayout` | `admin`, `cdm_reviewer`, `cdm` | `/cdm/dashboard` |
 | `DeanLayout` | `admin`, `dean` | `/dean/dashboard` |
 | `OrgAdviserLayout` | `admin`, `org_adviser` | `/org-adviser/dashboard` |
 | `OsaarLayout` | `admin`, `osaar` | `/osaar/dashboard` |
 | `AdminLayout` | `admin` | `/admin/sessions` |
 
-**Post-login hand-off** (`RoleRedirect`, first match wins): `admin` → `/admin/sessions`; `osaar` → `/osaar/dashboard`; `cdm_reviewer` → `/cdm-reviewer/dashboard`; `dean` → `/dean/dashboard`; `org_adviser` → `/org-adviser/dashboard`; `org_submitter` → `/students/dashboard`; unknown group → `/students/dashboard`.
+**Post-login hand-off** (`RoleRedirect`, first match wins): `admin` → `/admin/sessions`; `osaar` → `/osaar/dashboard`; `cdm_reviewer` → `/cdm/dashboard`; `dean` → `/dean/dashboard`; `org_adviser` → `/org-adviser/dashboard`; `org_submitter` → `/students/dashboard`; unknown group → `/students/dashboard`.
 
 **Log monitor gating.** Two page groups are wrapped in an extra `AuthGuard` at the route level (constants in `src/constants/auth.ts`):
 
 - `SESSION_LOG_GROUPS = ["admin"]` — gates `/admin/sessions`.
-- `ACTIVITY_LOG_GROUPS = ["admin", "osaar", "cdm_reviewer", "cdm"]` — gates the Activity Log pages reused across sections (`/admin/activities`, `/osaar/activities`, `/cdm-reviewer/activities`).
+- `ACTIVITY_LOG_GROUPS = ["admin", "osaar", "cdm_reviewer", "cdm"]` — gates the Activity Log pages reused across sections (`/admin/activities`, `/osaar/activities`, `/cdm/activities`).
 
 ---
 
@@ -55,18 +55,19 @@ Layout: `StudentsLayout` (`src/routes/layouts/students-layout.tsx`). Sidebar: Da
 
 ---
 
-## CDM Reviewer routes (`/cdm-reviewer`)
+## CDM Reviewer routes (`/cdm`)
 
-Layout: `CdmReviewerLayout` (`src/routes/layouts/cdm-reviewer-layout.tsx`). Sidebar: Dashboard, Reservables, (Activity Log when in `ACTIVITY_LOG_GROUPS`).
+Layout: `CdmReviewerLayout` (`src/routes/layouts/cdm-reviewer-layout.tsx`). Sidebar: Dashboard, Reservations, Reservables, (Activity Log when in `ACTIVITY_LOG_GROUPS`).
 
 | Path | Component | Source file | Notes |
 | :---- | :---- | :---- | :---- |
-| `/cdm-reviewer` | redirect | — | → `dashboard` |
-| `/cdm-reviewer/dashboard` | `CdmReviewerDashboard` | `src/routes/cdm-reviewer/dashboard.tsx` | CDM review home. |
-| `/cdm-reviewer/reservables` | `AdminReservablesPage` | `src/routes/cdm-reviewer/reservables.tsx` | Add / View / Reserve reservables (segmented control). |
-| `/cdm-reviewer/activities` | `AdminMonitorActivitiesPage` | `src/routes/admin/monitor-activities.tsx` | Reused admin page, wrapped in `AuthGuard` `ACTIVITY_LOG_GROUPS`. |
-| `/cdm-reviewer/about` | `About` | `src/routes/about.tsx` | Shared. |
-| `/cdm-reviewer/*` | redirect | — | → `dashboard` |
+| `/cdm` | redirect | — | → `dashboard` |
+| `/cdm/dashboard` | `CdmReviewerDashboard` | `src/routes/cdm-reviewer/dashboard.tsx` | CDM review home. |
+| `/cdm/reservations` | `CdmReservationsPage` | `src/routes/cdm-reviewer/reservations.tsx` | Master–detail desk to resolve student requests to cancel or reschedule an approved paper's holds (Cancel event / Reschedule / Deny). |
+| `/cdm/reservables` | `AdminReservablesPage` | `src/routes/cdm-reviewer/reservables.tsx` | Add / View / Reserve reservables (segmented control). |
+| `/cdm/activities` | `AdminMonitorActivitiesPage` | `src/routes/admin/monitor-activities.tsx` | Reused admin page, wrapped in `AuthGuard` `ACTIVITY_LOG_GROUPS`. |
+| `/cdm/about` | `About` | `src/routes/about.tsx` | Shared. |
+| `/cdm/*` | redirect | — | → `dashboard` |
 
 ---
 

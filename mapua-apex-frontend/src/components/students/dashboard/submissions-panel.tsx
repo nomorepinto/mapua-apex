@@ -32,6 +32,8 @@ function statusTextColor(status: string) {
       return "text-[#D9291C] bg-red-50"
     case "returned":
       return "text-[#F59E0B] bg-amber-50"
+    case "cancelled":
+      return "text-[#64748B] bg-neutral-100"
     default:
       return "text-[#64748B] bg-neutral-100"
   }

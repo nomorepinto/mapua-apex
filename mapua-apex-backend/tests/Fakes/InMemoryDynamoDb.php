@@ -213,6 +213,8 @@ final class InMemoryDynamoDb
             'GSI2' => 'GSI2PK',
             'GSI3' => 'GSI3PK',
             'GSI4' => 'GSI4PK',
+            'GSI5' => 'GSI5PK',
+            'GSI6' => 'GSI6PK',
             default => null,
         };
 
@@ -223,6 +225,7 @@ final class InMemoryDynamoDb
         $expected = $values[':org']['S']
             ?? $values[':signatory']['S']
             ?? $values[':role']['S']
+            ?? $values[':pk']['S']
             ?? null;
 
         return $item[$attribute]['S'] === $expected;
