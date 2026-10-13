@@ -1,6 +1,6 @@
 import { UsersIcon } from "lucide-react"
 
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { MAX_PARTICIPANT_VALUE, type ParticipantBound } from "@/lib/reservable-capacity-form"
 import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
@@ -89,11 +89,14 @@ export function ReservableCapacityFieldsForm({
           />
         </Field>
       </div>
-      <FieldDescription id={`${idPrefix}-capacity-description`}>
+      <p
+        id={`${idPrefix}-capacity-description`}
+        className="text-xs text-muted-foreground"
+      >
         The range of attendees this room can hold (1–
         {MAX_PARTICIPANT_VALUE.toLocaleString("en-PH")}). SAAF submissions with
         an expected headcount outside it are rejected. Leave blank for no limit.
-      </FieldDescription>
+      </p>
     </div>
   )
 }
