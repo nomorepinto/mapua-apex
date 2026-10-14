@@ -59,7 +59,7 @@ submission, including any collaboration.
 | `SK` | string | `SUBMISSION#uuid` |
 | `submission_type` | string | e.g. `saaf` |
 | `sent_at` | timestamp | Submit time (UTC) |
-| `status` | string | `pending / approved / denied / returned` |
+| `status` | string | `pending / approved / denied / returned / finished`. `finished` is terminal and set only when OSAAR approves the event's POSTEVAL (see below). `cancelled` is **reserved** for the deferred EventBridge auto-cancel — not written by any code path yet |
 | `current_signatory` | string | `SIGNATORY#uuid` holding the paper now |
 | `signatory_sequence` | list | Ordered `SIGNATORY#uuid` routing snapshot, written at submit time |
 | `collaboration.dependent_organization_ids` | list | `ORGANIZATION#uuid` dependents; empty/absent = no collaboration |
@@ -176,6 +176,76 @@ Queried from the dependent's partition (`SK` begins `COLLAB#`); no GSI is
 needed because DynamoDB cannot index the N values of an array. A dependent may
 read the shared submission and its NOTIFICATION timeline but cannot edit or
 resubmit — only the proponent may.
+
+---
+
+## POSTEVAL
+
+A post-evaluation filed by the org submitter after an approved event is held,
+within the 3-day evaluation window. It lives in the **event's** partition
+(alongside its SUBMISSION) and is discovered per-org through GSI1. OSAAR
+approval is the **only** path that transitions the linked submission
+`approved → finished`.
+
+| Property | Type | Notes |
+|---|---|---|
+| `PK` | string | `EVENT#uuid` (parent event partition) |
+| `SK` | string | `POSTEVAL#uuid` |
+| `entity_type` | string | `"posteval"` |
+| `organization_id` | string | Bare org uuid |
+| `event_id` | string | Bare event uuid |
+| `submission_id` | string | Bare uuid of the linked approved paper |
+| `status` | string | `submitted / approved / denied` |
+| `submitted_at` | timestamp | |
+| `approved_at` | timestamp | Sparse — stamped on OSAAR approve |
+| `denied_at` | timestamp | Sparse — stamped on OSAAR deny |
+| `event_title` | string | Snapshot of `activity_details.title_and_nature` |
+| `section_summary` | string | 100–500 chars — how the event went |
+| `financial_report` | object | `{ budget_items[], added_items[], initial_grand_total, actual_grand_total }`; every amount capped at 5 digits (0–99999) |
+| `participation_snapshot` | object | `{ attendance_count, attendance[], evaluation_count, evaluations[] }` — frozen at write time |
+| `GSI1PK` | string | `ORGANIZATION#uuid` |
+| `GSI1SK` | string | `POSTEVAL#uuid` (mirrors SUBMISSION for org discovery) |
+
+`financial_report.budget_items[]` are `{ item, unit, quantity, budgeted_total,
+actual_amount }`; `added_items[]` are `{ item, unit, quantity, price_per_unit,
+actual_amount }`. `participation_snapshot.attendance[]` are `{ student_id,
+full_name, department, member_organization, scanned_at, left_at }` and
+`evaluations[]` are `{ evaluation_id, student_id, full_name, participated,
+filed_at }`.
+
+**Write gates** (`WritePostEval`): the linked SUBMISSION must be
+`approved`/`finished` (**422** otherwise), `EventWindow::EVALUATION` must still
+be open (**422** — “window is closed”), and no `submitted`/`approved` POSTEVAL
+may already exist for the event (**409**). The snapshot is aggregated from the
+event's `MEMBER#`/`EVALUATION#` children (below) at write time and stored with an
+`attribute_not_exists(PK)` guard on the SK.
+
+**OSAAR actions:** `ApprovePostEval` sets `status = approved` + `approved_at`,
+then moves the linked SUBMISSION `approved → finished` (+ `finished_at`) — both
+idempotent, and the window is **not** re-checked (approval may follow the window
+closing). `DenyPostEval` sets `status = denied` + `denied_at` and leaves the
+submission `approved`. Approving a denied post-eval (or denying an approved one)
+aborts **422**.
+
+---
+
+## EVENT-partition children (written by the arcus companion apps)
+
+The `arcus-attendance` and `arcus-evaluation` microservices share the **same**
+physical table and write into the apex `EVENT#uuid` partition, keyed by the apex
+`event_id`. apex never writes these — it only reads them (via
+`AggregateEventParticipants`) to build a POSTEVAL's `participation_snapshot`.
+Both are capturable only on the event day (`window = attendance`).
+
+| Object | PK | SK | Attributes |
+|---|---|---|---|
+| Attendance check-in | `EVENT#uuid` | `MEMBER#{studentId}` | `member_organization`, `scannedAt`, `leftAt` (sparse) |
+| Participant evaluation | `EVENT#uuid` | `EVALUATION#{evaluationId}` | `evaluationId`, `studentId`, `fullName`, `participated` (`"yes"`/`"no"`), `filedAt`, `eventId` |
+
+The scanner also keeps a student **profile** item at `PK = SK = MEMBER#{studentId}`
+holding `student_id`, `full_name`, `department`; apex resolves each check-in's
+name from it. apex reads these camelCase attributes (with snake_case fallbacks)
+and normalizes `participated` to a boolean in the snapshot.
 
 ---
 

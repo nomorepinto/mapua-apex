@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Admin\ReservableController;
 use App\Http\Controllers\Api\V1\Admin\SignatoryController;
 use App\Http\Controllers\Api\V1\Admin\SubmissionController as AdminSubmissionController;
 use App\Http\Controllers\Api\V1\Arcus\EventController;
+use App\Http\Controllers\Api\V1\Osaar\PostEvalController as OsaarPostEvalController;
 use App\Http\Controllers\Api\V1\Public\AnnouncementController as PublicAnnouncementController;
 use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\Signatory\NotificationController as SignatoryNotificationController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Api\V1\Student\AnnouncementController as StudentAnnounc
 use App\Http\Controllers\Api\V1\Student\DeadlineController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\OrganizationController as StudentOrganizationController;
+use App\Http\Controllers\Api\V1\Student\PostEvalController as StudentPostEvalController;
 use App\Http\Controllers\Api\V1\Student\ReservableController as StudentReservableController;
 use App\Http\Controllers\Api\V1\Student\SubmissionController as StudentSubmissionController;
 use Illuminate\Support\Facades\Route;
@@ -63,6 +65,16 @@ Route::middleware(['cognito.jwt:student', 'throttle:student', 'activity.log'])
             ->middleware('throttle:student-write')
             ->where('notification', '[^/]+')
             ->name('submissions.notifications.update');
+        // Post-evaluations: filed by the org submitter for a passed, in-window event.
+        Route::get('postevals/events', [StudentPostEvalController::class, 'events'])->name('postevals.events');
+        Route::get('postevals', [StudentPostEvalController::class, 'index'])->name('postevals.index');
+        Route::post('postevals', [StudentPostEvalController::class, 'store'])
+            ->middleware('throttle:student-write')
+            ->name('postevals.store');
+        Route::get('events/{event}/postevals/{posteval}', [StudentPostEvalController::class, 'show'])
+            ->name('postevals.show');
+        Route::get('events/{event}/participants', [StudentPostEvalController::class, 'participants'])
+            ->name('postevals.participants');
         Route::get('deadlines', [DeadlineController::class, 'index'])->name('deadlines.index');
         Route::get('announcements', [StudentAnnouncementController::class, 'index'])->name('announcements.index');
         Route::get('organization', [StudentOrganizationController::class, 'show'])->name('organization.show');
@@ -124,6 +136,17 @@ Route::middleware(['cognito.jwt:admin', 'throttle:admin', 'activity.log'])
         Route::get('submissions', [AdminSubmissionController::class, 'index'])->name('submissions.index');
         Route::get('events/{event}/submissions/{submission}', [AdminSubmissionController::class, 'show'])
             ->name('submissions.show');
+        // Post-evaluation review desk (OSAAR): cross-org queue; approve finishes the
+        // linked submission, deny leaves it approved.
+        Route::get('postevals', [OsaarPostEvalController::class, 'index'])->name('postevals.index');
+        Route::get('postevals/{event}/{posteval}', [OsaarPostEvalController::class, 'show'])
+            ->name('postevals.show');
+        Route::post('postevals/{event}/{posteval}/approve', [OsaarPostEvalController::class, 'approve'])
+            ->middleware('throttle:admin-write')
+            ->name('postevals.approve');
+        Route::post('postevals/{event}/{posteval}/deny', [OsaarPostEvalController::class, 'deny'])
+            ->middleware('throttle:admin-write')
+            ->name('postevals.deny');
         Route::get('announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
         Route::post('announcements', [AnnouncementController::class, 'store'])
             ->middleware('throttle:admin-write')
@@ -200,7 +223,4 @@ Route::middleware(['arcus.service', 'throttle:admin'])
     ->group(function (): void {
         Route::get('events', [EventController::class, 'index'])
             ->name('events.index');
-        Route::post('events/{event}/submissions/{submission}/finish', [EventController::class, 'finish'])
-            ->middleware('throttle:admin-write')
-            ->name('submissions.finish');
     });

@@ -1,4 +1,4 @@
-import { ClipboardCheckIcon, FileCheck2Icon, HomeIcon, Settings2Icon } from "lucide-react"
+import { ClipboardCheckIcon, ClipboardListIcon, FileCheck2Icon, HomeIcon, Settings2Icon } from "lucide-react"
 import { Outlet } from "react-router"
 
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -21,6 +21,11 @@ const OSAAR_NAV = [
     label: "Review",
     to: "/osaar/review/dashboard",
     icon: ClipboardCheckIcon,
+  },
+  {
+    label: "Post-evals",
+    to: "/osaar/postevals",
+    icon: ClipboardListIcon,
   },
   {
     label: "Activity Log",

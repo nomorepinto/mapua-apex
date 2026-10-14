@@ -6,6 +6,7 @@ import {
   DEFAULT_SAAF_DRAFT,
 } from "@/components/submission/constants"
 import type { SaafDraft } from "@/components/submission/types"
+import type { PostEvalDraft } from "@/components/posteval/types"
 import type { Activity } from "@/components/ui/activity.types"
 import { slotEnd, slotStart } from "@/lib/schedule-slots"
 import { departmentAbbreviation } from "@/lib/departments"
@@ -1199,4 +1200,194 @@ export function omitEventIdFromPayload<T extends { event_id?: string }>(payload:
   const rest = { ...payload }
   delete rest.event_id
   return rest
+}
+
+/* -------------------------------------------------------------------------- */
+/* Post-evaluation adapters                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** A read-only budget line carried over from the linked submission. */
+export interface ApiPostEvalBudgetItem {
+  item: string
+  unit?: string | null
+  quantity?: number | null
+  budgeted_total?: number | null
+  actual_amount: number
+}
+
+/** An extra expense added during the post-eval. */
+export interface ApiPostEvalAddedItem {
+  item: string
+  unit?: string | null
+  quantity?: number | null
+  price_per_unit?: number | null
+  actual_amount: number
+}
+
+export interface ApiPostEvalFinancialReport {
+  budget_items: ApiPostEvalBudgetItem[]
+  added_items: ApiPostEvalAddedItem[]
+  initial_grand_total?: number | null
+  actual_grand_total?: number | null
+}
+
+/** Section 3 attendance row (arcus-attendance check-in). */
+export interface ApiPostEvalAttendance {
+  student_id: string
+  full_name: string
+  department: string
+  member_organization: string
+  scanned_at: string
+  left_at: string
+}
+
+/** Section 3 evaluation row (arcus-evaluation filing). */
+export interface ApiPostEvalEvaluation {
+  evaluation_id: string
+  student_id: string
+  full_name: string
+  participated: boolean
+  filed_at: string
+}
+
+export interface ApiPostEvalParticipation {
+  attendance_count: number
+  attendance: ApiPostEvalAttendance[]
+  evaluation_count: number
+  evaluations: ApiPostEvalEvaluation[]
+}
+
+/** Backend POSTEVAL shape returned by PostEvalResource. */
+export interface ApiPostEval {
+  event_id: string
+  posteval_id: string
+  submission_id: string
+  organization_id?: string | null
+  organization_name?: string | null
+  status: "submitted" | "approved" | "denied"
+  event_title?: string | null
+  submitted_at?: string | null
+  approved_at?: string | null
+  denied_at?: string | null
+  section_summary?: string | null
+  financial_report?: ApiPostEvalFinancialReport | null
+  participation_snapshot?: ApiPostEvalParticipation | null
+  /** Detail-only live re-aggregation (student show route). */
+  participation?: ApiPostEvalParticipation | null
+}
+
+/** Step-1 eligible-event picker row. */
+export interface ApiEligiblePostEvalEvent {
+  event_id: string
+  submission_id: string
+  event_title?: string | null
+  date_of_event?: string | null
+  status?: string | null
+}
+
+export type DashboardPostEvalStatus = "Submitted" | "Approved" | "Denied"
+
+/**
+ * Formats an API post-eval status to frontend badge colors.
+ */
+export function getPostEvalStatusMeta(status: string) {
+  switch ((status || "").toLowerCase()) {
+    case "approved":
+      return { label: "Approved", color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" }
+    case "denied":
+      return { label: "Denied", color: "bg-rose-500/10 text-rose-600 border-rose-200" }
+    case "submitted":
+    default:
+      return { label: "Submitted", color: "bg-amber-500/10 text-amber-600 border-amber-200" }
+  }
+}
+
+export interface DashboardPostEvalRow {
+  event_id: string
+  posteval_id: string
+  submission_id: string
+  organization_name: string
+  event_title: string
+  /** Human document code, e.g. "POST-1A2B3C4D". */
+  id: string
+  submitted_date: string
+  /** Raw submitted timestamp (ISO 8601) for chronological sorting. */
+  submitted_at: string
+  approved_at?: string | null
+  denied_at?: string | null
+  api_status: "submitted" | "approved" | "denied"
+  status: DashboardPostEvalStatus
+  statusColor: string
+  attendance_count: number
+  evaluation_count: number
+  actual_grand_total?: number | null
+}
+
+/**
+ * Maps a backend post-eval to the student dashboard / OSAAR queue row shape.
+ */
+export function apiPostEvalToDashboardRow(postEval: ApiPostEval): DashboardPostEvalRow {
+  const meta = getPostEvalStatusMeta(postEval.status)
+  return {
+    event_id: postEval.event_id,
+    posteval_id: postEval.posteval_id,
+    submission_id: postEval.submission_id,
+    organization_name: postEval.organization_name || "—",
+    event_title: postEval.event_title || "Untitled event",
+    id: formatDocumentId(postEval.posteval_id, "POST"),
+    submitted_date: formatDisplayDate(postEval.submitted_at),
+    submitted_at: postEval.submitted_at || "",
+    approved_at: postEval.approved_at,
+    denied_at: postEval.denied_at,
+    api_status: postEval.status,
+    status: meta.label as DashboardPostEvalStatus,
+    statusColor: meta.color,
+    attendance_count: postEval.participation_snapshot?.attendance_count ?? 0,
+    evaluation_count: postEval.participation_snapshot?.evaluation_count ?? 0,
+    actual_grand_total: postEval.financial_report?.actual_grand_total ?? null,
+  }
+}
+
+/**
+ * Builds the POST /students/postevals payload from the wizard draft.
+ *
+ * Grand totals are derived (never free-text): the initial total sums the
+ * read-only budgeted lines, the actual total sums every actual amount entered
+ * across both the carried-over budget and the added items.
+ */
+export function buildPostEvalApiPayload(draft: PostEvalDraft) {
+  const budgetItems = draft.financialReport?.budgetItems ?? []
+  const addedItems = draft.financialReport?.addedItems ?? []
+
+  const initialGrandTotal = budgetItems.reduce(
+    (sum, item) => sum + (Number(item.budgetedTotal) || 0),
+    0
+  )
+  const actualGrandTotal =
+    budgetItems.reduce((sum, item) => sum + (Number(item.actualAmount) || 0), 0) +
+    addedItems.reduce((sum, item) => sum + (Number(item.actualAmount) || 0), 0)
+
+  return {
+    event_id: draft.selectedEventId,
+    submission_id: draft.selectedSubmissionId,
+    section_summary: draft.summary.trim(),
+    financial_report: {
+      budget_items: budgetItems.map((item) => ({
+        item: item.item,
+        unit: item.unit || null,
+        quantity: item.quantity === "" ? null : Number(item.quantity),
+        budgeted_total: item.budgetedTotal === "" ? null : Number(item.budgetedTotal),
+        actual_amount: Number(item.actualAmount) || 0,
+      })),
+      added_items: addedItems.map((item) => ({
+        item: item.item,
+        unit: item.unit || null,
+        quantity: item.quantity === "" ? null : Number(item.quantity),
+        price_per_unit: item.pricePerUnit === "" ? null : Number(item.pricePerUnit),
+        actual_amount: Number(item.actualAmount) || 0,
+      })),
+      initial_grand_total: initialGrandTotal,
+      actual_grand_total: actualGrandTotal,
+    },
+  }
 }

@@ -26,6 +26,10 @@ graph TD
 
     BOOKING["<b>BOOKING</b><br/>PK = RESERVABLE#uuid<br/>SK = BOOKING#uuid<br/>------------------<br/>timestamp<br/>schedule_selected[] : date + slots<br/>source : submission / cdm<br/>GSI5PK = ORGANIZATION#uuid (submission)<br/>booked_by / reason (cdm)"]
 
+    POSTEVAL["<b>POSTEVAL</b><br/>PK = EVENT#uuid<br/>SK = POSTEVAL#uuid<br/>------------------<br/>entity_type : posteval<br/>status : submitted / approved / denied<br/>submission_id<br/>section_summary (100-500)<br/>financial_report<br/>participation_snapshot<br/>GSI1PK = ORGANIZATION#uuid<br/>GSI1SK = POSTEVAL#uuid"]
+
+    ARCUS_CHILD["<b>EVENT children (arcus-written)</b><br/>PK = EVENT#uuid<br/>SK = MEMBER#studentId / EVALUATION#id<br/>------------------<br/>check-in: member_organization, scannedAt, leftAt<br/>evaluation: studentId, fullName,<br/>&nbsp;&nbsp;participated (yes/no), filedAt<br/>read-only for apex"]
+
     ORGANIZATION -->|"1 : N &nbsp;(EVENT.GSI1PK)"| EVENT
     EVENT -->|"1 : N &nbsp;(children share PK = EVENT#id)"| SUBMISSION
     SUBMISSION -->|"1 : N &nbsp;(PK = SUBMISSION#id)"| NOTIFICATION
@@ -37,6 +41,10 @@ graph TD
     RESERVABLE -->|"1 : N &nbsp;(BOOKING.PK = RESERVABLE#id)"| BOOKING
     SUBMISSION -.->|"references holds (booking_refs)"| BOOKING
     ORGANIZATION -.->|"1 : N &nbsp;org booking list (BOOKING.GSI5PK)"| BOOKING
+    EVENT -->|"1 : N &nbsp;(children share PK = EVENT#id)"| POSTEVAL
+    EVENT -->|"1 : N &nbsp;(arcus writes MEMBER# / EVALUATION#)"| ARCUS_CHILD
+    POSTEVAL -.->|"OSAAR approve finishes linked submission"| SUBMISSION
+    ARCUS_CHILD -.->|"aggregated into participation_snapshot"| POSTEVAL
 
     classDef entity fill:#eef4ff,stroke:#3b5bdb,stroke-width:1px,color:#111111,text-align:left;
-    class ORGANIZATION,EVENT,SUBMISSION,NOTIFICATION,SIGNATORY,COLLAB,ANNOUNCEMENT,CAMPUS,RESERVABLE,BOOKING entity;
+    class ORGANIZATION,EVENT,SUBMISSION,NOTIFICATION,SIGNATORY,COLLAB,ANNOUNCEMENT,CAMPUS,RESERVABLE,BOOKING,POSTEVAL,ARCUS_CHILD entity;

@@ -1,6 +1,7 @@
 import { memo, useState } from "react"
 import { PlusIcon, Trash2Icon, XIcon } from "lucide-react"
 
+import { BUDGET_OPTIONS, QUANTITY_MAX_MAP, UNIT_MAP } from "@/components/submission/budget-options"
 import type { BudgetItem } from "@/components/submission/types"
 import {
   blockNonDecimalKeys,
@@ -19,36 +20,6 @@ import {
 } from "@/components/ui/select"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
-
-const BUDGET_OPTIONS = [
-  "Certificate / Certificate Holder",
-  "Printing Services",
-  "Design Materials",
-  "Food and Refreshments",
-  "Honorarium",
-  "Equipment Rental",
-]
-
-// Mapping of items to their fixed unit (auto-filled, read-only)
-const UNIT_MAP: Record<string, string> = {
-  "Certificate / Certificate Holder": "pcs",
-  "Printing Services": "page/pages",
-  "Design Materials": "pcs",
-  "Food and Refreshments": "pax",
-  "Honorarium": "pax",
-  "Equipment Rental": "day/days",
-}
-
-// Maximum number of digits allowed for quantity per item
-const QUANTITY_MAX_MAP: Record<string, number> = {
-  "Certificate / Certificate Holder": 2,
-  "Printing Services": 3,
-  "Design Materials": 2,
-  "Food and Refreshments": 3,
-  "Honorarium": 1,
-  "Equipment Rental": 1,
-  "Others": 3,
-}
 
 const BudgetRow = memo(function BudgetRow({
   item,

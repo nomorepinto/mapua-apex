@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1\Arcus;
 
-use App\Aws\DynamoDb\FinishSubmission;
 use App\Aws\DynamoDb\ListPublishedEvents;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\ArcusEventResource;
@@ -22,11 +21,6 @@ class EventController extends Controller
         return ArcusEventResource::collection(
             $events->handle($this->organizationId($request), $this->window($request))
         );
-    }
-
-    public function finish(Request $request, string $event, string $submission, FinishSubmission $finish): ArcusEventResource
-    {
-        return new ArcusEventResource($finish->handle($event, $submission, $this->organizationId($request)));
     }
 
     private function window(Request $request): string

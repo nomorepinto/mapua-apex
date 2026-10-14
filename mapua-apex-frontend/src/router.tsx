@@ -88,6 +88,41 @@ export const router = createBrowserRouter([
         ],
       },
       {
+        path: "postevals",
+        Component: PassThroughLayout,
+        children: [
+          {
+            index: true,
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { PostEvalsStart } = await import(
+                "@/routes/students/postevals"
+              )
+              return { Component: PostEvalsStart }
+            },
+          },
+          {
+            path: "wizard",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const [{ PostEvalWizard }, { action }] = await Promise.all([
+                import("@/routes/students/posteval-wizard"),
+                import("@/routes/students/posteval-wizard.action"),
+              ])
+              return { Component: PostEvalWizard, action }
+            },
+          },
+        ],
+      },
+      {
+        path: "tools",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { Tools } = await import("@/routes/students/tools")
+          return { Component: Tools }
+        },
+      },
+      {
         path: "*",
         Component: () => <Navigate to="/students/dashboard" replace />,
       },
@@ -290,6 +325,14 @@ export const router = createBrowserRouter([
             },
           },
         ],
+      },
+      {
+        path: "postevals",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminPostEvals } = await import("@/routes/osaar/postevals")
+          return { Component: AdminPostEvals }
+        },
       },
       {
         path: "activities",

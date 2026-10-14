@@ -3,6 +3,16 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { DEFAULT_SAAF_DRAFT } from '@/components/submission/constants'
 import type { SaafDraft } from '@/components/submission/types'
 import type { ReservationDraft } from '@/components/reservation/types'
+import { DEFAULT_POST_EVAL_DRAFT } from '@/components/posteval/constants'
+import type { PostEvalDraft, PostEvalFinancialReport } from '@/components/posteval/types'
+
+/**
+ * `patchPostEvalDraft` deep-merges `financialReport`, so callers may supply just
+ * one of `budgetItems`/`addedItems` without restating the other.
+ */
+export type PostEvalDraftPatch = Partial<Omit<PostEvalDraft, 'financialReport'>> & {
+  financialReport?: Partial<PostEvalFinancialReport>
+}
 
 export type TaskStatus = 'Pending' | 'In Progress' | 'Completed'
 
@@ -129,6 +139,12 @@ interface OrgState {
   setReservationDraft: (draft: ReservationDraft) => void;
   patchReservationDraft: (patch: Partial<ReservationDraft>) => void;
   clearReservationDraft: () => void;
+
+  // Post-Eval Draft
+  postEvalDraft: PostEvalDraft | null;
+  setPostEvalDraft: (draft: PostEvalDraft) => void;
+  patchPostEvalDraft: (patch: PostEvalDraftPatch) => void;
+  clearPostEvalDraft: () => void;
 
   editingEventId: string | null;
   editingSubmissionId: string | null;
@@ -402,6 +418,24 @@ export const useOrgStore = create<OrgState>()(
     })),
   clearReservationDraft: () => set({ reservationDraft: null }),
 
+  // Post-Eval Draft
+  postEvalDraft: null,
+  setPostEvalDraft: (draft) => set({ postEvalDraft: draft }),
+  patchPostEvalDraft: (patch) =>
+    set((state) => ({
+      postEvalDraft: {
+        ...DEFAULT_POST_EVAL_DRAFT,
+        ...(state.postEvalDraft ?? {}),
+        ...patch,
+        financialReport: {
+          ...DEFAULT_POST_EVAL_DRAFT.financialReport,
+          ...(state.postEvalDraft?.financialReport ?? {}),
+          ...(patch.financialReport ?? {}),
+        },
+      },
+    })),
+  clearPostEvalDraft: () => set({ postEvalDraft: null }),
+
   editingEventId: null,
   editingSubmissionId: null,
   setEditingSubmission: (eventId, submissionId) =>
@@ -418,6 +452,7 @@ export const useOrgStore = create<OrgState>()(
         saafValidated: state.saafValidated,
         saafDraft: state.saafDraft,
         reservationDraft: state.reservationDraft,
+        postEvalDraft: state.postEvalDraft,
         editingEventId: state.editingEventId,
         editingSubmissionId: state.editingSubmissionId,
       }),

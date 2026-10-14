@@ -40,22 +40,26 @@ Deny sets status
 "denied", drops GSI2, and the student cannot edit. GSI2 is also dropped
 on the last approve (status stays "approved" / "denied", current_signatory
 is left as the last desk).
-"finished" is a terminal, post-approval status set only when the event's
-post-evaluation is completed via the arcus-evaluation system; like "approved"
+"finished" is a terminal, post-approval status set only when OSAAR approves the
+event's post-evaluation (see POSTEVAL: a post-eval going submitted -> approved
+also transitions the linked SUBMISSION approved -> finished); like "approved"
 and "denied" it is not editable. There is no "ongoing" status — an event
 starting is recorded in the activity log only (deferred until logging ships).
 On the last approve the backend also writes an "event scheduled" NOTIFICATION
 (system-created, not client-postable) that surfaces in the org_submitter
 Timeline Reminders and triggers an SES email with the arcus attendance and
 evaluation links.
-The arcus apps reach the backend over server-to-server endpoints (shared secret
-ARCUS_SERVICE_TOKEN, not a Cognito JWT): GET /api/v1/arcus/events lists
+The arcus apps reach the backend over a single server-to-server endpoint (shared
+secret ARCUS_SERVICE_TOKEN, not a Cognito JWT): GET /api/v1/arcus/events lists
 approved/finished submissions whose stateless visibility window is open (derived
-per request from activity_details.date_of_event in Asia/Manila — attendance opens
-at the start of the event day, evaluation stays open
-ARCUS_POST_EVALUATION_WINDOW_DAYS days after), and
-POST /api/v1/arcus/events/{event}/submissions/{submission}/finish transitions
-approved -> finished (writing finished_at) only inside that evaluation window.
+per request from activity_details.date_of_event in Asia/Manila). Both companion
+apps now request window=attendance, so they list only events happening today
+(the event day). The former
+POST /api/v1/arcus/events/{event}/submissions/{submission}/finish route is
+RETIRED — a submission reaches "finished" only through OSAAR post-evaluation
+approval (see POSTEVAL). The 3-day evaluation window
+(ARCUS_POST_EVALUATION_WINDOW_DAYS) is retained server-side solely as the
+post-evaluation filing gate (WritePostEval), not for arcus visibility.
 
 SUBMISSION
 PK: EVENT#uuid
@@ -63,6 +67,10 @@ SK: SUBMISSION#uuid
 submission_type: string
 sent_at: timestamp
 status: "pending" | "approved" | "denied" | "returned" | "finished"
+  ("cancelled" is RESERVED for the deferred EventBridge auto-cancel — when an
+  event's 3-day post-evaluation window lapses with no filed post-eval the linked
+  submission becomes "cancelled" (+ cancelled_at). No code path writes it yet;
+  see mapua-apex/todo.md item 2.)
 current_signatory: SIGNATORY#uuid
 signatory_sequence: [ SIGNATORY#uuid ]   (ordered routing snapshot, written at submit time; the ONLY stored form of the chain — signatory_chain is derived at read time, never persisted)
 collaboration: {
@@ -72,7 +80,7 @@ GSI1PK: ORGANIZATION#uuid
 GSI1SK: SUBMISSION#uuid
 GSI2PK: SIGNATORY#uuid   (sparse: present while pending or returned on a desk)
 GSI2SK: timestamp
-finished_at: timestamp   (sparse: stamped when status becomes "finished" via the arcus-evaluation finish endpoint)
+finished_at: timestamp   (sparse: stamped when status becomes "finished" via OSAAR post-evaluation approval — see POSTEVAL)
 
 activity_classification: {
   activity_type: "co-curricular" | "extra-curricular"
@@ -160,6 +168,83 @@ dependent, update diffs the dependent set against the stored collaboration
 NOTIFICATION timeline through SubmissionAccess (requireProponent false) but
 cannot edit or resubmit — only the proponent (the event's GSI1PK org) may PUT.
 role on the API response is "dependent" for these rows, "proponent" otherwise.
+
+POSTEVAL (post-evaluation filed by the org submitter after the event is held)
+PK: EVENT#uuid
+SK: POSTEVAL#uuid
+entity_type: "posteval"
+organization_id: string   (bare ORGANIZATION uuid)
+event_id: string          (bare EVENT uuid)
+submission_id: string     (bare SUBMISSION uuid — the linked approved paper)
+status: "submitted" | "approved" | "denied"
+submitted_at: timestamp
+approved_at: timestamp   (sparse: stamped on OSAAR approve)
+denied_at: timestamp     (sparse: stamped on OSAAR deny)
+event_title: string      (snapshot of activity_details.title_and_nature)
+section_summary: string  (100-500 chars; how the event went, issues, etc.)
+financial_report: {
+  budget_items: [{ item, unit, quantity, budgeted_total, actual_amount }]
+  added_items:  [{ item, unit, quantity, price_per_unit, actual_amount }]
+  initial_grand_total: number
+  actual_grand_total: number
+}
+participation_snapshot: {
+  attendance_count: number
+  attendance:  [{ student_id, full_name, department, member_organization, scanned_at, left_at }]
+  evaluation_count: number
+  evaluations: [{ evaluation_id, student_id, full_name, participated, filed_at }]
+}
+GSI1PK: ORGANIZATION#uuid
+GSI1SK: POSTEVAL#uuid   (org discovery, mirrors SUBMISSION)
+
+One POSTEVAL per event, filed by the org submitter while the event's 3-day
+evaluation window is open. WritePostEval gates the write: the linked SUBMISSION
+must be approved/finished (422 otherwise), EventWindow::EVALUATION must still be
+open (422 "The post-evaluation window is closed for this event."), and no
+submitted/approved POSTEVAL may already exist for the event (409). Amounts are
+capped at 5 digits (0-99999) and the summary at 100-500 chars. It freezes
+participation_snapshot by aggregating the event's MEMBER#/EVALUATION# children
+(see below) at write time. The item is put with an attribute_not_exists(PK)
+guard on the SK.
+ListOrgPostEvals reads GSI1PK=ORGANIZATION#id with GSI1SK begins POSTEVAL#
+(student dashboard); ScanPostEvals walks every org's GSI1 the same way for the
+OSAAR cross-org queue (optional status filter). GetPostEval fetches one by
+PK/SK; single-record detail responses re-aggregate the live participation
+snapshot on top of the stored one.
+ApprovePostEval sets status=approved + approved_at, then transitions the linked
+SUBMISSION approved -> finished (+ finished_at) — both idempotent, and the
+window is NOT re-checked (approval may follow the window closing). DenyPostEval
+sets status=denied + denied_at and leaves the submission approved. Approving a
+denied post-eval, or denying an approved one, aborts 422.
+
+EVENT-partition children written by the arcus companion apps (SAME physical
+table, keyed by the apex event_id — apex never writes these, it only reads them
+via AggregateEventParticipants to build a POSTEVAL participation_snapshot; both
+are capturable only on the event day, window=attendance):
+
+ATTENDANCE CHECK-IN (arcus-attendance scanner)
+PK: EVENT#uuid
+SK: MEMBER#{studentId}
+member_organization: string
+scannedAt: timestamp
+leftAt: timestamp   (sparse)
+The student's profile is a separate item PK = SK = MEMBER#{studentId} holding
+student_id, full_name, department; AggregateEventParticipants resolves each
+check-in's name from that profile item.
+
+PARTICIPANT EVALUATION (arcus-evaluation officer form)
+PK: EVENT#uuid
+SK: EVALUATION#{evaluationId}
+evaluationId: string
+studentId: string
+fullName: string
+participated: "yes" | "no"
+filedAt: timestamp
+eventId: string   (the apex event id, for attribution)
+arcus-evaluation also stores its own detail/list items; this EVENT-partition
+copy exists so apex can query per event with begins_with(SK,'EVALUATION#').
+apex reads these camelCase attributes (with snake_case fallbacks) and normalizes
+participated to a boolean in the snapshot.
 
 NOTIFICATION
 PK: SUBMISSION#uuid
@@ -576,6 +661,34 @@ json
   "reservable_type": "room",
   "booked_by": "SIGNATORY#cdm001",
   "reason": "Department retreat"
+}
+POSTEVAL (filed after the event; participation_snapshot frozen at write time)
+json
+{
+  "PK": "EVENT#e001",
+  "SK": "POSTEVAL#pe001",
+  "entity_type": "posteval",
+  "organization_id": "a1b2",
+  "event_id": "e001",
+  "submission_id": "s001",
+  "status": "submitted",
+  "submitted_at": "2026-10-06T10:00:00Z",
+  "event_title": "Hack Night: Intro to Web Dev",
+  "section_summary": "The event ran smoothly with 48 attendees; the workshop portion ... (100-500 chars)",
+  "financial_report": {
+    "budget_items": [{ "item": "Snacks", "unit": 1, "quantity": 60, "budgeted_total": 3000, "actual_amount": 2800 }],
+    "added_items": [{ "item": "Extra chairs", "unit": 1, "quantity": 10, "price_per_unit": 0, "actual_amount": 0 }],
+    "initial_grand_total": 3000,
+    "actual_grand_total": 2800
+  },
+  "participation_snapshot": {
+    "attendance_count": 48,
+    "attendance": [{ "student_id": "2021-00123", "full_name": "Nicole Santos", "department": "CCIS", "member_organization": "Mapua Computing Society", "scanned_at": "2026-10-05T17:05:00Z", "left_at": "2026-10-05T20:55:00Z" }],
+    "evaluation_count": 40,
+    "evaluations": [{ "evaluation_id": "ev001", "student_id": "2021-00123", "full_name": "Nicole Santos", "participated": true, "filed_at": "2026-10-05T20:00:00Z" }]
+  },
+  "GSI1PK": "ORGANIZATION#a1b2",
+  "GSI1SK": "POSTEVAL#pe001"
 }
 
 ________________

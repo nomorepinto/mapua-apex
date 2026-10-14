@@ -203,4 +203,103 @@ final class DynamoFixtures
             'GSI2SK' => '2026-09-10T14:00:00Z',
         ], $payload, $overrides));
     }
+
+    /**
+     * A POSTEVAL item under an EVENT partition (also carries GSI1 for org discovery).
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    public static function postEval(InMemoryDynamoDb $db, array $overrides = []): void
+    {
+        $db->seed(array_merge([
+            'PK' => 'EVENT#e001',
+            'SK' => 'POSTEVAL#pe001',
+            'entity_type' => 'posteval',
+            'GSI1PK' => 'ORGANIZATION#a1b2',
+            'GSI1SK' => 'POSTEVAL#pe001',
+            'organization_id' => 'a1b2',
+            'event_id' => 'e001',
+            'submission_id' => 's001',
+            'status' => 'submitted',
+            'submitted_at' => '2026-09-11T08:00:00Z',
+            'event_title' => 'Hack Night: Intro to Web Dev',
+            'section_summary' => 'The event ran smoothly and attendees were engaged throughout the night.',
+            'financial_report' => [
+                'budget_items' => [],
+                'added_items' => [],
+                'initial_grand_total' => 3000,
+                'actual_grand_total' => 2800,
+            ],
+            'participation_snapshot' => [
+                'attendance_count' => 0,
+                'attendance' => [],
+                'evaluation_count' => 0,
+                'evaluations' => [],
+            ],
+        ], $overrides));
+    }
+
+    /**
+     * A MEMBER profile item (PK=SK=MEMBER#{studentId}) used to resolve names.
+     */
+    public static function member(
+        InMemoryDynamoDb $db,
+        string $studentId,
+        string $fullName = 'Juan Dela Cruz',
+        string $department = 'CCIS',
+    ): void {
+        $db->seed([
+            'PK' => 'MEMBER#'.$studentId,
+            'SK' => 'MEMBER#'.$studentId,
+            'student_id' => $studentId,
+            'full_name' => $fullName,
+            'department' => $department,
+            'course' => 'BSCS',
+            'current_organization' => 'a1b2',
+        ]);
+    }
+
+    /**
+     * An arcus-attendance check-in child of an EVENT partition (SK=MEMBER#{studentId}).
+     */
+    public static function checkIn(
+        InMemoryDynamoDb $db,
+        string $event,
+        string $studentId,
+        string $memberOrganization = 'a1b2',
+        string $scannedAt = '08:00 AM',
+    ): void {
+        $db->seed([
+            'PK' => 'EVENT#'.$event,
+            'SK' => 'MEMBER#'.$studentId,
+            'member_organization' => $memberOrganization,
+            'scannedAt' => $scannedAt,
+            'timestamp' => 1760000000000,
+        ]);
+    }
+
+    /**
+     * An arcus-evaluation filing child of an EVENT partition (SK=EVALUATION#{id}),
+     * stored with the camelCase attributes arcus-evaluation writes.
+     */
+    public static function evaluation(
+        InMemoryDynamoDb $db,
+        string $event,
+        string $evaluationId,
+        string $studentId,
+        string $fullName = 'Juan Dela Cruz',
+        bool $participated = true,
+    ): void {
+        $db->seed([
+            'PK' => 'EVENT#'.$event,
+            'SK' => 'EVALUATION#'.$evaluationId,
+            'entityType' => 'evaluation',
+            'evaluationId' => $evaluationId,
+            'studentId' => $studentId,
+            'fullName' => $fullName,
+            'participated' => $participated ? 'yes' : 'no',
+            'filedAt' => '2026-09-11T09:00:00Z',
+            'eventId' => $event,
+        ]);
+    }
 }

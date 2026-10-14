@@ -21,6 +21,15 @@ final class DynamoKeys
         return 'SUBMISSION#'.self::strip($id, 'SUBMISSION#');
     }
 
+    /**
+     * Sort key for a post-evaluation inside its EVENT partition. Reused verbatim
+     * as GSI1SK so an organization's post-evals are discoverable off GSI1.
+     */
+    public static function postEval(string $id): string
+    {
+        return 'POSTEVAL#'.self::strip($id, 'POSTEVAL#');
+    }
+
     public static function signatory(string $id): string
     {
         return 'SIGNATORY#'.self::strip($id, 'SIGNATORY#');
