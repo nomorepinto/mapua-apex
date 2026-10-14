@@ -420,6 +420,15 @@ export function sanitizeMobileNumber(val: string, prev = ""): string {
   return digits.slice(0, MOBILE_NUMBER_LENGTH)
 }
 
+/**
+ * Removes every digit from a value. Used on the proponent name and position
+ * fields, which must never contain numbers (mirrors the backend
+ * `not_regex:/[0-9]/` rule in SaafSubmissionRules).
+ */
+export function stripDigits(value: string): string {
+  return value.replace(/[0-9]/g, "")
+}
+
 export const SUFFIX_OPTIONS = [
   { value: "none", label: "None" },
   { value: "Jr.", label: "Jr." },

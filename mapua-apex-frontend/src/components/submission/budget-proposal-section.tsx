@@ -111,15 +111,15 @@ const BudgetRow = memo(function BudgetRow({
       </td>
       <td className="border-r border-neutral-300 p-2 text-center">
         {isOthersItem ? (
-          /* Others: free-text unit input, max 5 chars, no numbers */
+          /* Others: free-text unit input, max 10 chars, no numbers */
           <input
             type="text"
-            maxLength={5}
+            maxLength={10}
             name={`budgetItem_${index}_unit`}
             value={item.unit}
             placeholder="Unit"
             onChange={(e) => {
-              const cleaned = e.target.value.replace(/[0-9]/g, "").slice(0, 5)
+              const cleaned = e.target.value.replace(/[0-9]/g, "").slice(0, 10)
               onUpdate(item.id, "unit", cleaned)
             }}
             style={{ color: "#171717" }}

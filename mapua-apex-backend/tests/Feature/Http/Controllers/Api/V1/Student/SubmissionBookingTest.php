@@ -30,7 +30,7 @@ class SubmissionBookingTest extends TestCase
             'venue_reservation' => [
                 'has_reservation' => true,
                 'reservations' => [
-                    SaafPayload::reservation('c001', 'r001', self::DATE, $slots),
+                    SaafPayload::reservation('c001', 'r001', self::DATE, $slots, 'room', 'Room 1', 'Rehearsal'),
                 ],
             ],
         ]);
@@ -99,7 +99,7 @@ class SubmissionBookingTest extends TestCase
             'venue_reservation' => [
                 'has_reservation' => true,
                 'reservations' => [
-                    SaafPayload::reservation('c001', 'r002', self::DATE, [0], 'room', 'Small Room'),
+                    SaafPayload::reservation('c001', 'r002', self::DATE, [0], 'room', 'Small Room', 'Seminar'),
                 ],
             ],
         ]);
@@ -124,7 +124,7 @@ class SubmissionBookingTest extends TestCase
             'venue_reservation' => [
                 'has_reservation' => true,
                 'reservations' => [
-                    SaafPayload::reservation('c001', 'r002', self::DATE, [0], 'room', 'Big Hall'),
+                    SaafPayload::reservation('c001', 'r002', self::DATE, [0], 'room', 'Big Hall', 'Seminar'),
                 ],
             ],
         ]);
@@ -144,6 +144,102 @@ class SubmissionBookingTest extends TestCase
         $this->withStudentAuth()
             ->postJson('/api/v1/students/submissions', $this->payloadWithReservation([0]))
             ->assertCreated();
+    }
+
+    public function test_a_reservation_without_a_purpose_is_rejected(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        $this->seedCatalog($db);
+
+        // remarks defaults to null, so validation rejects the missing purpose
+        // before any booking is planned.
+        $payload = SaafPayload::valid([
+            'venue_reservation' => [
+                'has_reservation' => true,
+                'reservations' => [
+                    SaafPayload::reservation('c001', 'r001', self::DATE, [0]),
+                ],
+            ],
+        ]);
+
+        $this->withStudentAuth()->postJson('/api/v1/students/submissions', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['venue_reservation.reservations.0.remarks']);
+
+        $this->assertCount(0, $this->itemsWithSkPrefix($db, 'SUBMISSION#'));
+        $this->assertCount(0, $this->itemsWithSkPrefix($db, 'BOOKING#'));
+    }
+
+    public function test_equipment_without_a_room_is_rejected(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        $this->seedCatalog($db);
+        DynamoFixtures::reservable($db, 'c001', 'eq001', 'Projector', 'equipment');
+
+        $payload = SaafPayload::valid([
+            'venue_reservation' => [
+                'has_reservation' => true,
+                'reservations' => [
+                    SaafPayload::reservation('c001', 'eq001', self::DATE, [0], 'equipment', 'Projector', 'Presentation'),
+                ],
+            ],
+        ]);
+
+        $this->withStudentAuth()->postJson('/api/v1/students/submissions', $payload)
+            ->assertUnprocessable()
+            ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'Reserve a room before adding equipment'));
+
+        $this->assertCount(0, $this->itemsWithSkPrefix($db, 'SUBMISSION#'));
+        $this->assertCount(0, $this->itemsWithSkPrefix($db, 'BOOKING#'));
+    }
+
+    public function test_equipment_outside_the_room_slots_is_rejected(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        $this->seedCatalog($db);
+        DynamoFixtures::reservable($db, 'c001', 'eq001', 'Projector', 'equipment');
+
+        $payload = SaafPayload::valid([
+            'venue_reservation' => [
+                'has_reservation' => true,
+                'reservations' => [
+                    // The room covers slot 0 only; the projector asks for slot 5.
+                    SaafPayload::reservation('c001', 'r001', self::DATE, [0], 'room', 'Room 1', 'Rehearsal'),
+                    SaafPayload::reservation('c001', 'eq001', self::DATE, [5], 'equipment', 'Projector', 'Presentation'),
+                ],
+            ],
+        ]);
+
+        $this->withStudentAuth()->postJson('/api/v1/students/submissions', $payload)
+            ->assertUnprocessable()
+            ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'Projector'));
+
+        $this->assertCount(0, $this->itemsWithSkPrefix($db, 'SUBMISSION#'));
+        $this->assertCount(0, $this->itemsWithSkPrefix($db, 'BOOKING#'));
+    }
+
+    public function test_equipment_within_the_room_coverage_is_created(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        $this->seedCatalog($db);
+        DynamoFixtures::reservable($db, 'c001', 'eq001', 'Projector', 'equipment');
+
+        $payload = SaafPayload::valid([
+            'venue_reservation' => [
+                'has_reservation' => true,
+                'reservations' => [
+                    // The room covers slots 0 and 1; the projector uses slot 1.
+                    SaafPayload::reservation('c001', 'r001', self::DATE, [0, 1], 'room', 'Room 1', 'Rehearsal'),
+                    SaafPayload::reservation('c001', 'eq001', self::DATE, [1], 'equipment', 'Projector', 'Presentation'),
+                ],
+            ],
+        ]);
+
+        $this->withStudentAuth()->postJson('/api/v1/students/submissions', $payload)
+            ->assertCreated();
+
+        // One hold for the room and one for the equipment.
+        $this->assertCount(2, $this->itemsWithSkPrefix($db, 'BOOKING#'));
     }
 
     public function test_denying_a_submission_releases_its_bookings(): void

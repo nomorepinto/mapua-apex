@@ -13,6 +13,7 @@ import {
   sanitizeMobileNumber,
   SELECT_CONTENT_STYLE,
   SELECT_ITEM_CLASS,
+  stripDigits,
   STUDENT_NUMBER_LENGTH,
   SUFFIX_OPTIONS,
   YEAR_LEVEL_OPTIONS,
@@ -135,7 +136,7 @@ export const ProponentCard = memo(function ProponentCard({
             name={`proponent_${index}_firstName`}
             value={proponent.firstName}
             maxLength={35}
-            onChange={(e) => onUpdate(proponent.id, "firstName", e.target.value)}
+            onChange={(e) => onUpdate(proponent.id, "firstName", stripDigits(e.target.value))}
             placeholder="First Name"
             style={{ color: "#171717" }}
             className={FIELD_INPUT_CLASS}
@@ -152,7 +153,7 @@ export const ProponentCard = memo(function ProponentCard({
             value={proponent.middleName}
             maxLength={20}
             onChange={(e) =>
-              onUpdate(proponent.id, "middleName", e.target.value)
+              onUpdate(proponent.id, "middleName", stripDigits(e.target.value))
             }
             placeholder="Middle Name"
             style={{ color: "#171717" }}
@@ -167,7 +168,7 @@ export const ProponentCard = memo(function ProponentCard({
             name={`proponent_${index}_lastName`}
             value={proponent.lastName}
             maxLength={30}
-            onChange={(e) => onUpdate(proponent.id, "lastName", e.target.value)}
+            onChange={(e) => onUpdate(proponent.id, "lastName", stripDigits(e.target.value))}
             placeholder="Last Name"
             style={{ color: "#171717" }}
             className={FIELD_INPUT_CLASS}
@@ -216,6 +217,8 @@ export const ProponentCard = memo(function ProponentCard({
           />
         </div>
       </div>
+
+      <FieldWarning name={`proponent.${proponent.id}.duplicateFullName`} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-12">
         <div className="space-y-1.5 md:col-span-3">
@@ -415,7 +418,7 @@ export const ProponentCard = memo(function ProponentCard({
             value={proponent.positionOfApplicant}
             maxLength={30}
             onChange={(e) =>
-              onUpdate(proponent.id, "positionOfApplicant", e.target.value)
+              onUpdate(proponent.id, "positionOfApplicant", stripDigits(e.target.value))
             }
             placeholder="President / Project Lead"
             style={{ color: "#171717" }}

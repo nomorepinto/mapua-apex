@@ -61,8 +61,13 @@ function derivedSchedulePatch(picks: ReservationPick[]): Partial<SaafDraft> {
 
 /** Persist a new pick list plus the event schedule it implies, in one shot. */
 function commitPicks(picks: ReservationPick[]): void {
-  useOrgStore.getState().patchReservationDraft({ picks })
-  useOrgStore.getState().patchSaafDraft(derivedSchedulePatch(picks))
+  // Room-first: equipment cannot outlive the last reserved room, so drop any
+  // equipment pick when no room remains. Keeps the derived schedule in sync.
+  const normalized = picks.some((pick) => pick.type === "room")
+    ? picks
+    : picks.filter((pick) => pick.type !== "equipment")
+  useOrgStore.getState().patchReservationDraft({ picks: normalized })
+  useOrgStore.getState().patchSaafDraft(derivedSchedulePatch(normalized))
 }
 
 export function useReservationForm() {
@@ -106,6 +111,14 @@ export function useReservationForm() {
     const exists = picks.some(
       (pick) => pick.reservable_id === reservable.reservable_id
     )
+    // Room-first backstop: refuse to add equipment while no room is picked.
+    if (
+      !exists &&
+      reservable.type === "equipment" &&
+      !picks.some((pick) => pick.type === "room")
+    ) {
+      return
+    }
     const next = exists
       ? picks.filter(
           (pick) => pick.reservable_id !== reservable.reservable_id

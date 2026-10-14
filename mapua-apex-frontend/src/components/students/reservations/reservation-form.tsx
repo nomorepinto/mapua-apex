@@ -208,6 +208,8 @@ function ReservablePicker({
     () => new Set(picks.map((pick) => pick.reservable_id)),
     [picks]
   )
+  // Equipment can only be reserved once a room is picked (room-first rule).
+  const hasRoom = picks.some((pick) => pick.type === "room")
 
   if (!campusId) {
     return (
@@ -252,6 +254,8 @@ function ReservablePicker({
             reservables={rooms}
           />
           <ReservableGroup
+            disabled={!hasRoom}
+            disabledHint="Reserve a room first."
             icon={<BoxesIcon aria-hidden="true" className="size-4" />}
             label="Equipment"
             onToggle={onToggle}
@@ -270,12 +274,16 @@ function ReservableGroup({
   reservables,
   pickedIds,
   onToggle,
+  disabled = false,
+  disabledHint,
 }: {
   label: string
   icon: ReactNode
   reservables: ApiReservable[]
   pickedIds: Set<string>
   onToggle: (reservable: ApiReservable) => void
+  disabled?: boolean
+  disabledHint?: string
 }) {
   if (reservables.length === 0) return null
   return (
@@ -284,18 +292,24 @@ function ReservableGroup({
         {icon}
         {label}
       </span>
+      {disabled && disabledHint ? (
+        <p className="text-[11px] font-medium text-neutral-400">{disabledHint}</p>
+      ) : null}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {reservables.map((reservable) => {
           const picked = pickedIds.has(reservable.reservable_id)
           return (
             <button
               aria-pressed={picked}
+              disabled={disabled}
               className={cn(
                 "flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                picked
-                  ? "border-emerald-600 bg-emerald-500 text-white hover:bg-emerald-600"
-                  : "border-neutral-300 bg-white text-neutral-800 hover:border-neutral-400 hover:bg-neutral-50"
+                disabled
+                  ? "cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400"
+                  : picked
+                    ? "border-emerald-600 bg-emerald-500 text-white hover:bg-emerald-600"
+                    : "border-neutral-300 bg-white text-neutral-800 hover:border-neutral-400 hover:bg-neutral-50"
               )}
               key={reservable.reservable_id}
               onClick={() => onToggle(reservable)}
@@ -411,7 +425,7 @@ function PickCard({
           />
           <div className="space-y-1.5">
             <label className="block text-[11px] font-semibold text-neutral-600">
-              Purpose (optional)
+              Purpose <span className="text-red-500">*</span>
             </label>
             <Input
               autoComplete="off"
@@ -420,6 +434,7 @@ function PickCard({
               placeholder="Rehearsal, seminar, …"
               type="text"
               value={pick.remarks}
+              required
             />
           </div>
           <SelectedSummary pick={pick} />

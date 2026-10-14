@@ -117,6 +117,35 @@ function markDuplicateProponents(
       }
     }
   }
+
+  // Composite check: two proponents cannot share the exact same first, middle,
+  // and last name. Same first+last with a different middle (or same middle+last
+  // with a different first) stays allowed. This is a secondary safety net behind
+  // the student-number uniqueness above.
+  const normalizePart = (value: string | undefined): string =>
+    String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ")
+  const nameKeyOf = (proponent: Proponent): string | null => {
+    const first = normalizePart(proponent.firstName)
+    const middle = normalizePart(proponent.middleName)
+    const last = normalizePart(proponent.lastName)
+    if (!first && !last) return null
+    return [first, middle, last].join("\u0000")
+  }
+  const nameCounts = new Map<string, number>()
+  for (const proponent of proponents) {
+    const nameKey = nameKeyOf(proponent)
+    if (nameKey === null) continue
+    nameCounts.set(nameKey, (nameCounts.get(nameKey) ?? 0) + 1)
+  }
+  for (const proponent of proponents) {
+    const nameKey = nameKeyOf(proponent)
+    if (nameKey === null || (nameCounts.get(nameKey) ?? 0) < 2) continue
+    const key = `proponent.${proponent.id}.duplicateFullName`
+    if (!warnings[key]) {
+      warnings[key] =
+        "Two proponents cannot have the exact same first, middle, and last name."
+    }
+  }
 }
 
 function proponentWarnings(
@@ -358,6 +387,7 @@ const WARNING_KEY_LABELS: Record<string, string> = {
 const PROPONENT_FIELD_LABELS: Record<string, string> = {
   firstName: "First name",
   lastName: "Last name",
+  duplicateFullName: "Full name",
   studentNumber: "Student number",
   programAndYear: "Program / year level",
   department: "Department",
@@ -467,6 +497,39 @@ export function getReservationStepIssue(
   )
   if (hasEmptySlotList) {
     return "Select at least one time slot for each chosen date."
+  }
+
+  // Every reserved room or equipment needs a purpose (remarks). Mirrors the
+  // backend `venue_reservation.reservations.*.remarks` required rule.
+  const missingPurpose = picks.find((pick) => isBlank(pick.remarks))
+  if (missingPurpose) {
+    return `Add a purpose for "${missingPurpose.name}".`
+  }
+
+  // Room-first: equipment may only be reserved when a room is also reserved,
+  // and only on dates/slots covered by some reserved room (union of all rooms).
+  // Mirrors BookingRecords::assertEquipmentWithinRooms on the API.
+  const roomCoverage = new Map<string, Set<number>>()
+  for (const pick of picks) {
+    if (pick.type !== "room") continue
+    for (const selection of pick.selections) {
+      const slots = roomCoverage.get(selection.date) ?? new Set<number>()
+      for (const slot of selection.slots) slots.add(slot)
+      roomCoverage.set(selection.date, slots)
+    }
+  }
+  const equipmentPicks = picks.filter((pick) => pick.type === "equipment")
+  if (equipmentPicks.length > 0 && roomCoverage.size === 0) {
+    return "Reserve a room before reserving equipment."
+  }
+  for (const pick of equipmentPicks) {
+    const outsideRoom = pick.selections.some((selection) => {
+      const covered = roomCoverage.get(selection.date)
+      return selection.slots.some((slot) => !covered?.has(slot))
+    })
+    if (outsideRoom) {
+      return `"${pick.name}" can only be reserved during your reserved room dates and times.`
+    }
   }
 
   // Room participant bounds are enforced against the expected headcount here so
