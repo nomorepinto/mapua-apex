@@ -61,6 +61,32 @@ const VARIANTS: Record<ReviewNotice["notifType"], NoticeVariant> = {
     heading: "Event details",
     fallback: "Your proposal was fully approved and the event is now scheduled.",
   },
+  "reservation change requested": {
+    badge: "Change Requested",
+    badgeClass: "bg-amber-50 text-amber-800",
+    heading: "Your request",
+    fallback:
+      "Your reservation change request was sent to CDM and is pending review.",
+  },
+  "reservation change denied": {
+    badge: "Change Denied",
+    badgeClass: "bg-red-50 text-[#D9291C]",
+    heading: "Reason for denial",
+    fallback: "CDM declined your reservation change request.",
+  },
+  "reservation cancelled": {
+    badge: "Event Cancelled",
+    badgeClass: "bg-red-50 text-[#D9291C]",
+    heading: "Cancellation note",
+    fallback:
+      "This event was cancelled and its room/equipment holds were released.",
+  },
+  "reservation rescheduled": {
+    badge: "Event Rescheduled",
+    badgeClass: "bg-emerald-50 text-emerald-700",
+    heading: "New schedule",
+    fallback: "CDM rescheduled this event's reservation.",
+  },
 }
 
 const ReviewNoticeModal = memo(function ReviewNoticeModal({

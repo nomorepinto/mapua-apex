@@ -62,7 +62,7 @@ export interface Activity {
   decision: ActivityDecision
   type: string
   nature?: "major" | "minor" | string
-  status?: "Review" | "Returned" | "Rejected" | "Accepted" | "Pending Dean Approval"
+  status?: "Review" | "Returned" | "Rejected" | "Accepted" | "Pending Dean Approval" | "Cancelled"
   description: string
   venue: string
   expectedParticipants: number
@@ -99,6 +99,8 @@ export function getStatusVariant(status: Activity["status"]): StatusVariant {
     case "Returned":
     case "Rejected":
       return "error"
+    case "Cancelled":
+      return "outline"
     default:
       return "outline"
   }

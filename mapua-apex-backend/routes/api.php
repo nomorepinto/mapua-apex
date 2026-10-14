@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Admin\CampusController;
 use App\Http\Controllers\Api\V1\Admin\LogMonitorController;
 use App\Http\Controllers\Api\V1\Admin\OrganizationController;
 use App\Http\Controllers\Api\V1\Admin\ReservableController;
+use App\Http\Controllers\Api\V1\Admin\ReservationChangeController as AdminReservationChangeController;
 use App\Http\Controllers\Api\V1\Admin\SignatoryController;
 use App\Http\Controllers\Api\V1\Admin\SubmissionController as AdminSubmissionController;
 use App\Http\Controllers\Api\V1\Arcus\EventController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\OrganizationController as StudentOrganizationController;
 use App\Http\Controllers\Api\V1\Student\PostEvalController as StudentPostEvalController;
 use App\Http\Controllers\Api\V1\Student\ReservableController as StudentReservableController;
+use App\Http\Controllers\Api\V1\Student\ReservationChangeController as StudentReservationChangeController;
 use App\Http\Controllers\Api\V1\Student\SubmissionController as StudentSubmissionController;
 use Illuminate\Support\Facades\Route;
 
@@ -83,6 +85,12 @@ Route::middleware(['cognito.jwt:student', 'throttle:student', 'activity.log'])
         Route::get('campuses', [StudentReservableController::class, 'campuses'])->name('campuses.index');
         Route::get('campuses/{campus}/reservables', [StudentReservableController::class, 'index'])->name('reservables.index');
         Route::get('campuses/{campus}/reservables/{reservable}/availability', [StudentReservableController::class, 'availability'])->name('reservables.availability');
+        // Reservation change requests on an approved paper's holds.
+        Route::post('events/{event}/submissions/{submission}/reservation-change', [StudentReservationChangeController::class, 'store'])
+            ->middleware('throttle:student-write')
+            ->name('submissions.reservation-change.store');
+        Route::get('events/{event}/submissions/{submission}/reservation-changes', [StudentReservationChangeController::class, 'index'])
+            ->name('submissions.reservation-changes.index');
     });
 
 Route::middleware(['cognito.jwt:signatory', 'throttle:signatory', 'activity.log'])
@@ -214,6 +222,13 @@ Route::middleware(['cognito.jwt:admin', 'throttle:admin', 'activity.log'])
         Route::delete('campuses/{campus}/reservables/{reservable}/bookings/{booking}', [BookingController::class, 'destroy'])
             ->middleware('throttle:admin-write')
             ->name('reservables.bookings.destroy');
+
+        // Reservation changes (cdm) — the per-campus queue of student cancel/reschedule requests.
+        Route::get('campuses/{campus}/reservation-changes', [AdminReservationChangeController::class, 'index'])->name('reservation-changes.index');
+        Route::get('campuses/{campus}/reservation-changes/{change}', [AdminReservationChangeController::class, 'show'])->name('reservation-changes.show');
+        Route::post('campuses/{campus}/reservation-changes/{change}/resolve', [AdminReservationChangeController::class, 'resolve'])
+            ->middleware('throttle:admin-write')
+            ->name('reservation-changes.resolve');
     });
 
 // Arcus companion apps — server-to-server, shared secret (not a Cognito JWT).

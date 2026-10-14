@@ -66,7 +66,7 @@ PK: EVENT#uuid
 SK: SUBMISSION#uuid
 submission_type: string
 sent_at: timestamp
-status: "pending" | "approved" | "denied" | "returned" | "finished"
+status: "pending" | "approved" | "denied" | "returned" | "finished" | "cancelled"
   ("cancelled" is RESERVED for the deferred EventBridge auto-cancel — when an
   event's 3-day post-evaluation window lapses with no filed post-eval the linked
   submission becomes "cancelled" (+ cancelled_at). No code path writes it yet;
@@ -150,6 +150,17 @@ and keeps current_signatory / GSI2 on that desk. Deny sets status
 "denied", drops GSI2, and the student cannot edit. GSI2 is also dropped
 on the last approve (status stays "approved" / "denied", current_signatory
 is left as the last desk).
+
+"cancelled" is a terminal, post-approval status set ONLY by a CDM cancel
+resolution of a RESERVATION_CHANGE (see below) — never by the student edit path
+(WriteSubmission treats it like approved/denied/finished and refuses to edit
+it). Cancelling releases every linked BOOKING and removes booking_refs in the
+same write as the status flip; the paper is kept (never deleted), stays listed
+everywhere, and is excluded from the arcus GET /api/v1/arcus/events list. A
+reschedule resolution keeps status "approved" and rewrites
+activity_details.date_of_event / day_of_event / time_of_event plus
+venue_reservation.reservations[] and booking_refs in lockstep with the edited
+holds.
 
 COLLABORATION POINTER (index-only, one per dependent organization)
 PK: ORGANIZATION#uuid   (the dependent org, not the proponent)
@@ -250,7 +261,7 @@ NOTIFICATION
 PK: SUBMISSION#uuid
 SK: NOTIFICATION#timestamp
 signatory: SIGNATORY#uuid
-notif_type: "approved" | "fully approved" | "denied" | "returned" | "event scheduled"
+notif_type: "approved" | "fully approved" | "denied" | "returned" | "event scheduled" | "reservation change requested" | "reservation cancelled" | "reservation rescheduled" | "reservation change denied"
 comment: string (mandatory if denied or returned)
 
 Students GET / POST / PUT the timeline for their org's paper.
@@ -259,6 +270,12 @@ and PUT a row they authored. POST writes SK = now (UTC, second precision).
 PUT replaces notif_type / comment in place; SK does not change.
 Students may also change signatory on PUT. Signatory PUT keeps the author.
 Approve / return / deny still insert a NOTIFICATION row as a side effect.
+
+The four "reservation ..." notif_type values are system-only (written server-side
+by RequestReservationChange / ResolveReservationChange, never client-postable via
+StoreNotificationRequest): "reservation change requested" carries an empty
+signatory (student-initiated, timeline row only); the other three carry the
+resolving CDM signatory and each also triggers an SES email to the student.
 
 SIGNATORY
 PK: SIGNATORY#uuid
@@ -393,6 +410,15 @@ student re-edit — all driven by the SUBMISSION's booking_refs. The CDM
 manual-delete route refuses source "submission" with 409 so a live paper's hold
 is never deleted out from under it.
 
+Edited in place through a RESERVATION_CHANGE resolution: a same-reservable
+date/slot change patches schedule_selected on the existing PK/SK (keys, GSI5
+linkage and submission_id/event_id/organization_id all survive, and the
+SUBMISSION's booking_refs entry stays valid as-is); a room swap deletes the old
+BOOKING and recreates a source:"submission" hold (with GSI5) under the new
+RESERVABLE partition, swapping the booking_refs entry to the new keys in the
+same submission update. A cancel resolution releases (deletes) every linked hold
+and drops booking_refs. See RESERVATION_CHANGE.
+
 Manual (source "cdm") — created by CDM on the /reservables Reserve section
 (BookingRecords::createManual). Carries NO GSI5 and NO submission linkage, so it
 never surfaces in an org's booking list; it only blocks slots. Adds:
@@ -408,6 +434,60 @@ concrete date+slot. Conflict detection queries the base RESERVABLE partition
 the organization index exists. GSI5 is provisioned in AWS by the operator; the
 code writes GSI5PK/GSI5SK on submission-sourced bookings but does not depend on
 the index for correctness. There is no automatic expiry on a manual hold.
+
+RESERVATION_CHANGE (a student's request to cancel or reschedule an approved paper's holds)
+PK: EVENT#uuid
+SK: RESERVATION_CHANGE#uuid
+item_type: "reservation_change"
+organization_id: string        (bare uuid, snapshot)
+submission_id: string          (bare uuid, snapshot)
+campus_id: string              (bare uuid, snapshot)
+requested_by: string           (STUDENT#<sub> from the JWT)
+requested_at: timestamp
+request_type: "cancel" | "reschedule"
+reason: string                 (required, <=500)
+suggested_date: "YYYY-MM-DD"   (sparse: reschedule only; advisory, CDM is not bound by it)
+bookings: [{                   (the targeted holds, FROZEN from the paper's live booking_refs at request time)
+  pk: "RESERVABLE#uuid", sk: "BOOKING#uuid",
+  reservable_id, reservable_name, reservable_type,
+  schedule_selected: [{ date, slots }]
+}]
+status: "pending" | "resolved" | "denied"
+GSI6PK: CAMPUS#uuid
+GSI6SK: status#requested_at    (pending#..., resolved#..., denied#...)
+
+On resolution (status -> resolved/denied) the item also carries:
+decision: "cancel" | "reschedule" | "deny"
+resolved_by: SIGNATORY#uuid
+resolved_at: timestamp
+comment: string
+applied: {                     (before/after audit trail; audit only, never read back as source of truth)
+  bookings: [{
+    pk, sk,                    (original keys)
+    action: "released" | "kept" | "updated" | "replaced",
+    before: { reservable_id, schedule_selected },
+    after:  { reservable_id, schedule_selected } | null,
+    new_pk, new_sk             (room swaps only — point at the recreated BOOKING)
+  }],
+  submission: {
+    status_before, status_after,
+    date_of_event_before/after, time_of_event_before/after,   (reschedule only)
+    booking_refs_before, booking_refs_after
+  } | null                     (null for a deny)
+}
+
+One pending request per paper. The student side lists the full history with a
+base-table query on PK = EVENT#uuid, SK begins_with RESERVATION_CHANGE# (no GSI
+needed). The CDM per-campus queue reads GSI6 (GSI6PK = CAMPUS#uuid), optionally
+filtered by status. GSI6 is provisioned in AWS by the operator, mirroring how
+GSI5 backs the organization booking index; the code writes GSI6PK/GSI6SK but the
+CDM list endpoint fails loudly until the index exists. Resolve is guarded: the
+request must still be pending (finalize uses a conditional put on
+attribute_not_exists(resolved_at) so two CDM users cannot resolve it twice), the
+paper must still be approved, and every snapshotted hold must still appear in the
+paper's live booking_refs (a stale request aborts 409 with zero writes). The
+request window closes at the end of activity_details.date_of_event in
+Asia/Manila; CDM may resolve at any time, even after the event day.
 
 ________________
 
@@ -689,6 +769,82 @@ json
   },
   "GSI1PK": "ORGANIZATION#a1b2",
   "GSI1SK": "POSTEVAL#pe001"
+}
+RESERVATION_CHANGE (pending reschedule request; bookings snapshot frozen from booking_refs)
+json
+{
+  "PK": "EVENT#e001",
+  "SK": "RESERVATION_CHANGE#c001",
+  "GSI6PK": "CAMPUS#a1b2",
+  "GSI6SK": "pending#2026-09-20T08:00:00Z",
+  "item_type": "reservation_change",
+  "organization_id": "a1b2",
+  "submission_id": "s001",
+  "campus_id": "a1b2",
+  "requested_by": "STUDENT#usr_cognito_sub_123",
+  "requested_at": "2026-09-20T08:00:00Z",
+  "request_type": "reschedule",
+  "reason": "Room conflict with a make-up class.",
+  "suggested_date": "2026-10-12",
+  "bookings": [
+    {
+      "pk": "RESERVABLE#r1",
+      "sk": "BOOKING#b001",
+      "reservable_id": "r1",
+      "reservable_name": "AV Room",
+      "reservable_type": "room",
+      "schedule_selected": [{ "date": "2026-10-05", "slots": [8, 9, 10, 11] }]
+    }
+  ],
+  "status": "pending"
+}
+RESERVATION_CHANGE (resolved — cancel; the applied audit records the released hold)
+json
+{
+  "PK": "EVENT#e001",
+  "SK": "RESERVATION_CHANGE#c002",
+  "GSI6PK": "CAMPUS#a1b2",
+  "GSI6SK": "resolved#2026-09-21T02:00:00Z",
+  "item_type": "reservation_change",
+  "organization_id": "a1b2",
+  "submission_id": "s001",
+  "campus_id": "a1b2",
+  "requested_by": "STUDENT#usr_cognito_sub_123",
+  "requested_at": "2026-09-21T02:00:00Z",
+  "request_type": "cancel",
+  "reason": "Event postponed indefinitely.",
+  "bookings": [
+    {
+      "pk": "RESERVABLE#r1",
+      "sk": "BOOKING#b001",
+      "reservable_id": "r1",
+      "reservable_name": "AV Room",
+      "reservable_type": "room",
+      "schedule_selected": [{ "date": "2026-10-05", "slots": [8, 9, 10, 11] }]
+    }
+  ],
+  "status": "resolved",
+  "decision": "cancel",
+  "resolved_by": "SIGNATORY#cdm001",
+  "resolved_at": "2026-09-22T03:00:00Z",
+  "comment": "Cancelled per student request.",
+  "applied": {
+    "bookings": [
+      {
+        "pk": "RESERVABLE#r1",
+        "sk": "BOOKING#b001",
+        "action": "released",
+        "before": { "reservable_id": "r1", "schedule_selected": [{ "date": "2026-10-05", "slots": [8, 9, 10, 11] }] },
+        "after": null
+      }
+    ],
+    "submission": {
+      "status_before": "approved",
+      "status_after": "cancelled",
+      "booking_refs_before": [{ "pk": "RESERVABLE#r1", "sk": "BOOKING#b001" }],
+      "booking_refs_after": []
+    }
+  }
 }
 
 ________________

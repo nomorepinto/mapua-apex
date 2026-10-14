@@ -306,6 +306,83 @@ final class BookingRecords
     }
 
     /**
+     * Public selector normalization so callers (reservation-change resolution)
+     * validate and store the exact canonical {date, slots} shape.
+     *
+     * @param  mixed  $selections
+     * @return list<array{date: string, slots: list<int>}>
+     */
+    public function normalize(mixed $selections): array
+    {
+        return $this->normalizeSelections($selections);
+    }
+
+    /**
+     * In-place schedule edit of an existing booking (same PK/SK). Keys, source,
+     * GSI5 linkage and the submission pointers survive untouched, so the owning
+     * SUBMISSION's booking_refs entry stays valid as-is.
+     *
+     * @param  list<array{date: string, slots: list<int>}>  $selections
+     * @return array<string, mixed>
+     */
+    public function updateSchedule(string $pk, string $sk, array $selections): array
+    {
+        $normalized = $this->normalizeSelections($selections);
+
+        if ($normalized === []) {
+            abort(422, 'Select at least one date and time slot.');
+        }
+
+        $this->items->patch($pk, $sk, ['schedule_selected' => $normalized]);
+
+        return $this->items->get($pk, $sk) ?? [
+            'PK' => $pk,
+            'SK' => $sk,
+            'schedule_selected' => $normalized,
+        ];
+    }
+
+    /**
+     * Create a single submission-sourced booking (with GSI5 linkage) under a
+     * reservable. Used by reservation-change resolution when a hold is swapped
+     * onto a different room/equipment.
+     *
+     * @param  array{organization_id: string, event_id: string, submission_id: string, campus_id?: string}  $context
+     * @param  array<string, mixed>  $reservable
+     * @param  list<array{date: string, slots: list<int>}>  $selections
+     * @return array<string, mixed>
+     */
+    public function createForSubmission(array $context, array $reservable, array $selections): array
+    {
+        $normalized = $this->normalizeSelections($selections);
+
+        if ($normalized === []) {
+            abort(422, 'Select at least one date and time slot.');
+        }
+
+        $timestamp = DynamoKeys::now();
+        $item = [
+            'PK' => DynamoKeys::reservable($this->reservableId($reservable)),
+            'SK' => DynamoKeys::booking((string) Str::uuid()),
+            'GSI5PK' => DynamoKeys::organizationIndex($context['organization_id']),
+            'GSI5SK' => $timestamp,
+            'timestamp' => $timestamp,
+            'schedule_selected' => $normalized,
+            'source' => 'submission',
+            'campus_id' => (string) ($context['campus_id'] ?? ''),
+            'reservable_name' => (string) ($reservable['name'] ?? ''),
+            'reservable_type' => (string) ($reservable['type'] ?? ''),
+            'event_id' => $context['event_id'],
+            'submission_id' => $context['submission_id'],
+            'organization_id' => $context['organization_id'],
+        ];
+
+        $this->items->put($item);
+
+        return $item;
+    }
+
+    /**
      * Delete every booking referenced by a submission's booking_refs.
      *
      * @param  list<array<string, mixed>>  $refs

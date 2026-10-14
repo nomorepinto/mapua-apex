@@ -23,7 +23,7 @@ export interface ApiSubmission {
   organization_name?: string | null
   submission_type: string
   sent_at: string
-  status: "pending" | "approved" | "denied" | "returned"
+  status: "pending" | "approved" | "denied" | "returned" | "cancelled"
   current_signatory?: string
   /** Ordered snapshot of signatory IDs (plain, no `SIGNATORY#` prefix) resolved at submit time. */
   signatory_sequence?: string[]
@@ -136,6 +136,31 @@ export interface ApiSubmission {
   }
 }
 
+/**
+ * System-written reservation-change timeline entries. Written server-side only
+ * (never client-postable) when a student requests a change and when CDM resolves
+ * it, mirroring how `event scheduled` is written on final approval.
+ */
+export type ReservationNotifType =
+  | "reservation change requested"
+  | "reservation cancelled"
+  | "reservation rescheduled"
+  | "reservation change denied"
+
+/** Every reservation-change notif_type, for bucketing notices in the dashboard. */
+export const RESERVATION_NOTIF_TYPES: readonly ReservationNotifType[] = [
+  "reservation change requested",
+  "reservation cancelled",
+  "reservation rescheduled",
+  "reservation change denied",
+]
+
+export function isReservationNotifType(
+  value: string,
+): value is ReservationNotifType {
+  return (RESERVATION_NOTIF_TYPES as readonly string[]).includes(value)
+}
+
 export interface ApiNotification {
   submission_id: string
   sent_at: string
@@ -146,6 +171,7 @@ export interface ApiNotification {
     | "denied"
     | "returned"
     | "event scheduled"
+    | ReservationNotifType
   comment?: string
 }
 
@@ -340,13 +366,15 @@ export function getSubmissionStatusMeta(status: string) {
       return { label: "Denied", color: "bg-rose-500/10 text-rose-600 border-rose-200" }
     case "returned":
       return { label: "Returned", color: "bg-amber-500/10 text-amber-600 border-amber-200" }
+    case "cancelled":
+      return { label: "Cancelled", color: "bg-neutral-500/10 text-neutral-600 border-neutral-300" }
     case "pending":
     default:
       return { label: "Under Review", color: "bg-amber-500/10 text-amber-600 border-amber-200" }
   }
 }
 
-export type DashboardSubmissionStatus = "Under Review" | "Approved" | "Returned" | "Denied"
+export type DashboardSubmissionStatus = "Under Review" | "Approved" | "Returned" | "Denied" | "Cancelled"
 
 export interface DashboardSubmissionRow {
   event_id: string
@@ -366,7 +394,7 @@ export interface DashboardSubmissionRow {
   submitted_date: string
   /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
   sent_at: string
-  api_status: "pending" | "approved" | "denied" | "returned"
+  api_status: "pending" | "approved" | "denied" | "returned" | "cancelled"
   activity_details: {
     title: string
     description: string
@@ -427,6 +455,7 @@ export interface ReviewNotice {
     | "approved"
     | "fully approved"
     | "event scheduled"
+    | ReservationNotifType
   comment: string
   signatoryLabel: string
 }
@@ -754,7 +783,9 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
         ? "Rejected"
         : submission.status === "returned"
           ? "Returned"
-          : "Review"
+          : submission.status === "cancelled"
+            ? "Cancelled"
+            : "Review"
 
   // Derive the display arrays from the new reservable-based `reservations`
   // shape when present; fall back to the legacy free-text shape for stored

@@ -219,6 +219,131 @@ export type CreateBookingPayload = {
   reason?: string
 }
 
+// ─── Reservation Change Requests ─────────────────────────────────────────────
+// A student asks CDM to cancel or reschedule the holds on an approved paper;
+// CDM resolves it. Mirrors the backend RESERVATION_CHANGE object and the
+// `ReservationChangeResource` projection.
+
+export type ReservationChangeStatus = "pending" | "resolved" | "denied"
+export type ReservationChangeRequestType = "cancel" | "reschedule"
+export type ReservationChangeDecision = "cancel" | "reschedule" | "deny"
+/** Per-hold instruction CDM sends when rescheduling. */
+export type ReservationChangeAction = "keep" | "update" | "swap"
+/** What the resolution actually did to a hold, recorded in the audit trail. */
+export type AppliedBookingAction = "released" | "kept" | "updated" | "replaced"
+
+/** One hold the request targets, frozen at request time. */
+export interface ReservationChangeBooking {
+  pk: string
+  sk: string
+  reservable_id: string | null
+  reservable_name: string | null
+  reservable_type: ReservableType | null
+  schedule_selected: SlotSelection[]
+}
+
+export interface AppliedHoldSnapshot {
+  reservable_id: string | null
+  schedule_selected: SlotSelection[]
+}
+
+export interface AppliedBookingEntry {
+  pk: string
+  sk: string
+  action: AppliedBookingAction
+  before: AppliedHoldSnapshot | null
+  after: AppliedHoldSnapshot | null
+  /** Room swaps only: the recreated booking's keys. */
+  new_pk?: string | null
+  new_sk?: string | null
+}
+
+export interface AppliedSubmissionEntry {
+  status_before: string | null
+  status_after: string | null
+  date_of_event_before?: string | null
+  date_of_event_after?: string | null
+  time_of_event_before?: string | null
+  time_of_event_after?: string | null
+  booking_refs_before?: Array<{ pk: string; sk: string }>
+  booking_refs_after?: Array<{ pk: string; sk: string }>
+}
+
+export interface ReservationChangeApplied {
+  bookings: AppliedBookingEntry[]
+  submission: AppliedSubmissionEntry | null
+}
+
+/** The lean submission snapshot the CDM detail panel renders. */
+export interface ReservationChangeSubmission {
+  submission_id?: string | null
+  status?: string | null
+  organization_name?: string | null
+  activity_details?: {
+    title_and_nature?: string | null
+    venue?: string | null
+    date_of_event?: string | null
+    day_of_event?: string | null
+    time_of_event?: string | null
+    expected_participants?: number | null
+  } | null
+  venue_reservation?: {
+    has_reservation?: boolean
+    reservations?: Array<{
+      reservable_id?: string
+      campus_id?: string
+      name?: string
+      type?: ReservableType
+      selections?: SlotSelection[]
+      remarks?: string | null
+    }>
+  } | null
+}
+
+export interface ApiReservationChange {
+  change_id: string | null
+  event_id: string | null
+  submission_id: string | null
+  organization_id: string | null
+  campus_id: string | null
+  requested_by: string | null
+  requested_at: string | null
+  request_type: ReservationChangeRequestType | null
+  reason: string | null
+  suggested_date: string | null
+  status: ReservationChangeStatus | null
+  bookings: ReservationChangeBooking[]
+  decision: ReservationChangeDecision | null
+  resolved_by: string | null
+  resolved_at: string | null
+  comment: string | null
+  applied?: ReservationChangeApplied | null
+  /** Denormalized for the CDM list; present only when context rode along. */
+  event_title?: string | null
+  organization_name?: string | null
+  submission?: ReservationChangeSubmission | null
+}
+
+export interface StoreReservationChangePayload {
+  request_type: ReservationChangeRequestType
+  reason: string
+  suggested_date?: string | null
+}
+
+export interface ResolveBookingInstruction {
+  pk: string
+  sk: string
+  action: ReservationChangeAction
+  selections?: SlotSelection[]
+  new_reservable_id?: string | null
+}
+
+export interface ResolveReservationChangePayload {
+  decision: ReservationChangeDecision
+  comment?: string
+  bookings?: ResolveBookingInstruction[]
+}
+
 export interface Submission {
   /** PK = `EVENT#<uuid>` */
   PK: string
@@ -232,7 +357,7 @@ export interface Submission {
   institutional_alignment: InstitutionalAlignment
   detailed_budget_proposal: DetailedBudgetProposal
   venue_reservation: VenueReservation
-  status: "pending" | "approved" | "denied" | "returned"
+  status: "pending" | "approved" | "denied" | "returned" | "cancelled"
   /** UUID of the signatory who currently needs to act on this */
   current_signatory: string
   /** Ordered snapshot of signatory UUIDs resolved at submit time (plain ids, no `SIGNATORY#` prefix) */

@@ -65,6 +65,14 @@ final class DynamoKeys
     }
 
     /**
+     * SK for a reservation change request inside its EVENT partition.
+     */
+    public static function reservationChange(string $id): string
+    {
+        return 'RESERVATION_CHANGE#'.self::strip($id, 'RESERVATION_CHANGE#');
+    }
+
+    /**
      * GSI5PK for a booking: the owning organization (only submission-sourced bookings).
      */
     public static function organizationIndex(string $organizationId): string

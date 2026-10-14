@@ -89,6 +89,19 @@ class EventControllerTest extends TestCase
             ->assertJsonPath('data.0.attendance.is_open', true);
     }
 
+    public function test_index_excludes_cancelled_events(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::organization($db, 'a1b2');
+        $this->seedSubmission($db, 'e001', 's001', 'a1b2', 'approved', $this->day());
+        $this->seedSubmission($db, 'e002', 's002', 'a1b2', 'cancelled', $this->day());
+
+        $this->withServiceAuth()->getJson('/api/v1/arcus/events')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.submission_id', 's001');
+    }
+
     public function test_index_scopes_to_the_organization_header(): void
     {
         $db = InMemoryDynamoDb::bind($this);

@@ -1,4 +1,4 @@
-import { BoxesIcon, FileCheck2Icon, HomeIcon } from "lucide-react"
+import { BoxesIcon, CalendarClockIcon, FileCheck2Icon, HomeIcon } from "lucide-react"
 import { Outlet } from "react-router"
 import { useAuth } from "react-oidc-context"
 
@@ -20,6 +20,11 @@ export function CdmReviewerLayout() {
       to: "/cdm/dashboard",
       icon: HomeIcon,
       end: true,
+    },
+    {
+      label: "Reservations",
+      to: "/cdm/reservations",
+      icon: CalendarClockIcon,
     },
     {
       label: "Reservables",

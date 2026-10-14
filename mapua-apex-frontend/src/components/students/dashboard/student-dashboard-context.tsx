@@ -13,7 +13,9 @@ import {
   apiDeadlinesToReminders,
   apiSubmissionToDashboardRow,
   formatDocumentId,
+  isReservationNotifType,
   type ApiAnnouncement,
+  type ApiSubmission,
   type DashboardSubmissionRow,
   type DeadlineReminder,
   type ReviewNotice,
@@ -44,11 +46,18 @@ interface StudentDashboardState {
   returnedNotices: ReviewNotice[]
   approvedNotices: ReviewNotice[]
   scheduledNotices: ReviewNotice[]
+  reservationNotices: ReviewNotice[]
   remindersLoading: boolean
   remindersExpanded: boolean
   trackerOpen: boolean
   selectedKeys: { eventId: string; submissionId: string } | null
   selectedNotice: ReviewNotice | null
+  reservationChangeTarget: { eventId: string; submissionId: string } | null
+  /** Look up an already-loaded submission (holds + event date) without refetching. */
+  findSubmission: (
+    eventId: string,
+    submissionId: string
+  ) => ApiSubmission | undefined
 }
 
 interface StudentDashboardActions {
@@ -62,6 +71,8 @@ interface StudentDashboardActions {
   dismissReminder: (id: string) => void
   selectNotice: (notice: ReviewNotice) => void
   closeNotice: () => void
+  openReservationChange: (eventId: string, submissionId: string) => void
+  closeReservationChange: () => void
 }
 
 interface StudentDashboardContextValue {
@@ -146,6 +157,10 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
     useState<DateSortDirection>(null)
   const [dismissedReminderIds, setDismissedReminderIds] = useState<string[]>([])
   const [selectedNotice, setSelectedNotice] = useState<ReviewNotice | null>(null)
+  const [reservationChangeTarget, setReservationChangeTarget] = useState<{
+    eventId: string
+    submissionId: string
+  } | null>(null)
 
   const organizationQuery = useCurrentOrganizationQuery()
   const submissionsQuery = useOrgSubmissionsQuery()
@@ -235,6 +250,19 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
   const scheduledNotices = reviewNotices.filter(
     (notice) => notice.notifType === "event scheduled"
   )
+  const reservationNotices = reviewNotices.filter((notice) =>
+    isReservationNotifType(notice.notifType)
+  )
+
+  // Keyed lookup so the reminders panel + change dialog can read a paper's
+  // holds and event date straight from the already-loaded list (no refetch).
+  const submissionsByKey = useMemo(() => {
+    const map = new Map<string, ApiSubmission>()
+    for (const submission of submissionsQuery.data || []) {
+      map.set(`${submission.event_id}:${submission.submission_id}`, submission)
+    }
+    return map
+  }, [submissionsQuery.data])
 
   const reminders = useMemo(() => {
     const items = apiDeadlinesToReminders(
@@ -266,11 +294,15 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
       returnedNotices,
       approvedNotices,
       scheduledNotices,
+      reservationNotices,
       remindersLoading: deadlinesQuery.isLoading || reviewNoticesQuery.isLoading,
       remindersExpanded,
       trackerOpen,
       selectedKeys,
       selectedNotice,
+      reservationChangeTarget,
+      findSubmission: (eventId, submissionId) =>
+        submissionsByKey.get(`${eventId}:${submissionId}`),
     },
     actions: {
       setSearch,
@@ -298,6 +330,9 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
       dismissReminder: (id) => setDismissedReminderIds((prev) => [...prev, id]),
       selectNotice: setSelectedNotice,
       closeNotice: () => setSelectedNotice(null),
+      openReservationChange: (eventId, submissionId) =>
+        setReservationChangeTarget({ eventId, submissionId }),
+      closeReservationChange: () => setReservationChangeTarget(null),
     },
   }
 

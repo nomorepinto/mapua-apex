@@ -73,6 +73,11 @@ final class SubmissionEmailer
                 'event scheduled' => $this->notifyStudentEventScheduled($submission),
                 'denied' => $this->notifyStudentDecision($submission, $signatoryId, $comment, denied: true),
                 'returned' => $this->notifyStudentDecision($submission, $signatoryId, $comment, denied: false),
+                'reservation cancelled' => $this->notifyStudentReservationCancelled($submission, $comment),
+                'reservation rescheduled' => $this->notifyStudentReservationRescheduled($submission, $comment),
+                'reservation change denied' => $this->notifyStudentReservationDenied($submission, $comment),
+                // Student-initiated request: a timeline row only, no email back.
+                'reservation change requested' => null,
                 default => $this->notifyStudentDeskReminder($submission, $signatoryId, $notifType, $comment),
             };
 
@@ -167,6 +172,75 @@ final class SubmissionEmailer
         $date = data_get($submission, 'activity_details.date_of_event');
 
         return is_string($date) && $date !== '' ? $date : 'the scheduled date';
+    }
+
+    /**
+     * CDM cancelled the event: the reservation holds are released and the paper
+     * is now terminal.
+     *
+     * @param  array<string, mixed>  $submission
+     */
+    private function notifyStudentReservationCancelled(array $submission, string $comment): void
+    {
+        $email = $this->studentEmail($submission);
+
+        if ($email === null) {
+            return;
+        }
+
+        $body = 'Your reservation for "'.$this->activityTitle($submission).'" has been cancelled.'
+            .' Any room or equipment holds were released.';
+
+        if ($comment !== '') {
+            $body .= "\n\nReason: ".$comment;
+        }
+
+        $this->mailer->send($email, 'Your event reservation was cancelled', $body);
+    }
+
+    /**
+     * CDM rescheduled the event and/or moved it to a different room.
+     *
+     * @param  array<string, mixed>  $submission
+     */
+    private function notifyStudentReservationRescheduled(array $submission, string $comment): void
+    {
+        $email = $this->studentEmail($submission);
+
+        if ($email === null) {
+            return;
+        }
+
+        $body = 'Your reservation for "'.$this->activityTitle($submission).'" has been updated.'
+            ."\n\nNew schedule: ".$this->eventDate($submission);
+
+        if ($comment !== '') {
+            $body .= "\n\nDetails: ".$comment;
+        }
+
+        $this->mailer->send($email, 'Your event reservation was rescheduled', $body);
+    }
+
+    /**
+     * CDM denied the student's reservation change request; the paper is untouched.
+     *
+     * @param  array<string, mixed>  $submission
+     */
+    private function notifyStudentReservationDenied(array $submission, string $comment): void
+    {
+        $email = $this->studentEmail($submission);
+
+        if ($email === null) {
+            return;
+        }
+
+        $body = 'Your reservation change request for "'.$this->activityTitle($submission).'" was denied.';
+
+        if ($comment !== '') {
+            $body .= "\n\nReason: ".$comment;
+        }
+
+        $this->mailer->send($email, 'Your reservation change request was denied', $body);
     }
 
     /**

@@ -108,7 +108,7 @@ and 9:00 PM, end not earlier than start, and start ≠ end.
 | `reservations[]` | list | One entry per picked reservable: `{ reservable_id, campus_id, name, type, selections[], remarks }` |
 | `reservations[].type` | string | `room` \| `equipment` |
 | `reservations[].selections[]` | list | `{ date: "YYYY-MM-DD", slots: [int 0-11] }` — 0-based indices into the 07:00–21:00 / 70-min day (12 slots) |
-| `booking_refs[]` | list | Sparse reverse index `{ pk: "RESERVABLE#uuid", sk: "BOOKING#uuid" }`; present only while the paper holds BOOKINGs. Released + removed on deny/return, reconciled on re-edit |
+| `booking_refs[]` | list | Sparse reverse index `{ pk: "RESERVABLE#uuid", sk: "BOOKING#uuid" }`; present only while the paper holds BOOKINGs. Released + removed on deny/return/cancel-resolution, reconciled on re-edit and on a reschedule-resolution |
 
 Legacy items stored before this shape may still carry `equipment_requested` /
 `function_rooms` / `audiovisual_equipment`; reads tolerate both. On submit each
@@ -128,7 +128,7 @@ keyed by the submission id (a separate partition from the event).
 | `PK` | string | `SUBMISSION#uuid` |
 | `SK` | string | `NOTIFICATION#timestamp` (identity; UTC second precision) |
 | `signatory` | string | `SIGNATORY#uuid` author (snapshot) |
-| `notif_type` | string | `approved / fully approved / denied / returned` |
+| `notif_type` | string | `approved / fully approved / denied / returned / event scheduled / reservation change requested / reservation cancelled / reservation rescheduled / reservation change denied` — the four `reservation ...` types are system-only (written by RequestReservationChange / ResolveReservationChange, never client-postable) |
 | `comment` | string | Mandatory when `denied` or `returned` |
 
 Approve / return / deny insert a NOTIFICATION row as a side effect. A PUT
@@ -354,3 +354,57 @@ Both flavors share one availability engine: a slot is free only when the weekly
 template allows it AND no BOOKING (either source) occupies that date+slot.
 Conflict detection runs on the base RESERVABLE partition — never GSI5 — so it
 works before the (operator-provisioned) organization index exists.
+
+A submission-sourced hold is also **edited in place** through a
+RESERVATION_CHANGE resolution: a same-reservable date/slot change patches
+`schedule_selected` on the existing `PK`/`SK` (keys, GSI5 linkage and
+`submission_id`/`event_id`/`organization_id` all survive, and the SUBMISSION's
+`booking_refs` entry stays valid); a room swap deletes the old BOOKING and
+recreates a `source:"submission"` hold under the new RESERVABLE partition,
+swapping the `booking_refs` entry to the new keys in the same submission update.
+
+---
+
+## RESERVATION_CHANGE
+
+A student's request to cancel or reschedule the holds on an **approved** paper
+(which the student cannot edit directly), resolved by CDM. Each request freezes
+the concrete BOOKING records it targets and keeps a full before/after audit
+trail once resolved.
+
+| Property | Type | Notes |
+|---|---|---|
+| `PK` | string | `EVENT#uuid` (parent event partition) |
+| `SK` | string | `RESERVATION_CHANGE#uuid` |
+| `item_type` | string | `reservation_change` |
+| `organization_id` / `submission_id` / `campus_id` | string | Bare uuids, snapshotted at request time |
+| `requested_by` | string | `STUDENT#<sub>` from the JWT |
+| `requested_at` | timestamp | |
+| `request_type` | string | `cancel` \| `reschedule` |
+| `reason` | string | Required (≤500) |
+| `suggested_date` | string | **Sparse, reschedule only.** `"YYYY-MM-DD"`, advisory — CDM is not bound by it |
+| `bookings[]` | list | The targeted holds, **frozen** from the paper's live `booking_refs` at request time: `{ pk, sk, reservable_id, reservable_name, reservable_type, schedule_selected[] }` |
+| `status` | string | `pending / resolved / denied` |
+| `GSI6PK` | string | `CAMPUS#uuid` — CDM per-campus queue |
+| `GSI6SK` | string | `status#requested_at` (`pending#...`, `resolved#...`, `denied#...`) |
+
+On resolution the item also carries `decision` (`cancel / reschedule / deny`),
+`resolved_by` (`SIGNATORY#uuid`), `resolved_at`, `comment`, and an `applied`
+audit object:
+
+| Property | Type | Notes |
+|---|---|---|
+| `applied.bookings[]` | list | One entry per targeted hold: `{ pk, sk, action: released \| kept \| updated \| replaced, before: { reservable_id, schedule_selected }, after: {…} \| null, new_pk, new_sk }` — `new_pk`/`new_sk` only on a room swap (point at the recreated BOOKING) |
+| `applied.submission` | object \| null | `{ status_before, status_after, date_of_event_before/after, time_of_event_before/after, booking_refs_before, booking_refs_after }`; `null` for a deny |
+
+`applied` is an audit trail only — never read back as the source of truth. One
+pending request per paper. The student side lists the full history with a
+base-table query on `PK = EVENT#uuid`, `SK` begins `RESERVATION_CHANGE#` (no
+GSI); the CDM queue reads **GSI6** (operator-provisioned in AWS, mirroring GSI5;
+the CDM list endpoint fails loudly until it exists). Resolve is guarded: the
+request must still be `pending` (`finalize` uses a conditional put on
+`attribute_not_exists(resolved_at)` so two CDM users cannot resolve it twice),
+the paper must still be `approved`, and every snapshotted hold must still appear
+in the paper's live `booking_refs` (a stale request aborts **409** with zero
+writes). The request window closes at the end of `activity_details.date_of_event`
+in Asia/Manila; CDM may resolve at any time.

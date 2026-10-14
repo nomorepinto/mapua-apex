@@ -158,6 +158,16 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "reservations",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { CdmReservationsPage } = await import(
+            "@/routes/cdm-reviewer/reservations"
+          )
+          return { Component: CdmReservationsPage }
+        },
+      },
+      {
         path: "activities",
         HydrateFallback: RouteFallback,
         lazy: async () => {

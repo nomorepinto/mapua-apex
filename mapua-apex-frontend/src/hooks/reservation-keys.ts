@@ -18,6 +18,15 @@ export const RESERVATION_KEYS = {
     ["student-availability", campusId, reservableId, start, end] as const,
   bookings: (campusId = "", reservableId = "", start = "", end = "") =>
     ["reservable-bookings", campusId, reservableId, start, end] as const,
+  /** Student: the change history for one paper (drives the pending badge). */
+  studentChanges: (eventId = "", submissionId = "") =>
+    ["student-reservation-changes", eventId, submissionId] as const,
+  /** CDM: the per-campus request queue, filtered by `pending | all`. */
+  adminChanges: (campusId = "", status = "") =>
+    ["admin-reservation-changes", campusId, status] as const,
+  /** CDM: a single request for the detail panel. */
+  adminChange: (campusId = "", changeId = "") =>
+    ["admin-reservation-change", campusId, changeId] as const,
 }
 
 /**
@@ -30,4 +39,15 @@ export function invalidateAvailabilityAndBookings(queryClient: QueryClient): voi
   queryClient.invalidateQueries({ queryKey: ["admin-availability"] })
   queryClient.invalidateQueries({ queryKey: ["student-availability"] })
   queryClient.invalidateQueries({ queryKey: ["reservable-bookings"] })
+}
+
+/**
+ * Invalidate every reservation-change cache (student history + CDM queue and
+ * detail). Requesting a change moves it into the pending queue; resolving it
+ * moves it out, so all three families refresh together.
+ */
+export function invalidateReservationChanges(queryClient: QueryClient): void {
+  queryClient.invalidateQueries({ queryKey: ["student-reservation-changes"] })
+  queryClient.invalidateQueries({ queryKey: ["admin-reservation-changes"] })
+  queryClient.invalidateQueries({ queryKey: ["admin-reservation-change"] })
 }
