@@ -375,7 +375,7 @@ async function fetchSessionsWithDeduplication(startDate?: string, endDate?: stri
     startDate,
     endDate,
     limit: 200,
-    nextToken: cursor,
+    nextToken: cursor ?? undefined,
   };
 
   const promise = apiClient.get<{ data: any[]; nextToken?: string | null }>(
