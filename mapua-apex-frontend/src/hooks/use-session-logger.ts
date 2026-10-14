@@ -78,6 +78,8 @@ export const clearStoredLastActive = (): void => {
   }
 };
 
+let lastGlobalHeartbeatSentAt = 0;
+
 interface SessionResponse {
   sessionId: string;
   status: string;
@@ -183,6 +185,10 @@ export function useSessionLogger() {
 
     const sendHeartbeat = async () => {
       if (isTerminatedRef.current) return;
+
+      const now = Date.now();
+      if (now - lastGlobalHeartbeatSentAt < 3000) return;
+      lastGlobalHeartbeatSentAt = now;
 
       const currentSessionId = sessionIdRef.current;
       if (!currentSessionId) {

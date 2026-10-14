@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon, RefreshCw } from "lucide-react";
 import { FormPageHeader } from "@/components/forms/form-page-header";
 import { layout } from "@/config";
+import { cn } from "@/lib/utils";
 import {
   useSessionsQuery,
   useSessionDetailQuery,
@@ -60,6 +61,12 @@ export function AdminMonitorSessionsPage() {
 
   const isSessionsLoading = sessionsQuery.isLoading || sessionsQuery.isFetching;
   const isAnalyticsLoading = sessionAnalyticsQuery.isLoading || sessionAnalyticsQuery.isFetching;
+  const isRefreshing = isSessionsLoading || isAnalyticsLoading;
+
+  const handleRefresh = () => {
+    sessionsQuery.refetch();
+    sessionAnalyticsQuery.refetch();
+  };
 
   const rawSessions = sessionsQuery.data?.data ?? [];
   const sessionStats = sessionAnalyticsQuery.data;
@@ -216,6 +223,16 @@ export function AdminMonitorSessionsPage() {
                 Mock Preview Mode
               </span>
             )}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3.5 py-2 text-xs font-semibold text-neutral-700 shadow-xs hover:bg-neutral-50 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              title="Refresh session logs"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5 text-neutral-600", isRefreshing && "animate-spin text-[#8B0000]")} />
+              {isRefreshing ? "Refreshing..." : "Refresh"}
+            </button>
             <button
               type="button"
               onClick={handleExportCsv}

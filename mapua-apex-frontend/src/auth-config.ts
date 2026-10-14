@@ -27,6 +27,12 @@ export const oidcConfig: AuthProviderProps = {
     jwks_uri: `${authority}/.well-known/jwks.json`,
   },
   onSigninCallback: () => {
+    try {
+      localStorage.setItem("apex_last_active_at", Date.now().toString());
+      localStorage.removeItem("apex_session_id");
+    } catch {
+      // ignore
+    }
     window.history.replaceState(
       {},
       document.title,

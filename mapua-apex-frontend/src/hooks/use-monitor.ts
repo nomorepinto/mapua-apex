@@ -360,8 +360,33 @@ export function useAnalyticsQuery(params: LogQueryParams) {
         throw err;
       }
     },
-    refetchInterval: 30 * 1000,
   });
+}
+
+const sessionRequestInFlight = new Map<string, Promise<{ data: any[]; nextToken?: string | null }>>();
+
+async function fetchSessionsWithDeduplication(startDate?: string, endDate?: string, cursor?: string | null) {
+  const cacheKey = `${startDate ?? ""}_${endDate ?? ""}_${cursor ?? ""}`;
+  if (sessionRequestInFlight.has(cacheKey)) {
+    return sessionRequestInFlight.get(cacheKey)!;
+  }
+
+  const query: Record<string, string | number | boolean | undefined> = {
+    startDate,
+    endDate,
+    limit: 200,
+    nextToken: cursor,
+  };
+
+  const promise = apiClient.get<{ data: any[]; nextToken?: string | null }>(
+    "/admins/monitor/sessions",
+    { params: query }
+  ).finally(() => {
+    sessionRequestInFlight.delete(cacheKey);
+  });
+
+  sessionRequestInFlight.set(cacheKey, promise);
+  return promise;
 }
 
 export function useSessionsQuery(params: LogQueryParams) {
@@ -372,15 +397,10 @@ export function useSessionsQuery(params: LogQueryParams) {
         return getMockSessionsResponse(params);
       }
       try {
-        const query: Record<string, string | number | boolean | undefined> = {
-          startDate: params.startDate,
-          endDate: params.endDate,
-          limit: 200,
-          nextToken: params.cursor,
-        };
-        const res = await apiClient.get<{ data: any[]; nextToken?: string | null }>(
-          "/admins/monitor/sessions",
-          { params: query }
+        const res = await fetchSessionsWithDeduplication(
+          params.startDate,
+          params.endDate,
+          params.cursor
         );
         const rawItems = res.data || [];
         const items = rawItems.map(normalizeSessionItem);
@@ -393,7 +413,6 @@ export function useSessionsQuery(params: LogQueryParams) {
         throw err;
       }
     },
-    refetchInterval: 15 * 1000,
   });
 }
 
@@ -548,13 +567,10 @@ export function useSessionAnalyticsQuery(params: LogQueryParams & { compare?: "m
         return getMockSessionAnalytics(params);
       }
       try {
-        const sessionsRes = await apiClient.get<{ data: any[] }>("/admins/monitor/sessions", {
-          params: {
-            startDate: params.startDate,
-            endDate: params.endDate,
-            limit: 200,
-          },
-        });
+        const sessionsRes = await fetchSessionsWithDeduplication(
+          params.startDate,
+          params.endDate
+        );
 
         const rawSessions = sessionsRes.data || [];
         const sessions = rawSessions.map(normalizeSessionItem);
