@@ -1,5 +1,5 @@
 import { useAuth } from "react-oidc-context"
-import { useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
@@ -8,13 +8,15 @@ import { useSignOut } from "@/hooks/use-sign-out"
 import { useSessionLogger, isIdleExpired } from "@/hooks/use-session-logger"
 import { SessionDisplacementDialogs } from "./session-displacement-dialogs"
 
+const SessionTrackerContext = createContext<boolean>(false)
+
 function AuthenticatedSessionTracker({ children }: { children: React.ReactNode }) {
   useSessionLogger()
   return (
-    <>
+    <SessionTrackerContext.Provider value={true}>
       <SessionDisplacementDialogs />
       {children}
-    </>
+    </SessionTrackerContext.Provider>
   )
 }
 
@@ -27,8 +29,9 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
   const auth = useAuth()
   const handleSignOut = useSignOut()
   const [hasAttemptedSignin, setHasAttemptedSignin] = useState(false)
+  const isNested = useContext(SessionTrackerContext)
 
-  const expired = auth.isAuthenticated && isIdleExpired()
+  const expired = !isNested && auth.isAuthenticated && isIdleExpired()
   useEffect(() => {
     if (!expired) return
 
@@ -134,6 +137,10 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
           </div>
         )
       }
+    }
+
+    if (isNested) {
+      return <>{children}</>
     }
 
     return <AuthenticatedSessionTracker>{children}</AuthenticatedSessionTracker>
