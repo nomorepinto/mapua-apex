@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, type ReactElement } from "react"
+import type * as React from "react"
 import { CalendarIcon } from "lucide-react"
 
 import { Calendar } from "@/components/ui/calendar"
@@ -30,6 +31,9 @@ export function DatePicker({
   className,
   size = "default",
   displayStyle = "short",
+  modifiers,
+  modifiersClassNames,
+  legend,
 }: {
   value: string
   onChange: (value: string) => void
@@ -43,6 +47,9 @@ export function DatePicker({
   className?: string
   size?: "sm" | "default" | "lg"
   displayStyle?: "short" | "long"
+  modifiers?: React.ComponentProps<typeof Calendar>["modifiers"]
+  modifiersClassNames?: React.ComponentProps<typeof Calendar>["modifiersClassNames"]
+  legend?: React.ReactNode
 }): ReactElement {
   const selected = value ? parseDateKey(value) : undefined
   const minimum =
@@ -90,18 +97,25 @@ export function DatePicker({
           </span>
         </PopoverTrigger>
         <PopoverPopup align="start" className="w-auto">
-          <Calendar
-            mode="single"
-            selected={selected}
-            onSelect={handleSelect}
-            month={month}
-            onMonthChange={setMonth}
-            disabled={
-              minDateKey
-                ? (date) => getDateKey(date) < minDateKey
-                : undefined
-            }
-          />
+          <div className="flex flex-col gap-2">
+            {legend ? (
+              <div className="px-1 pt-1 text-xs leading-none">{legend}</div>
+            ) : null}
+            <Calendar
+              mode="single"
+              selected={selected}
+              onSelect={handleSelect}
+              month={month}
+              onMonthChange={setMonth}
+              modifiers={modifiers}
+              modifiersClassNames={modifiersClassNames}
+              disabled={
+                minDateKey
+                  ? (date) => getDateKey(date) < minDateKey
+                  : undefined
+              }
+            />
+          </div>
         </PopoverPopup>
       </Popover>
     </div>

@@ -1,11 +1,15 @@
 import { createBrowserRouter, Navigate, Outlet } from "react-router"
 
 import { layout } from "@/config"
+import { SESSION_LOG_GROUPS, ACTIVITY_LOG_GROUPS } from "@/constants/auth"
 import { AdminLayout } from "@/routes/layouts/admin-layout"
 import { CdmReviewerLayout } from "@/routes/layouts/cdm-reviewer-layout"
 import { DeanLayout } from "@/routes/layouts/dean-layout"
 import { OrgAdviserLayout } from "@/routes/layouts/org-adviser-layout"
+import { OsaarLayout } from "@/routes/layouts/osaar-layout"
+import { OsaarSetupLayout } from "@/routes/osaar/setup"
 import { StudentsLayout } from "@/routes/layouts/students-layout"
+import { RootErrorBoundary, NotFoundPage } from "@/components/layout/error-boundary"
 
 function RouteFallback() {
   return (
@@ -20,24 +24,25 @@ function PassThroughLayout() {
 }
 
 import { AuthGuard } from "@/components/auth/AuthGuard"
-import { RoleRedirect } from "@/components/auth/RoleRedirect"
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: () => (
-      <AuthGuard>
-        <RoleRedirect />
-      </AuthGuard>
-    ),
+    HydrateFallback: RouteFallback,
+    ErrorBoundary: RootErrorBoundary,
+    lazy: async () => {
+      const { LandingPage } = await import("@/routes/landing")
+      return { Component: LandingPage }
+    },
   },
   {
     path: "students",
     Component: StudentsLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/students/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -82,15 +87,55 @@ export const router = createBrowserRouter([
           },
         ],
       },
+      {
+        path: "postevals",
+        Component: PassThroughLayout,
+        children: [
+          {
+            index: true,
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { PostEvalsStart } = await import(
+                "@/routes/students/postevals"
+              )
+              return { Component: PostEvalsStart }
+            },
+          },
+          {
+            path: "wizard",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const [{ PostEvalWizard }, { action }] = await Promise.all([
+                import("@/routes/students/posteval-wizard"),
+                import("@/routes/students/posteval-wizard.action"),
+              ])
+              return { Component: PostEvalWizard, action }
+            },
+          },
+        ],
+      },
+      {
+        path: "tools",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { Tools } = await import("@/routes/students/tools")
+          return { Component: Tools }
+        },
+      },
+      {
+        path: "*",
+        Component: () => <Navigate to="/students/dashboard" replace />,
+      },
     ],
   },
   {
-    path: "cdm-reviewer",
+    path: "cdm",
     Component: CdmReviewerLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/cdm/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -103,6 +148,42 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "reservables",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminReservablesPage } = await import(
+            "@/routes/cdm-reviewer/reservables"
+          )
+          return { Component: AdminReservablesPage }
+        },
+      },
+      {
+        path: "reservations",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { CdmReservationsPage } = await import(
+            "@/routes/cdm-reviewer/reservations"
+          )
+          return { Component: CdmReservationsPage }
+        },
+      },
+      {
+        path: "activities",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorActivitiesPage } = await import(
+            "@/routes/admin/monitor-activities"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
+                <AdminMonitorActivitiesPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
         path: "about",
         HydrateFallback: RouteFallback,
         lazy: async () => {
@@ -110,15 +191,20 @@ export const router = createBrowserRouter([
           return { Component: About }
         },
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="/cdm/dashboard" replace />,
+      },
     ],
   },
   {
     path: "dean",
     Component: DeanLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/dean/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -136,15 +222,20 @@ export const router = createBrowserRouter([
           return { Component: About }
         },
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="/dean/dashboard" replace />,
+      },
     ],
   },
   {
-    path: "org-adviser",
+    path: "adviser",
     Component: OrgAdviserLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/adviser/dashboard" replace />,
       },
       {
         path: "dashboard",
@@ -164,43 +255,66 @@ export const router = createBrowserRouter([
           return { Component: About }
         },
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="/adviser/dashboard" replace />,
+      },
     ],
   },
   {
-    path: "admin",
-    Component: AdminLayout,
+    path: "osaar",
+    Component: OsaarLayout,
+    ErrorBoundary: RootErrorBoundary,
     children: [
       {
         index: true,
-        Component: () => <Navigate to="dashboard" replace />,
+        Component: () => <Navigate to="/osaar/dashboard" replace />,
       },
       {
         path: "dashboard",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { AdminOsaPanel } = await import("@/routes/admin/dashboard")
+          const { AdminOsaPanel } = await import("@/routes/osaar/dashboard")
           return { Component: AdminOsaPanel }
         },
       },
       {
-        path: "organizations",
-        HydrateFallback: RouteFallback,
-        lazy: async () => {
-          const { AdminOrganizationsPage } = await import(
-            "@/routes/admin/organizations"
-          )
-          return { Component: AdminOrganizationsPage }
-        },
-      },
-      {
-        path: "signatories",
-        HydrateFallback: RouteFallback,
-        lazy: async () => {
-          const { AdminSignatoriesPage } = await import(
-            "@/routes/admin/signatories"
-          )
-          return { Component: AdminSignatoriesPage }
-        },
+        path: "setup",
+        Component: OsaarSetupLayout,
+        children: [
+          {
+            index: true,
+            Component: () => <Navigate to="/osaar/setup/organizations" replace />,
+          },
+          {
+            path: "organizations",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminOrganizationsPage } = await import(
+                "@/routes/osaar/organizations"
+              )
+              return { Component: AdminOrganizationsPage }
+            },
+          },
+          {
+            path: "signatories",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminSignatoriesPage } = await import(
+                "@/routes/osaar/signatories"
+              )
+              return { Component: AdminSignatoriesPage }
+            },
+          },
+          {
+            path: "campuses",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminCampusPage } = await import("@/routes/osaar/campus")
+              return { Component: AdminCampusPage }
+            },
+          },
+        ],
       },
       {
         path: "review",
@@ -208,17 +322,118 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            Component: () => <Navigate to="dashboard" replace />,
+            Component: () => <Navigate to="/osaar/review/dashboard" replace />,
           },
           {
             path: "dashboard",
             HydrateFallback: RouteFallback,
             lazy: async () => {
               const { AdminReviewDashboard } = await import(
-                "@/routes/admin/review-dashboard"
+                "@/routes/osaar/review-dashboard"
               )
               return { Component: AdminReviewDashboard }
             },
+          },
+        ],
+      },
+      {
+        path: "postevals",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminPostEvals } = await import("@/routes/osaar/postevals")
+          return { Component: AdminPostEvals }
+        },
+      },
+      {
+        path: "activities",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorActivitiesPage } = await import(
+            "@/routes/admin/monitor-activities"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
+                <AdminMonitorActivitiesPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
+        path: "about",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { About } = await import("@/routes/about")
+          return { Component: About }
+        },
+      },
+      {
+        path: "*",
+        Component: () => <Navigate to="/osaar/dashboard" replace />,
+      },
+    ],
+  },
+  {
+    path: "admin",
+    Component: AdminLayout,
+    ErrorBoundary: RootErrorBoundary,
+    children: [
+      {
+        index: true,
+        Component: () => <Navigate to="/admin/sessions" replace />,
+      },
+      {
+        path: "sessions",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorSessionsPage } = await import(
+            "@/routes/admin/monitor-sessions"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={SESSION_LOG_GROUPS}>
+                <AdminMonitorSessionsPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
+        path: "activities",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorActivitiesPage } = await import(
+            "@/routes/admin/monitor-activities"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
+                <AdminMonitorActivitiesPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
+        path: "monitor",
+        Component: PassThroughLayout,
+        children: [
+          {
+            index: true,
+            Component: () => <Navigate to="/admin/sessions" replace />,
+          },
+          {
+            path: "overview",
+            Component: () => <Navigate to="/admin/sessions" replace />,
+          },
+          {
+            path: "sessions",
+            Component: () => <Navigate to="/admin/sessions" replace />,
+          },
+          {
+            path: "activities",
+            Component: () => <Navigate to="/admin/activities" replace />,
           },
         ],
       },
@@ -230,6 +445,15 @@ export const router = createBrowserRouter([
           return { Component: About }
         },
       },
+      {
+        path: "*",
+        Component: () => <Navigate to="/admin/sessions" replace />,
+      },
     ],
+  },
+  {
+    path: "*",
+    ErrorBoundary: RootErrorBoundary,
+    Component: NotFoundPage,
   },
 ])

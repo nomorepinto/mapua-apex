@@ -1,22 +1,40 @@
-import { useCallback } from "react"
+import { useCallback } from "react";
+import { apiClient } from "@/lib/api-client";
+import { clearStoredLastActive } from "@/hooks/use-session-logger";
 
 export function useSignOut() {
-  return useCallback(() => {
+  return useCallback(async (options?: { skipSessionEnd?: boolean }) => {
+    // End session in backend logger before Cognito redirect
+    const sessionId = localStorage.getItem("apex_session_id");
+    if (sessionId && !options?.skipSessionEnd) {
+      try {
+        await apiClient.post(`/sessions/${sessionId}/end`, { reason: "logout" });
+      } catch (err) {
+        console.warn("useSignOut: end session call failed", err);
+      }
+    }
+    localStorage.removeItem("apex_session_id");
+    clearStoredLastActive();
+
     // Cognito's /logout endpoint expects `client_id` + `logout_uri`,
     // NOT the standard OIDC `post_logout_redirect_uri` that oidc-client-ts sends.
-    const domain = import.meta.env.VITE_COGNITO_DOMAIN
-    const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID
-    const authority = import.meta.env.VITE_COGNITO_AUTHORITY
-    const logoutUri = import.meta.env.VITE_COGNITO_POST_LOGOUT_REDIRECT_URI
+    const domain = import.meta.env.VITE_COGNITO_DOMAIN;
+    const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
+    const authority = import.meta.env.VITE_COGNITO_AUTHORITY;
+    const logoutUri = import.meta.env.VITE_COGNITO_POST_LOGOUT_REDIRECT_URI;
 
     // Clear the OIDC user data directly from storage (synchronous).
-    // We CANNOT use auth.removeUser() because even fire-and-forget,
-    // its resolved promise triggers a React re-render where AuthGuard
-    // calls signinRedirect() — overriding our logout redirect.
-    const storageKey = `oidc.user:${authority}:${clientId}`
-    sessionStorage.removeItem(storageKey)
+    if (authority && clientId) {
+      const storageKey = `oidc.user:${authority}:${clientId}`;
+      sessionStorage.removeItem(storageKey);
+    }
 
     // Redirect to Cognito's logout endpoint with correct params
-    window.location.href = `${domain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`
-  }, [])
+    if (domain && clientId && logoutUri) {
+      window.location.href = `${domain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
+    } else {
+      window.location.href = "/";
+    }
+  }, []);
 }
+

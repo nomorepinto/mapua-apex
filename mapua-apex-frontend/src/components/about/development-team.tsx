@@ -9,28 +9,28 @@ export function DevelopmentTeam() {
   return (
     <>
       <div className={layout.section}>
-        <div className="mb-1 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-            <UsersIcon className="h-4.5 w-4.5" />
+        <div className="mb-2 flex items-center justify-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 shadow-sm">
+            <UsersIcon className="h-6 w-6" />
           </div>
-          <div>
-            <h2 className="text-base font-bold text-[#1E293B]">
+          <div className="text-left">
+            <h2 className="text-2xl font-bold text-[#1E293B]">
               Development Team
             </h2>
-            <p className="text-xs text-neutral-600">The people behind the portal</p>
+            <p className="text-sm text-neutral-600 mt-0.5">The people behind the portal</p>
           </div>
         </div>
 
-        <div className="mt-3 mb-5 flex flex-wrap items-center gap-4 pl-0.5">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-[#D9291C]" />
-            <span className="text-[11px] font-semibold text-[#64748B]">
+        <div className="mt-8 mb-6 flex flex-wrap items-center justify-center gap-8">
+          <div className="flex items-center gap-2.5">
+            <div className="h-3.5 w-3.5 rounded-full bg-[#D9291C] shadow-sm" />
+            <span className="text-[13px] font-semibold text-[#64748B]">
               Council of Organizations Role
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-amber-400" />
-            <span className="text-[11px] font-semibold text-[#64748B]">
+          <div className="flex items-center gap-2.5">
+            <div className="h-3.5 w-3.5 rounded-full bg-amber-400 shadow-sm" />
+            <span className="text-[13px] font-semibold text-[#64748B]">
               AWS-SBG Arcus Role
             </span>
           </div>

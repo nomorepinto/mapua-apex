@@ -8,14 +8,16 @@ import { InstitutionalAlignmentSection } from "@/components/submission/instituti
 import { ProponentsSection } from "@/components/submission/proponents-section"
 import { SubmissionActions } from "@/components/submission/submission-actions"
 import { SubmissionErrorAlert } from "@/components/forms/submission-error-alert"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ReservationFields } from "@/components/students/reservations/reservation-form"
 import { useReservationFormContext } from "@/components/students/reservations/reservation-context"
 import { SaafStepPanel } from "@/components/students/saaf/saaf-form"
 import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
 import { brand } from "@/config"
+import { SAAF_STEP_ISSUES_ID } from "@/components/submission/validate-saaf-step"
 import { cn } from "@/lib/utils"
 
+// STEP 1: Classification (Index 0)
 export function SaafClassificationStep() {
   const { state, actions } = useSaafFormContext()
   const { draft } = state
@@ -34,6 +36,7 @@ export function SaafClassificationStep() {
   )
 }
 
+// STEP 2: People (Index 1)
 export function SaafPeopleStep() {
   const { state, actions } = useSaafFormContext()
   const { draft } = state
@@ -56,11 +59,25 @@ export function SaafPeopleStep() {
   )
 }
 
-export function SaafActivityStep() {
-  const { state, actions } = useSaafFormContext()
+// STEP 3: Reservation (Index 2 when includeReservation is true)
+export function SaafReservationStep() {
+  const { state } = useSaafFormContext()
+  if (!state.includeReservation) return null
 
   return (
     <SaafStepPanel index={2}>
+      <ReservationFields />
+    </SaafStepPanel>
+  )
+}
+
+// STEP 4: Activity (Index 3 with reservation, Index 2 without)
+export function SaafActivityStep() {
+  const { state, actions } = useSaafFormContext()
+  const stepIndex = state.includeReservation ? 3 : 2
+
+  return (
+    <SaafStepPanel index={stepIndex}>
       <ActivityDetailsSection
         values={state.draft}
         onChange={actions.updateField}
@@ -70,11 +87,13 @@ export function SaafActivityStep() {
   )
 }
 
+// STEP 5: Alignment & Budget (Index 4 with reservation, Index 3 without)
 export function SaafAlignmentStep() {
   const { state, actions } = useSaafFormContext()
+  const stepIndex = state.includeReservation ? 4 : 3
 
   return (
-    <SaafStepPanel index={3}>
+    <SaafStepPanel index={stepIndex}>
       <InstitutionalAlignmentSection
         values={state.draft}
         onChange={actions.updateField}
@@ -90,31 +109,36 @@ export function SaafAlignmentStep() {
   )
 }
 
-export function SaafReservationStep() {
-  const { state } = useSaafFormContext()
-  if (!state.includeReservation) return null
-
-  return (
-    <SaafStepPanel index={4}>
-      <ReservationFields />
-    </SaafStepPanel>
-  )
-}
-
 export function SaafSubmitError() {
   const { state } = useSaafFormContext()
   if (state.step !== state.finalStep) return null
   return <SubmissionErrorAlert message={state.submitError} />
 }
 
-function SaafStepError() {
+/**
+ * What a rejected Continue/Submit says back: every field still open on the
+ * page, by name. Rendered above the panels so the click lands the reader here.
+ */
+export function SaafStepIssueSummary() {
   const { state } = useSaafFormContext()
-  if (!state.stepError) return null
+  if (state.stepIssues.length === 0) return null
+
+  const heading =
+    state.step === state.finalStep
+      ? "Resolve these before submitting"
+      : "Resolve these before continuing"
 
   return (
-    <Alert variant="error">
+    <Alert variant="error" id={SAAF_STEP_ISSUES_ID}>
       <CircleAlertIcon />
-      <AlertDescription>{state.stepError}</AlertDescription>
+      <AlertTitle>{heading}</AlertTitle>
+      <AlertDescription>
+        <ul className="list-disc space-y-1 pl-4">
+          {state.stepIssues.map((issue, index) => (
+            <li key={`${index}-${issue}`}>{issue}</li>
+          ))}
+        </ul>
+      </AlertDescription>
     </Alert>
   )
 }
@@ -159,11 +183,15 @@ function SaafContinueActions() {
         <SaafBackButton />
         <SaafClearButton />
       </div>
+      {/* Stays clickable while the page is incomplete: the click is what reveals
+          the page summary and glows the offending fields. */}
       <button
         type="button"
         onClick={actions.goNext}
-        disabled={!state.currentStepComplete}
-        className={brand.action}
+        className={cn(
+          brand.action,
+          !state.currentStepComplete && "opacity-70"
+        )}
       >
         Continue
       </button>
@@ -176,8 +204,6 @@ function SaafReviewActions() {
   const { actions: reservationActions } = useReservationFormContext()
   if (state.step !== state.finalStep) return null
 
-  // On the reservation step the full-proposal PDF (SAAF + reservation) is the
-  // meaningful export; otherwise the SAAF-only variant is used.
   const onSavePdf = state.includeReservation
     ? reservationActions.handleSavePdf
     : actions.savePdf
@@ -188,13 +214,14 @@ function SaafReviewActions() {
         <button type="button" onClick={actions.goBack} className={brand.actionGhost}>
           Back
         </button>
-        <SaafClearButton />
       </div>
       <SubmissionActions
         isSubmitting={state.isSubmitting}
         inactive={!state.formComplete}
         onSavePdf={onSavePdf}
         onSubmit={actions.initiateSubmit}
+        onClear={actions.openClear}
+        canClear={state.canClear}
       />
     </div>
   )
@@ -203,7 +230,6 @@ function SaafReviewActions() {
 export function SaafStepActions() {
   return (
     <>
-      <SaafStepError />
       <SaafContinueActions />
       <SaafReviewActions />
     </>

@@ -10,10 +10,8 @@ export const SAAF_STEPS = [
 
 export const RESERVATION_STEP = { id: "reservation", label: "Reservation" }
 
-/** Step indices for the four SAAF panels (used by the SAAF validation maps). */
-export type SaafStepIndex = 0 | 1 | 2 | 3
-
-/** Step indices for the whole wizard, including the optional reservation step. */
+/** Step indices for the wizard */
+export type SaafStepIndex = 0 | 1 | 2 | 3 | 4
 export type WizardStepIndex = 0 | 1 | 2 | 3 | 4
 
 export function SaafStepper({
@@ -29,15 +27,19 @@ export function SaafStepper({
   includeReservation: boolean
   onStepSelect: (step: WizardStepIndex) => void
 }) {
+  // Step order: Classification (1), People (2), Reservation (3), Activity (4), Alignment & budget (5)
   const steps = includeReservation
-    ? [...SAAF_STEPS, RESERVATION_STEP]
+    ? [
+      SAAF_STEPS[0], // Classification
+      SAAF_STEPS[1], // People
+      RESERVATION_STEP, // Reservation
+      SAAF_STEPS[2], // Activity
+      SAAF_STEPS[3], // Alignment & budget
+    ]
     : [...SAAF_STEPS]
-  // The list shrinks when the reservation step is dropped, so an out-of-range
-  // index must clamp instead of reading past the end.
+
   const activeStep = Math.min(step, steps.length - 1)
 
-  // Per-step display state, shared by the mobile ball rail and the desktop
-  // cards so the two layouts stay in lockstep.
   const stepStates = steps.map((item, index) => {
     const active = index === activeStep
     const reached = index <= farthestStep
@@ -51,10 +53,7 @@ export function SaafStepper({
         <p className="text-sm font-semibold text-neutral-800">{eventTitle}</p>
       ) : null}
 
-      {/* Mobile: a centered progress rail of numbered balls joined by a line
-          that fills as steps are reached. The step name lives in the caption
-          below, so the balls stay compact while keeping the same tap-to-jump
-          behavior as the desktop cards. */}
+      {/* Mobile progress rail */}
       <ol className="flex items-center sm:hidden">
         {stepStates.map(({ item, index, active, done, clickable }) => (
           <li
@@ -82,7 +81,7 @@ export function SaafStepper({
         ))}
       </ol>
 
-      {/* From `sm` up: the labelled cards. */}
+      {/* Desktop cards */}
       <ol
         className={cn(
           "hidden gap-2 sm:grid",
@@ -94,10 +93,10 @@ export function SaafStepper({
             "flex min-h-11 w-full items-center gap-2 rounded-xl border px-3 py-2 text-left",
             active && "border-[#8B0000] bg-[#8B0000] text-white",
             done &&
-              "cursor-pointer border-[#8B0000]/30 bg-[#8B0000]/5 text-[#8B0000] transition-colors hover:border-[#8B0000]/50 hover:bg-[#8B0000]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B0000]/40",
+            "cursor-pointer border-[#8B0000]/30 bg-[#8B0000]/5 text-[#8B0000] transition-colors hover:border-[#8B0000]/50 hover:bg-[#8B0000]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B0000]/40",
             !active &&
-              !done &&
-              "cursor-default border-neutral-200 bg-white text-neutral-600"
+            !done &&
+            "cursor-default border-neutral-200 bg-white text-neutral-600"
           )
 
           return (
@@ -159,11 +158,6 @@ function StepMarker({
   )
 }
 
-/**
- * Mobile step marker: a numbered ball on the progress rail. Completed steps
- * stay clickable (mirroring the desktop cards), the active step is solid, and
- * steps not yet reached are muted.
- */
 function StepBall({
   index,
   active,
@@ -183,7 +177,7 @@ function StepBall({
     "flex size-10 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B0000]/40",
     active && "border-[#8B0000] bg-[#8B0000] text-white",
     done &&
-      "cursor-pointer border-[#8B0000] bg-white text-[#8B0000] hover:bg-[#8B0000] hover:text-white",
+    "cursor-pointer border-[#8B0000] bg-white text-[#8B0000] hover:bg-[#8B0000] hover:text-white",
     !active && !done && "border-neutral-200 bg-white text-neutral-400"
   )
 

@@ -7,23 +7,31 @@ import {
   SAME_EVENT_TIME_MESSAGE,
   splitEventTime,
 } from "@/components/submission/event-time"
-import { isVenue, MAX_PROPONENTS, MOBILE_NUMBER_LENGTH, STUDENT_NUMBER_LENGTH } from "@/components/submission/constants"
-import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
+import {
+  MAX_PROPONENTS,
+  MAX_STUDENT_YEAR,
+  MIN_STUDENT_YEAR,
+  MOBILE_NUMBER_LENGTH,
+  STUDENT_NUMBER_LENGTH,
+  YEAR_LEVEL_OPTIONS,
+} from "@/components/submission/constants"
+import type {
+  SaafStepIndex,
+  WizardStepIndex,
+} from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
 import {
-  CLASSROOM_ROOM,
-  classroomFormatFor,
-  isRoomOfferedAtCampus,
-  isValidClassroomName,
-} from "@/lib/campus-rooms"
+  capacityIssue,
+  withinCapacity,
+} from "@/lib/reservable-capacity"
 import {
   EVENT_DATE_TOO_SOON_MESSAGE,
   minEventDateKey,
 } from "@/lib/date-key"
 
 const EMAIL_PATTERN =
-  /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+  /^[a-zA-Z0-9._%+-]+@(mymail\.mapua\.edu\.ph|mapua\.edu\.ph)$/i
 
 function isBlank(value: string | undefined): boolean {
   return !value || !value.trim()
@@ -59,10 +67,18 @@ function isInsideEventWindow(value: string): boolean {
   )
 }
 
-function isValidAbsoluteUrl(value: string): boolean {
+function isValidFacebookUrl(value: string): boolean {
+  const trimmed = value.trim()
+  if (!/^https:\/\/(www\.)?facebook\.com\/.+/i.test(trimmed)) {
+    return false
+  }
   try {
-    const url = new URL(value)
-    return url.protocol === "http:" || url.protocol === "https:"
+    const url = new URL(trimmed)
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "facebook.com" || url.hostname === "www.facebook.com") &&
+      url.pathname.length > 1
+    )
   } catch {
     return false
   }
@@ -70,27 +86,16 @@ function isValidAbsoluteUrl(value: string): boolean {
 
 const REQUIRED = "This field is required."
 
-/**
- * Proponent details that must be unique across every proponent in Section 2.
- * Two rows sharing a non-blank value for any of these are a data-entry clash,
- * so the duplicated rows are flagged and the wizard refuses to advance.
- */
 const UNIQUE_PROPONENT_FIELDS: Array<{
   field: keyof Proponent
   label: string
 }> = [
-  { field: "studentNumber", label: "student number" },
-  { field: "contactNumber", label: "mobile number" },
-  { field: "positionOfApplicant", label: "position of the applicant" },
-  { field: "facebookLink", label: "Facebook link" },
-]
+    { field: "studentNumber", label: "student number" },
+    { field: "contactNumber", label: "mobile number" },
+    { field: "positionOfApplicant", label: "position of the applicant" },
+    { field: "facebookLink", label: "Facebook link" },
+  ]
 
-/**
- * Flags every proponent row whose unique-required detail repeats another row's.
- * Comparison is trimmed and case-insensitive; blank values are skipped so the
- * per-field "required" warning stays the actionable message. A duplicate never
- * overwrites an existing format error already recorded for that field.
- */
 function markDuplicateProponents(
   proponents: Proponent[],
   warnings: Record<string, string>
@@ -126,12 +131,33 @@ function proponentWarnings(
   } else if (proponent.studentNumber.trim().length < STUDENT_NUMBER_LENGTH) {
     warnings[key("studentNumber")] =
       `Student number must be ${STUDENT_NUMBER_LENGTH} digits.`
+  } else {
+    const year = Number(proponent.studentNumber.slice(0, 4))
+    if (year < MIN_STUDENT_YEAR || year > MAX_STUDENT_YEAR) {
+      warnings[key("studentNumber")] =
+        `Student number must start with a year between ${MIN_STUDENT_YEAR} and ${MAX_STUDENT_YEAR}.`
+    }
   }
-  if (isBlank(proponent.programAndYear)) warnings[key("programAndYear")] = REQUIRED
+  if (isBlank(proponent.programAndYear)) {
+    warnings[key("programAndYear")] = REQUIRED
+  } else {
+    const trimmed = proponent.programAndYear.trim()
+    const hasYear = YEAR_LEVEL_OPTIONS.some((yr) =>
+      trimmed.toLowerCase().endsWith(yr.toLowerCase())
+    )
+    const hasProgram =
+      trimmed.includes(" - ") ||
+      (!hasYear && !isBlank(trimmed))
+    if (!hasYear || !hasProgram) {
+      warnings[key("programAndYear")] = "Both program and year level are required."
+    }
+  }
   if (isBlank(proponent.positionOfApplicant)) warnings[key("positionOfApplicant")] = REQUIRED
   if (isBlank(proponent.orgOrCourseSection)) warnings[key("orgOrCourseSection")] = REQUIRED
   if (isBlank(proponent.contactNumber)) {
     warnings[key("contactNumber")] = REQUIRED
+  } else if (!proponent.contactNumber.trim().startsWith("09")) {
+    warnings[key("contactNumber")] = "Mobile number must start with 09."
   } else if (proponent.contactNumber.trim().length < MOBILE_NUMBER_LENGTH) {
     warnings[key("contactNumber")] =
       `Mobile number must be ${MOBILE_NUMBER_LENGTH} digits.`
@@ -141,13 +167,15 @@ function proponentWarnings(
   if (isBlank(proponent.emailAddress)) {
     warnings[key("emailAddress")] = REQUIRED
   } else if (!EMAIL_PATTERN.test(proponent.emailAddress.trim())) {
-    warnings[key("emailAddress")] = "Enter a valid email address."
+    warnings[key("emailAddress")] =
+      "Email must end with @mymail.mapua.edu.ph or @mapua.edu.ph."
   }
 
   if (isBlank(proponent.facebookLink)) {
     warnings[key("facebookLink")] = REQUIRED
-  } else if (!isValidAbsoluteUrl(proponent.facebookLink.trim())) {
-    warnings[key("facebookLink")] = "Enter a valid Facebook URL."
+  } else if (!isValidFacebookUrl(proponent.facebookLink.trim())) {
+    warnings[key("facebookLink")] =
+      "Facebook link must start with https://facebook.com/"
   }
 }
 
@@ -157,13 +185,13 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   if (!draft.activityType) warnings.activityType = "Select an activity type."
   if (isBlank(draft.totalOrgMembers)) {
     warnings.totalOrgMembers = REQUIRED
-  } else if (draft.totalOrgMembers.length > 5) {
-    warnings.totalOrgMembers = "Cannot exceed 5 digits."
+  } else if (Number(draft.totalOrgMembers) < 30) {
+    warnings.totalOrgMembers = "Must be at least 30 members."
+  } else if (Number(draft.totalOrgMembers) > 3000) {
+    warnings.totalOrgMembers = "Cannot exceed 3000 members."
   }
 
   if (draft.proponents.length > MAX_PROPONENTS) {
-    // Reachable only from a legacy draft (restored paper or saved session) —
-    // the wizard hides "Add Proponent" once the cap is hit.
     warnings["proponent.max"] = `A maximum of ${MAX_PROPONENTS} proponents is allowed. Remove ${draft.proponents.length - MAX_PROPONENTS} to continue.`
   }
 
@@ -190,9 +218,6 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   }
   if (isBlank(draft.activityVenue)) {
     warnings.activityVenue = "Select a venue."
-  } else if (!isVenue(draft.activityVenue)) {
-    // Drafts saved before the venue became a selector hold free text.
-    warnings.activityVenue = "Select a venue from the list."
   }
 
   const startDate = draft.dateOfEvent
@@ -221,8 +246,18 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
     }
   }
 
-  if (isBlank(draft.expectedParticipants)) warnings.expectedParticipants = REQUIRED
-  if (isBlank(draft.individualContribution)) warnings.individualContribution = REQUIRED
+  if (isBlank(draft.expectedParticipants)) {
+    warnings.expectedParticipants = REQUIRED
+  } else if (Number(draft.expectedParticipants) < 20) {
+    warnings.expectedParticipants = "Must be at least 20 participants."
+  } else if (Number(draft.expectedParticipants) > 3000) {
+    warnings.expectedParticipants = "Cannot exceed 3000 participants."
+  }
+  if (isBlank(draft.individualContribution)) {
+    warnings.individualContribution = REQUIRED
+  } else if (Number(draft.individualContribution) > 5000) {
+    warnings.individualContribution = "Cannot exceed 5000."
+  }
   if (isBlank(draft.proposedBudget)) warnings.proposedBudget = REQUIRED
 
   if (!(draft.mission1 || draft.mission2 || draft.mission3)) {
@@ -248,7 +283,33 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   return warnings
 }
 
-const STEP_PREFIXES: Record<SaafStepIndex, string[]> = {
+// Prefixes:
+// 0: Classification
+// 1: People
+// 2: Reservation (activityVenue, dateOfEvent, endDateOfEvent, timeOfEvent & expectedParticipants)
+// 3: Activity
+// 4: Alignment & Budget
+export const STEP_PREFIXES_WITH_RESERVATION: Record<SaafStepIndex, string[]> = {
+  0: ["activityType", "totalOrgMembers"],
+  1: ["proponent."],
+  2: [
+    "activityVenue",
+    "dateOfEvent",
+    "endDateOfEvent",
+    "timeOfEvent",
+    "expectedParticipants",
+  ],
+  3: [
+    "activityTitle",
+    "activityDescription",
+    "activityObjectives",
+    "individualContribution",
+    "proposedBudget",
+  ],
+  4: ["mission", "coreValuesExplanation", "peoExplanation", "sdgExplanation"],
+}
+
+export const STEP_PREFIXES_NO_RESERVATION: Record<SaafStepIndex, string[]> = {
   0: ["activityType", "totalOrgMembers"],
   1: ["proponent."],
   2: [
@@ -264,89 +325,227 @@ const STEP_PREFIXES: Record<SaafStepIndex, string[]> = {
     "proposedBudget",
   ],
   3: ["mission", "coreValuesExplanation", "peoExplanation", "sdgExplanation"],
+  4: [],
 }
 
-export function getSaafStepIssue(
+/**
+ * Warning keys are machine-facing (`activityVenue`, `proponent.<id>.lastName`),
+ * so they say nothing to a reader. These labels turn a key into the words the
+ * field is actually called on screen, which is what makes a step-level error
+ * list actionable.
+ */
+const WARNING_KEY_LABELS: Record<string, string> = {
+  activityType: "Type of activity",
+  totalOrgMembers: "Total no. of org members",
+  activityTitle: "Title of activity",
+  activityDescription: "Description",
+  activityObjectives: "Objectives of the activity",
+  activityVenue: "Venue campus",
+  dateOfEvent: "Start date of event",
+  endDateOfEvent: "End date of event",
+  timeOfEvent: "Time of event",
+  expectedParticipants: "Expected participants",
+  individualContribution: "Individual contribution",
+  proposedBudget: "Proposed budget",
+  mission: "Mission statement",
+  coreValuesExplanation: "Core values explanation",
+  peoExplanation: "Program educational objectives",
+  sdgExplanation: "UN sustainability goals",
+}
+
+/** Proponent row fields, keyed by the `Proponent` property name. */
+const PROPONENT_FIELD_LABELS: Record<string, string> = {
+  firstName: "First name",
+  lastName: "Last name",
+  studentNumber: "Student number",
+  programAndYear: "Program / year level",
+  department: "Department",
+  positionOfApplicant: "Position of the applicant",
+  orgOrCourseSection: "Name of organization",
+  contactNumber: "Mobile number",
+  emailAddress: "Email address",
+  facebookLink: "Facebook link",
+}
+
+/**
+ * Turns a `saafFieldWarnings` key into a human label. Proponent keys carry the
+ * row id, which is resolved to its on-screen row number so a page with several
+ * proponents says *which* proponent is short a field.
+ */
+function warningKeyLabel(key: string, proponents: Proponent[]): string {
+  if (key === "proponent.max") return "Number of proponents"
+  const match = /^proponent\.([^.]+)\.(.+)$/.exec(key)
+  if (match) {
+    const index = proponents.findIndex((p) => p.id === match[1])
+    const field = PROPONENT_FIELD_LABELS[match[2]] ?? match[2]
+    return index >= 0 ? `Proponent ${index + 1} · ${field}` : `Proponent · ${field}`
+  }
+  return WARNING_KEY_LABELS[key] ?? key
+}
+
+/** Raw `[key, message]` warnings that belong to the given wizard step. */
+function stepWarningEntries(
   step: SaafStepIndex,
-  draft: SaafDraft
-): string | null {
+  draft: SaafDraft,
+  includeReservation = false
+): Array<[string, string]> {
   const warnings = saafFieldWarnings(draft)
-  const prefixes = STEP_PREFIXES[step]
-  const messages = Object.entries(warnings)
-    .filter(([key]) => prefixes.some((prefix) => key === prefix || key.startsWith(prefix)))
-    .map(([, message]) => message)
+  const map = includeReservation
+    ? STEP_PREFIXES_WITH_RESERVATION
+    : STEP_PREFIXES_NO_RESERVATION
 
-  return messages[0] ?? null
+  const prefixes = map[step] || []
+
+  return Object.entries(warnings).filter(([key]) =>
+    prefixes.some((prefix) => key === prefix || key.startsWith(prefix))
+  )
 }
 
-export function isSaafStepComplete(step: SaafStepIndex, draft: SaafDraft): boolean {
-  return getSaafStepIssue(step, draft) === null
+/**
+ * Every unresolved field on a step, each prefixed with its label. A failed
+ * Continue reveals this list, so the proponent sees all that is missing on the
+ * page at once instead of one message per click.
+ */
+export function getSaafStepIssues(
+  step: SaafStepIndex,
+  draft: SaafDraft,
+  includeReservation = false
+): string[] {
+  return stepWarningEntries(step, draft, includeReservation).map(
+    ([key, message]) => `${warningKeyLabel(key, draft.proponents)}: ${message}`
+  )
 }
 
-export function isSaafDraftComplete(draft: SaafDraft): boolean {
-  return ([0, 1, 2, 3] as const).every((step) => isSaafStepComplete(step, draft))
+/** Whether the step has nothing left to fill in or correct. */
+export function isSaafStepComplete(
+  step: SaafStepIndex,
+  draft: SaafDraft,
+  includeReservation: boolean = false
+): boolean {
+  return stepWarningEntries(step, draft, includeReservation).length === 0
+}
+
+export function isSaafDraftComplete(draft: SaafDraft, includeReservation: boolean = false): boolean {
+  const total = includeReservation ? ([0, 1, 2, 3, 4] as const) : ([0, 1, 2, 3] as const)
+  return total.every((step) => isSaafStepComplete(step, draft, includeReservation))
 }
 
 const RESERVATION_EMPTY_MESSAGE =
-  "Add at least one equipment, room, or audiovisual item."
+  "Select at least one room or equipment to reserve."
 
-/**
- * The reservation step advances once the proponent has added at least one
- * equipment, function room, or audiovisual row. Rooms must also fit the venue
- * campus: only that campus's rooms can be booked, and every "Classroom" row
- * needs a code matching the campus format, so a wrong code stops submission.
- */
+/** Headcount as a number, or null when blank/invalid (unknown = allowed). */
+function expectedParticipantsValue(
+  expectedParticipants?: string | number | null
+): number | null {
+  if (expectedParticipants === null || expectedParticipants === undefined) {
+    return null
+  }
+  const trimmed = String(expectedParticipants).trim()
+  if (trimmed === "") return null
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 export function getReservationStepIssue(
   draft: ReservationDraft,
-  campus: string
+  campus: string,
+  expectedParticipants?: string | number | null
 ): string | null {
-  const hasItems =
-    draft.equipmentItems.length > 0 ||
-    draft.roomItems.length > 0 ||
-    draft.avItems.length > 0
-  if (!hasItems) return RESERVATION_EMPTY_MESSAGE
+  const picks = Array.isArray(draft?.picks) ? draft.picks : []
+  if (isBlank(campus)) {
+    return "Select a campus for the facility reservation."
+  }
+  if (picks.length === 0) return RESERVATION_EMPTY_MESSAGE
 
-  // Custom "Others" rows carry a free-text name instead of a catalog value, so
-  // they skip the campus whitelist below but must still be named.
-  if (draft.equipmentItems.some((item) => item.isOther && isBlank(item.name))) {
-    return "Enter a name for the custom equipment item."
+  const missingSelection = picks.find((pick) => pick.selections.length === 0)
+  if (missingSelection) {
+    return `Pick a date and at least one time slot for "${missingSelection.name}".`
   }
-  if (
-    draft.avItems.some((item) => item.isOther && isBlank(item.equipmentNeeded))
-  ) {
-    return "Enter a name for the custom audiovisual equipment."
-  }
-  if (draft.roomItems.some((item) => item.isOther && isBlank(item.roomNeeded))) {
-    return "Enter a name for the custom room."
-  }
-
-  const offCampus = draft.roomItems.find(
-    (item) => !item.isOther && !isRoomOfferedAtCampus(campus, item.roomNeeded)
+  const hasEmptySlotList = picks.some((pick) =>
+    pick.selections.some((selection) => selection.slots.length === 0)
   )
-  if (offCampus) {
-    return `Remove "${offCampus.roomNeeded}" — it is not offered at ${campus || "the selected campus"}.`
+  if (hasEmptySlotList) {
+    return "Select at least one time slot for each chosen date."
   }
 
-  const classroom = draft.roomItems.find(
-    (item) =>
-      item.roomNeeded === CLASSROOM_ROOM &&
-      !isValidClassroomName(campus, item.classroomName)
-  )
-  if (classroom) {
-    const format = classroomFormatFor(campus)
-    return isBlank(classroom.classroomName)
-      ? `Enter the classroom name (format: ${format}).`
-      : `Fix the classroom name — format: ${format}.`
+  // Room participant bounds are enforced against the expected headcount here so
+  // an out-of-range selection is blocked before submit instead of a 422 from the
+  // API (which mirrors this same check in BookingRecords::assertAvailable).
+  const headcount = expectedParticipantsValue(expectedParticipants)
+  if (headcount !== null) {
+    const overCapacity = picks.find(
+      (pick) =>
+        pick.type === "room" &&
+        !withinCapacity(
+          { min: pick.min_participants, max: pick.max_participants },
+          headcount
+        )
+    )
+    if (overCapacity) {
+      return capacityIssue(
+        overCapacity.name,
+        { min: overCapacity.min_participants, max: overCapacity.max_participants },
+        headcount
+      )
+    }
   }
 
   return null
 }
 
+// The reservation step owns its own catalog picks, which are not part of the
+// SAAF draft; label them the same way the field warnings are labelled.
+export function getReservationStepIssues(
+  draft: ReservationDraft,
+  campus: string,
+  expectedParticipants?: string | number | null
+): string[] {
+  const issue = getReservationStepIssue(draft, campus, expectedParticipants)
+  return issue ? [`Rooms and equipment: ${issue}`] : []
+}
+
 export function isReservationStepComplete(
   draft: ReservationDraft,
-  campus: string
+  campus: string,
+  expectedParticipants?: string | number | null
 ): boolean {
-  return getReservationStepIssue(draft, campus) === null
+  return getReservationStepIssue(draft, campus, expectedParticipants) === null
+}
+
+/**
+ * First wizard page whose rules still fail. Used to move the proponent to the
+ * page that actually holds the problem when a submit is rejected from the last
+ * page, instead of leaving them staring at an error about another page's fields.
+ */
+export function firstIncompleteWizardStep(
+  draft: SaafDraft,
+  includeReservation: boolean,
+  reservationDraft: ReservationDraft
+): WizardStepIndex | null {
+  const steps = includeReservation
+    ? ([0, 1, 2, 3, 4] as const)
+    : ([0, 1, 2, 3] as const)
+
+  for (const step of steps) {
+    if (!isSaafStepComplete(step, draft, includeReservation)) {
+      return step as WizardStepIndex
+    }
+    // The picks live outside the SAAF draft, so they are checked separately on
+    // the reservation page only.
+    if (
+      includeReservation &&
+      step === 2 &&
+      !isReservationStepComplete(
+        reservationDraft,
+        draft.activityVenue,
+        draft.expectedParticipants
+      )
+    ) {
+      return 2 as WizardStepIndex
+    }
+  }
+
+  return null
 }
 
 export function isStepHtmlValid(panel: HTMLElement): boolean {
@@ -364,3 +563,10 @@ export function isStepHtmlValid(panel: HTMLElement): boolean {
 
 export const STEP_INVALID_FOCUS_SELECTOR =
   'input:invalid:not([type="hidden"]), textarea:invalid, select:invalid, .saaf-glow-invalid'
+
+/**
+ * Id of the wizard's per-page issue summary. The reveal scrolls to it, so the
+ * contract is shared between the hook that reveals and the component that
+ * renders the list.
+ */
+export const SAAF_STEP_ISSUES_ID = "saaf-step-issues"

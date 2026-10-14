@@ -24,7 +24,9 @@ export interface RoomRequestedItem {
   classroomName?: string
   remarks?: string
   dateNeeded?: string
+  endDateNeeded?: string
   timeNeeded?: string
+  endTimeNeeded?: string
 }
 
 export interface AvEquipmentItem {
@@ -60,7 +62,7 @@ export interface Activity {
   decision: ActivityDecision
   type: string
   nature?: "major" | "minor" | string
-  status?: "Review" | "Returned" | "Rejected" | "Accepted" | "Pending Dean Approval"
+  status?: "Review" | "Returned" | "Rejected" | "Accepted" | "Pending Dean Approval" | "Cancelled"
   description: string
   venue: string
   expectedParticipants: number
@@ -75,6 +77,12 @@ export interface Activity {
   avEquipmentRequested?: AvEquipmentItem[]
   /** Detailed budget proposal items */
   budgetItems?: ActivityBudgetItem[]
+  /** Whether the activity has a venue/equipment reservation requested */
+  hasReservation?: boolean
+  /** Raw start date of the event in YYYY-MM-DD */
+  dateOfEvent?: string
+  /** Raw end date of the event in YYYY-MM-DD */
+  endDateOfEvent?: string
   /** Grand total of the detailed budget proposal */
   budgetGrandTotal?: number
 }
@@ -91,6 +99,8 @@ export function getStatusVariant(status: Activity["status"]): StatusVariant {
     case "Returned":
     case "Rejected":
       return "error"
+    case "Cancelled":
+      return "outline"
     default:
       return "outline"
   }

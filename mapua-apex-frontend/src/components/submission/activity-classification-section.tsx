@@ -2,6 +2,9 @@ import { FieldWarning } from "@/components/forms/field-warning"
 import { Input } from "@/components/ui/input"
 import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
 
+const MIN_TOTAL_ORG_MEMBERS = 30
+const MAX_TOTAL_ORG_MEMBERS = 3000
+
 export function ActivityClassificationSection({
   activityType,
   totalOrgMembers,
@@ -58,14 +61,18 @@ export function ActivityClassificationSection({
           pattern="[0-9]*"
           name="totalOrgMembers"
           placeholder="0"
-          maxLength={5}
+          maxLength={4}
+          min={MIN_TOTAL_ORG_MEMBERS}
+          max={MAX_TOTAL_ORG_MEMBERS}
           value={totalOrgMembers}
           onKeyDown={blockNonIntegerKeys}
-          onChange={(e) =>
-            onTotalOrgMembersChange(
-              sanitizeIntegerInput(e.target.value).slice(0, 5)
-            )
-          }
+          onChange={(e) => {
+            const sanitized = sanitizeIntegerInput(e.target.value).slice(0, 4)
+            if (sanitized === "0") {
+              return
+            }
+            onTotalOrgMembersChange(sanitized)
+          }}
           style={{ color: "#171717" }}
           className="no-spinner h-10 rounded-lg border-neutral-300 bg-white text-center !text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-red-800/20"
           required

@@ -1,3 +1,4 @@
+import { CdmCalendarSection } from "@/components/signatories/dashboard/cdm-calendar-section"
 import { ReviewActivityDialog } from "@/components/signatories/dashboard/review-queue"
 import { ReviewDashboardHeader } from "@/components/signatories/dashboard/review-dashboard-header"
 import { ReviewDashboardProvider } from "@/components/signatories/dashboard/review-dashboard-context"
@@ -12,6 +13,7 @@ export function CdmReviewerDashboard() {
       <div className={layout.page}>
         <div className={cn(layout.container, layout.stack)}>
           <ReviewDashboardHeader />
+          <CdmCalendarSection />
           <ReviewQueue />
           <SubmissionHistorySection />
         </div>

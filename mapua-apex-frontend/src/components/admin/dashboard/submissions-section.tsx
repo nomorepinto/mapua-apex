@@ -19,7 +19,11 @@ export function AdminSubmissionsSection() {
   const { state, actions } = useAdminDashboard()
 
   return (
-    <section className={layout.section}>
+    <section
+      id="submissions-section"
+      className={cn(layout.section, "scroll-mt-6")}
+      aria-label="Submissions Section"
+    >
       <div className="mb-5 flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 sm:max-w-sm">
           <h2 className="text-lg font-extrabold text-neutral-900">Submissions</h2>

@@ -98,6 +98,22 @@ abstract class TestCase extends BaseTestCase
         return $this->withToken($jwt);
     }
 
+    /**
+     * @param  array<string, mixed>  $claims
+     */
+    protected function withSuperAdminAuth(array $claims = [], string $jwt = 'fake-jwt'): static
+    {
+        $this->fakeCognitoJwt(array_merge([
+            'sub' => 'superadmin-001',
+            'cognito:groups' => ['super_admin'],
+            'email' => 'superadmin@mapua.edu.ph',
+            'name' => 'Super Admin',
+            'custom:role' => 'super_admin',
+        ], $claims));
+
+        return $this->withToken($jwt);
+    }
+
     public function swapDynamoDbClient(DynamoDbClient|MockInterface $client): void
     {
         $this->app->instance(DynamoDbClient::class, $client);

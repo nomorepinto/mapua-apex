@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Auth\CognitoJwksUnavailable;
 use App\Auth\CognitoJwtVerifier;
 use App\Auth\InvalidCognitoJwt;
+use App\Logging\LogTableItems;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
@@ -21,9 +22,11 @@ class AuthenticateCognitoJwt
      * @var array<string, list<string>>
      */
     private const ROUTE_GROUPS = [
-        'student' => ['student', 'students', 'org_submitter', 'admin'],
-        'signatory' => ['signatory', 'signatories', 'org_adviser', 'dean', 'cdm_reviewer', 'cdm', 'osaar', 'admin'],
-        'admin' => ['admin', 'osaar'],
+        'student'     => ['student', 'students', 'org_submitter', 'admin', 'super_admin'],
+        'signatory'   => ['signatory', 'signatories', 'org_adviser', 'dean', 'cdm_reviewer', 'cdm', 'osaar', 'admin', 'super_admin'],
+        'admin'       => ['admin', 'osaar', 'cdm_reviewer', 'cdm', 'super_admin'],
+        'super_admin' => ['super_admin'],
+        // 'any' is handled explicitly in mayAccessRole — valid JWT, no group check
     ];
 
     public function __construct(private CognitoJwtVerifier $verifier) {}
@@ -64,7 +67,7 @@ class AuthenticateCognitoJwt
 
         $groups = $this->groups($claims['cognito:groups'] ?? null);
         $normalizedGroups = array_map(strtolower(...), $groups);
-        $isAdmin = in_array('admin', $normalizedGroups, true);
+        $isAdmin = in_array('admin', $normalizedGroups, true) || in_array('super_admin', $normalizedGroups, true);
         $mayImpersonateSignatory = $isAdmin || in_array('osaar', $normalizedGroups, true);
 
         if (is_string($role) && $role !== '' && ! $this->mayAccessRole($role, $normalizedGroups)) {
@@ -79,6 +82,25 @@ class AuthenticateCognitoJwt
                 ],
             );
         }
+
+        $userRole = 'student';
+        if ($isAdmin) {
+            $userRole = 'admin';
+        } elseif (array_intersect($normalizedGroups, ['signatory', 'signatories', 'org_adviser', 'dean', 'cdm_reviewer', 'cdm', 'osaar'])) {
+            $userRole = 'signatory';
+        }
+
+        $cognitoUser = [
+            'sub' => (string) ($claims['sub'] ?? 'unknown'),
+            'email' => (string) ($claims['email'] ?? 'unknown@mapua.edu.ph'),
+            'name' => (string) ($claims['name'] ?? $claims['email'] ?? 'Unknown User'),
+            'role' => (string) ($claims['custom:role'] ?? $userRole),
+            'auth_time' => (int) ($claims['auth_time'] ?? time()),
+            'claims' => $claims,
+        ];
+
+        $request->attributes->set('cognito_user', $cognitoUser);
+        Context::addHidden('cognito_user', $cognitoUser);
 
         $request->attributes->set('cognito.is_admin', $isAdmin);
         Context::addHidden('cognito.is_admin', $isAdmin);
@@ -113,6 +135,58 @@ class AuthenticateCognitoJwt
             $role,
             $mayImpersonateSignatory,
         );
+
+        // Active session enforcement on authenticated business endpoints (skip /sessions/*)
+        if (! $request->is('api/v1/sessions/*') && ! $request->is('sessions/*')) {
+            $sessionId = $request->header('X-Session-ID');
+            if (is_string($sessionId) && trim($sessionId) !== '') {
+                $sessionId = trim($sessionId);
+                try {
+                    $logTable = app(LogTableItems::class);
+                    $pointer = $logTable->getActiveSessionPointer($cognitoUser['sub']);
+
+                    if ($pointer !== null) {
+                        if (($pointer['session_id'] ?? '') !== $sessionId) {
+                            $sessionItem = $logTable->getSessionItem($sessionId);
+                            $reason = $sessionItem['end_reason'] ?? null;
+                            if ($reason === 'concurrent_login') {
+                                return response()->json([
+                                    'error' => 'This session was logged out because your account was logged into another device',
+                                    'code' => 'CONCURRENT_LOGIN_DISPLACED',
+                                ], 409);
+                            }
+                            if ($reason === 'admin_revoked') {
+                                return response()->json([
+                                    'error' => 'An administrator ended your session',
+                                    'code' => 'SESSION_REVOKED',
+                                ], 409);
+                            }
+
+                            return response()->json([
+                                'error' => 'Session expired or replaced',
+                                'code' => 'SESSION_EXPIRED',
+                            ], 409);
+                        }
+
+                        // Check lazy staleness (> 15 minutes)
+                        $lastHb = $pointer['last_heartbeat'] ?? null;
+                        if ($lastHb && (time() - strtotime($lastHb)) > (15 * 60)) {
+                            return response()->json([
+                                'error' => 'Session expired due to inactivity',
+                                'code' => 'SESSION_EXPIRED',
+                            ], 409);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('AuthenticateCognitoJwt: session check failed', ['error' => $e->getMessage()]);
+                }
+            } elseif (! app()->environment('testing')) {
+                return response()->json([
+                    'error' => 'Active session required',
+                    'code' => 'SESSION_REQUIRED',
+                ], 428);
+            }
+        }
 
         return $next($request);
     }
@@ -208,6 +282,11 @@ class AuthenticateCognitoJwt
      */
     private function mayAccessRole(string $role, array $normalizedGroups): bool
     {
+        // 'any' = accept any valid JWT, no group membership required
+        if ($role === 'any') {
+            return true;
+        }
+
         $allowed = self::ROUTE_GROUPS[strtolower($role)] ?? [strtolower($role)];
 
         foreach ($allowed as $group) {

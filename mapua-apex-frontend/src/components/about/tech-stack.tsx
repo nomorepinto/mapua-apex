@@ -20,15 +20,18 @@ export function TechStack() {
       </div>
       <div className="flex flex-wrap gap-2">
         {TECH_STACK.map((tech) => (
-          <span
+          <a
             key={tech.name}
+            href={tech.url}
+            target="_blank"
+            rel="noopener noreferrer"
             className={cn(
-              "inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-bold",
+              "inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-bold transition-all hover:scale-105 hover:shadow-sm cursor-pointer",
               tech.color
             )}
           >
             {tech.name}
-          </span>
+          </a>
         ))}
       </div>
     </div>

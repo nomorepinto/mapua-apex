@@ -24,20 +24,24 @@ export function RoleRedirect() {
   }
 
   if (!auth.isAuthenticated) {
-    // AuthGuard at the root layout usually handles this, but just in case
-    return <Navigate to="/students/dashboard" replace />
+    return <Navigate to="/" replace />
   }
 
   const userGroups = (auth.user?.profile["cognito:groups"] as string[]) || []
 
-  // Admin & OSAAR → admin panel
-  if (hasGroup(userGroups, "admin") || hasGroup(userGroups, "osaar")) {
-    return <Navigate to="/admin/dashboard" replace />
+  // Admin → admin panel
+  if (hasGroup(userGroups, "admin")) {
+    return <Navigate to="/admin/sessions" replace />
+  }
+
+  // OSAAR → osaar panel
+  if (hasGroup(userGroups, "osaar")) {
+    return <Navigate to="/osaar/dashboard" replace />
   }
 
   // CDM Reviewer → own panel
   if (hasGroup(userGroups, "cdm_reviewer")) {
-    return <Navigate to="/cdm-reviewer/dashboard" replace />
+    return <Navigate to="/cdm/dashboard" replace />
   }
 
   // Dean → own panel
@@ -47,7 +51,7 @@ export function RoleRedirect() {
 
   // Org Adviser → own panel
   if (hasGroup(userGroups, "org_adviser")) {
-    return <Navigate to="/org-adviser/dashboard" replace />
+    return <Navigate to="/adviser/dashboard" replace />
   }
 
   // Org Submitter (student orgs) → student panel

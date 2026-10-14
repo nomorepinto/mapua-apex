@@ -5,12 +5,12 @@ export function FormPageHeader({
   subtitle,
 }: {
   title: string
-  subtitle: string
+  subtitle?: string
 }) {
   return (
     <div className="border-b border-neutral-200 pb-5">
       <h1 className={layout.pageTitle}>{title}</h1>
-      <p className={layout.pageSubtitle}>{subtitle}</p>
+      {subtitle ? <p className={layout.pageSubtitle}>{subtitle}</p> : null}
     </div>
   )
 }

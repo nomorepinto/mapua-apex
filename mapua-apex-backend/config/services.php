@@ -37,6 +37,18 @@ return [
         'cdm_id' => env('CDM_SIGNATORY_ID', ''),
     ],
 
+    /*
+    | Arcus companion apps. Links are embedded in the approval email sent to the
+    | org_submitter when a proposal is fully approved; the post-evaluation window
+    | is the number of days after the event that evaluation stays open.
+    */
+    'arcus' => [
+        'attendance_url' => env('ARCUS_ATTENDANCE_URL', ''),
+        'evaluation_url' => env('ARCUS_EVALUATION_URL', ''),
+        'post_evaluation_window_days' => env('ARCUS_POST_EVALUATION_WINDOW_DAYS', 3),
+        'service_token' => env('ARCUS_SERVICE_TOKEN', ''),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

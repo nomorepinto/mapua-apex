@@ -69,8 +69,17 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
       submit: (event) => {
         event.preventDefault()
         const name = eventName.trim()
+
         if (name.length === 0) {
-          setError("Enter an event name to continue.")
+          setError("This field is required.")
+          return
+        }
+        if (name.length < 8) {
+          setError("Event name must be at least 8 characters.")
+          return
+        }
+        if (name.length > 60) {
+          setError("Event name cannot exceed 60 characters.")
           return
         }
         if (reserveFacilities !== "yes" && reserveFacilities !== "no") {

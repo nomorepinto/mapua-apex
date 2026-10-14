@@ -31,6 +31,6 @@ export const oidcConfig: AuthProviderProps = {
       {},
       document.title,
       window.location.pathname
-    )
+    );
   },
 }

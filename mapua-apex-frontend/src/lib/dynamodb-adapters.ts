@@ -1,21 +1,14 @@
-import {
-  AV_EQUIPMENT_OPTIONS,
-  DEFAULT_RESERVATION_DRAFT,
-  EQUIPMENT_OPTIONS,
-} from "@/components/reservation/constants"
-import type { EquipmentItem, ReservationDraft } from "@/components/reservation/types"
-import {
-  CLASSROOM_ROOM,
-  isRoomOfferedAtCampus,
-} from "@/lib/campus-rooms"
+import type { ReservationDraft } from "@/components/reservation/types"
+import type { VenueReservationPick } from "@/lib/types"
 import {
   createEmptyProponent,
   DEFAULT_BUDGET_ITEMS,
   DEFAULT_SAAF_DRAFT,
 } from "@/components/submission/constants"
 import type { SaafDraft } from "@/components/submission/types"
+import type { PostEvalDraft } from "@/components/posteval/types"
 import type { Activity } from "@/components/ui/activity.types"
-import { getEventSchedule } from "@/lib/event-schedule"
+import { slotEnd, slotStart } from "@/lib/schedule-slots"
 import { departmentAbbreviation } from "@/lib/departments"
 
 /**
@@ -30,7 +23,7 @@ export interface ApiSubmission {
   organization_name?: string | null
   submission_type: string
   sent_at: string
-  status: "pending" | "approved" | "denied" | "returned"
+  status: "pending" | "approved" | "denied" | "returned" | "cancelled"
   current_signatory?: string
   /** Ordered snapshot of signatory IDs (plain, no `SIGNATORY#` prefix) resolved at submit time. */
   signatory_sequence?: string[]
@@ -105,6 +98,12 @@ export interface ApiSubmission {
   }
   venue_reservation?: {
     has_reservation: boolean
+    /**
+     * New reservable-based shape: one entry per picked reservable, each carrying
+     * its concrete date+slot selections. Written by `buildSaafApiPayload`.
+     */
+    reservations?: VenueReservationPick[]
+    /** Legacy shape retained for tolerance with pre-migration stored items. */
     equipment_requested?: {
       items?: Array<{
         name: string
@@ -137,11 +136,42 @@ export interface ApiSubmission {
   }
 }
 
+/**
+ * System-written reservation-change timeline entries. Written server-side only
+ * (never client-postable) when a student requests a change and when CDM resolves
+ * it, mirroring how `event scheduled` is written on final approval.
+ */
+export type ReservationNotifType =
+  | "reservation change requested"
+  | "reservation cancelled"
+  | "reservation rescheduled"
+  | "reservation change denied"
+
+/** Every reservation-change notif_type, for bucketing notices in the dashboard. */
+export const RESERVATION_NOTIF_TYPES: readonly ReservationNotifType[] = [
+  "reservation change requested",
+  "reservation cancelled",
+  "reservation rescheduled",
+  "reservation change denied",
+]
+
+export function isReservationNotifType(
+  value: string,
+): value is ReservationNotifType {
+  return (RESERVATION_NOTIF_TYPES as readonly string[]).includes(value)
+}
+
 export interface ApiNotification {
   submission_id: string
   sent_at: string
   signatory: string
-  notif_type: "approved" | "fully approved" | "denied" | "returned"
+  notif_type:
+    | "approved"
+    | "fully approved"
+    | "denied"
+    | "returned"
+    | "event scheduled"
+    | ReservationNotifType
   comment?: string
 }
 
@@ -236,21 +266,16 @@ export function buildSaafApiPayload(
   existingEventId?: string
 ) {
   const event_id = existingEventId || crypto.randomUUID()
-  // Reservation date/time is locked to the event schedule so the stored
-  // room/AV items can never disagree with the activity details.
-  const schedule = getEventSchedule(saafDraft)
   // Proposed budget is locked to the itemized Detailed Budget grand total so the
   // summary figure and the line-item sum can never disagree.
   const grandTotal = (saafDraft.budgetItems || []).reduce(
     (sum, b) => sum + (Number(b.quantity) || 0) * (Number(b.pricePerUnit) || 0),
     0
   )
-  const hasReservation = Boolean(
-    reservationDraft &&
-    (reservationDraft.roomItems?.length > 0 ||
-      reservationDraft.avItems?.length > 0 ||
-      reservationDraft.equipmentItems?.length > 0)
-  )
+  // Each picked reservable carries its own concrete date+slot selections, so the
+  // event schedule is derived from the picks (never free-text).
+  const picks = reservationDraft?.picks ?? []
+  const hasReservation = picks.length > 0
 
   return {
     event_id,
@@ -315,35 +340,17 @@ export function buildSaafApiPayload(
     },
     venue_reservation: {
       has_reservation: hasReservation,
-      equipment_requested: {
-        items: (reservationDraft?.equipmentItems || []).map((e) => ({
-          name: e.name,
-          purpose: e.purpose || "",
-          remark: e.remark || "",
+      reservations: picks.map((pick) => ({
+        reservable_id: pick.reservable_id,
+        campus_id: pick.campus_id,
+        name: pick.name,
+        type: pick.type,
+        selections: pick.selections.map((selection) => ({
+          date: selection.date,
+          slots: [...selection.slots].sort((a, b) => a - b),
         })),
-      },
-      function_rooms: {
-        items: (reservationDraft?.roomItems || []).map((r) => ({
-          date_needed: schedule.startDate,
-          end_date_needed: schedule.endDate,
-          time_needed: schedule.startTime,
-          end_time_needed: schedule.endTime,
-          room_needed: r.roomNeeded,
-          // Only "Classroom" rows carry a code; fixed rooms are named already.
-          ...(r.classroomName ? { classroom_name: r.classroomName } : {}),
-          remarks: r.remarks || "",
-        })),
-      },
-      audiovisual_equipment: {
-        items: (reservationDraft?.avItems || []).map((a) => ({
-          date_needed: schedule.startDate,
-          end_date_needed: schedule.endDate,
-          time_needed: schedule.startTime,
-          end_time_needed: schedule.endTime,
-          equipment_needed: a.equipmentNeeded,
-          remarks: a.remarks || "",
-        })),
-      },
+        remarks: pick.remarks || "",
+      })),
     },
   }
 }
@@ -359,13 +366,15 @@ export function getSubmissionStatusMeta(status: string) {
       return { label: "Denied", color: "bg-rose-500/10 text-rose-600 border-rose-200" }
     case "returned":
       return { label: "Returned", color: "bg-amber-500/10 text-amber-600 border-amber-200" }
+    case "cancelled":
+      return { label: "Cancelled", color: "bg-neutral-500/10 text-neutral-600 border-neutral-300" }
     case "pending":
     default:
       return { label: "Under Review", color: "bg-amber-500/10 text-amber-600 border-amber-200" }
   }
 }
 
-export type DashboardSubmissionStatus = "Under Review" | "Approved" | "Returned" | "Denied"
+export type DashboardSubmissionStatus = "Under Review" | "Approved" | "Returned" | "Denied" | "Cancelled"
 
 export interface DashboardSubmissionRow {
   event_id: string
@@ -379,11 +388,13 @@ export interface DashboardSubmissionRow {
   nature?: "major" | "minor"
   current_signatory: string
   target_date: string
+  date_of_event?: string
+  end_date_of_event?: string
   requires_venue: boolean
   submitted_date: string
   /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
   sent_at: string
-  api_status: "pending" | "approved" | "denied" | "returned"
+  api_status: "pending" | "approved" | "denied" | "returned" | "cancelled"
   activity_details: {
     title: string
     description: string
@@ -438,7 +449,13 @@ export interface ReviewNotice {
   sentAt: string
   dateStr: string
   title: string
-  notifType: "denied" | "returned" | "approved" | "fully approved"
+  notifType:
+    | "denied"
+    | "returned"
+    | "approved"
+    | "fully approved"
+    | "event scheduled"
+    | ReservationNotifType
   comment: string
   signatoryLabel: string
 }
@@ -703,6 +720,8 @@ export function apiSubmissionToDashboardRow(
     nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,
     current_signatory: currentSignatoryLabel,
     target_date: submission.activity_details?.date_of_event || submission.sent_at,
+    date_of_event: submission.activity_details?.date_of_event,
+    end_date_of_event: submission.activity_details?.end_date_of_event,
     requires_venue: Boolean(submission.venue_reservation?.has_reservation),
     submitted_date: formatDisplayDate(submission.sent_at),
     sent_at: submission.sent_at || "",
@@ -764,7 +783,67 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
         ? "Rejected"
         : submission.status === "returned"
           ? "Returned"
-          : "Review"
+          : submission.status === "cancelled"
+            ? "Cancelled"
+            : "Review"
+
+  // Derive the display arrays from the new reservable-based `reservations`
+  // shape when present; fall back to the legacy free-text shape for stored
+  // items that predate the migration.
+  const reservations = submission.venue_reservation?.reservations
+  const hasNewReservations = Array.isArray(reservations) && reservations.length > 0
+
+  const derivedRooms = hasNewReservations
+    ? (reservations ?? [])
+        .filter((pick) => pick.type === "room")
+        .flatMap((pick) =>
+          (pick.selections ?? []).map((selection) => {
+            const slots = [...(selection.slots ?? [])].sort((a, b) => a - b)
+            return {
+              roomNeeded: pick.name,
+              classroomName: undefined,
+              remarks: pick.remarks || "",
+              dateNeeded: selection.date,
+              endDateNeeded: selection.date,
+              timeNeeded: slots.length ? slotStart(slots[0]) : "",
+              endTimeNeeded: slots.length ? slotEnd(slots[slots.length - 1]) : "",
+            }
+          })
+        )
+    : (submission.venue_reservation?.function_rooms?.items || []).map((item) => ({
+        roomNeeded: item.room_needed,
+        classroomName: item.classroom_name,
+        remarks: item.remarks || "",
+        dateNeeded: item.date_needed,
+        endDateNeeded: item.end_date_needed,
+        timeNeeded: item.time_needed,
+        endTimeNeeded: item.end_time_needed,
+      }))
+
+  const derivedEquipment = hasNewReservations
+    ? (reservations ?? [])
+        .filter((pick) => pick.type === "equipment")
+        .map((pick) => ({
+          name: pick.name,
+          purpose: pick.remarks || "",
+          remark: "",
+        }))
+    : (submission.venue_reservation?.equipment_requested?.items || []).map((item) => ({
+        name: item.name,
+        purpose: item.purpose || "",
+        remark: item.remark || "",
+      }))
+
+  const derivedAv = hasNewReservations
+    ? []
+    : (submission.venue_reservation?.audiovisual_equipment?.items || []).map(
+        (item) => ({
+          equipmentNeeded: item.equipment_needed,
+          remarks: item.remarks || "",
+          dateNeeded: item.date_needed,
+          timeNeeded: item.time_needed,
+        })
+      )
 
   return {
     id: `${submission.event_id}:${submission.submission_id}`,
@@ -799,28 +878,9 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
       objectives.length > 0
         ? objectives
         : [{ title: "Objective", description: "No objectives listed." }],
-    equipmentRequested: (submission.venue_reservation?.equipment_requested?.items || []).map(
-      (item) => ({
-        name: item.name,
-        purpose: item.purpose || "",
-        remark: item.remark || "",
-      })
-    ),
-    roomsRequested: (submission.venue_reservation?.function_rooms?.items || []).map((item) => ({
-      roomNeeded: item.room_needed,
-      classroomName: item.classroom_name,
-      remarks: item.remarks || "",
-      dateNeeded: item.date_needed,
-      timeNeeded: item.time_needed,
-    })),
-    avEquipmentRequested: (
-      submission.venue_reservation?.audiovisual_equipment?.items || []
-    ).map((item) => ({
-      equipmentNeeded: item.equipment_needed,
-      remarks: item.remarks || "",
-      dateNeeded: item.date_needed,
-      timeNeeded: item.time_needed,
-    })),
+    equipmentRequested: derivedEquipment,
+    roomsRequested: derivedRooms,
+    avEquipmentRequested: derivedAv,
     budgetItems: (submission.detailed_budget_proposal?.items || []).map(
       (item, idx) => {
         const qty = Number(item.quantity) || 0
@@ -836,6 +896,9 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
         }
       }
     ),
+    hasReservation: Boolean(submission.venue_reservation?.has_reservation),
+    dateOfEvent: submission.activity_details?.date_of_event,
+    endDateOfEvent: submission.activity_details?.end_date_of_event,
     budgetGrandTotal:
       typeof submission.detailed_budget_proposal?.grand_total === "number"
         ? submission.detailed_budget_proposal.grand_total
@@ -1104,79 +1167,30 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
       pricePerUnit: String(item.price_per_unit ?? 0),
     })) || DEFAULT_BUDGET_ITEMS
 
-  const reservationSource = submission.venue_reservation
-  const equipment = reservationSource?.equipment_requested
-  // Legacy submissions stored `equipment_requested` as a flat boolean record;
-  // newer ones store `{ items: [{ name, purpose, remark }] }`. Rehydrate both,
-  // mapping legacy flags to name-only rows (empty purpose/remark).
-  const legacyEquipmentLabels: Record<string, string> = {
-    monoblock_chairs: "Monoblock Chairs",
-    whiteboards: "White Boards",
-    tables: "Tables",
-    rostrum: "Rostrum",
-    flags_with_stand: "Flags (w/ Poles & Stand)",
-    panel_boards: "Panel Boards",
-  }
-  const legacyEquipment = (equipment ?? {}) as Record<string, unknown>
-  const legacyOthers =
-    typeof legacyEquipment.others_specified === "string"
-      ? legacyEquipment.others_specified.trim()
-      : ""
-  const legacyNames = [
-    ...Object.keys(legacyEquipmentLabels)
-      .filter((key) => Boolean(legacyEquipment[key]))
-      .map((key) => legacyEquipmentLabels[key]),
-    ...(legacyOthers ? [legacyOthers] : []),
-  ]
-  const equipmentItems: EquipmentItem[] = Array.isArray(equipment?.items)
-    ? (equipment?.items ?? []).map((item, index) => ({
-        id: String(index + 1),
-        name: item.name || "",
-        purpose: item.purpose || "",
-        remark: item.remark || "",
-        // A stored name outside the fixed catalog was typed via "Others", so it
-        // reopens as an editable custom row.
-        isOther: !EQUIPMENT_OPTIONS.includes(item.name || ""),
-      }))
-    : legacyNames.map((name, index) => ({
-        id: String(index + 1),
-        name,
-        purpose: "",
-        remark: "",
-        isOther: !EQUIPMENT_OPTIONS.includes(name),
-      }))
-  const roomCampus = submission.activity_details?.venue || ""
-  const reservation: ReservationDraft = {
-    equipmentItems,
-    roomItems: reservationSource?.function_rooms?.items?.length
-      ? reservationSource.function_rooms.items.map((item, index) => ({
-        id: String(index + 1),
-        dateNeeded: item.date_needed,
-        endDateNeeded: item.end_date_needed || item.date_needed,
-        timeNeeded: item.time_needed,
-        endTimeNeeded: item.end_time_needed || item.time_needed,
-        roomNeeded: item.room_needed,
-        classroomName: item.classroom_name || "",
-        remarks: item.remarks || "",
-        // Neither a fixed campus room nor "Classroom" => a custom "Others" row.
-        isOther:
-          item.room_needed !== CLASSROOM_ROOM &&
-          !isRoomOfferedAtCampus(roomCampus, item.room_needed),
-      }))
-      : DEFAULT_RESERVATION_DRAFT.roomItems,
-    avItems: reservationSource?.audiovisual_equipment?.items?.length
-      ? reservationSource.audiovisual_equipment.items.map((item, index) => ({
-        id: String(index + 1),
-        dateNeeded: item.date_needed,
-        endDateNeeded: item.end_date_needed || item.date_needed,
-        timeNeeded: item.time_needed,
-        endTimeNeeded: item.end_time_needed || item.time_needed,
-        equipmentNeeded: item.equipment_needed,
-        remarks: item.remarks || "",
-        isOther: !AV_EQUIPMENT_OPTIONS.includes(item.equipment_needed || ""),
-      }))
-      : DEFAULT_RESERVATION_DRAFT.avItems,
-  }
+  // Rehydrate the reservation draft from the new reservable-based shape. Each
+  // stored reservation becomes a pick carrying its concrete date+slot
+  // selections. Legacy free-text items cannot be mapped back to reservable ids,
+  // so they rehydrate to an empty pick list (the activity dates still populate
+  // the SAAF draft from `activity_details` below).
+  const storedReservations = submission.venue_reservation?.reservations
+  const reservation: ReservationDraft =
+    Array.isArray(storedReservations) && storedReservations.length > 0
+      ? {
+          campusId: storedReservations[0]?.campus_id ?? "",
+          picks: storedReservations.map((pick, index) => ({
+            id: pick.reservable_id || String(index + 1),
+            reservable_id: pick.reservable_id,
+            campus_id: pick.campus_id,
+            name: pick.name,
+            type: pick.type,
+            selections: (pick.selections ?? []).map((selection) => ({
+              date: selection.date,
+              slots: [...(selection.slots ?? [])].sort((a, b) => a - b),
+            })),
+            remarks: pick.remarks ?? "",
+          })),
+        }
+      : { campusId: "", picks: [] }
 
   return {
     saaf: {
@@ -1209,7 +1223,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
       dependentOrgs: submission.collaboration?.dependent_organization_ids || [],
     },
     reservation,
-    hasReservation: Boolean(reservationSource?.has_reservation),
+    hasReservation: Boolean(submission.venue_reservation?.has_reservation),
   }
 }
 
@@ -1217,4 +1231,194 @@ export function omitEventIdFromPayload<T extends { event_id?: string }>(payload:
   const rest = { ...payload }
   delete rest.event_id
   return rest
+}
+
+/* -------------------------------------------------------------------------- */
+/* Post-evaluation adapters                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** A read-only budget line carried over from the linked submission. */
+export interface ApiPostEvalBudgetItem {
+  item: string
+  unit?: string | null
+  quantity?: number | null
+  budgeted_total?: number | null
+  actual_amount: number
+}
+
+/** An extra expense added during the post-eval. */
+export interface ApiPostEvalAddedItem {
+  item: string
+  unit?: string | null
+  quantity?: number | null
+  price_per_unit?: number | null
+  actual_amount: number
+}
+
+export interface ApiPostEvalFinancialReport {
+  budget_items: ApiPostEvalBudgetItem[]
+  added_items: ApiPostEvalAddedItem[]
+  initial_grand_total?: number | null
+  actual_grand_total?: number | null
+}
+
+/** Section 3 attendance row (arcus-attendance check-in). */
+export interface ApiPostEvalAttendance {
+  student_id: string
+  full_name: string
+  department: string
+  member_organization: string
+  scanned_at: string
+  left_at: string
+}
+
+/** Section 3 evaluation row (arcus-evaluation filing). */
+export interface ApiPostEvalEvaluation {
+  evaluation_id: string
+  student_id: string
+  full_name: string
+  participated: boolean
+  filed_at: string
+}
+
+export interface ApiPostEvalParticipation {
+  attendance_count: number
+  attendance: ApiPostEvalAttendance[]
+  evaluation_count: number
+  evaluations: ApiPostEvalEvaluation[]
+}
+
+/** Backend POSTEVAL shape returned by PostEvalResource. */
+export interface ApiPostEval {
+  event_id: string
+  posteval_id: string
+  submission_id: string
+  organization_id?: string | null
+  organization_name?: string | null
+  status: "submitted" | "approved" | "denied"
+  event_title?: string | null
+  submitted_at?: string | null
+  approved_at?: string | null
+  denied_at?: string | null
+  section_summary?: string | null
+  financial_report?: ApiPostEvalFinancialReport | null
+  participation_snapshot?: ApiPostEvalParticipation | null
+  /** Detail-only live re-aggregation (student show route). */
+  participation?: ApiPostEvalParticipation | null
+}
+
+/** Step-1 eligible-event picker row. */
+export interface ApiEligiblePostEvalEvent {
+  event_id: string
+  submission_id: string
+  event_title?: string | null
+  date_of_event?: string | null
+  status?: string | null
+}
+
+export type DashboardPostEvalStatus = "Submitted" | "Approved" | "Denied"
+
+/**
+ * Formats an API post-eval status to frontend badge colors.
+ */
+export function getPostEvalStatusMeta(status: string) {
+  switch ((status || "").toLowerCase()) {
+    case "approved":
+      return { label: "Approved", color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" }
+    case "denied":
+      return { label: "Denied", color: "bg-rose-500/10 text-rose-600 border-rose-200" }
+    case "submitted":
+    default:
+      return { label: "Submitted", color: "bg-amber-500/10 text-amber-600 border-amber-200" }
+  }
+}
+
+export interface DashboardPostEvalRow {
+  event_id: string
+  posteval_id: string
+  submission_id: string
+  organization_name: string
+  event_title: string
+  /** Human document code, e.g. "POST-1A2B3C4D". */
+  id: string
+  submitted_date: string
+  /** Raw submitted timestamp (ISO 8601) for chronological sorting. */
+  submitted_at: string
+  approved_at?: string | null
+  denied_at?: string | null
+  api_status: "submitted" | "approved" | "denied"
+  status: DashboardPostEvalStatus
+  statusColor: string
+  attendance_count: number
+  evaluation_count: number
+  actual_grand_total?: number | null
+}
+
+/**
+ * Maps a backend post-eval to the student dashboard / OSAAR queue row shape.
+ */
+export function apiPostEvalToDashboardRow(postEval: ApiPostEval): DashboardPostEvalRow {
+  const meta = getPostEvalStatusMeta(postEval.status)
+  return {
+    event_id: postEval.event_id,
+    posteval_id: postEval.posteval_id,
+    submission_id: postEval.submission_id,
+    organization_name: postEval.organization_name || "—",
+    event_title: postEval.event_title || "Untitled event",
+    id: formatDocumentId(postEval.posteval_id, "POST"),
+    submitted_date: formatDisplayDate(postEval.submitted_at),
+    submitted_at: postEval.submitted_at || "",
+    approved_at: postEval.approved_at,
+    denied_at: postEval.denied_at,
+    api_status: postEval.status,
+    status: meta.label as DashboardPostEvalStatus,
+    statusColor: meta.color,
+    attendance_count: postEval.participation_snapshot?.attendance_count ?? 0,
+    evaluation_count: postEval.participation_snapshot?.evaluation_count ?? 0,
+    actual_grand_total: postEval.financial_report?.actual_grand_total ?? null,
+  }
+}
+
+/**
+ * Builds the POST /students/postevals payload from the wizard draft.
+ *
+ * Grand totals are derived (never free-text): the initial total sums the
+ * read-only budgeted lines, the actual total sums every actual amount entered
+ * across both the carried-over budget and the added items.
+ */
+export function buildPostEvalApiPayload(draft: PostEvalDraft) {
+  const budgetItems = draft.financialReport?.budgetItems ?? []
+  const addedItems = draft.financialReport?.addedItems ?? []
+
+  const initialGrandTotal = budgetItems.reduce(
+    (sum, item) => sum + (Number(item.budgetedTotal) || 0),
+    0
+  )
+  const actualGrandTotal =
+    budgetItems.reduce((sum, item) => sum + (Number(item.actualAmount) || 0), 0) +
+    addedItems.reduce((sum, item) => sum + (Number(item.actualAmount) || 0), 0)
+
+  return {
+    event_id: draft.selectedEventId,
+    submission_id: draft.selectedSubmissionId,
+    section_summary: draft.summary.trim(),
+    financial_report: {
+      budget_items: budgetItems.map((item) => ({
+        item: item.item,
+        unit: item.unit || null,
+        quantity: item.quantity === "" ? null : Number(item.quantity),
+        budgeted_total: item.budgetedTotal === "" ? null : Number(item.budgetedTotal),
+        actual_amount: Number(item.actualAmount) || 0,
+      })),
+      added_items: addedItems.map((item) => ({
+        item: item.item,
+        unit: item.unit || null,
+        quantity: item.quantity === "" ? null : Number(item.quantity),
+        price_per_unit: item.pricePerUnit === "" ? null : Number(item.pricePerUnit),
+        actual_amount: Number(item.actualAmount) || 0,
+      })),
+      initial_grand_total: initialGrandTotal,
+      actual_grand_total: actualGrandTotal,
+    },
+  }
 }

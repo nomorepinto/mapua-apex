@@ -48,6 +48,7 @@ export function useReviewDashboard() {
     eventId: string
     submissionId: string
   } | null>(null)
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   const detailQuery = useSignatorySubmissionDetailQuery(
@@ -66,16 +67,44 @@ export function useReviewDashboard() {
   )
 
   const activeActivity = useMemo(() => {
-    if (detailQuery.data) return apiSubmissionToActivity(detailQuery.data)
     if (!activeKeys) return null
+
+    if (
+      detailQuery.data &&
+      detailQuery.data.event_id === activeKeys.eventId &&
+      detailQuery.data.submission_id === activeKeys.submissionId
+    ) {
+      return apiSubmissionToActivity(detailQuery.data)
+    }
+
+    if (
+      selectedActivity &&
+      selectedActivity.eventId === activeKeys.eventId &&
+      selectedActivity.submissionId === activeKeys.submissionId
+    ) {
+      return selectedActivity
+    }
+
     return (
       activitiesList.find(
         (activity) =>
           activity.eventId === activeKeys.eventId &&
           activity.submissionId === activeKeys.submissionId
-      ) || null
+      ) ||
+      historyActivitiesList.find(
+        (activity) =>
+          activity.eventId === activeKeys.eventId &&
+          activity.submissionId === activeKeys.submissionId
+      ) ||
+      null
     )
-  }, [activeKeys, activitiesList, detailQuery.data])
+  }, [
+    activeKeys,
+    activitiesList,
+    historyActivitiesList,
+    detailQuery.data,
+    selectedActivity,
+  ])
 
   const handleDeptSelect = useCallback((dept: string | null) => {
     setSelectedDept(dept)
@@ -92,6 +121,7 @@ export function useReviewDashboard() {
 
   const handleActivitySelect = useCallback((activity: Activity) => {
     setActionError(null)
+    setSelectedActivity(activity)
     setActiveKeys({
       eventId: activity.eventId,
       submissionId: activity.submissionId,
@@ -100,6 +130,7 @@ export function useReviewDashboard() {
 
   const handleModalClose = useCallback(() => {
     setActiveKeys(null)
+    setSelectedActivity(null)
     setActionError(null)
   }, [])
 
@@ -219,7 +250,7 @@ export function useReviewDashboard() {
    * are read-only and cannot be approved, returned, denied, or reclassified.
    */
   const isReadOnly = useMemo(() => {
-    if (!activeKeys) return false
+    if (!activeKeys) return true
     return !reviewActivities.some(
       (a) =>
         a.eventId === activeKeys.eventId &&

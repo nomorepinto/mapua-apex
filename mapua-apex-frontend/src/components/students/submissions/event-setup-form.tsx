@@ -1,7 +1,7 @@
 import { FormPageHeader } from "@/components/forms/form-page-header"
 import { useSubmissionsStart } from "@/components/students/submissions/submissions-start-context"
 import { Button } from "@/components/ui/button"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -29,32 +29,42 @@ export function EventSetupForm() {
       />
 
       <form
+        noValidate
         onSubmit={actions.submit}
         className={cn(layout.section, "space-y-6")}
       >
-        <Field>
-          <FieldLabel htmlFor="eventName">Event name</FieldLabel>
+        <Field className="w-full">
+          <FieldLabel htmlFor="eventName">
+            Event name <span className="text-red-500">*</span>
+          </FieldLabel>
           <Input
             id="eventName"
             name="eventName"
             nativeInput
             placeholder="e.g. Tech Week 2026"
-            required
+            maxLength={60}
             type="text"
             value={state.eventName}
             onChange={(event) => actions.changeEventName(event.target.value)}
+            className={cn(
+              Boolean(state.error) && "!border-red-500 focus-visible:!ring-red-500"
+            )}
           />
+          {state.error ? (
+            <p className="mt-1.5 text-sm font-normal text-red-600">
+              {state.error}
+            </p>
+          ) : null}
         </Field>
 
         <Field className="w-full">
           <FieldLabel htmlFor="reserveFacilities">
-            Are you going to reserve school facilities?
+            Are you going to reserve school facilities? <span className="text-red-500">*</span>
           </FieldLabel>
           <Select
             items={FACILITY_ITEMS}
             itemToStringValue={(item) => item.value}
             name="reserveFacilities"
-            required
             value={
               FACILITY_ITEMS.find(
                 (item) => item.value === state.reserveFacilities
@@ -83,8 +93,6 @@ export function EventSetupForm() {
             </SelectPopup>
           </Select>
         </Field>
-
-        {state.error ? <FieldError>{state.error}</FieldError> : null}
 
         <div className="flex justify-center pt-2">
           <Button type="submit" className="min-w-40 sm:min-w-48">

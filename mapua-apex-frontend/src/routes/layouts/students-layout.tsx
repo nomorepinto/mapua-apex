@@ -1,4 +1,4 @@
-import { HomeIcon, PlusCircleIcon } from "lucide-react"
+import { ClipboardListIcon, HomeIcon, PlusCircleIcon, WrenchIcon } from "lucide-react"
 import { Outlet } from "react-router"
 
 import { AppSidebar } from "@/components/layout/app-sidebar"
@@ -17,11 +17,21 @@ const STUDENT_NAV = [
     to: "/students/submissions",
     icon: PlusCircleIcon,
   },
+  {
+    label: "Post-evals",
+    to: "/students/postevals",
+    icon: ClipboardListIcon,
+  },
+  {
+    label: "Tools",
+    to: "/students/tools",
+    icon: WrenchIcon,
+  },
 ]
 
 export function StudentsLayout() {
   return (
-    <AuthGuard allowedGroups={["admin", "org_adviser", "org_submitter"]}>
+    <AuthGuard allowedGroups={["admin", "org_adviser", "org_submitter", "student"]}>
       <div className={layout.frame}>
         <AppSidebar homeTo="/students/dashboard" items={STUDENT_NAV} />
         <main className={layout.main}>

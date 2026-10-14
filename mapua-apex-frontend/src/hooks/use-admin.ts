@@ -11,7 +11,7 @@ import {
   type CreateSignatoryPayload,
 } from "@/lib/dynamodb-adapters"
 
-function mutationErrorMessage(error: unknown, fallback: string): string {
+export function mutationErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     return error.message
   }

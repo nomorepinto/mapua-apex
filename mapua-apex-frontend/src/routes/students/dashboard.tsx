@@ -1,6 +1,7 @@
 import { AnnouncementsPanel } from "@/components/students/dashboard/announcements-panel"
 import { StudentDashboardDialogs } from "@/components/students/dashboard/dashboard-dialogs"
 import { StudentDashboardHeader } from "@/components/students/dashboard/dashboard-header"
+import { PostEvalsPanel } from "@/components/students/dashboard/postevals-panel"
 import { RemindersPanel } from "@/components/students/dashboard/reminders-panel"
 import { StudentDashboardProvider } from "@/components/students/dashboard/student-dashboard-context"
 import { SubmissionsPanel } from "@/components/students/dashboard/submissions-panel"
@@ -15,6 +16,7 @@ export function OrgDashboard() {
         <div className={cn(layout.grid3, layout.gap)}>
           <div className={cn("xl:col-span-2", layout.stack)}>
             <SubmissionsPanel />
+            <PostEvalsPanel />
             <AnnouncementsPanel />
           </div>
           <div className={cn("xl:col-span-1", layout.stack)}>

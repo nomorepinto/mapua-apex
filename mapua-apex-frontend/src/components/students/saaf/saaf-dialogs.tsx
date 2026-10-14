@@ -11,7 +11,7 @@ export function SaafDialogs() {
       <ConfirmClearModal
         open={state.showConfirmClearModal}
         title="Are you sure you want to clear?"
-        description="This action will clear your student activity form with the data you have inputted."
+        description="This action will clear the data you have inputted in this section."
         onClose={actions.closeClear}
         onConfirm={actions.confirmClear}
       />

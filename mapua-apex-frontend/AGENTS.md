@@ -17,10 +17,21 @@ These rules apply to `mapua-apex-frontend`. Also follow the root `AGENTS.md` (cr
   - **Nest sub-sections the same way** the existing `submissions` branch nests `saaf` (parent uses a `PassThroughLayout` wrapper with `children`).
 - Consistency with the existing route conventions takes precedence over introducing a fresh routing pattern.
 
+## Frontend Route Docs
+
+- **Keep `FRONTEND_ROUTES.md` (repo root) in sync with `src/router.tsx`.** When you add, change, or remove anything in the client route tree — a path, layout, nested section, lazy page, `action`, index/wildcard redirect, `AuthGuard` group set, or a `RoleRedirect` landing — update `FRONTEND_ROUTES.md` in the **same turn**. Do not leave the doc describing the pre-change tree.
+- `src/router.tsx` is the source of truth; the doc mirrors it (path, component, source file, allowed groups, notes). Match the doc's existing table format and keep source-file paths accurate.
+- Skip the doc only for refactors that do not change the URL, the component wired to a route, or the gating groups.
+
 ## UI Components
 
 - **Use coss ui components.** For interactive UI (selects, dropdowns, dialogs, menus, inputs, toggles, etc.), use the coss ui primitives vendored in `src/components/ui` (the `@coss` registry, built on Base UI). Prefer these existing exports over hand-rolled markup or another component library, and follow each primitive's documented composition/trigger hierarchy.
 - **Light mode only.** This app ships a single light theme. Do not add dark-mode variants, `dark:` styling, or theme toggles; use coss components in their light-mode presentation.
+
+## Design Conventions (Impeccable)
+
+- **Follow the design conventions set by `impeccable`.** This project's UI is designed and critiqued through the `impeccable` skill; its conventions are the source of truth for visual decisions. Before designing, building, or restyling any interface, invoke/consult the `impeccable` skill and align with its standards (typography, color, spacing, visual hierarchy, states, accessibility, motion).
+- **Respect the recorded design context.** Read `PRODUCT.md` (product/users/positioning brief) and the latest design critiques under `.impeccable/critique/` before making UI changes; keep `.impeccable/` state (config, live definitions) consistent with what you change. Do not introduce visual patterns that contradict these conventions — if a change genuinely requires breaking one, surface it and consult the user first.
 
 ## Data Fetching & Caching
 

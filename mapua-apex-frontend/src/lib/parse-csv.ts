@@ -2,6 +2,7 @@ import type {
   ApiSignatoryRole,
   OrganizationAssignableDeskRole,
 } from "@/lib/dynamodb-adapters"
+import type { ReservableType } from "@/lib/types"
 import { resolveDepartment } from "@/lib/departments"
 
 /** Split CSV text into trimmed rows, honoring quoted commas and BOM. */
@@ -312,6 +313,77 @@ export function parseOrganizationCsv(text: string): {
     }
 
     parsed.push({ name, desks, is_higher_council: isHigherCouncil })
+  }
+
+  return { rows: parsed, errors }
+}
+
+export type ReservableCsvRow = {
+  name: string
+  type: ReservableType
+}
+
+const RESERVABLE_TYPE_ALIASES: Record<string, ReservableType> = {
+  room: "room",
+  rooms: "room",
+  "function room": "room",
+  "function rooms": "room",
+  equipment: "equipment",
+  equipments: "equipment",
+  av: "equipment",
+  "audio-visual": "equipment",
+  "audio visual": "equipment",
+  audiovisual: "equipment",
+}
+
+export function parseReservableType(value: string): ReservableType | null {
+  return RESERVABLE_TYPE_ALIASES[value.trim().toLowerCase()] ?? null
+}
+
+/**
+ * Parse a reservable CSV of `name,type`. Type accepts room/equipment (plus a few
+ * friendly aliases); the weekly schedule is NOT in the file — imported rows
+ * default to all-available Mon-Sat and are edited afterwards on the grid.
+ * A header row is optional.
+ */
+export function parseReservableCsv(text: string): {
+  rows: ReservableCsvRow[]
+  errors: string[]
+} {
+  const rows = parseCsvRows(text)
+  const errors: string[] = []
+
+  if (rows.length === 0) {
+    return { rows: [], errors: ["CSV is empty."] }
+  }
+
+  const first = rows[0]
+  const hasHeader =
+    headerIndex(first, ["name"]) >= 0 || headerIndex(first, ["type"]) >= 0
+  const header = hasHeader ? first : ["name", "type"]
+  const start = hasHeader ? 1 : 0
+  const nameIdx = headerIndex(header, ["name"]) >= 0 ? headerIndex(header, ["name"]) : 0
+  const typeIdx = headerIndex(header, ["type"]) >= 0 ? headerIndex(header, ["type"]) : 1
+
+  const parsed: ReservableCsvRow[] = []
+
+  for (let i = start; i < rows.length; i++) {
+    const row = rows[i]
+    const name = row[nameIdx]?.trim() ?? ""
+    const typeRaw = row[typeIdx]?.trim() ?? ""
+    const line = i + 1
+
+    if (!name && !typeRaw) {
+      continue
+    }
+
+    const type = parseReservableType(typeRaw)
+    if (!name || !type) {
+      errors.push(`Row ${line}: expected name and type (room | equipment).`)
+      continue
+    }
+
+    parsed.push({ name, type })
   }
 
   return { rows: parsed, errors }

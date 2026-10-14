@@ -20,6 +20,9 @@ return [
         'endpoint' => env('DYNAMODB_ENDPOINT', env('AWS_ENDPOINT')),
         'table' => env('AWS_DYNAMODB_TABLE'),
         'table_prefix' => env('DYNAMODB_TABLE_PREFIX', ''),
+        'log_session_table' => env('AWS_DYNAMODB_SESSION_LOG_TABLE'),
+        'log_activity_table' => env('AWS_DYNAMODB_ACTIVITY_LOG_TABLE'),
+        'log_retention_days' => (int) env('LOG_RETENTION_DAYS', 90),
     ],
 
     's3' => [

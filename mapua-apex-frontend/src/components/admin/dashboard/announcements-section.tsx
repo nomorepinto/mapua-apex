@@ -14,12 +14,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { layout } from "@/config"
+import { cn } from "@/lib/utils"
 
 export function AdminAnnouncementsSection() {
   const { state, actions } = useAdminDashboard()
 
   return (
-    <section className={layout.section}>
+    <section
+      id="announcements-section"
+      className={cn(layout.section, "scroll-mt-6")}
+      aria-label="Announcements Section"
+    >
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-lg font-extrabold text-neutral-900">

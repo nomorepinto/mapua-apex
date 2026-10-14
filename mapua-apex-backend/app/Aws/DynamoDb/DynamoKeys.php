@@ -21,6 +21,15 @@ final class DynamoKeys
         return 'SUBMISSION#'.self::strip($id, 'SUBMISSION#');
     }
 
+    /**
+     * Sort key for a post-evaluation inside its EVENT partition. Reused verbatim
+     * as GSI1SK so an organization's post-evals are discoverable off GSI1.
+     */
+    public static function postEval(string $id): string
+    {
+        return 'POSTEVAL#'.self::strip($id, 'POSTEVAL#');
+    }
+
     public static function signatory(string $id): string
     {
         return 'SIGNATORY#'.self::strip($id, 'SIGNATORY#');
@@ -36,6 +45,41 @@ final class DynamoKeys
         return 'DEADLINE#'.self::strip($id, 'DEADLINE#');
     }
 
+    public static function campus(string $id): string
+    {
+        return 'CAMPUS#'.self::strip($id, 'CAMPUS#');
+    }
+
+    /**
+     * Globally unique sort key for a reservable (room|equipment) inside a CAMPUS partition.
+     * Doubles as the BOOKING partition key (RESERVABLE#uuid).
+     */
+    public static function reservable(string $id): string
+    {
+        return 'RESERVABLE#'.self::strip($id, 'RESERVABLE#');
+    }
+
+    public static function booking(string $id): string
+    {
+        return 'BOOKING#'.self::strip($id, 'BOOKING#');
+    }
+
+    /**
+     * SK for a reservation change request inside its EVENT partition.
+     */
+    public static function reservationChange(string $id): string
+    {
+        return 'RESERVATION_CHANGE#'.self::strip($id, 'RESERVATION_CHANGE#');
+    }
+
+    /**
+     * GSI5PK for a booking: the owning organization (only submission-sourced bookings).
+     */
+    public static function organizationIndex(string $organizationId): string
+    {
+        return 'ORGANIZATION#'.self::strip($organizationId, 'ORGANIZATION#');
+    }
+
     /**
      * Index-only sort key for a collaboration pointer in a dependent's ORGANIZATION partition.
      */
@@ -47,6 +91,38 @@ final class DynamoKeys
     public static function announcement(): string
     {
         return 'ANNOUNCEMENT';
+    }
+
+    /**
+     * PK for a session log item: SESSION#{session_id}
+     */
+    public static function session(string $sessionId): string
+    {
+        return 'SESSION#'.self::strip($sessionId, 'SESSION#');
+    }
+
+    /**
+     * GSI1PK for monthly-bucketed session log queries: LOG#SESSION#{YYYY-MM}
+     */
+    public static function sessionGsi1(string $yearMonth): string
+    {
+        return 'LOG#SESSION#'.$yearMonth;
+    }
+
+    /**
+     * PK for a user partition: USER#{sub}
+     */
+    public static function user(string $sub): string
+    {
+        return 'USER#'.self::strip($sub, 'USER#');
+    }
+
+    /**
+     * SK for a user's active session pointer: ACTIVE_SESSION
+     */
+    public static function activeSessionSk(): string
+    {
+        return 'ACTIVE_SESSION';
     }
 
     public static function roleIndex(string $role, ?string $department = null): string

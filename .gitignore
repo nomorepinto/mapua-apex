@@ -50,6 +50,7 @@ dist-ssr/
 # ─── Agent / skill caches ──────────────────────────────────────────
 .agents/
 .expo/
+.qoder/
 
 # ─── PHP / Laravel (scoped to the backend folder) ──────────────────
 # Laravel ships nested .gitignore files inside bootstrap/cache/,
@@ -79,3 +80,8 @@ mapua-apex-backend/.idea/
 mapua-apex-backend/.nova/
 mapua-apex-backend/.vscode/
 mapua-apex-backend/.zed/
+
+# Fake Folders
+fake_folder/
+arcus-attendance-system/
+arcus-evaluation-system/
