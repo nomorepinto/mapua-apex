@@ -34,7 +34,10 @@ class SubmissionControllerTest extends TestCase
     {
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::event($db);
-        DynamoFixtures::submission($db);
+        DynamoFixtures::submission($db, [
+            'GSI1PK' => 'ORGANIZATION#a1b2',
+            'GSI1SK' => 'SUBMISSION#s001',
+        ]);
 
         $response = $this->withAdminAuth()
             ->withHeaders(['X-Organization-Id' => 'a1b2'])
@@ -101,7 +104,10 @@ class SubmissionControllerTest extends TestCase
     {
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::event($db);
-        DynamoFixtures::submission($db);
+        DynamoFixtures::submission($db, [
+            'GSI1PK' => 'ORGANIZATION#a1b2',
+            'GSI1SK' => 'SUBMISSION#s001',
+        ]);
 
         $response = $this->withStudentAuth()->getJson('/api/v1/students/submissions');
 
@@ -117,11 +123,16 @@ class SubmissionControllerTest extends TestCase
     {
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::event($db);
-        DynamoFixtures::submission($db);
+        DynamoFixtures::submission($db, [
+            'GSI1PK' => 'ORGANIZATION#a1b2',
+            'GSI1SK' => 'SUBMISSION#s001',
+        ]);
         DynamoFixtures::event($db, org: 'other-org', event: 'e002');
         DynamoFixtures::submission($db, [
             'PK' => 'EVENT#e002',
             'SK' => 'SUBMISSION#s002',
+            'GSI1PK' => 'ORGANIZATION#other-org',
+            'GSI1SK' => 'SUBMISSION#s002',
         ]);
 
         $response = $this->withStudentAuth()->getJson('/api/v1/students/submissions');

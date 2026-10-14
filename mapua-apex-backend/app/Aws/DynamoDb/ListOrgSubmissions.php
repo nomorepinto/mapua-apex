@@ -9,39 +9,35 @@ final class ListOrgSubmissions
     public function __construct(private DynamoDbItems $items) {}
 
     /**
-     * List submissions for an organization by querying GSI1 events, then each event's submissions.
+     * An organization's own submissions, read straight off GSI1: each SUBMISSION
+     * item carries GSI1PK=ORGANIZATION#{id} and GSI1SK=SUBMISSION#{uuid} (the same
+     * discovery path the admin list and ListOrgPostEvals use), so one begins_with
+     * query returns every paper with full pagination and no cap.
      *
-     * Caps events at EVENT_LIMIT. A submissions-by-org GSI is the hot-path fix if this grows.
+     * The previous event-round-trip capped at the EVENT_LIMIT oldest events, so once
+     * an org passed that many events its newest submissions silently dropped off the
+     * student dashboard (and their timeline reminders with them).
      *
      * @return list<array<string, mixed>>
      */
-    public function handle(string $organizationId, int $eventLimit = self::EVENT_LIMIT): array
+    public function handle(string $organizationId): array
     {
-        $submissions = [];
-        $seenEvents = [];
-
-        foreach ($this->eventsForOrganization($organizationId, $eventLimit) as $event) {
-            $eventPk = $event['PK'] ?? null;
-
-            if (! is_string($eventPk) || ! str_starts_with($eventPk, 'EVENT#')) {
-                continue;
-            }
-
-            if (isset($seenEvents[$eventPk])) {
-                continue;
-            }
-
-            $seenEvents[$eventPk] = true;
-
-            foreach ($this->submissionsForEvent($eventPk) as $item) {
-                $submissions[] = $item;
-            }
-        }
-
-        return $submissions;
+        return $this->items->query([
+            'IndexName' => 'GSI1',
+            'KeyConditionExpression' => 'GSI1PK = :org AND begins_with(GSI1SK, :sk)',
+            'ExpressionAttributeValues' => [
+                ':org' => ['S' => DynamoKeys::organization($organizationId)],
+                ':sk' => ['S' => 'SUBMISSION#'],
+            ],
+        ]);
     }
 
     /**
+     * EVENT items for an organization (oldest first, capped at EVENT_LIMIT).
+     *
+     * Retained for ListOrgDeadlines, which still walks each EVENT partition for its
+     * DEADLINE# children rather than reading the submission rows.
+     *
      * @return list<array<string, mixed>>
      */
     public function eventsForOrganization(string $organizationId, int $eventLimit = self::EVENT_LIMIT): array
@@ -54,19 +50,5 @@ final class ListOrgSubmissions
             ],
             'Limit' => $eventLimit,
         ], allPages: false);
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    public function submissionsForEvent(string $eventPk): array
-    {
-        return $this->items->query([
-            'KeyConditionExpression' => 'PK = :pk AND begins_with(SK, :sk)',
-            'ExpressionAttributeValues' => [
-                ':pk' => ['S' => $eventPk],
-                ':sk' => ['S' => 'SUBMISSION#'],
-            ],
-        ]);
     }
 }

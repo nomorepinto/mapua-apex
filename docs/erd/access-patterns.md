@@ -10,7 +10,7 @@ Index summary:
 | Index | Key | On | Purpose |
 |---|---|---|---|
 | Base table | `PK` / `SK` | all items | Primary access |
-| GSI1 | `GSI1PK` / `GSI1SK` | EVENT, SUBMISSION, POSTEVAL | Org-scoped event list, admin submission list & org/OSAAR post-eval list |
+| GSI1 | `GSI1PK` / `GSI1SK` | EVENT, SUBMISSION, POSTEVAL | Org event walk (deadlines), student & admin submission lists, org/OSAAR post-eval list |
 | GSI2 | `GSI2PK` / `GSI2SK` | SUBMISSION | Sparse signatory inbox (`pending` / `returned`) |
 | GSI4 | `GSI4PK` / `GSI4SK` | SIGNATORY | Role directory (`ROLE#...`) |
 | GSI5 | `GSI5PK` / `GSI5SK` | BOOKING | Org-scoped booking list (submission-sourced holds only; operator-provisioned) |
@@ -22,9 +22,9 @@ Index summary:
 
 | # | Access pattern | Operation | Key condition | Index |
 |---|---|---|---|---|
-| 1 | Org event list (student dashboard) | Query | `GSI1PK = ORGANIZATION#id`, `GSI1SK` desc (first 25 EVENT items) | GSI1 |
-| 2 | Event children (its submissions) | Query | `PK = EVENT#id`, `SK` begins `SUBMISSION#` | Base |
-| 3 | Student's own submissions | Query | GSI1 for org, then each event partition | GSI1 + Base |
+| 1 | Org event walk (deadlines list) | Query | `GSI1PK = ORGANIZATION#id` (first 25 EVENT items, oldest first) | GSI1 |
+| 2 | Event children (its deadlines) | Query | `PK = EVENT#id`, `SK` begins `DEADLINE#` | Base |
+| 3 | Student's own submissions | Query | `GSI1PK = ORGANIZATION#id`, `GSI1SK` begins `SUBMISSION#` (all papers, paginated) | GSI1 |
 | 4 | Collaboration submissions (dependent view) | Query | `PK = ORGANIZATION#<dep>`, `SK` begins `COLLAB#`, then resolve each pointer to its master SUBMISSION | Base |
 | 5 | Single submission detail | GetItem | `PK = EVENT#id`, `SK = SUBMISSION#id` | Base |
 | 6 | Submission timeline / audit | Query | `PK = SUBMISSION#id`, `SK` begins `NOTIFICATION#` | Base |

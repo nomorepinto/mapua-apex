@@ -108,7 +108,7 @@ The token is compared with `hash_equals` against backend env `ARCUS_SERVICE_TOKE
 
 `Authorization: Bearer <student ID token>`
 
-Scoped to the JWT org (`custom:organization_id`). List, deadlines, and `GET /organization` return only that org (first **25** events). Event paths return `404` if the event belongs to another org.
+Scoped to the JWT org (`custom:organization_id`). The submissions list returns **all** of that org’s papers (proponent + collaboration, de-duplicated, newest `sent_at` first); deadlines and `GET /organization` return only that org, and the deadlines walk still caps at the first **25** events. Event paths return `404` if the event belongs to another org.
 
 | Method | Endpoint | Example JSON |
 | :---- | :---- | :---- |

@@ -32,9 +32,12 @@ sent_at: timestamp
 GSI1PK: ORGANIZATION#uuid
 GSI1SK: timestamp
 
-Org event list queries GSI1 (first 25 EVENT items), then each event's
-SUBMISSION# children. Student GET /organization reads this
-ORGANIZATION item directly.
+The deadlines list walks GSI1 EVENT items (first 25, oldest first), then
+each event’s DEADLINE# children. The org submission list no longer walks
+events: it reads SUBMISSION rows straight off GSI1 (GSI1SK begins
+SUBMISSION#), same as admin, so every paper is returned regardless of
+event count. Student GET /organization reads this ORGANIZATION item
+directly.
 
 Deny sets status
 "denied", drops GSI2, and the student cannot edit. GSI2 is also dropped
@@ -142,8 +145,10 @@ Admin GET /admins/submissions lists organizations, then queries GSI1 for each
 one with GSI1SK beginning SUBMISSION#. Event rows on the same partition are
 not included. organization_id is that GSI1PK without the prefix.
 organization_name is the name on that ORGANIZATION item.
-The student org list still walks EVENT GSI1, then queries each event
-partition. GSI2 is the signatory inbox. It stays on return (status
+The student org submission list (GET /students/submissions) queries the
+same GSI1 SUBMISSION# rows directly, so every paper is returned no matter
+how many events the org has; only the deadlines list still walks EVENT
+GSI1 (first 25). GSI2 is the signatory inbox. It stays on return (status
 "returned") so the same desk and the student both still see the paper.
 The student may edit a returned paper; PUT sets status back to "pending"
 and keeps current_signatory / GSI2 on that desk. Deny sets status
