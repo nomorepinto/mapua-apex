@@ -88,17 +88,25 @@ final class OrganizationRecords
         }
 
         $key = DynamoKeys::organization($organizationId);
-        $item = [
+        $signatories = $this->orderedDesks($this->desks(['signatories' => $signatories]));
+        $isHigherCouncil = $isHigherCouncil ?? (($existing['is_higher_council'] ?? false) === true);
+
+        // Patch only the attributes this app owns; a PutItem would silently
+        // strip foreign attributes (e.g. arcus membership data) that live on
+        // the identical PK/SK in the shared table.
+        $this->items->patch($key, $key, [
+            'name' => $name,
+            'signatories' => $signatories,
+            'is_higher_council' => $isHigherCouncil,
+        ]);
+
+        return [
             'PK' => $key,
             'SK' => $key,
             'name' => $name,
-            'signatories' => $this->orderedDesks($this->desks(['signatories' => $signatories])),
-            'is_higher_council' => $isHigherCouncil ?? (($existing['is_higher_council'] ?? false) === true),
+            'signatories' => $signatories,
+            'is_higher_council' => $isHigherCouncil,
         ];
-
-        $this->items->put($item);
-
-        return $item;
     }
 
     /**
@@ -117,7 +125,23 @@ final class OrganizationRecords
             abort(409, 'This organization still has submissions and cannot be deleted.');
         }
 
+        if ($this->hasMemberships($key)) {
+            abort(409, 'This organization still has member rosters in the attendance system.');
+        }
+
         $this->items->delete($key, $key);
+    }
+
+    private function hasMemberships(string $organizationKey): bool
+    {
+        return $this->items->query([
+            'KeyConditionExpression' => 'PK = :pk AND begins_with(SK, :sk)',
+            'ExpressionAttributeValues' => [
+                ':pk' => ['S' => $organizationKey],
+                ':sk' => ['S' => 'MEMBER#'],
+            ],
+            'Limit' => 1,
+        ], allPages: false) !== [];
     }
 
     private function hasEvents(string $organizationKey): bool

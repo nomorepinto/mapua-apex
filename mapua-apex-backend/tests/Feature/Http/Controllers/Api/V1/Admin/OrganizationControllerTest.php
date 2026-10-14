@@ -257,4 +257,69 @@ class OrganizationControllerTest extends TestCase
 
         $this->assertNotNull($db->find('ORGANIZATION#a1b2', 'ORGANIZATION#a1b2'));
     }
+
+    public function test_update_preserves_foreign_arcus_attributes_on_the_shared_key(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        // An organization item that also carries arcus-attendance's legacy
+        // attributes on the identical PK/SK (the shared-table cohabitation).
+        $db->seed([
+            'PK' => 'ORGANIZATION#a1b2',
+            'SK' => 'ORGANIZATION#a1b2',
+            'name' => 'Mapua Computing Society',
+            'signatories' => [],
+            'is_higher_council' => false,
+            'org_name' => 'Legacy Arcus Name',
+            'normalized_org_name' => 'legacyarcusname',
+            'GSI4PK' => 'ORGANIZATION',
+            'GSI4SK' => 'legacyarcusname#a1b2',
+        ]);
+        // Seed only the SIGNATORY item; the DynamoFixtures::signatory() helper
+        // would re-seed the organization and wipe the foreign attributes we are
+        // asserting survive the update.
+        $db->seed([
+            'PK' => 'SIGNATORY#adv001',
+            'SK' => 'SIGNATORY#adv001',
+            'name' => 'Prof. Juan Dela Cruz',
+            'role' => 'adviser',
+            'organization_id' => 'a1b2',
+        ]);
+
+        $this->withAdminAuth()
+            ->putJson('/api/v1/admins/organizations/a1b2', [
+                'name' => 'IEEE Mapua',
+                'signatories' => [
+                    ['role' => 'adviser', 'signatory_id' => 'adv001'],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'IEEE Mapua');
+
+        $stored = $db->find('ORGANIZATION#a1b2', 'ORGANIZATION#a1b2');
+        $this->assertSame('IEEE Mapua', $stored['name'] ?? null);
+        // A PutItem would strip these; the patch must leave foreign attributes.
+        $this->assertSame('Legacy Arcus Name', $stored['org_name'] ?? null);
+        $this->assertSame('legacyarcusname', $stored['normalized_org_name'] ?? null);
+        $this->assertSame('ORGANIZATION', $stored['GSI4PK'] ?? null);
+    }
+
+    public function test_returns_409_when_the_organization_has_member_join_rows(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::organization($db);
+        // An arcus-attendance membership join row under the organization PK.
+        $db->seed([
+            'PK' => 'ORGANIZATION#a1b2',
+            'SK' => 'MEMBER#1001',
+            'organization_id' => 'a1b2',
+            'student_id' => '1001',
+        ]);
+
+        $this->withAdminAuth()
+            ->deleteJson('/api/v1/admins/organizations/a1b2')
+            ->assertConflict()
+            ->assertJsonPath('message', 'This organization still has member rosters in the attendance system.');
+
+        $this->assertNotNull($db->find('ORGANIZATION#a1b2', 'ORGANIZATION#a1b2'));
+    }
 }
