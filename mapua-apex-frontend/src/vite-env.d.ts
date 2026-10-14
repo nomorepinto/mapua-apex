@@ -11,6 +11,8 @@ interface ImportMetaEnv {
   readonly VITE_ARCUS_EVALUATION_URL: string
   // Clock display format: "12" or "24" (defaults to 12 when unset).
   readonly VITE_TIME_FORMAT?: string
+  // Local-only: lifts the 10-day minimum event-date lead when "true".
+  readonly VITE_ALLOW_ANY_EVENT_DATE?: string
 }
 
 interface ImportMeta {

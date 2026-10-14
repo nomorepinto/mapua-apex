@@ -43,6 +43,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Local-only event-date override
+    |--------------------------------------------------------------------------
+    |
+    | When APP_ENV=local and the flag is set, the SAAF submission rule drops
+    | its 10-day minimum lead for activity_details.date_of_event so events can
+    | be dated today or any date. Mirrors the SPA flag VITE_ALLOW_ANY_EVENT_DATE
+    | read from the shared repo-root .env; gated to `local` so it can never
+    | activate in production or leak into the (APP_ENV=testing) test suite.
+    |
+    */
+
+    'allow_any_event_date' => env('APP_ENV') === 'local'
+        && filter_var(env('VITE_ALLOW_ANY_EVENT_DATE', false), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |

@@ -1,5 +1,15 @@
 export const EVENT_DATE_MIN_LEAD_DAYS = 10
 
+/**
+ * Local-only escape hatch. Set VITE_ALLOW_ANY_EVENT_DATE=true in the repo-root
+ * .env to lift the 10-day minimum lead so proposals and reservations can be
+ * dated today or any date (including the past) for testing time-sensitive
+ * features. The root .env is gitignored and never used by deployed builds, so
+ * the 10-day rule stays enforced everywhere else.
+ */
+export const ALLOW_ANY_EVENT_DATE =
+  import.meta.env.VITE_ALLOW_ANY_EVENT_DATE === "true"
+
 export const EVENT_DATE_TOO_SOON_MESSAGE =
   "The date of event must be at least 10 days from today."
 
@@ -38,11 +48,26 @@ export function addDays(date: Date, days: number): Date {
 }
 
 export function minEventDate(): Date {
-  return addDays(startOfLocalDay(), EVENT_DATE_MIN_LEAD_DAYS)
+  return addDays(
+    startOfLocalDay(),
+    ALLOW_ANY_EVENT_DATE ? 0 : EVENT_DATE_MIN_LEAD_DAYS,
+  )
 }
 
 export function minEventDateKey(): string {
   return getDateKey(minEventDate())
+}
+
+/**
+ * Date-picker floor. Returns `undefined` when the override is on so the picker
+ * imposes no minimum and any date (including the past) is selectable.
+ */
+export function eventDateFloor(): Date | undefined {
+  return ALLOW_ANY_EVENT_DATE ? undefined : minEventDate()
+}
+
+export function eventDateFloorKey(): string | undefined {
+  return ALLOW_ANY_EVENT_DATE ? undefined : minEventDateKey()
 }
 
 export function formatDisplayDate(

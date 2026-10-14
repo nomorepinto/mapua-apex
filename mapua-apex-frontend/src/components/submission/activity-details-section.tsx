@@ -24,7 +24,8 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  minEventDateKey,
+  ALLOW_ANY_EVENT_DATE,
+  eventDateFloorKey,
   parseDateKey,
 } from "@/lib/date-key"
 import {
@@ -78,11 +79,13 @@ export function ActivityDetailsSection({
     }
   }, [values.activityTitle, displayTitle, onChange])
 
-  const minStartDate = minEventDateKey()
+  const minStartDate = eventDateFloorKey()
   const minEndDate =
-    values.dateOfEvent && values.dateOfEvent > minStartDate
-      ? values.dateOfEvent
-      : minStartDate
+    minStartDate === undefined
+      ? values.dateOfEvent || undefined
+      : values.dateOfEvent && values.dateOfEvent > minStartDate
+        ? values.dateOfEvent
+        : minStartDate
 
   const handleStartDateChange = (startVal: string) => {
     onChange("dateOfEvent", startVal)
@@ -297,7 +300,7 @@ export function ActivityDetailsSection({
                 required
               />
             )}
-            {!includeReservation && (
+            {!includeReservation && !ALLOW_ANY_EVENT_DATE && (
               <span className="block text-[10px] text-neutral-500">
                 At least 10 days from today
               </span>

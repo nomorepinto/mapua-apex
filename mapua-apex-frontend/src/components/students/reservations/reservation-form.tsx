@@ -27,6 +27,7 @@ import { useStudentReservablesQuery } from "@/hooks/use-reservables"
 import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
 import {
   addDays,
+  eventDateFloor,
   formatDisplayDate,
   getDateKey,
   minEventDate,
@@ -401,7 +402,7 @@ function PickCard({
         <div className="space-y-3">
           <DatePicker
             aria-label={`Reservation date for ${pick.name}`}
-            minDate={minEventDate()}
+            minDate={eventDateFloor()}
             onChange={setDate}
             value={date}
             modifiers={modifiers}

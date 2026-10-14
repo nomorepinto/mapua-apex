@@ -235,6 +235,30 @@ class SubmissionControllerTest extends TestCase
             ->assertJsonPath('data.activity_details.date_of_event', '2026-10-02');
     }
 
+    public function test_allows_same_day_event_date_when_override_is_enabled(): void
+    {
+        $this->travelTo('2026-09-22 08:00:00');
+        config(['app.allow_any_event_date' => true]);
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db);
+        DynamoFixtures::signatory($db, 'adv001', 'adviser');
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar');
+        DynamoFixtures::signatory($db, 'cdm001', 'cdm');
+
+        $response = $this->withStudentAuth()->postJson(
+            '/api/v1/students/submissions',
+            SaafPayload::valid([
+                'activity_details' => [
+                    'date_of_event' => '2026-09-22',
+                    'end_date_of_event' => '2026-09-22',
+                ],
+            ]),
+        );
+
+        $response->assertCreated()
+            ->assertJsonPath('data.activity_details.date_of_event', '2026-09-22');
+    }
+
     public function test_creates_a_submission_and_routes_to_the_adviser(): void
     {
         $this->freezeTime();

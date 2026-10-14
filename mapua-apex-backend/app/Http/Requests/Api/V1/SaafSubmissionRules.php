@@ -9,6 +9,13 @@ final class SaafSubmissionRules
      */
     public static function fields(bool $requireEventId = false): array
     {
+        // Local-only override (config/app.php <- VITE_ALLOW_ANY_EVENT_DATE): when
+        // enabled, drop the 10-day minimum lead so events can be dated any day.
+        $dateOfEvent = ['required', 'date_format:Y-m-d'];
+        if (! config('app.allow_any_event_date')) {
+            $dateOfEvent[] = 'after_or_equal:'.now()->addDays(10)->toDateString();
+        }
+
         $rules = [
             'submission_type' => ['required', 'string', 'max:50'],
             'activity_classification' => ['required', 'array'],
@@ -39,7 +46,7 @@ final class SaafSubmissionRules
             'activity_details.description' => ['required', 'string'],
             'activity_details.objectives' => ['required', 'string'],
             'activity_details.venue' => ['required', 'string', 'max:255'],
-            'activity_details.date_of_event' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.now()->addDays(10)->toDateString()],
+            'activity_details.date_of_event' => $dateOfEvent,
             'activity_details.end_date_of_event' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:activity_details.date_of_event'],
             'activity_details.day_of_event' => ['nullable', 'string', 'max:32'],
             'activity_details.time_of_event' => ['required', 'string', 'max:32'],

@@ -26,6 +26,7 @@ import {
   withinCapacity,
 } from "@/lib/reservable-capacity"
 import {
+  ALLOW_ANY_EVENT_DATE,
   EVENT_DATE_TOO_SOON_MESSAGE,
   minEventDateKey,
 } from "@/lib/date-key"
@@ -224,7 +225,7 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   const endDate = draft.endDateOfEvent || draft.dateOfEvent
   if (isBlank(startDate)) warnings.dateOfEvent = REQUIRED
   if (isBlank(endDate)) warnings.endDateOfEvent = REQUIRED
-  if (!isBlank(startDate) && startDate < minEventDateKey()) {
+  if (!ALLOW_ANY_EVENT_DATE && !isBlank(startDate) && startDate < minEventDateKey()) {
     warnings.dateOfEvent = EVENT_DATE_TOO_SOON_MESSAGE
   }
   if (!isBlank(startDate) && !isBlank(endDate) && endDate < startDate) {
