@@ -1,4 +1,3 @@
-import type { KeyboardEvent } from "react"
 import { DownloadIcon, PlusIcon } from "lucide-react"
 import { CircleAlertIcon } from "lucide-react"
 
@@ -8,6 +7,14 @@ import {
   signatoryRoleLabel,
 } from "@/components/admin-osa/signatory-roles"
 import { ORG_CSV_TEMPLATE } from "@/components/admin/organizations/organization-desks"
+import {
+  ORGANIZATION_NAME_MAX,
+  ORGANIZATION_NAME_MIN,
+  blockOrganizationNameDigitKeys,
+  isOrganizationNameValid,
+  organizationNameLiveError,
+  sanitizeOrganizationName,
+} from "@/components/admin/organizations/organization-name"
 import {
   HigherCouncilField,
   SignatoryDeskCombobox,
@@ -30,17 +37,6 @@ import { Separator } from "@/components/ui/separator"
 import { layout } from "@/config"
 import { downloadCsvTemplate } from "@/lib/parse-csv"
 
-/** Prevents typing 0-9 in letters-only fields */
-function blockDigitKeys(e: KeyboardEvent<HTMLInputElement>) {
-  if (/^[0-9]$/.test(e.key)) {
-    e.preventDefault()
-  }
-}
-
-function stripDigits(value: string): string {
-  return value.replace(/[0-9]/g, "")
-}
-
 export function AddOrganizationCard() {
   return (
     <Card className={layout.card}>
@@ -54,26 +50,14 @@ export function AddOrganizationCard() {
 function AddOrganizationForm() {
   const { state, actions } = useOrganizationsPage()
 
-  const nameTrimmed = state.name.trim()
-  const hasNumbers = /[0-9]/.test(state.name)
-  const isLengthInvalid =
-    state.name.length > 0 &&
-    (nameTrimmed.length < 5 || nameTrimmed.length > 100)
-
   const nameError =
     (state.formError &&
       (state.formError.toLowerCase().includes("name") ||
         state.formError.includes("character"))
       ? state.formError
-      : null) ??
-    (isLengthInvalid
-      ? "The required minimum character is 5 and a maximum of 100"
-      : null)
+      : null) ?? organizationNameLiveError(state.name)
 
-  const isNameValid =
-    nameTrimmed.length >= 5 &&
-    nameTrimmed.length <= 100 &&
-    !hasNumbers
+  const isNameValid = isOrganizationNameValid(state.name)
 
   const areDesksValid =
     Boolean(state.desks.adviser) &&
@@ -101,12 +85,12 @@ function AddOrganizationForm() {
               autoComplete="off"
               id="organization-name"
               name="name"
-              minLength={5}
-              maxLength={100}
-              onKeyDown={blockDigitKeys}
+              minLength={ORGANIZATION_NAME_MIN}
+              maxLength={ORGANIZATION_NAME_MAX}
+              onKeyDown={blockOrganizationNameDigitKeys}
               onChange={(event) =>
                 actions.changeName(
-                  stripDigits(event.currentTarget.value).slice(0, 100)
+                  sanitizeOrganizationName(event.currentTarget.value)
                 )
               }
               placeholder="Mapua Computing Society"

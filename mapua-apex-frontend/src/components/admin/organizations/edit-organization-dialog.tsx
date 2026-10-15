@@ -5,6 +5,14 @@ import {
   HigherCouncilField,
   SignatoryDeskCombobox,
 } from "@/components/admin/organizations/organization-fields"
+import {
+  ORGANIZATION_NAME_MAX,
+  ORGANIZATION_NAME_MIN,
+  blockOrganizationNameDigitKeys,
+  isOrganizationNameValid,
+  organizationNameLiveError,
+  sanitizeOrganizationName,
+} from "@/components/admin/organizations/organization-name"
 import { useOrganizationsPage } from "@/components/admin/organizations/organizations-context"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -29,6 +37,18 @@ import { modal } from "@/config"
 
 export function EditOrganizationDialog() {
   const { state, actions } = useOrganizationsPage()
+
+  const nameError =
+    (state.editError &&
+    (state.editError.toLowerCase().includes("name") ||
+      state.editError.includes("character"))
+      ? state.editError
+      : null) ?? organizationNameLiveError(state.editName)
+
+  const canSave =
+    isOrganizationNameValid(state.editName) &&
+    Boolean(state.editDesks.adviser) &&
+    (state.editIsHigherCouncil || Boolean(state.editDesks.dean))
 
   return (
     <Dialog
@@ -60,15 +80,24 @@ export function EditOrganizationDialog() {
             <Field>
               <FieldLabel htmlFor="edit-organization-name">Name</FieldLabel>
               <Input
+                aria-invalid={nameError ? true : undefined}
                 autoComplete="off"
                 id="edit-organization-name"
+                minLength={ORGANIZATION_NAME_MIN}
+                maxLength={ORGANIZATION_NAME_MAX}
+                onKeyDown={blockOrganizationNameDigitKeys}
                 onChange={(event) =>
-                  actions.changeEditName(event.currentTarget.value)
+                  actions.changeEditName(
+                    sanitizeOrganizationName(event.currentTarget.value)
+                  )
                 }
                 required
                 type="text"
                 value={state.editName}
               />
+              {nameError ? (
+                <p className="text-xs font-medium text-red-600">{nameError}</p>
+              ) : null}
             </Field>
             {ORGANIZATION_ASSIGNABLE_DESK_ITEMS.map((item) => (
               <SignatoryDeskCombobox
@@ -91,7 +120,9 @@ export function EditOrganizationDialog() {
               id="edit-organization-higher-council"
               onCheckedChange={actions.setEditIsHigherCouncil}
             />
-            {state.editError ? (
+            {state.editError &&
+            !state.editError.toLowerCase().includes("name") &&
+            !state.editError.includes("character") ? (
               <Alert variant="error">
                 <CircleAlertIcon />
                 <AlertTitle>Could not save</AlertTitle>
@@ -117,7 +148,7 @@ export function EditOrganizationDialog() {
             <DialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
             </DialogClose>
-            <Button loading={state.updatePending} type="submit">
+            <Button disabled={!canSave} loading={state.updatePending} type="submit">
               Save changes
             </Button>
           </DialogFooter>

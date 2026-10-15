@@ -21,6 +21,7 @@ import {
   type DepartmentOption,
   type RoleOption,
 } from "@/components/admin/signatories/signatory-options"
+import { signatoryNameError } from "@/components/admin/signatories/signatory-name"
 import { toastManager } from "@/components/ui/toast"
 import {
   useBulkCreateSignatoriesMutation,
@@ -243,18 +244,9 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       setFormError("Name and role are required.")
       return
     }
-    if (name.startsWith(".")) {
-      setFormError("You cannot start with a special character .")
-      return
-    }
-    if (trimmed.length < 3 || trimmed.length > 30) {
-      setFormError("The required minimum character is 3 and a maximum of 30")
-      return
-    }
-    if (/[^\p{L}\s.]|\d/u.test(trimmed)) {
-      setFormError(
-        "Signatory name can only contain letters, spaces, and non-initial periods."
-      )
+    const nameError = signatoryNameError(name)
+    if (nameError) {
+      setFormError(nameError)
       return
     }
     if (takenRoles.has(role)) {
@@ -338,6 +330,11 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
     }
     if (!editName.trim() || !editRole) {
       setEditError("Name and role are required.")
+      return
+    }
+    const nameError = signatoryNameError(editName)
+    if (nameError) {
+      setEditError(nameError)
       return
     }
 
