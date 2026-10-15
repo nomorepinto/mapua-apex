@@ -86,9 +86,12 @@ export function SubmissionsPanel() {
         />
       </div>
 
-      <div className={layout.tableWrap}>
-        <Table className={cn(layout.table, "min-w-0 sm:min-w-[36rem] text-left")}>
-          <TableHeader>
+      <div>
+        <Table
+          className={cn(layout.table, "min-w-0 sm:min-w-[36rem] text-left")}
+          containerClassName="max-h-[36rem] overflow-auto rounded-xl border border-neutral-200/80 shadow-2xs"
+        >
+          <TableHeader className="sticky top-0 z-10 bg-white shadow-xs [&_th]:bg-white">
             <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-600 uppercase">
               <TableHead className="pr-4 pb-3 font-bold">DOCUMENT ID</TableHead>
               <SubmissionsFilterHeader

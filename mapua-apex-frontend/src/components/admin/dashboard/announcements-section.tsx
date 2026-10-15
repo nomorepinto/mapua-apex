@@ -39,9 +39,12 @@ export function AdminAnnouncementsSection() {
           New announcement
         </Button>
       </div>
-      <div className={layout.tableWrap}>
-        <Table className={layout.table}>
-          <TableHeader>
+      <div>
+        <Table
+          className={layout.table}
+          containerClassName="max-h-[38rem] overflow-auto rounded-xl border border-neutral-200/80 shadow-2xs"
+        >
+          <TableHeader className="sticky top-0 z-10 bg-white shadow-xs [&_th]:bg-white">
             <TableRow className="border-b border-neutral-200 text-neutral-500">
               <TableHead className="text-xs font-bold uppercase">Posted</TableHead>
               <TableHead className="text-xs font-bold uppercase">Notice</TableHead>

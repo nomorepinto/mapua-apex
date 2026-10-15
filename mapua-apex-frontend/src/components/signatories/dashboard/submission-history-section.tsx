@@ -60,10 +60,12 @@ interface HistoryTableProps {
 function HistoryTable({ filters, loading, onSelect, emptyLabel, hasRows }: HistoryTableProps) {
   return (
     <div className={layout.sectionFlush}>
-      <div className={layout.tableWrap}>
-        <Table className={layout.table}>
-          <TableHeader>
-            <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-500 uppercase hover:bg-transparent!">
+      <Table
+        className={layout.table}
+        containerClassName="max-h-[36rem] overflow-auto"
+      >
+        <TableHeader className="sticky top-0 z-10 bg-white shadow-xs [&_th]:bg-white">
+          <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-500 uppercase hover:bg-transparent!">
               <ActivityFilterHeader
                 column="organization"
                 label="Organization"

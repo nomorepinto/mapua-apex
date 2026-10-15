@@ -47,9 +47,12 @@ export function AdminSubmissionsSection() {
         </div>
       </div>
 
-      <div className={cn("min-h-0 flex-1", layout.tableWrap)}>
-        <Table className={layout.table}>
-          <TableHeader>
+      <div className="min-h-0 flex-1">
+        <Table
+          className={layout.table}
+          containerClassName="max-h-[36rem] overflow-auto rounded-xl border border-neutral-200/80 shadow-2xs"
+        >
+          <TableHeader className="sticky top-0 z-10 bg-white shadow-xs [&_th]:bg-white">
             <TableRow className="border-b border-neutral-200 text-neutral-500">
               <TableHead className="text-xs font-bold uppercase">Event</TableHead>
               <SubmissionsFilterHeader
