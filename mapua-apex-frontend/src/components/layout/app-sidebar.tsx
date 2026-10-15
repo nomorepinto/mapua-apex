@@ -424,7 +424,10 @@ export function AppSidebar({
           if (!isSigningOut) setSignOutOpen(open)
         }}
       >
-        <DialogPopup className={modal.dialogMd}>
+        <DialogPopup
+          className={modal.dialogMd}
+          viewportProps={{ className: "sm:grid-rows-[1fr_auto_1fr]" }}
+        >
           <DialogHeader>
             <DialogTitle>Sign out of APEX?</DialogTitle>
             <DialogDescription>
