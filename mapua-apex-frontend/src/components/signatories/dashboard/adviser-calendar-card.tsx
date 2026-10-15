@@ -1,0 +1,456 @@
+import { useMemo, useState } from "react"
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+} from "lucide-react"
+
+import {
+  mapProposalStatus,
+  ProposalStatusBadge,
+  type ProposalDashboardStatus,
+} from "@/components/students/dashboard/student-calendar-card"
+import { useReviewDashboardContext } from "@/components/signatories/dashboard/review-dashboard-context"
+import type { Activity } from "@/components/ui/activity.types"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogDescription,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { layout } from "@/config"
+import {
+  MONTH_NAMES,
+  WEEKDAY_NAMES,
+  getDatesInRange,
+  toLocalDateKey,
+} from "@/lib/calendar-utils"
+import { getDateKey, parseDateKey } from "@/lib/date-key"
+import { formatDocumentId } from "@/lib/dynamodb-adapters"
+import { cn } from "@/lib/utils"
+
+/**
+ * Normalizes a review-dashboard activity into the limited 3-state calendar
+ * status model (Approved / Pending / Cancelled) shared with the student
+ * calendar. Unlike the OSAAR desk, advisers never see the granular queue
+ * states — "Pending Dean Approval" and "Returned" collapse into Pending,
+ * and only outright rejection/cancellation surfaces as Cancelled.
+ */
+export function getAdviserActivityCalendarStatus(
+  activity: Activity
+): ProposalDashboardStatus {
+  const s = (activity.status || "").toLowerCase()
+  const apiToken =
+    s === "accepted"
+      ? "approved"
+      : s === "rejected" || s === "cancelled" || activity.decision === "Reject"
+        ? "cancelled"
+        : "pending"
+  return mapProposalStatus(null, apiToken)
+}
+
+export function AdviserCalendarCard() {
+  const { state, actions } = useReviewDashboardContext()
+  const { reviewActivities, historyActivities } = state
+
+  const today = useMemo(() => new Date(), [])
+  const todayKey = useMemo(() => getDateKey(today), [today])
+
+  const [currentMonth, setCurrentMonth] = useState<Date>(
+    () => new Date(today.getFullYear(), today.getMonth(), 1)
+  )
+  const [selectedDateKey, setSelectedDateKey] = useState<string>(todayKey)
+  const [dialogOpen, setDialogOpen] = useState(false)
+
+  // Proposals visible to this adviser: review queue + history, deduplicated
+  const activities = useMemo(() => {
+    const seen = new Set<string>()
+    return [...reviewActivities, ...historyActivities].filter((act) => {
+      const key = `${act.eventId}:${act.submissionId}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [reviewActivities, historyActivities])
+
+  // Map proposals onto their event dates (falls back to submission date)
+  const dateActivitiesMap = useMemo(() => {
+    const map = new Map<string, Activity[]>()
+
+    activities.forEach((act) => {
+      const keys = new Set<string>()
+      if (act.dateOfEvent) {
+        getDatesInRange(
+          act.dateOfEvent,
+          act.endDateOfEvent || act.dateOfEvent
+        ).forEach((k) => keys.add(k))
+      }
+      if (keys.size === 0 && act.submittedAt) {
+        const sentKey = toLocalDateKey(act.submittedAt)
+        if (sentKey) keys.add(sentKey)
+      }
+
+      keys.forEach((key) => {
+        const list = map.get(key) || []
+        list.push(act)
+        map.set(key, list)
+      })
+    })
+
+    return map
+  }, [activities])
+
+  // Calendar cells for the current month grid
+  const calendarCells = useMemo(() => {
+    const year = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+
+    const firstDay = new Date(year, month, 1)
+    const startDayOfWeek = firstDay.getDay() // 0 = Sunday
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const daysInPrevMonth = new Date(year, month, 0).getDate()
+
+    const totalCells = startDayOfWeek + daysInMonth > 35 ? 42 : 35
+    const cells = []
+
+    for (let i = 0; i < totalCells; i++) {
+      let date: Date
+      let isCurrentMonth = true
+
+      if (i < startDayOfWeek) {
+        const dayNumber = daysInPrevMonth - startDayOfWeek + i + 1
+        date = new Date(year, month - 1, dayNumber)
+        isCurrentMonth = false
+      } else if (i >= startDayOfWeek + daysInMonth) {
+        const dayNumber = i - (startDayOfWeek + daysInMonth) + 1
+        date = new Date(year, month + 1, dayNumber)
+        isCurrentMonth = false
+      } else {
+        const dayNumber = i - startDayOfWeek + 1
+        date = new Date(year, month, dayNumber)
+      }
+
+      const dateKey = getDateKey(date)
+      const proposals = dateActivitiesMap.get(dateKey) || []
+
+      const hasApproved = proposals.some(
+        (p) => getAdviserActivityCalendarStatus(p) === "Approved"
+      )
+      const hasPending = proposals.some(
+        (p) => getAdviserActivityCalendarStatus(p) === "Pending"
+      )
+      const hasCancelled = proposals.some(
+        (p) => getAdviserActivityCalendarStatus(p) === "Cancelled"
+      )
+
+      cells.push({
+        date,
+        dateKey,
+        dayNumber: date.getDate(),
+        isCurrentMonth,
+        isToday: dateKey === todayKey,
+        isSelected: dateKey === selectedDateKey,
+        proposals,
+        hasApproved,
+        hasPending,
+        hasCancelled,
+      })
+    }
+
+    return cells
+  }, [currentMonth, dateActivitiesMap, selectedDateKey, todayKey])
+
+  // Activities for the currently selected date
+  const selectedDateProposals = useMemo(() => {
+    return dateActivitiesMap.get(selectedDateKey) || []
+  }, [dateActivitiesMap, selectedDateKey])
+
+  // Formatted date label for selected date
+  const selectedDateDisplay = useMemo(() => {
+    const d = parseDateKey(selectedDateKey)
+    if (!d) return selectedDateKey
+    return d.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    })
+  }, [selectedDateKey])
+
+  const goToPreviousMonth = () => {
+    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+  }
+
+  const goToNextMonth = () => {
+    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+  }
+
+  const goToToday = () => {
+    const now = new Date()
+    setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1))
+    setSelectedDateKey(todayKey)
+  }
+
+  const handleCellClick = (cellDateKey: string, cellDate: Date, isCurrentMonth: boolean) => {
+    setSelectedDateKey(cellDateKey)
+    if (!isCurrentMonth) {
+      setCurrentMonth(new Date(cellDate.getFullYear(), cellDate.getMonth(), 1))
+    }
+    setDialogOpen(true)
+  }
+
+  return (
+    <div className={cn(layout.section, "overflow-hidden")}>
+      {/* Calendar Card Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-neutral-200 pb-4">
+        <div>
+          <h3 className="text-base font-extrabold text-neutral-900 sm:text-lg">
+            Calendar · {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+          </h3>
+          <p className="text-xs text-neutral-500">
+            Proposals from the organizations you advise
+          </p>
+
+          {/* Status Legend under the title */}
+          <div className="mt-2.5 flex items-center gap-3.5 text-xs">
+            <span className="flex items-center gap-1.5 font-semibold text-neutral-700">
+              <span className="size-2 rounded-full bg-emerald-500 shadow-2xs" />
+              <span>Approved</span>
+            </span>
+            <span className="flex items-center gap-1.5 font-semibold text-neutral-700">
+              <span className="size-2 rounded-full bg-amber-500 shadow-2xs" />
+              <span>Pending</span>
+            </span>
+            <span className="flex items-center gap-1.5 font-semibold text-neutral-700">
+              <span className="size-2 rounded-full bg-rose-500 shadow-2xs" />
+              <span>Cancelled</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Controls at Top Right: Today / Previous / Next */}
+        <div className="flex items-center gap-1.5 self-start sm:self-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToPreviousMonth}
+            className="h-8 px-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
+            aria-label="Previous Month"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToToday}
+            className="h-8 px-3 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
+          >
+            Today
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToNextMonth}
+            className="h-8 px-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
+            aria-label="Next Month"
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Calendar Grid Container (same format & styling as the student card) */}
+      <div className="mt-4 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-2xs">
+        {/* Day of Week Headers */}
+        <div className="grid grid-cols-7 border-b border-neutral-200 bg-neutral-50/80 text-center">
+          {WEEKDAY_NAMES.map((name, index) => (
+            <div
+              key={name}
+              className={cn(
+                "py-2 text-[11px] font-bold tracking-wider uppercase",
+                index === 0 || index === 6 ? "text-neutral-500" : "text-neutral-700"
+              )}
+            >
+              {name}
+            </div>
+          ))}
+        </div>
+
+        {/* Day Cells Grid */}
+        <div className="grid grid-cols-7 bg-neutral-200 gap-px">
+          {calendarCells.map((cell) => {
+            const hasProposals = cell.proposals.length > 0
+
+            return (
+              <button
+                key={cell.dateKey}
+                type="button"
+                onClick={() => handleCellClick(cell.dateKey, cell.date, cell.isCurrentMonth)}
+                className={cn(
+                  "group relative flex min-h-[68px] flex-col justify-between p-1.5 text-left transition-colors sm:min-h-[76px] sm:p-2 cursor-pointer outline-none",
+                  cell.isCurrentMonth ? "bg-white" : "bg-neutral-50/60 text-neutral-400",
+                  cell.isSelected
+                    ? "ring-2 ring-[#8B0000] ring-inset bg-red-50/20 z-10 font-bold"
+                    : "hover:bg-neutral-50/90",
+                  cell.isToday && !cell.isSelected && "bg-red-50/30"
+                )}
+                aria-label={`${cell.dayNumber} ${MONTH_NAMES[cell.date.getMonth()]}, ${cell.proposals.length} proposals`}
+              >
+                {/* Day Number Row */}
+                <div className="flex items-center justify-between">
+                  <span
+                    className={cn(
+                      "inline-flex size-6 items-center justify-center rounded-full text-xs font-semibold transition-colors",
+                      cell.isToday
+                        ? "bg-[#8B0000] text-white font-extrabold shadow-2xs"
+                        : cell.isSelected
+                          ? "text-[#8B0000] font-extrabold"
+                          : cell.isCurrentMonth
+                            ? "text-neutral-800"
+                            : "text-neutral-400"
+                    )}
+                  >
+                    {cell.dayNumber}
+                  </span>
+
+                  {/* Multiple proposals count pill */}
+                  {hasProposals && cell.proposals.length > 1 && (
+                    <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[9px] font-bold text-neutral-600 sm:text-[10px]">
+                      {cell.proposals.length}
+                    </span>
+                  )}
+                </div>
+
+                {/* Status Indicator Dots on Event Date */}
+                <div className="mt-1 flex min-h-4.5 items-end gap-1">
+                  {hasProposals && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {cell.hasApproved && (
+                        <span
+                          className="size-2 rounded-full bg-emerald-500 shadow-2xs ring-1 ring-emerald-300"
+                          title="Approved proposal"
+                        />
+                      )}
+                      {cell.hasPending && (
+                        <span
+                          className="size-2 rounded-full bg-amber-500 shadow-2xs ring-1 ring-amber-300"
+                          title="Pending proposal"
+                        />
+                      )}
+                      {cell.hasCancelled && (
+                        <span
+                          className="size-2 rounded-full bg-rose-500 shadow-2xs ring-1 ring-rose-300"
+                          title="Cancelled proposal"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Quick helper note under calendar */}
+      <div className="mt-2.5 flex items-center justify-between text-[11px] text-neutral-500">
+        <span>Click any date to see proposals scheduled on it</span>
+        {selectedDateProposals.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setDialogOpen(true)}
+            className="font-bold text-[#8B0000] hover:underline cursor-pointer"
+          >
+            View {selectedDateProposals.length} proposal{selectedDateProposals.length > 1 ? "s" : ""} on {selectedDateDisplay}
+          </button>
+        )}
+      </div>
+
+      {/* Date Proposals Modal Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogPopup className="max-w-xl">
+          <DialogHeader className="border-b border-neutral-200 pb-3 pr-8">
+            <DialogTitle className="text-base font-bold text-neutral-900">
+              Proposals on {selectedDateDisplay}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-500">
+              {selectedDateProposals.length === 0
+                ? "No proposals scheduled on this date."
+                : `${selectedDateProposals.length} proposal${selectedDateProposals.length > 1 ? "s" : ""} from your organizations on this date.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogPanel className="max-h-[60vh] overflow-y-auto p-4 space-y-3">
+            {selectedDateProposals.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 p-8 text-center">
+                <CalendarIcon className="mb-2 h-7 w-7 text-neutral-300" />
+                <p className="text-xs font-bold text-neutral-700">
+                  No proposals scheduled on this date
+                </p>
+                <p className="mt-1 text-[11px] text-neutral-500">
+                  Select a date marked with status dots (green, orange, or red) to view its proposals.
+                </p>
+              </div>
+            ) : (
+              selectedDateProposals.map((act) => {
+                const mappedStatus = getAdviserActivityCalendarStatus(act)
+
+                return (
+                  <div
+                    key={`${act.eventId}-${act.submissionId}`}
+                    className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-3.5 shadow-2xs hover:border-neutral-300 transition-all"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs font-bold text-neutral-500">
+                        {formatDocumentId(act.submissionId)}
+                      </span>
+                      <ProposalStatusBadge status={mappedStatus} />
+                    </div>
+
+                    <h4 className="text-sm font-bold text-neutral-900 leading-snug">
+                      {act.title}
+                    </h4>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
+                      <span>{act.org}</span>
+                      {act.date && <span>Event: {act.date}{act.time ? ` · ${act.time}` : ""}</span>}
+                    </div>
+
+                    {act.description && (
+                      <p className="line-clamp-2 text-xs text-neutral-600 bg-neutral-50 rounded-lg p-2 mt-1">
+                        {act.description}
+                      </p>
+                    )}
+
+                    <div className="mt-2 pt-2 border-t border-neutral-100 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setDialogOpen(false)
+                          actions.handleActivitySelect(act)
+                        }}
+                        className="text-xs font-semibold gap-1.5 cursor-pointer text-neutral-800 hover:text-neutral-900"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>View Proposal</span>
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </DialogPanel>
+        </DialogPopup>
+      </Dialog>
+    </div>
+  )
+}
