@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from "react"
 import { CircleAlertIcon, DownloadIcon, PlusIcon } from "lucide-react"
 
 import { CsvFileField } from "@/components/admin-osa/csv-file-field"
@@ -29,6 +30,41 @@ import { Separator } from "@/components/ui/separator"
 import { layout } from "@/config"
 import { downloadCsvTemplate } from "@/lib/parse-csv"
 
+/**
+ * Prevents typing numbers and special characters in signatory name.
+ * Allows letters (including unicode), spaces, and dot (.).
+ */
+function blockInvalidSignatoryNameKeys(e: KeyboardEvent<HTMLInputElement>) {
+  if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) {
+    return
+  }
+
+  // Block digits 0-9
+  if (/^[0-9]$/.test(e.key)) {
+    e.preventDefault()
+    return
+  }
+
+  // Allow period (.)
+  if (e.key === ".") {
+    return
+  }
+
+  // Allow letters (including Unicode letters) and spaces
+  if (!/^[\p{L}\s]$/u.test(e.key)) {
+    e.preventDefault()
+  }
+}
+
+/**
+ * Sanitizes input to remove digits and special characters except '.',
+ * and caps at 30 characters.
+ */
+function sanitizeSignatoryName(value: string): string {
+  const cleaned = value.replace(/[^\p{L}\s.]/gu, "")
+  return cleaned.slice(0, 30)
+}
+
 export function AddSignatoryCard() {
   return (
     <Card className={layout.card}>
@@ -41,6 +77,38 @@ export function AddSignatoryCard() {
 
 function AddSignatoryForm() {
   const { state, actions } = useSignatoriesPage()
+
+  const nameTrimmed = state.name.trim()
+  const startsWithDot = state.name.startsWith(".")
+  const isLengthInvalid =
+    state.name.length > 0 &&
+    (nameTrimmed.length < 3 || nameTrimmed.length > 30)
+
+  const signatoryErrors: string[] = []
+  if (startsWithDot) {
+    signatoryErrors.push("You cannot start with a special character .")
+  }
+  if (isLengthInvalid) {
+    signatoryErrors.push(
+      "The required minimum character is 3 and a maximum of 30"
+    )
+  }
+  if (
+    state.formError &&
+    state.formError.toLowerCase().includes("name") &&
+    !signatoryErrors.includes(state.formError)
+  ) {
+    signatoryErrors.push(state.formError)
+  }
+
+  const isNameValid =
+    nameTrimmed.length >= 3 &&
+    nameTrimmed.length <= 30 &&
+    !startsWithDot &&
+    !/[^\p{L}\s.]|\d/u.test(state.name)
+
+  const isRoleValid = state.role !== null && !state.takenRoles.has(state.role)
+  const canAddSignatory = state.canAddSignatory && isNameValid && isRoleValid
 
   return (
     <>
@@ -56,15 +124,28 @@ function AddSignatoryForm() {
           <Field>
             <FieldLabel htmlFor="signatory-name">Name</FieldLabel>
             <Input
+              aria-invalid={signatoryErrors.length > 0 ? true : undefined}
               autoComplete="off"
               id="signatory-name"
               name="name"
-              onChange={(event) => actions.changeName(event.currentTarget.value)}
+              minLength={3}
+              maxLength={30}
+              onKeyDown={blockInvalidSignatoryNameKeys}
+              onChange={(event) =>
+                actions.changeName(
+                  sanitizeSignatoryName(event.currentTarget.value)
+                )
+              }
               placeholder="Prof. Juan Dela Cruz"
               required
               type="text"
               value={state.name}
             />
+            {signatoryErrors.map((err) => (
+              <p key={err} className="text-xs font-medium text-red-600">
+                {err}
+              </p>
+            ))}
           </Field>
 
           <Field>
@@ -113,7 +194,7 @@ function AddSignatoryForm() {
             </Alert>
           ) : null}
 
-          {state.formError ? (
+          {state.formError && !state.formError.toLowerCase().includes("name") ? (
             <Alert variant="error">
               <CircleAlertIcon />
               <AlertTitle>Missing fields</AlertTitle>
@@ -122,7 +203,11 @@ function AddSignatoryForm() {
           ) : null}
         </CardPanel>
         <CardFooter className="justify-end">
-          <Button loading={state.createPending} type="submit">
+          <Button
+            disabled={!canAddSignatory}
+            loading={state.createPending}
+            type="submit"
+          >
             <PlusIcon aria-hidden="true" />
             Add signatory
           </Button>
