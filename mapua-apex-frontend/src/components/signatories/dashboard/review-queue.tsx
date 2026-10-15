@@ -152,6 +152,8 @@ export function ReviewActivityDialog() {
       onClassificationChange={actions.handleClassificationChange}
       actionError={state.actionError}
       readOnly={state.isReadOnly}
+      bookingConflicts={state.bookingConflicts}
+      isCheckingBookingConflicts={state.isCheckingBookingConflicts}
     />
   )
 }

@@ -137,7 +137,8 @@ export function ViewReservableSection() {
             <CardHeader>
               <CardTitle>{selectedReservable.name}</CardTitle>
               <CardDescription>
-                Effective availability = weekly template minus existing bookings.
+                Effective availability = weekly template minus approved bookings.
+                Requests still pending CDM approval don't occupy slots.
               </CardDescription>
             </CardHeader>
             <CardPanel className="flex flex-col gap-4">

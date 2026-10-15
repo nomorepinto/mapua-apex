@@ -10,12 +10,19 @@ use Illuminate\Support\Str;
  * write path and the CDM manual-reserve path, so a slot held by one is
  * unavailable to the other.
  *
+ * SAAF holds are written `approval_status: pending` and only occupy slots once
+ * the CDM desk approves the submission (see isApproved).
+ *
  * Conflict detection runs on the base RESERVABLE partition (PK = RESERVABLE#id,
  * SK begins_with BOOKING#) — never on GSI5 — so it works before the (user-added)
  * organization index exists.
  */
 final class BookingRecords
 {
+    public const PENDING = 'pending';
+
+    public const APPROVED = 'approved';
+
     /**
      * Hard cap on the number of days an availability window will expand to.
      */
@@ -106,34 +113,168 @@ final class BookingRecords
      */
     public function assertAvailable(array $reservable, array $selections, array $excludeSks = [], ?int $expectedParticipants = null): void
     {
+        $conflict = $this->collectConflicts($reservable, $selections, $excludeSks, $expectedParticipants)[0] ?? null;
+
+        if ($conflict !== null) {
+            abort($conflict['reason'] === 'capacity' ? 422 : 409, $conflict['message']);
+        }
+    }
+
+    /**
+     * Every conflict between a submission's own holds and the reservables'
+     * current approved bookings, without aborting. Feeds the CDM review warning
+     * and the approval-time guard.
+     *
+     * @param  list<array<string, mixed>>  $refs
+     * @return list<array{reservable_id: string, reservable_name: string, date: string|null, slot: int|null, reason: string, message: string}>
+     */
+    public function conflictsForRefs(array $refs, ?int $expectedParticipants = null): array
+    {
+        $excludeSks = $this->refSortKeys($refs);
+        $conflicts = [];
+
+        foreach ($refs as $ref) {
+            $pk = is_array($ref) ? ($ref['pk'] ?? null) : null;
+            $sk = is_array($ref) ? ($ref['sk'] ?? null) : null;
+
+            if (! is_string($pk) || $pk === '' || ! is_string($sk) || $sk === '') {
+                continue;
+            }
+
+            $booking = $this->items->get($pk, $sk);
+
+            if ($booking === null) {
+                continue;
+            }
+
+            $reservableId = DynamoKeys::strip($pk, 'RESERVABLE#') ?? '';
+            $name = (string) ($booking['reservable_name'] ?? 'This reservable');
+            $campusId = (string) ($booking['campus_id'] ?? '');
+            $reservable = $campusId !== ''
+                ? $this->items->get(DynamoKeys::campus($campusId), DynamoKeys::reservable($reservableId))
+                : null;
+
+            if ($reservable === null) {
+                $conflicts[] = [
+                    'reservable_id' => $reservableId,
+                    'reservable_name' => $name,
+                    'date' => null,
+                    'slot' => null,
+                    'reason' => 'missing_reservable',
+                    'message' => "{$name} no longer exists.",
+                ];
+
+                continue;
+            }
+
+            array_push($conflicts, ...$this->collectConflicts(
+                $reservable,
+                $this->selections($booking),
+                $excludeSks,
+                $expectedParticipants,
+            ));
+        }
+
+        return $conflicts;
+    }
+
+    /**
+     * Mark a submission's pending holds approved so they start counting toward
+     * availability. Refs whose booking no longer exists are skipped.
+     *
+     * @param  list<array<string, mixed>>  $refs
+     */
+    public function approveRefs(array $refs, string $signatoryId): void
+    {
+        $timestamp = DynamoKeys::now();
+
+        foreach ($refs as $ref) {
+            $pk = is_array($ref) ? ($ref['pk'] ?? null) : null;
+            $sk = is_array($ref) ? ($ref['sk'] ?? null) : null;
+
+            if (! is_string($pk) || $pk === '' || ! is_string($sk) || $sk === '') {
+                continue;
+            }
+
+            $booking = $this->items->get($pk, $sk);
+
+            if ($booking === null || ($booking['approval_status'] ?? null) !== self::PENDING) {
+                continue;
+            }
+
+            $this->items->patch($pk, $sk, [
+                'approval_status' => self::APPROVED,
+                'approved_at' => $timestamp,
+                'approved_by' => DynamoKeys::signatory($signatoryId),
+            ]);
+        }
+    }
+
+    /**
+     * Whether a booking occupies its slots. Manual CDM holds and legacy items
+     * without approval_status always count; submission holds count once approved.
+     *
+     * @param  array<string, mixed>  $booking
+     */
+    public static function isApproved(array $booking): bool
+    {
+        if (($booking['source'] ?? null) === 'cdm') {
+            return true;
+        }
+
+        $status = $booking['approval_status'] ?? null;
+
+        return $status === null || $status === self::APPROVED;
+    }
+
+    /**
+     * @param  array<string, mixed>  $reservable
+     * @param  list<array{date: string, slots: list<int>}>  $selections
+     * @param  list<string>  $excludeSks
+     * @return list<array{reservable_id: string, reservable_name: string, date: string|null, slot: int|null, reason: string, message: string}>
+     */
+    private function collectConflicts(array $reservable, array $selections, array $excludeSks, ?int $expectedParticipants): array
+    {
         $schedule = ReservableSchedule::normalize($reservable['schedule'] ?? []);
         $name = (string) ($reservable['name'] ?? 'This reservable');
+        $reservableId = DynamoKeys::strip($reservable['SK'] ?? null, 'RESERVABLE#') ?? '';
+        $conflict = static fn (?string $date, ?int $slot, string $reason, string $message): array => [
+            'reservable_id' => $reservableId,
+            'reservable_name' => $name,
+            'date' => $date,
+            'slot' => $slot,
+            'reason' => $reason,
+            'message' => $message,
+        ];
 
         if (! ReservableSchedule::withinCapacity($reservable, $expectedParticipants)) {
             $label = ReservableSchedule::capacityLabel($reservable);
-            abort(422, "{$name} holds {$label}; the expected participants ({$expectedParticipants}) fall outside it.");
+
+            return [$conflict(null, null, 'capacity', "{$name} holds {$label}; the expected participants ({$expectedParticipants}) fall outside it.")];
         }
 
-        $reservableId = DynamoKeys::strip($reservable['SK'] ?? null, 'RESERVABLE#') ?? '';
         $occupied = $this->occupiedSlots($reservableId, $excludeSks);
+        $conflicts = [];
 
         foreach ($selections as $selection) {
             $date = $selection['date'];
 
             if (ReservableSchedule::dayKeyForDate($date) === null) {
-                abort(409, "{$name} cannot be reserved on {$date}.");
+                $conflicts[] = $conflict($date, null, 'not_offered', "{$name} cannot be reserved on {$date}.");
+
+                continue;
             }
 
             foreach ($selection['slots'] as $slot) {
                 if (! ReservableSchedule::templateAllows($schedule, $date, $slot)) {
-                    abort(409, "{$name} is not offered on {$date} at ".ReservableSchedule::slotLabel($slot).'.');
-                }
-
-                if (isset($occupied[$date][$slot])) {
-                    abort(409, "{$name} is already booked on {$date} at ".ReservableSchedule::slotLabel($slot).'. Pick another time.');
+                    $conflicts[] = $conflict($date, $slot, 'not_offered', "{$name} is not offered on {$date} at ".ReservableSchedule::slotLabel($slot).'.');
+                } elseif (isset($occupied[$date][$slot])) {
+                    $conflicts[] = $conflict($date, $slot, 'taken', "{$name} is already booked on {$date} at ".ReservableSchedule::slotLabel($slot).'. Pick another time.');
                 }
             }
         }
+
+        return $conflicts;
     }
 
     /**
@@ -203,6 +344,7 @@ final class BookingRecords
                 'timestamp' => $timestamp,
                 'schedule_selected' => $entry['selections'],
                 'source' => 'submission',
+                'approval_status' => self::PENDING,
                 'campus_id' => (string) ($entry['reservation']['campus_id'] ?? ''),
                 'reservable_name' => (string) ($entry['reservable']['name'] ?? ''),
                 'reservable_type' => (string) ($entry['reservable']['type'] ?? ''),
@@ -357,7 +499,6 @@ final class BookingRecords
      * Public selector normalization so callers (reservation-change resolution)
      * validate and store the exact canonical {date, slots} shape.
      *
-     * @param  mixed  $selections
      * @return list<array{date: string, slots: list<int>}>
      */
     public function normalize(mixed $selections): array
@@ -417,6 +558,8 @@ final class BookingRecords
             'timestamp' => $timestamp,
             'schedule_selected' => $normalized,
             'source' => 'submission',
+            'approval_status' => self::APPROVED,
+            'approved_at' => $timestamp,
             'campus_id' => (string) ($context['campus_id'] ?? ''),
             'reservable_name' => (string) ($reservable['name'] ?? ''),
             'reservable_type' => (string) ($reservable['type'] ?? ''),
@@ -452,8 +595,8 @@ final class BookingRecords
     }
 
     /**
-     * date => (slot => true) for every booking under a reservable, skipping the
-     * given booking sort keys.
+     * date => (slot => true) for every approved booking under a reservable,
+     * skipping the given booking sort keys.
      *
      * @param  list<string>  $excludeSks
      * @return array<string, array<int, true>>
@@ -472,7 +615,7 @@ final class BookingRecords
         $occupied = [];
 
         foreach ($bookings as $booking) {
-            if (isset($exclude[(string) ($booking['SK'] ?? '')])) {
+            if (isset($exclude[(string) ($booking['SK'] ?? '')]) || ! self::isApproved($booking)) {
                 continue;
             }
 
@@ -500,7 +643,6 @@ final class BookingRecords
     /**
      * Coerce raw selections into normalized {date: Y-m-d, slots: sorted unique ints}.
      *
-     * @param  mixed  $selections
      * @return list<array{date: string, slots: list<int>}>
      */
     private function normalizeSelections(mixed $selections): array

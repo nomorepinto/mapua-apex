@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Aws\DynamoDb\BookingRecords;
 use App\Aws\DynamoDb\DynamoKeys;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -22,6 +23,9 @@ class BookingResource extends JsonResource
             'reservable_type' => $item['reservable_type'] ?? null,
             'campus_id' => $item['campus_id'] ?? null,
             'source' => $item['source'] ?? null,
+            'approval_status' => BookingRecords::isApproved($item) ? BookingRecords::APPROVED : BookingRecords::PENDING,
+            'approved_at' => $item['approved_at'] ?? null,
+            'approved_by' => DynamoKeys::strip($item['approved_by'] ?? null, 'SIGNATORY#'),
             'timestamp' => $item['timestamp'] ?? null,
             'schedule_selected' => $item['schedule_selected'] ?? [],
             'reason' => $item['reason'] ?? null,

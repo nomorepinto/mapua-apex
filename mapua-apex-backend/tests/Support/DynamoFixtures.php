@@ -99,14 +99,22 @@ final class DynamoFixtures
         array $selections,
         string $source = 'submission',
         array $extra = [],
+        ?string $approvalStatus = null,
     ): void {
-        $db->seed(array_merge([
+        $item = [
             'PK' => 'RESERVABLE#'.$reservableId,
             'SK' => 'BOOKING#'.$id,
             'timestamp' => '2026-10-01T00:00:00Z',
             'schedule_selected' => $selections,
             'source' => $source,
-        ], $extra));
+        ];
+
+        // Omitted = legacy item, which reads as approved.
+        if ($approvalStatus !== null) {
+            $item['approval_status'] = $approvalStatus;
+        }
+
+        $db->seed(array_merge($item, $extra));
     }
 
     /**

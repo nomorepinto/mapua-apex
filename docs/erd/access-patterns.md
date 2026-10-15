@@ -42,9 +42,9 @@ Index summary:
 | 18 | Admin: delete signatory (guarded) | Scan/Query → DeleteItem | block (**409**) if any `ORGANIZATION.signatories` desk holds the id or `GSI2PK = SIGNATORY#id` (open inbox); else DeleteItem `PK = SK = SIGNATORY#id` | GSI2 + Base |
 | 19 | Campus list (osaar `/campus`, SAAF venue dropdown) | Scan | `PK` begins `CAMPUS#` AND `PK = SK` | Base |
 | 20 | Reservables under a campus | Query | `PK = CAMPUS#id`, `SK` begins `RESERVABLE#` | Base |
-| 21 | Reservable availability (template + per-date free/booked slots) | Query | `PK = RESERVABLE#id`, `SK` begins `BOOKING#`; overlay bookings on the weekly template across the window | Base |
+| 21 | Reservable availability (template + per-date free/booked slots) | Query | `PK = RESERVABLE#id`, `SK` begins `BOOKING#`; overlay approved bookings (pending SAAF holds skipped) on the weekly template across the window | Base |
 | 22 | CDM View/Reserve calendar (raw bookings, both sources) | Query | `PK = RESERVABLE#id`, `SK` begins `BOOKING#` (filtered to dates in window) | Base |
-| 23 | Create booking (submission hold or CDM manual) | Query → PutItem | validate selections vs template + existing bookings (**409** on conflict) and, on submission, expected headcount vs each room's `min/max_participants` (**422** out of range), then PutItem `PK = RESERVABLE#id`, `SK = BOOKING#id` | Base |
+| 23 | Create booking (submission hold or CDM manual) | Query → PutItem | validate selections vs template + existing approved bookings (**409** on conflict) and, on submission, expected headcount vs each room's `min/max_participants` (**422** out of range), then PutItem `PK = RESERVABLE#id`, `SK = BOOKING#id` | Base |
 | 24 | Release holds on deny / return / re-edit / cancel-resolution | DeleteItem | delete each `booking_refs[]` `{pk, sk}` (submission holds) | Base |
 | 25 | Delete a manual booking (CDM) | GetItem → DeleteItem | **409** if `source` is `submission`; else DeleteItem `PK = RESERVABLE#id`, `SK = BOOKING#id` | Base |
 | 26 | Admin: delete campus / reservable (guarded) | Query → DeleteItem | block (**409**) if a campus owns any RESERVABLE, or a reservable owns any BOOKING; else DeleteItem | Base |
@@ -60,6 +60,7 @@ Index summary:
 | 36 | Arcus officer: live participants + review status | Query | `PK = EVENT#id`, prefixes `SUBMISSION#` and `POSTEVAL#`; prefer active/latest filing and its linked submission, enforce org scope, then aggregate participants (32) | Base |
 | 37 | Arcus student: file full response | TransactWriteItems | Full detail `PK = SK = EVALUATION#id`; full list `PK = EVALUATION`, `SK = filedAt#id`; slim `EVENT#id/EVALUATION#id` child, all conditional puts | Base |
 | 38 | Arcus officer: event-scoped export | Query → BatchGetItem | Query `EVENT#id`, `SK` begins `EVALUATION#`, then batch-read full `EVALUATION#id` detail records; filter/sort, return up to 100; PDF generation stays in browser | Base |
+| 39 | CDM approval of a paper's holds | GetItem → UpdateItem | on the last (CDM) approve, GetItem each `booking_refs[]` hold + its RESERVABLE, re-check against approved bookings (**409**, nothing written, on conflict), then UpdateItem `approval_status = approved`, `approved_at`, `approved_by`; the same check (no writes) backs `GET …/booking-conflicts` | Base |
 
 ---
 
@@ -71,7 +72,7 @@ Index summary:
 | Submission tracker / detail | SUBMISSION, NOTIFICATION, SIGNATORY (by copied id) | 5, 6 |
 | New / edit submission (SAAF) | SUBMISSION, COLLAB POINTER, ORGANIZATION (directory), CAMPUS, RESERVABLE, BOOKING (holds + `booking_refs`) | 12, 15, 19, 20, 21, 23, 24 |
 | Signatory desk (inbox) | SUBMISSION, SIGNATORY | 7, 9 |
-| Signatory review (approve/return/deny/classify) | SUBMISSION, NOTIFICATION, BOOKING (release holds on deny/return) | 6, 16, 24 |
+| Signatory review (approve/return/deny/classify) | SUBMISSION, NOTIFICATION, BOOKING (release holds on deny/return; approve holds on CDM approve), RESERVABLE | 6, 16, 24, 39 |
 | Admin dashboard (submissions) | ORGANIZATION, SUBMISSION | 10 |
 | Admin → Organizations | ORGANIZATION, SIGNATORY | 11, 12, 17 |
 | Admin → Signatories | SIGNATORY, ORGANIZATION (desk guard) | 8, 18 |

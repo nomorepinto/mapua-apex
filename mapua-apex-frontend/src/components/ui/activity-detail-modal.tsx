@@ -20,6 +20,9 @@ import { useActivityDetail } from "@/hooks/use-activity-detail"
 import { saveActivityAsPdf } from "@/lib/save-proposal-pdf"
 import { brand, modal } from "@/config"
 import { cn } from "@/lib/utils"
+import type { BookingConflict } from "@/lib/types"
+
+const EMPTY_CONFLICTS: BookingConflict[] = []
 
 export interface ActivityDetailModalProps {
   activity: Activity | null
@@ -35,6 +38,9 @@ export interface ActivityDetailModalProps {
     details?: { comment: string }
   ) => void | Promise<void>
   readOnly?: boolean
+  /** CDM desk: approved bookings the paper's pending holds collide with. */
+  bookingConflicts?: BookingConflict[]
+  isCheckingBookingConflicts?: boolean
 }
 
 const ActivityDetailModal = memo(function ActivityDetailModal({
@@ -47,6 +53,8 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
   onClassificationChange,
   onAction,
   readOnly = false,
+  bookingConflicts = EMPTY_CONFLICTS,
+  isCheckingBookingConflicts = false,
 }: ActivityDetailModalProps) {
   // Retain last non-null activity and readOnly state so during exit animations content doesn't collapse or pop out extra buttons
   const lastActivityRef = useRef<Activity | null>(null)
@@ -69,8 +77,17 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
     handleCommentSubmit,
   } = useActivityDetail({ activity: displayActivity, onClose, onAction })
 
+  const hasBookingConflicts = bookingConflicts.length > 0
   const isApproveDisabled =
-    isActing || (isOsaar && !displayActivity?.nature)
+    isActing ||
+    (isOsaar && !displayActivity?.nature) ||
+    hasBookingConflicts ||
+    isCheckingBookingConflicts
+  const approveTitle = hasBookingConflicts
+    ? "Some reserved slots are already booked. Return or reject this proposal."
+    : isOsaar && !displayActivity?.nature
+      ? "Select an event classification first"
+      : undefined
 
   const [isSavingPdf, setIsSavingPdf] = useState(false)
 
@@ -298,6 +315,7 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
                 equipmentRequested={displayActivity.equipmentRequested}
                 roomsRequested={displayActivity.roomsRequested}
                 avEquipmentRequested={displayActivity.avEquipmentRequested}
+                bookingConflicts={displayReadOnly ? undefined : bookingConflicts}
               />
             </div>
           </DialogPanel>
@@ -357,7 +375,7 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
                     type="button"
                     disabled={isApproveDisabled}
                     onClick={requestApprove}
-                    title={isOsaar && !displayActivity?.nature ? "Select an event classification first" : undefined}
+                    title={approveTitle}
                     className={cn(
                       "min-h-11 rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all",
                       isApproveDisabled

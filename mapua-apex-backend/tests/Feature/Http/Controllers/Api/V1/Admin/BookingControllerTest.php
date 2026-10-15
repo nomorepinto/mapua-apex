@@ -26,6 +26,47 @@ class BookingControllerTest extends TestCase
             ->assertJsonPath('data.dates.'.self::DATE.'.available_slots', range(1, 11));
     }
 
+    public function test_availability_ignores_bookings_pending_cdm_approval(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::campus($db, 'c001');
+        DynamoFixtures::reservable($db, 'c001', 'r001');
+        DynamoFixtures::booking($db, 'r001', 'b001', [['date' => self::DATE, 'slots' => [0]]], 'submission', [
+            'approval_status' => 'pending',
+        ]);
+
+        $this->withAdminAuth()
+            ->getJson('/api/v1/admins/campuses/c001/reservables/r001/availability?start='.self::DATE.'&end='.self::DATE)
+            ->assertOk()
+            ->assertJsonPath('data.dates.'.self::DATE.'.booked_slots', [])
+            ->assertJsonPath('data.dates.'.self::DATE.'.available_slots', range(0, 11));
+
+        // A manual hold on the same slot is still allowed.
+        $this->withAdminAuth()->postJson('/api/v1/admins/campuses/c001/reservables/r001/bookings', [
+            'selections' => [['date' => self::DATE, 'slots' => [0]]],
+        ])->assertCreated();
+    }
+
+    public function test_lists_pending_bookings_with_their_approval_status(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::campus($db, 'c001');
+        DynamoFixtures::reservable($db, 'c001', 'r001');
+        DynamoFixtures::booking($db, 'r001', 'b001', [['date' => self::DATE, 'slots' => [0]]], 'submission', [
+            'approval_status' => 'pending',
+        ]);
+        DynamoFixtures::booking($db, 'r001', 'b002', [['date' => self::DATE, 'slots' => [1]]]);
+
+        $response = $this->withAdminAuth()
+            ->getJson('/api/v1/admins/campuses/c001/reservables/r001/bookings?start='.self::DATE.'&end='.self::DATE)
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+
+        $statuses = collect($response->json('data'))->pluck('approval_status', 'booking_id')->all();
+        // b002 has no approval_status (legacy) and reads as approved.
+        $this->assertSame(['b001' => 'pending', 'b002' => 'approved'], $statuses);
+    }
+
     public function test_lists_bookings_in_range(): void
     {
         $db = InMemoryDynamoDb::bind($this);
@@ -39,6 +80,7 @@ class BookingControllerTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.booking_id', 'b001')
             ->assertJsonPath('data.0.source', 'cdm')
+            ->assertJsonPath('data.0.approval_status', 'approved')
             ->assertJsonPath('data.0.reason', 'Setup');
     }
 

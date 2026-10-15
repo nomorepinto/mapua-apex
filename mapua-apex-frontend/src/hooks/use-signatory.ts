@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api-client"
 import type { ApiSubmission, ApiSignatory } from "@/lib/dynamodb-adapters"
 import { SUBMISSION_KEYS } from "@/hooks/use-submissions"
+import type { BookingConflict } from "@/lib/types"
 
 export const SIGNATORY_KEYS = {
   me: ["signatory-me"] as const,
@@ -9,6 +10,28 @@ export const SIGNATORY_KEYS = {
   history: ["signatory-history"] as const,
   detail: (eventId: string, submissionId: string) =>
     ["signatory-submission-detail", eventId, submissionId] as const,
+  bookingConflicts: (eventId: string, submissionId: string) =>
+    ["signatory-booking-conflicts", eventId, submissionId] as const,
+}
+
+/**
+ * Slots this paper's pending holds would collide with if CDM approved it now.
+ */
+export function useSubmissionBookingConflictsQuery(
+  eventId?: string,
+  submissionId?: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: SIGNATORY_KEYS.bookingConflicts(eventId || "", submissionId || ""),
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: BookingConflict[] }>(
+        `/signatories/events/${eventId}/submissions/${submissionId}/booking-conflicts`
+      )
+      return res.data || []
+    },
+    enabled: enabled && Boolean(eventId && submissionId),
+  })
 }
 
 /**
@@ -94,6 +117,11 @@ export function useApproveSubmissionMutation() {
       queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.history })
       queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
       queryClient.invalidateQueries({ queryKey: ["submission-notifications"] })
+    },
+    onError: (_error, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: SIGNATORY_KEYS.bookingConflicts(variables.eventId, variables.submissionId),
+      })
     },
   })
 }

@@ -1,16 +1,20 @@
 import { memo } from "react"
+import { AlertTriangle } from "lucide-react"
 
 import type {
   AvEquipmentItem,
   EquipmentItem,
   RoomRequestedItem,
 } from "@/components/ui/activity.types"
+import type { BookingConflict } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export interface ActivityReservationDetailsProps {
   equipmentRequested?: EquipmentItem[]
   roomsRequested?: RoomRequestedItem[]
   avEquipmentRequested?: AvEquipmentItem[]
+  /** CDM desk: slots already taken by approved bookings. */
+  bookingConflicts?: BookingConflict[]
   className?: string
 }
 
@@ -18,13 +22,15 @@ export const ActivityReservationDetails = memo(function ActivityReservationDetai
   equipmentRequested = [],
   roomsRequested = [],
   avEquipmentRequested = [],
+  bookingConflicts = [],
   className,
 }: ActivityReservationDetailsProps) {
   const hasEquipment = equipmentRequested.length > 0
   const hasRooms = roomsRequested.length > 0
   const hasAv = avEquipmentRequested.length > 0
+  const hasConflicts = bookingConflicts.length > 0
 
-  if (!hasEquipment && !hasRooms && !hasAv) return null
+  if (!hasEquipment && !hasRooms && !hasAv && !hasConflicts) return null
 
   const hasClassroom = roomsRequested.some((r) => Boolean(r.classroomName))
 
@@ -33,6 +39,30 @@ export const ActivityReservationDetails = memo(function ActivityReservationDetai
       <hr className="border-neutral-200" />
 
       <div className={cn("space-y-6 pt-2", className)}>
+        {hasConflicts && (
+          <div
+            role="alert"
+            className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+            <div className="space-y-2">
+              <p className="font-bold">
+                This reservation can't be approved as filed.
+              </p>
+              <ul className="list-disc space-y-1 pl-4">
+                {bookingConflicts.map((conflict, idx) => (
+                  <li key={`${conflict.reservable_id}-${conflict.date}-${conflict.slot}-${idx}`}>
+                    {conflict.message.replace(/ Pick another time\.$/, "")}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-amber-800">
+                Return the proposal so the organization can pick another time, or reject it.
+              </p>
+            </div>
+          </div>
+        )}
+
         {hasEquipment && (
           <div className="space-y-3">
             <h4 className="text-sm font-bold text-neutral-900">

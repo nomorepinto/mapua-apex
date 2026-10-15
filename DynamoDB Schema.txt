@@ -156,10 +156,12 @@ booking_refs: [{ pk: "RESERVABLE#uuid", sk: "BOOKING#uuid" }]
 has_reservation true routes the paper through the CDM desk. Each reservations[]
 entry is one picked RESERVABLE (a room or equipment item under a campus) with
 its concrete selections. On submit the API validates every { date, slots }
-against the reservable's weekly template and the existing BOOKINGs, then writes
-source:"submission" BOOKING holds and stores their keys on booking_refs (see
-BOOKING). A slot taken in the meantime aborts the write with 409 and persists
-nothing. Deny and Return release booking_refs and remove the attribute; a
+against the reservable's weekly template and the existing approved BOOKINGs,
+then writes source:"submission" BOOKING holds with approval_status "pending"
+and stores their keys on booking_refs (see BOOKING). A slot taken in the
+meantime aborts the write with 409 and persists nothing. Pending holds do not
+occupy slots; the CDM desk's approval (the last step) re-checks them and flips
+them to "approved" (409 with nothing written if a slot was taken). Deny and Return release booking_refs and remove the attribute; a
 student re-edit reconciles them (releases removed, plans added). slots are
 0-based indices into the canonical 07:00-21:00 day split into 70-minute slots
 (exactly 12; slot i starts 07:00 + i*70min, slot 11 = 19:50-21:00); Sunday is
@@ -470,6 +472,16 @@ so the owning org can list its holds and CDM can label them read-only:
   event_id: string          (bare EVENT uuid)
   submission_id: string     (bare SUBMISSION uuid)
   organization_id: string   (bare ORGANIZATION uuid)
+  approval_status: "pending" | "approved"
+                            (written "pending" by the SAAF path; absent on
+                            legacy items, which read as approved)
+  approved_at: string       (sparse; stamped when CDM approves the paper)
+  approved_by: SIGNATORY#uuid  (sparse; the approving CDM signatory)
+Only approved holds occupy slots. ApproveSubmission flips every booking_refs
+hold to "approved" on the paper's last (CDM) approval, after re-checking them
+against the approved bookings (409, nothing written, on conflict). A hold
+recreated by a RESERVATION_CHANGE room swap is written "approved" directly.
+Legacy holds are stamped by scripts/backfill_booking_approval.py.
 Released (deleted) when the paper is denied or returned, or reconciled on a
 student re-edit — all driven by the SUBMISSION's booking_refs. The CDM
 manual-delete route refuses source "submission" with 409 so a live paper's hold
@@ -493,8 +505,9 @@ Released only by CDM: DELETE
 /admins/campuses/{campus}/reservables/{reservable}/bookings/{booking}.
 
 Both flavors share one availability engine (BookingRecords): a slot is free only
-when the weekly template allows it AND no BOOKING (either source) occupies that
-concrete date+slot. Conflict detection queries the base RESERVABLE partition
+when the weekly template allows it AND no approved BOOKING (either source; a
+manual hold always counts) occupies that concrete date+slot. Pending holds are
+still listed on the CDM calendar and still block reservable deletion. Conflict detection queries the base RESERVABLE partition
 (PK = RESERVABLE#id, SK begins_with BOOKING#) — never GSI5 — so it works before
 the organization index exists. GSI5 is provisioned in AWS by the operator; the
 code writes GSI5PK/GSI5SK on submission-sourced bookings but does not depend on
@@ -786,6 +799,9 @@ json
   "timestamp": "2026-09-10T14:00:00Z",
   "schedule_selected": [{ "date": "2026-10-05", "slots": [8, 9, 10, 11] }],
   "source": "submission",
+  "approval_status": "approved",
+  "approved_at": "2026-09-14T10:00:00Z",
+  "approved_by": "SIGNATORY#cdm001",
   "campus_id": "a1b2",
   "reservable_name": "AV Room",
   "reservable_type": "room",

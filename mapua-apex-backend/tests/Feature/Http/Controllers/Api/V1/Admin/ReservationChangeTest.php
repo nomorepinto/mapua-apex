@@ -260,6 +260,7 @@ class ReservationChangeTest extends TestCase
         $newBooking = $db->find($refs[0]['pk'], $refs[0]['sk']);
         $this->assertIsArray($newBooking);
         $this->assertSame('submission', $newBooking['source'] ?? null);
+        $this->assertSame('approved', $newBooking['approval_status'] ?? null);
         $this->assertSame('ORGANIZATION#a1b2', $newBooking['GSI5PK'] ?? null);
         $this->assertSame([['date' => $date, 'slots' => [4]]], $newBooking['schedule_selected'] ?? null);
 
