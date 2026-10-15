@@ -3,6 +3,7 @@ import { StudentDashboardDialogs } from "@/components/students/dashboard/dashboa
 import { StudentDashboardHeader } from "@/components/students/dashboard/dashboard-header"
 import { RemindersPanel } from "@/components/students/dashboard/reminders-panel"
 import { StudentCalendarCard } from "@/components/students/dashboard/student-calendar-card"
+import { PostEvalsPanel } from "@/components/students/dashboard/postevals-panel"
 import { StudentDashboardProvider } from "@/components/students/dashboard/student-dashboard-context"
 import { SubmissionsPanel } from "@/components/students/dashboard/submissions-panel"
 import { layout } from "@/config"
@@ -30,6 +31,9 @@ export function OrgDashboard() {
             <RemindersPanel />
           </div>
         </div>
+
+        {/* 4. Full-width Card: Post-Evaluation Forms */}
+        <PostEvalsPanel />
 
         {/* Modals & Dialogs (Submission tracker, review notices, etc.) */}
         <StudentDashboardDialogs />
