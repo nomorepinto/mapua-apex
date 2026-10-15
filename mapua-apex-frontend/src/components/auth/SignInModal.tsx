@@ -1,9 +1,10 @@
 import React, { useState } from "react"
-import { X, AlertCircle, AlertTriangle, Clock, Eye, EyeOff, HelpCircle, Info } from "lucide-react"
+import { X, AlertCircle, AlertTriangle, Clock, Eye, EyeOff, HelpCircle, Info, Loader2 } from "lucide-react"
 import apexBrandLogo from "@/assets/apex-brand.svg"
 import { cognitoSignIn } from "@/lib/cognito-auth"
 import { useSignInLockout } from "@/hooks/use-sign-in-lockout"
-import { validateEmailLive } from "@/lib/auth-validation"
+import { useEmailExistence } from "@/hooks/use-email-existence"
+import { validateEmailLive, validateEmailDomain } from "@/lib/auth-validation"
 
 export interface SignInModalProps {
   isOpen: boolean
@@ -40,10 +41,14 @@ export function SignInModal({
     attemptsRemaining,
   } = useSignInLockout()
 
+  const emailExistence = useEmailExistence()
+
   if (!isOpen) return null
 
-  // Real-time live email validation error
-  const liveEmailError = (emailTouched || email.length > 0) ? validateEmailLive(email) : null
+  // Real-time live email validation error (format first, then domain allow-list)
+  const liveEmailError = (emailTouched || email.length > 0)
+    ? validateEmailLive(email) ?? validateEmailDomain(email)
+    : null
 
   const handlePasswordKeyEvent = (
     e: React.KeyboardEvent<HTMLInputElement> | React.FocusEvent<HTMLInputElement>
@@ -74,8 +79,22 @@ export function SignInModal({
       return
     }
 
+    const domainErr = validateEmailDomain(cleanEmail)
+    if (domainErr) {
+      setErrorMessage(domainErr)
+      return
+    }
+
     if (!password) {
       setErrorMessage("Please enter your password.")
+      return
+    }
+
+    // Mailbox-existence gate: block only on a conclusive "invalid" answer
+    // (checker outages resolve to "unavailable" and fail open).
+    const existence = await emailExistence.check(cleanEmail)
+    if (existence === "invalid") {
+      setErrorMessage("No mailbox exists for this address. Please double-check it.")
       return
     }
 
@@ -235,14 +254,18 @@ export function SignInModal({
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value)
+                emailExistence.reset()
                 if (errorMessage) setErrorMessage(null)
               }}
-              onBlur={() => setEmailTouched(true)}
+              onBlur={() => {
+                setEmailTouched(true)
+                emailExistence.check(email)
+              }}
               placeholder="you@example.com"
               required
               disabled={isLocked || isLoading}
               className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 transition-all disabled:bg-neutral-50 disabled:text-neutral-400 ${
-                liveEmailError && emailTouched
+                (liveEmailError || (emailTouched && emailExistence.state === "invalid"))
                   ? "border-red-400 focus:border-red-500 focus:ring-red-500/20"
                   : "border-neutral-200 focus:border-[#b91c1c] focus:ring-[#b91c1c]/15"
               }`}
@@ -251,6 +274,18 @@ export function SignInModal({
               <p className="flex items-start gap-1 text-[11px] text-red-600 mt-1 animate-in fade-in">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                 <span>{liveEmailError}</span>
+              </p>
+            )}
+            {!liveEmailError && emailExistence.state === "checking" && (
+              <p className="flex items-center gap-1 text-[11px] text-neutral-500 mt-1">
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                <span>Verifying email...</span>
+              </p>
+            )}
+            {!liveEmailError && emailExistence.state === "invalid" && (
+              <p className="flex items-start gap-1 text-[11px] text-red-600 mt-1 animate-in fade-in">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>No mailbox exists for this address. Please double-check it.</span>
               </p>
             )}
           </div>

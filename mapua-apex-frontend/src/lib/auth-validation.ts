@@ -2,6 +2,27 @@
  * Authentication Form Validation Utilities
  */
 
+/**
+ * Domains accepted for account and proponent emails. Anything else is
+ * rejected locally before the mailbox-existence check spends an API credit.
+ * Mirrors the allow-list enforced server-side by GET /public/validate-email.
+ */
+export const ALLOWED_EMAIL_DOMAINS = ["mymail.mapua.edu.ph", "mapua.edu.ph", "gmail.com"]
+
+/**
+ * Domain allow-list check (instant, offline). Runs after the format checks
+ * in validateEmailLive so half-typed addresses are not flagged as domains.
+ */
+export function validateEmailDomain(email: string): string | null {
+  const trimmed = email.trim()
+  if (!trimmed || !trimmed.includes("@")) return null
+
+  const domain = trimmed.split("@").pop()?.toLowerCase() ?? ""
+  if (ALLOWED_EMAIL_DOMAINS.includes(domain)) return null
+
+  return "Please use your @mapua.edu.ph, @mymail.mapua.edu.ph or @gmail.com address."
+}
+
 export interface PasswordRequirements {
   minLength: boolean
   hasUppercase: boolean

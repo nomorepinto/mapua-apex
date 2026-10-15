@@ -1,9 +1,11 @@
 import React, { useState } from "react"
-import { X, AlertCircle, AlertTriangle, Check, Circle, Eye, EyeOff, Info } from "lucide-react"
+import { X, AlertCircle, AlertTriangle, Check, Circle, Eye, EyeOff, Info, Loader2 } from "lucide-react"
 import apexBrandLogo from "@/assets/apex-brand.svg"
 import { cognitoSignUp } from "@/lib/cognito-auth"
+import { useEmailExistence } from "@/hooks/use-email-existence"
 import {
   validateEmailLive,
+  validateEmailDomain,
   validateFullName,
   checkPasswordRequirements,
 } from "@/lib/auth-validation"
@@ -35,11 +37,15 @@ export function SignUpModal({
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  const emailExistence = useEmailExistence()
+
   if (!isOpen) return null
 
   // Live validation calculations
   const nameError = (fullNameTouched || fullName.length > 0) ? validateFullName(fullName) : null
-  const liveEmailError = (emailTouched || email.length > 0) ? validateEmailLive(email) : null
+  const liveEmailError = (emailTouched || email.length > 0)
+    ? validateEmailLive(email) ?? validateEmailDomain(email)
+    : null
   const pwdReqs = checkPasswordRequirements(password)
 
   const handlePasswordKeyEvent = (
@@ -87,10 +93,23 @@ export function SignUpModal({
       setErrorMessage(emailErr)
       return
     }
+    const domainErr = validateEmailDomain(cleanEmail)
+    if (domainErr) {
+      setErrorMessage(domainErr)
+      return
+    }
 
     // 3. Password requirements check
     if (!pwdReqs.allValid) {
       setErrorMessage("Please ensure your password satisfies all security requirements.")
+      return
+    }
+
+    // 4. Mailbox-existence gate: block only on a conclusive "invalid" answer
+    // (checker outages resolve to "unavailable" and fail open).
+    const existence = await emailExistence.check(cleanEmail)
+    if (existence === "invalid") {
+      setErrorMessage("No mailbox exists for this address. Please double-check it.")
       return
     }
 
@@ -208,14 +227,18 @@ export function SignUpModal({
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value)
+                emailExistence.reset()
                 if (errorMessage) setErrorMessage(null)
               }}
-              onBlur={() => setEmailTouched(true)}
+              onBlur={() => {
+                setEmailTouched(true)
+                emailExistence.check(email)
+              }}
               placeholder="you@example.com"
               required
               disabled={isLoading}
               className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 transition-all ${
-                liveEmailError && emailTouched
+                (liveEmailError || (emailTouched && emailExistence.state === "invalid"))
                   ? "border-red-400 focus:border-red-500 focus:ring-red-500/20"
                   : "border-neutral-200 focus:border-[#b91c1c] focus:ring-[#b91c1c]/15"
               }`}
@@ -224,6 +247,18 @@ export function SignUpModal({
               <p className="flex items-start gap-1 text-[11px] text-red-600 mt-1 animate-in fade-in">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                 <span>{liveEmailError}</span>
+              </p>
+            )}
+            {!liveEmailError && emailExistence.state === "checking" && (
+              <p className="flex items-center gap-1 text-[11px] text-neutral-500 mt-1">
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                <span>Verifying email...</span>
+              </p>
+            )}
+            {!liveEmailError && emailExistence.state === "invalid" && (
+              <p className="flex items-start gap-1 text-[11px] text-red-600 mt-1 animate-in fade-in">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>No mailbox exists for this address. Please double-check it.</span>
               </p>
             )}
           </div>

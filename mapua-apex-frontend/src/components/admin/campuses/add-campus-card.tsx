@@ -62,11 +62,11 @@ function AddCampusForm() {
           </Field>
           <div className="flex flex-col gap-4 rounded-lg border border-dashed p-3">
             <p className="text-sm font-medium">Classroom name format</p>
-            <FieldDescription>
+            <p className="text-xs text-muted-foreground">
               Optional. Leave blank for no classroom naming rule. When set, CDM
               can flag a room as a classroom only if its name matches this
               format.
-            </FieldDescription>
+            </p>
             <Field>
               <FieldLabel htmlFor="campus-prefixes">Allowed prefixes</FieldLabel>
               <Input
@@ -98,12 +98,12 @@ function AddCampusForm() {
               />
             </Field>
             {classroomExampleNames(state.prefixesText, state.digitsText) ? (
-              <FieldDescription>
+              <p className="text-xs text-muted-foreground">
                 Classroom names look like{" "}
                 <span className="font-mono">
                   {classroomExampleNames(state.prefixesText, state.digitsText)}
                 </span>
-              </FieldDescription>
+              </p>
             ) : null}
           </div>
         </CardPanel>

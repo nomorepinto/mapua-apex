@@ -30,9 +30,7 @@ import {
   EVENT_DATE_TOO_SOON_MESSAGE,
   minEventDateKey,
 } from "@/lib/date-key"
-
-const EMAIL_PATTERN =
-  /^[a-zA-Z0-9._%+-]+@(mymail\.mapua\.edu\.ph|mapua\.edu\.ph)$/i
+import { validateEmailDomain, validateEmailLive } from "@/lib/auth-validation"
 
 // Matches letters, spaces, hyphens, periods, and apostrophes (no digits)
 const LETTERS_ONLY_PATTERN = /^[\p{L}\s\-'.]+$/u
@@ -226,9 +224,13 @@ function proponentWarnings(
 
   if (isBlank(proponent.emailAddress)) {
     warnings[key("emailAddress")] = REQUIRED
-  } else if (!EMAIL_PATTERN.test(proponent.emailAddress.trim())) {
-    warnings[key("emailAddress")] =
-      "Email must end with @mymail.mapua.edu.ph or @mapua.edu.ph."
+  } else {
+    // Same format + allow-list rules the auth modals use (gmail.com included);
+    // mailbox existence is verified asynchronously against the API.
+    const emailError =
+      validateEmailLive(proponent.emailAddress) ??
+      validateEmailDomain(proponent.emailAddress)
+    if (emailError) warnings[key("emailAddress")] = emailError
   }
 
   if (isBlank(proponent.facebookLink)) {

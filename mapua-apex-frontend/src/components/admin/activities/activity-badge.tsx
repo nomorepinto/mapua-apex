@@ -28,6 +28,27 @@ export function ActivityBadge({ type = "" }: ActivityBadgeProps) {
       </span>
     );
   }
+  if (norm === "deleted") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 border border-rose-200">
+        deleted
+      </span>
+    );
+  }
+  if (norm === "updated") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-700 border border-violet-200">
+        updated
+      </span>
+    );
+  }
+  if (norm === "created") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 border border-indigo-200">
+        created
+      </span>
+    );
+  }
   if (norm.includes("create") || norm.includes("submit") || norm.includes("submission")) {
     return (
       <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-800 border border-blue-200">

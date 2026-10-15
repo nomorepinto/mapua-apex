@@ -301,11 +301,12 @@ export function SaafProvider({ children }: { children: ReactNode }) {
         form.setShowConfirmClearModal(false)
       },
       closeConfirm: () => form.setShowConfirmModal(false),
-      initiateSubmit: (event) => {
-        if (form.handleInitiateSubmit(event, formRef.current)) return
+      initiateSubmit: async (event) => {
+        if (await form.handleInitiateSubmit(event, formRef.current)) return
         // Submit checks every page, so a rejection is usually about another
         // page. Move there and reveal it rather than listing other pages' fields
-        // on the one the proponent is looking at.
+        // on the one the proponent is looking at. A null blocker means the only
+        // failure was the async mailbox pass, whose banner already shows here.
         const blocker = firstIncompleteWizardStep(
           draft,
           includeReservation,
