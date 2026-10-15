@@ -503,9 +503,15 @@ export function getReservationStepIssue(
     return "Select at least one time slot for each chosen date."
   }
 
-  const missingPurpose = picks.find((pick) => isBlank(pick.remarks))
-  if (missingPurpose) {
-    return `Add a purpose for "${missingPurpose.name}".`
+  // Purpose validation: required and must be at least 20 characters
+  const invalidPurposePick = picks.find(
+    (pick) => isBlank(pick.remarks) || pick.remarks.trim().length < 20
+  )
+  if (invalidPurposePick) {
+    if (isBlank(invalidPurposePick.remarks)) {
+      return `Add a purpose for "${invalidPurposePick.name}".`
+    }
+    return `Purpose for "${invalidPurposePick.name}" must be at least 20 characters.`
   }
 
   const roomCoverage = new Map<string, Set<number>>()
