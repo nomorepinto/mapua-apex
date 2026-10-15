@@ -41,15 +41,7 @@ import type { ReservationPick } from "@/components/reservation/types"
 import { cn } from "@/lib/utils"
 
 /**
- * The reservation step of the SAAF wizard. The proponent picks a campus (which
- * is also the event venue), adds the rooms/equipment to reserve, then chooses
- * concrete dates and 70-minute slots from live availability. The event's date
- * and time are derived from those selections (see `use-reservation-form`), so
- * this step owns them and the Activity step shows them read-only.
- *
- * This is form-less (no nested `<form>`): the wizard wraps every step in a
- * single `fetcher.Form`, and the hidden inputs below carry the derived values
- * so native required-field validity still gates the step.
+ * The reservation step of the SAAF wizard.
  */
 export function ReservationFields() {
   const { state, actions } = useReservationFormContext()
@@ -82,9 +74,6 @@ export function ReservationFields() {
           </label>
           <Select
             value={campusId || null}
-            // Provide the value→label map so the trigger shows the campus name
-            // even before the popup mounts (the campus id is restored from the
-            // persisted draft, so Base UI would otherwise stringify the UUID).
             items={campuses.map((campus) => ({ value: campus.campus_id, label: campus.name }))}
             onValueChange={(value: string | null) => {
               const campus = campuses.find((c) => c.campus_id === value)
@@ -123,11 +112,18 @@ export function ReservationFields() {
             placeholder="0"
             maxLength={4}
             value={saafDraft.expectedParticipants}
-            onKeyDown={blockNonIntegerKeys}
+            onKeyDown={(e) => {
+              const target = e.currentTarget
+              if (e.key === "0" && (target.value === "" || target.selectionStart === 0)) {
+                e.preventDefault()
+                return
+              }
+              blockNonIntegerKeys(e)
+            }}
             onChange={(e) =>
               saafActions.updateField(
                 "expectedParticipants",
-                sanitizeIntegerInput(e.target.value).slice(0, 4)
+                sanitizeIntegerInput(e.target.value).replace(/^0+/, "").slice(0, 4)
               )
             }
             style={{ color: "#171717" }}
@@ -170,7 +166,6 @@ export function ReservationFields() {
         timeOfEvent={saafDraft.timeOfEvent}
       />
 
-      {/* Derived values carried for native required-field validity. */}
       <input type="hidden" name="activityVenue" value={saafDraft.activityVenue} required />
       <input type="hidden" name="dateOfEvent" value={saafDraft.dateOfEvent} required />
       <input
@@ -208,8 +203,22 @@ function ReservablePicker({
     () => new Set(picks.map((pick) => pick.reservable_id)),
     [picks]
   )
-  // Equipment can only be reserved once a room is picked (room-first rule).
-  const hasRoom = picks.some((pick) => pick.type === "room")
+
+  // Requires every room to have at least 20 characters in purpose
+  const roomPicks = picks.filter((pick) => pick.type === "room")
+  const hasRoom = roomPicks.length > 0
+  const allRoomsHavePurpose =
+    hasRoom &&
+    roomPicks.every(
+      (room) => Boolean(room.remarks && room.remarks.trim().length >= 20)
+    )
+
+  const isEquipmentDisabled = !hasRoom || !allRoomsHavePurpose
+  const equipmentDisabledHint = !hasRoom
+    ? "Reserve a room first."
+    : !allRoomsHavePurpose
+      ? "Enter a valid purpose (min. 20 chars) for all selected rooms first."
+      : undefined
 
   if (!campusId) {
     return (
@@ -254,8 +263,8 @@ function ReservablePicker({
             reservables={rooms}
           />
           <ReservableGroup
-            disabled={!hasRoom}
-            disabledHint="Reserve a room first."
+            disabled={isEquipmentDisabled}
+            disabledHint={equipmentDisabledHint}
             icon={<BoxesIcon aria-hidden="true" className="size-4" />}
             label="Equipment"
             onToggle={onToggle}
@@ -293,19 +302,21 @@ function ReservableGroup({
         {label}
       </span>
       {disabled && disabledHint ? (
-        <p className="text-[11px] font-medium text-neutral-400">{disabledHint}</p>
+        <p className="text-[11px] font-medium text-amber-600">{disabledHint}</p>
       ) : null}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {reservables.map((reservable) => {
           const picked = pickedIds.has(reservable.reservable_id)
+          const isButtonDisabled = disabled && !picked
+
           return (
             <button
               aria-pressed={picked}
-              disabled={disabled}
+              disabled={isButtonDisabled}
               className={cn(
                 "flex h-10 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                disabled
+                isButtonDisabled
                   ? "cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400"
                   : picked
                     ? "border-emerald-600 bg-emerald-500 text-white hover:bg-emerald-600"
@@ -342,7 +353,6 @@ function PickCard({
 }) {
   const [date, setDate] = useState<string>(() => minEventDateKey())
 
-  // Reserve from the earliest allowed event date through ~6 months out.
   const window = useMemo(() => {
     const start = minEventDate()
     return { start: getDateKey(start), end: getDateKey(addDays(start, 180)) }
@@ -366,8 +376,6 @@ function PickCard({
     0
   )
 
-  // Room participant bounds: show the range, and flag when the expected
-  // headcount falls outside it (the same rule the API enforces on submit).
   const bounds = { min: pick.min_participants, max: pick.max_participants }
   const range = pick.type === "room" ? capacityRangeLabel(bounds) : ""
   const headcount =
@@ -377,6 +385,9 @@ function PickCard({
     headcount !== null &&
     Number.isFinite(headcount) &&
     !withinCapacity(bounds, headcount)
+
+  const currentLength = (pick.remarks || "").trim().length
+  const isTooShort = currentLength > 0 && currentLength < 20
 
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-xs">
@@ -412,8 +423,8 @@ function PickCard({
         </Button>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
-        <div className="space-y-3">
+      <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+        <div className="space-y-4">
           <DatePicker
             aria-label={`Reservation date for ${pick.name}`}
             minDate={eventDateFloor()}
@@ -423,20 +434,47 @@ function PickCard({
             modifiersClassNames={modifiersClassNames}
             legend={<AvailabilityLegend />}
           />
+
+          {/* Expanded Purpose field with min 20 / max 150 constraints */}
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-semibold text-neutral-600">
-              Purpose <span className="text-red-500">*</span>
-            </label>
-            <Input
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-neutral-700">
+                Purpose <span className="text-red-500">*</span>
+              </label>
+              <span
+                className={cn(
+                  "text-[11px]",
+                  isTooShort
+                    ? "font-medium text-amber-600"
+                    : "text-neutral-400"
+                )}
+              >
+                {currentLength}/150
+              </span>
+            </div>
+            <textarea
               autoComplete="off"
-              maxLength={120}
-              onChange={(e) => onUpdateRemarks(pick.id, e.currentTarget.value)}
-              placeholder="Rehearsal, seminar, …"
-              type="text"
-              value={pick.remarks}
+              minLength={20}
+              maxLength={150}
+              rows={5}
+              value={pick.remarks || ""}
+              onChange={(e) => onUpdateRemarks(pick.id, e.target.value.slice(0, 150))}
+              placeholder="State purpose of reservation (minimum 20 characters)..."
               required
+              style={{ color: "#171717" }}
+              className={cn(
+                "w-full min-h-[110px] resize-y rounded-xl border border-neutral-300 bg-white p-3 text-xs leading-relaxed !text-neutral-900 placeholder:text-neutral-400 shadow-xs",
+                "focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900",
+                isTooShort && "border-amber-500 focus:border-amber-500 focus:ring-amber-500"
+              )}
             />
+            {isTooShort && (
+              <p className="text-[11px] text-amber-600">
+                Must be at least 20 characters ({20 - currentLength} more needed).
+              </p>
+            )}
           </div>
+
           <SelectedSummary pick={pick} />
         </div>
 
