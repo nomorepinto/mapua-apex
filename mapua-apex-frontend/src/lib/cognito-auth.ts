@@ -92,6 +92,14 @@ export function storeCognitoSession(tokens: {
     groups: profile["cognito:groups"] || [],
   }))
 
+  // Fresh sign-in: reset idle tracking timestamp to now and clear old session ID
+  try {
+    localStorage.setItem("apex_last_active_at", Date.now().toString())
+    localStorage.removeItem("apex_session_id")
+  } catch {
+    // ignore
+  }
+
   return sessionData
 }
 
