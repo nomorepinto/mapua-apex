@@ -39,10 +39,15 @@ export function VerifyEmailModal({
     if (isLoading) return
 
     setErrorMessage(null)
-    const cleanCode = code.trim()
+    const cleanCode = code.replace(/\D/g, "").trim()
 
     if (!cleanCode) {
-      setErrorMessage("Please enter the verification code sent to your email.")
+      setErrorMessage("Please enter the 6-digit verification code sent to your email.")
+      return
+    }
+
+    if (cleanCode.length !== 6) {
+      setErrorMessage(`Verification code must be exactly 6 digits (currently ${cleanCode.length}/6).`)
       return
     }
 
@@ -109,7 +114,7 @@ export function VerifyEmailModal({
             Verify your email
           </h2>
           <p className="mt-1 text-sm text-neutral-500">
-            We sent a verification code to{" "}
+            We sent a 6-digit verification code to{" "}
             <span className="font-semibold text-neutral-800 break-all">{email}</span>.
           </p>
         </div>
@@ -133,24 +138,36 @@ export function VerifyEmailModal({
         {/* Verification Form */}
         <form onSubmit={handleVerify} className="w-full space-y-4">
           <div className="space-y-1.5 text-left">
-            <label className="block text-xs font-semibold text-neutral-800">
-              6-digit verification code
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-neutral-800">
+                6-digit verification code
+              </label>
+              <span className="text-[11px] text-neutral-400">
+                {code.length}/6 digits
+              </span>
+            </div>
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="one-time-code"
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\s+/g, ""))}
-              placeholder="123456"
-              maxLength={8}
+              onChange={(e) => {
+                const numericVal = e.target.value.replace(/\D/g, "").slice(0, 6)
+                setCode(numericVal)
+                if (errorMessage) setErrorMessage(null)
+              }}
+              placeholder="••••••"
+              maxLength={6}
               required
               disabled={isLoading}
-              className="w-full text-center tracking-[0.3em] font-mono text-lg rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-neutral-900 placeholder:text-neutral-300 placeholder:tracking-normal focus:border-[#b91c1c] focus:outline-none focus:ring-2 focus:ring-[#b91c1c]/15 transition-all"
+              className="w-full text-center tracking-[0.4em] font-mono text-2xl font-bold rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-neutral-900 placeholder:text-neutral-300 placeholder:tracking-normal focus:border-[#b91c1c] focus:outline-none focus:ring-2 focus:ring-[#b91c1c]/15 transition-all"
             />
           </div>
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || code.length !== 6}
             className="w-full rounded-xl bg-[#c01525] hover:bg-[#a8101f] active:bg-[#8B0000] text-white font-medium py-2.5 text-sm transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 mt-2"
           >
             {isLoading ? (

@@ -1,8 +1,9 @@
 import React, { useState } from "react"
-import { X, AlertCircle, Clock, Eye, EyeOff } from "lucide-react"
+import { X, AlertCircle, AlertTriangle, Clock, Eye, EyeOff, HelpCircle, Info } from "lucide-react"
 import apexBrandLogo from "@/assets/apex-brand.svg"
 import { cognitoSignIn } from "@/lib/cognito-auth"
 import { useSignInLockout } from "@/hooks/use-sign-in-lockout"
+import { validateEmailLive } from "@/lib/auth-validation"
 
 export interface SignInModalProps {
   isOpen: boolean
@@ -22,8 +23,12 @@ export function SignInModal({
   onSuccess,
 }: SignInModalProps) {
   const [email, setEmail] = useState("")
+  const [emailTouched, setEmailTouched] = useState(false)
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [capsLockActive, setCapsLockActive] = useState(false)
+  const [numLockActive, setNumLockActive] = useState(false)
+  const [isWrongPassword, setIsWrongPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -37,15 +42,37 @@ export function SignInModal({
 
   if (!isOpen) return null
 
+  // Real-time live email validation error
+  const liveEmailError = (emailTouched || email.length > 0) ? validateEmailLive(email) : null
+
+  const handlePasswordKeyEvent = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (typeof e.getModifierState === "function") {
+      setCapsLockActive(e.getModifierState("CapsLock"))
+      setNumLockActive(e.getModifierState("NumLock"))
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (isLocked || isLoading) return
 
     setErrorMessage(null)
+    setEmailTouched(true)
 
     const cleanEmail = email.trim()
-    if (!cleanEmail || !password) {
-      setErrorMessage("Please fill in both your email address and password.")
+    if (!cleanEmail) {
+      setErrorMessage("Please enter your email address.")
+      return
+    }
+
+    const emailErr = validateEmailLive(cleanEmail)
+    if (emailErr) {
+      setErrorMessage(emailErr)
+      return
+    }
+
+    if (!password) {
+      setErrorMessage("Please enter your password.")
       return
     }
 
@@ -55,8 +82,9 @@ export function SignInModal({
       // Direct AWS Cognito Sign In
       await cognitoSignIn(cleanEmail, password)
 
-      // Reset lockout counter on success
+      // Reset lockout counter and wrong password flag on success
       resetLockout()
+      setIsWrongPassword(false)
 
       if (onSuccess) {
         onSuccess()
@@ -77,9 +105,15 @@ export function SignInModal({
         }
       }
 
-      // If password / credentials are incorrect, record failure for the 30m cooldown
-      if (errCode === "NotAuthorizedException") {
+      // Check for incorrect credentials / wrong password
+      const isAuthMismatch =
+        errCode === "NotAuthorizedException" ||
+        errMsg.toLowerCase().includes("incorrect") ||
+        errMsg.toLowerCase().includes("password")
+
+      if (isAuthMismatch) {
         recordFailedAttempt()
+        setIsWrongPassword(true)
       }
 
       setErrorMessage(errMsg)
@@ -158,6 +192,26 @@ export function SignInModal({
           </div>
         )}
 
+        {/* Wrong Password Assistance Message */}
+        {!isLocked && isWrongPassword && (
+          <div className="w-full mb-4 rounded-xl border border-amber-300 bg-amber-50/95 p-3 text-xs flex items-start justify-between gap-3 animate-in fade-in slide-in-from-top-1">
+            <div className="flex items-start gap-2">
+              <HelpCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold text-amber-900">Incorrect password</p>
+                <p className="text-amber-800 mt-0.5">Do you need help in resetting your password?</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onSwitchToForgotPassword}
+              className="shrink-0 font-semibold text-white bg-[#b91c1c] hover:bg-[#991b1b] px-2.5 py-1.5 rounded-lg text-xs shadow-xs transition-colors"
+            >
+              Reset
+            </button>
+          </div>
+        )}
+
         {/* Form */}
         <form onSubmit={handleSubmit} className="w-full space-y-4">
           {/* Email field */}
@@ -168,12 +222,26 @@ export function SignInModal({
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                if (errorMessage) setErrorMessage(null)
+              }}
+              onBlur={() => setEmailTouched(true)}
               placeholder="you@example.com"
               required
               disabled={isLocked || isLoading}
-              className="w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[#b91c1c] focus:outline-none focus:ring-2 focus:ring-[#b91c1c]/15 transition-all disabled:bg-neutral-50 disabled:text-neutral-400"
+              className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 transition-all disabled:bg-neutral-50 disabled:text-neutral-400 ${
+                liveEmailError && emailTouched
+                  ? "border-red-400 focus:border-red-500 focus:ring-red-500/20"
+                  : "border-neutral-200 focus:border-[#b91c1c] focus:ring-[#b91c1c]/15"
+              }`}
             />
+            {liveEmailError && (emailTouched || email.length > 0) && (
+              <p className="flex items-start gap-1 text-[11px] text-red-600 mt-1 animate-in fade-in">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>{liveEmailError}</span>
+              </p>
+            )}
           </div>
 
           {/* Password field */}
@@ -185,7 +253,14 @@ export function SignInModal({
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (isWrongPassword) setIsWrongPassword(false)
+                  if (errorMessage) setErrorMessage(null)
+                }}
+                onKeyDown={handlePasswordKeyEvent}
+                onKeyUp={handlePasswordKeyEvent}
+                onFocus={handlePasswordKeyEvent}
                 placeholder="Enter your password"
                 required
                 disabled={isLocked || isLoading}
@@ -210,6 +285,24 @@ export function SignInModal({
                 )}
               </button>
             </div>
+
+            {/* CapsLock & NumLock live warnings */}
+            {(capsLockActive || numLockActive) && (
+              <div className="flex flex-wrap items-center gap-2 pt-1 animate-in fade-in">
+                {capsLockActive && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                    <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
+                    Caps Lock is ON
+                  </span>
+                )}
+                {numLockActive && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                    <Info className="h-3 w-3 text-blue-500 shrink-0" />
+                    Num Lock is ON
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Forgot password link */}
@@ -217,8 +310,13 @@ export function SignInModal({
             <button
               type="button"
               onClick={onSwitchToForgotPassword}
-              className="text-xs font-medium text-[#b91c1c] hover:text-[#991b1b] hover:underline transition-colors"
+              className={`text-xs transition-all ${
+                isWrongPassword
+                  ? "text-[#b91c1c] font-bold underline bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 shadow-xs"
+                  : "font-medium text-[#b91c1c] hover:text-[#991b1b] hover:underline"
+              }`}
             >
+              {isWrongPassword && <AlertCircle className="h-3.5 w-3.5 text-[#b91c1c] shrink-0" />}
               Forgot password?
             </button>
           </div>
