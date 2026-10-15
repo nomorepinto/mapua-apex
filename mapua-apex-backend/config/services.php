@@ -49,6 +49,15 @@ return [
         'service_token' => env('ARCUS_SERVICE_TOKEN', ''),
     ],
 
+    /*
+    | EmailDetective mailbox checker. Proxied by GET /public/validate-email so the
+    | key never reaches the browser; lookups are credit-metered and cached per email.
+    */
+    'emaildetective' => [
+        'base_url' => env('EMAILDETECTIVE_BASE_URL', 'https://api.emaildetective.io'),
+        'api_key' => env('EMAILDETECTIVE_API_KEY', ''),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

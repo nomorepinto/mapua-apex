@@ -1,5 +1,5 @@
 import { memo } from "react"
-import { Trash2Icon } from "lucide-react"
+import { AlertCircle, Loader2, Trash2Icon } from "lucide-react"
 
 import { FieldWarning } from "@/components/forms/field-warning"
 import {
@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
+import { useEmailExistence } from "@/hooks/use-email-existence"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -89,6 +90,10 @@ export const ProponentCard = memo(function ProponentCard({
   onRemove,
   onDepartmentChange,
 }: ProponentCardProps) {
+  // On-blur mailbox verification for this card's email field; format and
+  // domain errors already surface through the FieldWarning context.
+  const emailExistence = useEmailExistence()
+
   const today = new Date().toISOString().split("T")[0]
   const submissionDate = proponent.dateOfSubmission || today
   const organizationValue = organizationName || proponent.orgOrCourseSection
@@ -519,19 +524,36 @@ export const ProponentCard = memo(function ProponentCard({
           </label>
           <Input
             type="email"
-            pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            pattern="[a-zA-Z0-9._%+-]+@(mymail\.mapua\.edu\.ph|mapua\.edu\.ph|gmail\.com)"
             title="Please enter a valid email address with an '@' and domain (e.g., student@mymail.mapua.edu.ph)"
             name={`proponent_${index}_emailAddress`}
             value={proponent.emailAddress}
-            onChange={(e) =>
+            onChange={(e) => {
               onUpdate(proponent.id, "emailAddress", e.target.value)
-            }
+              emailExistence.reset()
+            }}
+            onBlur={() => emailExistence.check(proponent.emailAddress)}
             placeholder="student@mymail.mapua.edu.ph"
             style={{ color: "#171717" }}
-            className={FIELD_INPUT_CLASS}
+            className={cn(
+              FIELD_INPUT_CLASS,
+              emailExistence.state === "invalid" && "!border-red-400"
+            )}
             required
           />
           <FieldWarning name={`proponent.${proponent.id}.emailAddress`} />
+          {emailExistence.state === "checking" && (
+            <p className="flex items-center gap-1 text-[11px] text-neutral-500">
+              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+              <span>Verifying email...</span>
+            </p>
+          )}
+          {emailExistence.state === "invalid" && (
+            <p className="flex items-start gap-1 text-[11px] text-red-600 animate-in fade-in">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>No mailbox exists for this address. Please double-check it.</span>
+            </p>
+          )}
         </div>
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-neutral-700">

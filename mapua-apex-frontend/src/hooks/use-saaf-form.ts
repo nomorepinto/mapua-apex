@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
 import { useFetcher, useNavigation } from "react-router"
 
+import { checkEmailExistence } from "@/hooks/use-email-existence"
 import { useScrollToTop } from "@/hooks/use-scroll-to-top"
 import { useHydrateEditingSubmission } from "@/hooks/use-hydrate-editing-submission"
 import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
@@ -60,12 +61,15 @@ export function useSaafForm() {
   }, [])
   const [successDismissed, setSuccessDismissed] = useState(false)
   const showSuccessModal = Boolean(fetcher.data?.success) && !successDismissed
+  // Set when the pre-submit mailbox-existence pass finds a proponent email
+  // with no mailbox; resets on the next submit attempt and on email edits.
+  const [mailboxError, setMailboxError] = useState<string | null>(null)
   const submitError =
     fetcher.data && fetcher.data.success === false
       ? fetcher.data.message ||
         Object.values(fetcher.data.errors ?? {})[0] ||
         "Failed to submit application. Please try again."
-      : null
+      : mailboxError
 
   // Directly select draft from Zustand with fallback to default. Memoized so the
   // validation callbacks below keep their identity between unrelated renders.
@@ -182,6 +186,7 @@ export function useSaafForm() {
 
   const handleUpdateProponent = useCallback(
     (id: string, field: keyof Proponent, value: string) => {
+      if (field === "emailAddress") setMailboxError(null)
       const current = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
       useOrgStore.getState().patchSaafDraft({
         proponents: current.proponents.map((p) =>
@@ -374,15 +379,33 @@ export function useSaafForm() {
   }, [setShowErrors])
 
   const handleInitiateSubmit = useCallback(
-    (e: MouseEvent, form: HTMLFormElement | null): boolean => {
+    async (e: MouseEvent, form: HTMLFormElement | null): Promise<boolean> => {
       e.preventDefault()
-      if (validateForm(form)) {
-        setShowConfirmModal(true)
-        return true
+      setMailboxError(null)
+      if (!validateForm(form)) return false
+
+      // Every field rule passed, so the page's cards have had their blur
+      // checks run; await any still-settling verdicts (the shared session
+      // cache dedups repeats, so settled emails resolve instantly here) and
+      // block only on a conclusive "invalid" — outages resolve to
+      // "unavailable" and let the submit through (fail open).
+      const emails = [...new Set(
+        draft.proponents
+          .map((p) => p.emailAddress.trim().toLowerCase())
+          .filter(Boolean)
+      )]
+      const states = await Promise.all(emails.map(checkEmailExistence))
+      if (states.some((state) => state === "invalid")) {
+        setMailboxError(
+          "One or more proponent email addresses have no mailbox. Please double-check them."
+        )
+        return false
       }
-      return false
+
+      setShowConfirmModal(true)
+      return true
     },
-    [validateForm]
+    [draft.proponents, validateForm]
   )
 
   const handleConfirmProceed = useCallback(

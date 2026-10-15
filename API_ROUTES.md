@@ -50,6 +50,7 @@ No Cognito JWT. Served under `/api/v1` like every other route, but open to anony
 | Method | Endpoint | Example JSON |
 | :---- | :---- | :---- |
 | **GET** | `/api/v1/public/announcements` | **Response `200`** — all announcements, newest `sent_at` first. Same shape as the admin/student announcement lists. Throttled with the student limiter. <pre>{<br>  "data": [<br>    {<br>      "sent_at": "2026-09-15T08:00:00Z",<br>      "content": "OSAAR office hours are 9:00–17:00."<br>    }<br>  ]<br>}</pre> |
+| **GET** | `/api/v1/public/validate-email?email={email}` | **Response `200`** — mailbox-existence check (EmailDetective proxy; key stays server-side). Only `@mymail.mapua.edu.ph`, `@mapua.edu.ph` and `@gmail.com` are looked up; anything else returns `domain_not_allowed` with no upstream call. Conclusive results are cached for a day; upstream outages resolve to `unavailable` (HTTP stays `200` so clients fail open). `422` when `email` is missing or malformed. Throttled with the student limiter. <pre>{<br>  "state": "valid",<br>  "score": 100,<br>  "did_you_mean": null,<br>  "cached": false<br>}</pre> |
 
 ---
 
