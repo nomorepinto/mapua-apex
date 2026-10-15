@@ -259,6 +259,85 @@ class SubmissionControllerTest extends TestCase
             ->assertJsonPath('data.activity_details.date_of_event', '2026-09-22');
     }
 
+    public function test_returns_422_when_a_proponent_name_contains_a_digit(): void
+    {
+        InMemoryDynamoDb::bind($this);
+
+        $response = $this->withStudentAuth()->postJson(
+            '/api/v1/students/submissions',
+            SaafPayload::valid([
+                'proponents' => [['first_name' => 'Nic0le']],
+            ]),
+        );
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['proponents.0.first_name']);
+
+        $errors = $response->json('errors');
+        $this->assertIsArray($errors);
+        $this->assertSame(
+            ['Names cannot contain numbers.'],
+            $errors['proponents.0.first_name'] ?? null,
+        );
+    }
+
+    public function test_returns_422_when_the_position_of_applicant_contains_a_digit(): void
+    {
+        InMemoryDynamoDb::bind($this);
+
+        $response = $this->withStudentAuth()->postJson(
+            '/api/v1/students/submissions',
+            SaafPayload::valid([
+                'proponents' => [['position_of_applicant' => '2nd President']],
+            ]),
+        );
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['proponents.0.position_of_applicant']);
+
+        $errors = $response->json('errors');
+        $this->assertIsArray($errors);
+        $this->assertSame(
+            ['The position of the applicant cannot contain numbers.'],
+            $errors['proponents.0.position_of_applicant'] ?? null,
+        );
+    }
+
+    public function test_returns_422_when_a_budget_unit_exceeds_10_characters(): void
+    {
+        InMemoryDynamoDb::bind($this);
+
+        $response = $this->withStudentAuth()->postJson(
+            '/api/v1/students/submissions',
+            SaafPayload::valid([
+                'detailed_budget_proposal' => [
+                    'items' => [['unit' => str_repeat('a', 11)]],
+                ],
+            ]),
+        );
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['detailed_budget_proposal.items.0.unit']);
+    }
+
+    public function test_creates_a_submission_when_a_budget_unit_is_10_characters(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db);
+        DynamoFixtures::signatory($db, 'adv001', 'adviser');
+
+        $response = $this->withStudentAuth()->postJson(
+            '/api/v1/students/submissions',
+            SaafPayload::valid([
+                'detailed_budget_proposal' => [
+                    'items' => [['unit' => str_repeat('a', 10)]],
+                ],
+            ]),
+        );
+
+        $response->assertCreated();
+    }
+
     public function test_creates_a_submission_and_routes_to_the_adviser(): void
     {
         $this->freezeTime();

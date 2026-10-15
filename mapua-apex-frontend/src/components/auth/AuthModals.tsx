@@ -33,6 +33,12 @@ export function AuthModals() {
         onSwitchToForgotPassword={openForgotPassword}
         onRequireVerification={(email) => openVerifyEmail(email)}
         onSuccess={() => {
+          try {
+            localStorage.setItem("apex_last_active_at", Date.now().toString())
+            localStorage.removeItem("apex_session_id")
+          } catch {
+            // ignore
+          }
           closeModal()
           window.location.href = "/"
         }}

@@ -61,8 +61,13 @@ function derivedSchedulePatch(picks: ReservationPick[]): Partial<SaafDraft> {
 
 /** Persist a new pick list plus the event schedule it implies, in one shot. */
 function commitPicks(picks: ReservationPick[]): void {
-  useOrgStore.getState().patchReservationDraft({ picks })
-  useOrgStore.getState().patchSaafDraft(derivedSchedulePatch(picks))
+  // Room-first: equipment cannot outlive the last reserved room, so drop any
+  // equipment pick when no room remains. Keeps the derived schedule in sync.
+  const normalized = picks.some((pick) => pick.type === "room")
+    ? picks
+    : picks.filter((pick) => pick.type !== "equipment")
+  useOrgStore.getState().patchReservationDraft({ picks: normalized })
+  useOrgStore.getState().patchSaafDraft(derivedSchedulePatch(normalized))
 }
 
 export function useReservationForm() {
@@ -106,26 +111,34 @@ export function useReservationForm() {
     const exists = picks.some(
       (pick) => pick.reservable_id === reservable.reservable_id
     )
+    // Room-first backstop: refuse to add equipment while no room is picked.
+    if (
+      !exists &&
+      reservable.type === "equipment" &&
+      !picks.some((pick) => pick.type === "room")
+    ) {
+      return
+    }
     const next = exists
       ? picks.filter(
-          (pick) => pick.reservable_id !== reservable.reservable_id
-        )
+        (pick) => pick.reservable_id !== reservable.reservable_id
+      )
       : [
-          ...picks,
-          {
-            id: reservable.reservable_id,
-            reservable_id: reservable.reservable_id,
-            campus_id: reservable.campus_id,
-            name: reservable.name,
-            type: reservable.type,
-            // Room participant bounds travel with the pick so the step can
-            // validate the expected headcount without another API read.
-            min_participants: reservable.min_participants ?? null,
-            max_participants: reservable.max_participants ?? null,
-            selections: [],
-            remarks: "",
-          },
-        ]
+        ...picks,
+        {
+          id: reservable.reservable_id,
+          reservable_id: reservable.reservable_id,
+          campus_id: reservable.campus_id,
+          name: reservable.name,
+          type: reservable.type,
+          // Room participant bounds travel with the pick so the step can
+          // validate the expected headcount without another API read.
+          min_participants: reservable.min_participants ?? null,
+          max_participants: reservable.max_participants ?? null,
+          selections: [],
+          remarks: "",
+        },
+      ]
     commitPicks(next)
   }, [currentPicks])
 
@@ -153,7 +166,7 @@ export function useReservationForm() {
     (pickId: string, remarks: string) => {
       const next = currentPicks().map((pick) =>
         pick.id === pickId
-          ? { ...pick, remarks: remarks.slice(0, 120) }
+          ? { ...pick, remarks: remarks.slice(0, 150) }
           : pick
       )
       // Remarks never affect the event schedule, so skip the derived patch.

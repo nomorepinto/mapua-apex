@@ -13,6 +13,7 @@ import {
   sanitizeMobileNumber,
   SELECT_CONTENT_STYLE,
   SELECT_ITEM_CLASS,
+  stripDigits,
   STUDENT_NUMBER_LENGTH,
   SUFFIX_OPTIONS,
   YEAR_LEVEL_OPTIONS,
@@ -59,6 +60,13 @@ function parseProgramAndYear(val: string): { program: string; year: string } {
   return { program: trimmed, year: "" }
 }
 
+/** Prevents typing 0-9 in letters-only fields */
+function blockDigitKeys(e: React.KeyboardEvent<HTMLInputElement>) {
+  if (/^[0-9]$/.test(e.key)) {
+    e.preventDefault()
+  }
+}
+
 interface ProponentCardProps {
   proponent: Proponent
   index: number
@@ -83,7 +91,6 @@ export const ProponentCard = memo(function ProponentCard({
 }: ProponentCardProps) {
   const today = new Date().toISOString().split("T")[0]
   const submissionDate = proponent.dateOfSubmission || today
-  // Derived from the applying organization, so it can never disagree with it.
   const organizationValue = organizationName || proponent.orgOrCourseSection
 
   const deptItem = getDepartmentItem(departmentValue)
@@ -135,7 +142,8 @@ export const ProponentCard = memo(function ProponentCard({
             name={`proponent_${index}_firstName`}
             value={proponent.firstName}
             maxLength={35}
-            onChange={(e) => onUpdate(proponent.id, "firstName", e.target.value)}
+            onKeyDown={blockDigitKeys}
+            onChange={(e) => onUpdate(proponent.id, "firstName", stripDigits(e.target.value))}
             placeholder="First Name"
             style={{ color: "#171717" }}
             className={FIELD_INPUT_CLASS}
@@ -151,13 +159,15 @@ export const ProponentCard = memo(function ProponentCard({
             name={`proponent_${index}_middleName`}
             value={proponent.middleName}
             maxLength={20}
+            onKeyDown={blockDigitKeys}
             onChange={(e) =>
-              onUpdate(proponent.id, "middleName", e.target.value)
+              onUpdate(proponent.id, "middleName", stripDigits(e.target.value))
             }
             placeholder="Middle Name"
             style={{ color: "#171717" }}
             className={FIELD_INPUT_CLASS}
           />
+          <FieldWarning name={`proponent.${proponent.id}.middleName`} />
         </div>
         <div className="space-y-1.5 md:col-span-3">
           <label className="block text-xs font-medium text-neutral-700">
@@ -167,7 +177,8 @@ export const ProponentCard = memo(function ProponentCard({
             name={`proponent_${index}_lastName`}
             value={proponent.lastName}
             maxLength={30}
-            onChange={(e) => onUpdate(proponent.id, "lastName", e.target.value)}
+            onKeyDown={blockDigitKeys}
+            onChange={(e) => onUpdate(proponent.id, "lastName", stripDigits(e.target.value))}
             placeholder="Last Name"
             style={{ color: "#171717" }}
             className={FIELD_INPUT_CLASS}
@@ -217,6 +228,8 @@ export const ProponentCard = memo(function ProponentCard({
         </div>
       </div>
 
+      <FieldWarning name={`proponent.${proponent.id}.duplicateFullName`} />
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-12">
         <div className="space-y-1.5 md:col-span-3">
           <label className="block text-xs font-medium text-neutral-700">
@@ -257,12 +270,12 @@ export const ProponentCard = memo(function ProponentCard({
                 const newPrograms = getDepartmentPrograms(val)
                 const isProgValid = Boolean(
                   selectedProgCode &&
-                    newPrograms.some((p) => p.code === selectedProgCode)
+                  newPrograms.some((p) => p.code === selectedProgCode)
                 )
                 const newYearOptions = getYearLevelOptions(val)
                 const isYearValid = Boolean(
                   currentYear &&
-                    (newYearOptions as readonly string[]).includes(currentYear)
+                  (newYearOptions as readonly string[]).includes(currentYear)
                 )
 
                 const nextProg = isProgValid ? selectedProgCode : ""
@@ -414,8 +427,9 @@ export const ProponentCard = memo(function ProponentCard({
             name={`proponent_${index}_positionOfApplicant`}
             value={proponent.positionOfApplicant}
             maxLength={30}
+            onKeyDown={blockDigitKeys}
             onChange={(e) =>
-              onUpdate(proponent.id, "positionOfApplicant", e.target.value)
+              onUpdate(proponent.id, "positionOfApplicant", stripDigits(e.target.value))
             }
             placeholder="President / Project Lead"
             style={{ color: "#171717" }}

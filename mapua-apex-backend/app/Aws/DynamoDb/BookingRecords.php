@@ -155,6 +155,8 @@ final class BookingRecords
             : null;
         $planned = [];
 
+        $this->assertEquipmentWithinRooms($reservations);
+
         foreach ($reservations as $reservation) {
             if (! is_array($reservation)) {
                 continue;
@@ -214,6 +216,52 @@ final class BookingRecords
         }
 
         return ['refs' => $refs, 'items' => $items];
+    }
+
+    /**
+     * Enforce the SAAF reservation rule that equipment may only be held while a
+     * room is reserved, and only on dates/slots some reserved room already covers
+     * (union of all rooms). Runs validate-first (before any write) so a violation
+     * aborts 422 with nothing persisted. CDM manual holds (createManual) are
+     * intentionally exempt.
+     *
+     * @param  list<array<string, mixed>>  $reservations
+     */
+    private function assertEquipmentWithinRooms(array $reservations): void
+    {
+        $roomCoverage = [];
+
+        foreach ($reservations as $reservation) {
+            if (! is_array($reservation) || ($reservation['type'] ?? null) !== 'room') {
+                continue;
+            }
+
+            foreach ($this->normalizeSelections($reservation['selections'] ?? []) as $selection) {
+                foreach ($selection['slots'] as $slot) {
+                    $roomCoverage[$selection['date']][$slot] = true;
+                }
+            }
+        }
+
+        foreach ($reservations as $reservation) {
+            if (! is_array($reservation) || ($reservation['type'] ?? null) !== 'equipment') {
+                continue;
+            }
+
+            $name = (string) ($reservation['name'] ?? 'This equipment');
+
+            if ($roomCoverage === []) {
+                abort(422, 'Reserve a room before adding equipment.');
+            }
+
+            foreach ($this->normalizeSelections($reservation['selections'] ?? []) as $selection) {
+                foreach ($selection['slots'] as $slot) {
+                    if (! isset($roomCoverage[$selection['date']][$slot])) {
+                        abort(422, "Equipment '{$name}' can only be reserved during your reserved room times.");
+                    }
+                }
+            }
+        }
     }
 
     /**

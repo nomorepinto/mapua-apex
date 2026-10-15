@@ -58,6 +58,14 @@ export function SignInModal({
       // Reset lockout counter on success
       resetLockout()
 
+      // Reset idle tracking timestamp to now and clear old session ID on fresh login
+      try {
+        localStorage.setItem("apex_last_active_at", Date.now().toString())
+        localStorage.removeItem("apex_session_id")
+      } catch {
+        // ignore
+      }
+
       if (onSuccess) {
         onSuccess()
       } else {

@@ -34,6 +34,11 @@ import {
 const EMAIL_PATTERN =
   /^[a-zA-Z0-9._%+-]+@(mymail\.mapua\.edu\.ph|mapua\.edu\.ph)$/i
 
+// Matches letters, spaces, hyphens, periods, and apostrophes (no digits)
+const LETTERS_ONLY_PATTERN = /^[\p{L}\s\-'.]+$/u
+// Positions can also include slashes, ampersands, and parentheses (e.g., "VP / Co-Lead")
+const POSITION_LETTERS_ONLY_PATTERN = /^[\p{L}\s\-'.\/&(),]+$/u
+
 function isBlank(value: string | undefined): boolean {
   return !value || !value.trim()
 }
@@ -117,6 +122,31 @@ function markDuplicateProponents(
       }
     }
   }
+
+  const normalizePart = (value: string | undefined): string =>
+    String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ")
+  const nameKeyOf = (proponent: Proponent): string | null => {
+    const first = normalizePart(proponent.firstName)
+    const middle = normalizePart(proponent.middleName)
+    const last = normalizePart(proponent.lastName)
+    if (!first && !last) return null
+    return [first, middle, last].join("\u0000")
+  }
+  const nameCounts = new Map<string, number>()
+  for (const proponent of proponents) {
+    const nameKey = nameKeyOf(proponent)
+    if (nameKey === null) continue
+    nameCounts.set(nameKey, (nameCounts.get(nameKey) ?? 0) + 1)
+  }
+  for (const proponent of proponents) {
+    const nameKey = nameKeyOf(proponent)
+    if (nameKey === null || (nameCounts.get(nameKey) ?? 0) < 2) continue
+    const key = `proponent.${proponent.id}.duplicateFullName`
+    if (!warnings[key]) {
+      warnings[key] =
+        "Two proponents cannot have the exact same first, middle, and last name."
+    }
+  }
 }
 
 function proponentWarnings(
@@ -125,8 +155,26 @@ function proponentWarnings(
   warnings: Record<string, string>
 ): void {
   const key = (field: string) => `proponent.${proponent.id}.${field}`
-  if (isBlank(proponent.firstName)) warnings[key("firstName")] = REQUIRED
-  if (isBlank(proponent.lastName)) warnings[key("lastName")] = REQUIRED
+
+  // First Name validation
+  if (isBlank(proponent.firstName)) {
+    warnings[key("firstName")] = REQUIRED
+  } else if (!LETTERS_ONLY_PATTERN.test(proponent.firstName.trim())) {
+    warnings[key("firstName")] = "First name must only contain letters."
+  }
+
+  // Middle Name validation (optional, but no digits if provided)
+  if (!isBlank(proponent.middleName) && !LETTERS_ONLY_PATTERN.test(proponent.middleName.trim())) {
+    warnings[key("middleName")] = "Middle name must only contain letters."
+  }
+
+  // Last Name validation
+  if (isBlank(proponent.lastName)) {
+    warnings[key("lastName")] = REQUIRED
+  } else if (!LETTERS_ONLY_PATTERN.test(proponent.lastName.trim())) {
+    warnings[key("lastName")] = "Last name must only contain letters."
+  }
+
   if (isBlank(proponent.studentNumber)) {
     warnings[key("studentNumber")] = REQUIRED
   } else if (proponent.studentNumber.trim().length < STUDENT_NUMBER_LENGTH) {
@@ -139,6 +187,7 @@ function proponentWarnings(
         `Student number must start with a year between ${MIN_STUDENT_YEAR} and ${MAX_STUDENT_YEAR}.`
     }
   }
+
   if (isBlank(proponent.programAndYear)) {
     warnings[key("programAndYear")] = REQUIRED
   } else {
@@ -153,8 +202,16 @@ function proponentWarnings(
       warnings[key("programAndYear")] = "Both program and year level are required."
     }
   }
-  if (isBlank(proponent.positionOfApplicant)) warnings[key("positionOfApplicant")] = REQUIRED
+
+  // Position validation
+  if (isBlank(proponent.positionOfApplicant)) {
+    warnings[key("positionOfApplicant")] = REQUIRED
+  } else if (!POSITION_LETTERS_ONLY_PATTERN.test(proponent.positionOfApplicant.trim())) {
+    warnings[key("positionOfApplicant")] = "Position must only contain letters."
+  }
+
   if (isBlank(proponent.orgOrCourseSection)) warnings[key("orgOrCourseSection")] = REQUIRED
+
   if (isBlank(proponent.contactNumber)) {
     warnings[key("contactNumber")] = REQUIRED
   } else if (!proponent.contactNumber.trim().startsWith("09")) {
@@ -163,6 +220,7 @@ function proponentWarnings(
     warnings[key("contactNumber")] =
       `Mobile number must be ${MOBILE_NUMBER_LENGTH} digits.`
   }
+
   if (isBlank(department)) warnings[key("department")] = REQUIRED
 
   if (isBlank(proponent.emailAddress)) {
@@ -284,12 +342,6 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   return warnings
 }
 
-// Prefixes:
-// 0: Classification
-// 1: People
-// 2: Reservation (activityVenue, dateOfEvent, endDateOfEvent, timeOfEvent & expectedParticipants)
-// 3: Activity
-// 4: Alignment & Budget
 export const STEP_PREFIXES_WITH_RESERVATION: Record<SaafStepIndex, string[]> = {
   0: ["activityType", "totalOrgMembers"],
   1: ["proponent."],
@@ -329,12 +381,6 @@ export const STEP_PREFIXES_NO_RESERVATION: Record<SaafStepIndex, string[]> = {
   4: [],
 }
 
-/**
- * Warning keys are machine-facing (`activityVenue`, `proponent.<id>.lastName`),
- * so they say nothing to a reader. These labels turn a key into the words the
- * field is actually called on screen, which is what makes a step-level error
- * list actionable.
- */
 const WARNING_KEY_LABELS: Record<string, string> = {
   activityType: "Type of activity",
   totalOrgMembers: "Total no. of org members",
@@ -354,10 +400,11 @@ const WARNING_KEY_LABELS: Record<string, string> = {
   sdgExplanation: "UN sustainability goals",
 }
 
-/** Proponent row fields, keyed by the `Proponent` property name. */
 const PROPONENT_FIELD_LABELS: Record<string, string> = {
   firstName: "First name",
+  middleName: "Middle name",
   lastName: "Last name",
+  duplicateFullName: "Full name",
   studentNumber: "Student number",
   programAndYear: "Program / year level",
   department: "Department",
@@ -368,11 +415,6 @@ const PROPONENT_FIELD_LABELS: Record<string, string> = {
   facebookLink: "Facebook link",
 }
 
-/**
- * Turns a `saafFieldWarnings` key into a human label. Proponent keys carry the
- * row id, which is resolved to its on-screen row number so a page with several
- * proponents says *which* proponent is short a field.
- */
 function warningKeyLabel(key: string, proponents: Proponent[]): string {
   if (key === "proponent.max") return "Number of proponents"
   const match = /^proponent\.([^.]+)\.(.+)$/.exec(key)
@@ -384,7 +426,6 @@ function warningKeyLabel(key: string, proponents: Proponent[]): string {
   return WARNING_KEY_LABELS[key] ?? key
 }
 
-/** Raw `[key, message]` warnings that belong to the given wizard step. */
 function stepWarningEntries(
   step: SaafStepIndex,
   draft: SaafDraft,
@@ -402,11 +443,6 @@ function stepWarningEntries(
   )
 }
 
-/**
- * Every unresolved field on a step, each prefixed with its label. A failed
- * Continue reveals this list, so the proponent sees all that is missing on the
- * page at once instead of one message per click.
- */
 export function getSaafStepIssues(
   step: SaafStepIndex,
   draft: SaafDraft,
@@ -417,7 +453,6 @@ export function getSaafStepIssues(
   )
 }
 
-/** Whether the step has nothing left to fill in or correct. */
 export function isSaafStepComplete(
   step: SaafStepIndex,
   draft: SaafDraft,
@@ -434,7 +469,6 @@ export function isSaafDraftComplete(draft: SaafDraft, includeReservation: boolea
 const RESERVATION_EMPTY_MESSAGE =
   "Select at least one room or equipment to reserve."
 
-/** Headcount as a number, or null when blank/invalid (unknown = allowed). */
 function expectedParticipantsValue(
   expectedParticipants?: string | number | null
 ): number | null {
@@ -469,9 +503,40 @@ export function getReservationStepIssue(
     return "Select at least one time slot for each chosen date."
   }
 
-  // Room participant bounds are enforced against the expected headcount here so
-  // an out-of-range selection is blocked before submit instead of a 422 from the
-  // API (which mirrors this same check in BookingRecords::assertAvailable).
+  // Purpose validation: required and must be at least 20 characters
+  const invalidPurposePick = picks.find(
+    (pick) => isBlank(pick.remarks) || pick.remarks.trim().length < 20
+  )
+  if (invalidPurposePick) {
+    if (isBlank(invalidPurposePick.remarks)) {
+      return `Add a purpose for "${invalidPurposePick.name}".`
+    }
+    return `Purpose for "${invalidPurposePick.name}" must be at least 20 characters.`
+  }
+
+  const roomCoverage = new Map<string, Set<number>>()
+  for (const pick of picks) {
+    if (pick.type !== "room") continue
+    for (const selection of pick.selections) {
+      const slots = roomCoverage.get(selection.date) ?? new Set<number>()
+      for (const slot of selection.slots) slots.add(slot)
+      roomCoverage.set(selection.date, slots)
+    }
+  }
+  const equipmentPicks = picks.filter((pick) => pick.type === "equipment")
+  if (equipmentPicks.length > 0 && roomCoverage.size === 0) {
+    return "Reserve a room before reserving equipment."
+  }
+  for (const pick of equipmentPicks) {
+    const outsideRoom = pick.selections.some((selection) => {
+      const covered = roomCoverage.get(selection.date)
+      return selection.slots.some((slot) => !covered?.has(slot))
+    })
+    if (outsideRoom) {
+      return `"${pick.name}" can only be reserved during your reserved room dates and times.`
+    }
+  }
+
   const headcount = expectedParticipantsValue(expectedParticipants)
   if (headcount !== null) {
     const overCapacity = picks.find(
@@ -494,8 +559,6 @@ export function getReservationStepIssue(
   return null
 }
 
-// The reservation step owns its own catalog picks, which are not part of the
-// SAAF draft; label them the same way the field warnings are labelled.
 export function getReservationStepIssues(
   draft: ReservationDraft,
   campus: string,
@@ -513,11 +576,6 @@ export function isReservationStepComplete(
   return getReservationStepIssue(draft, campus, expectedParticipants) === null
 }
 
-/**
- * First wizard page whose rules still fail. Used to move the proponent to the
- * page that actually holds the problem when a submit is rejected from the last
- * page, instead of leaving them staring at an error about another page's fields.
- */
 export function firstIncompleteWizardStep(
   draft: SaafDraft,
   includeReservation: boolean,
@@ -531,8 +589,6 @@ export function firstIncompleteWizardStep(
     if (!isSaafStepComplete(step, draft, includeReservation)) {
       return step as WizardStepIndex
     }
-    // The picks live outside the SAAF draft, so they are checked separately on
-    // the reservation page only.
     if (
       includeReservation &&
       step === 2 &&
@@ -550,9 +606,11 @@ export function firstIncompleteWizardStep(
 }
 
 export function isStepHtmlValid(panel: HTMLElement): boolean {
-  const fields = panel.querySelectorAll<
-    HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-  >("input, textarea, select")
+  const fields = Array.from(
+    panel.querySelectorAll<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >("input, textarea, select")
+  )
 
   for (const field of fields) {
     if (field.disabled) continue
@@ -565,9 +623,4 @@ export function isStepHtmlValid(panel: HTMLElement): boolean {
 export const STEP_INVALID_FOCUS_SELECTOR =
   'input:invalid:not([type="hidden"]), textarea:invalid, select:invalid, .saaf-glow-invalid'
 
-/**
- * Id of the wizard's per-page issue summary. The reveal scrolls to it, so the
- * contract is shared between the hook that reveals and the component that
- * renders the list.
- */
 export const SAAF_STEP_ISSUES_ID = "saaf-step-issues"
