@@ -262,12 +262,29 @@ The `arcus-attendance` and `arcus-evaluation` microservices share the **same**
 physical table and write into the apex `EVENT#uuid` partition, keyed by the apex
 `event_id`. apex never writes these — it only reads them (via
 `AggregateEventParticipants`) to build a POSTEVAL's `participation_snapshot`.
-Both are capturable only on the event day (`window = attendance`).
+Attendance uses the event-day window. Participant evaluations require the
+signed-in student's check-in and use the evaluation window (event day through
+three days afterward by default, in Asia/Manila).
 
 | Object | PK | SK | Attributes |
 |---|---|---|---|
 | Attendance check-in | `EVENT#uuid` | `MEMBER#{studentId}` | `member_organization`, `scannedAt`, `leftAt` (sparse) |
 | Participant evaluation | `EVENT#uuid` | `EVALUATION#{evaluationId}` | `evaluationId`, `studentId`, `fullName`, `participated` (`"yes"`/`"no"`), `filedAt`, `eventId` |
+
+Arcus Evaluation also writes full response copies at `PK = SK = EVALUATION#{id}`
+and `PK = EVALUATION`, `SK = {filedAt}#{id}`. These retain the identity/event
+metadata plus `schemaVersion: 2`, `eventTitle`, all applicable `ratings` (a numeric
+map for 23 criteria), `discoverySources` (boolean map), `comments`, and
+`othersSpecify`. Both full copies and the slim event child are committed in one
+DynamoDB transaction. No new S3 object or bucket/key attribute is written;
+the browser fills the original FM-SA-05-01 template for preview and export.
+Legacy metadata without full responses remains visible but cannot regenerate
+a PDF. No legacy object migration or deletion is performed.
+
+The Arcus officer panel reads live participants and the active POSTEVAL, falling
+back to the latest denied filing by `submitted_at`. Its `submission_id` resolves
+the associated paper; orphaned filings are ignored. These reads do not change
+review status or replace the frozen `participation_snapshot`.
 
 The scanner also keeps a student **profile** item at `PK = SK = STUDENT#{studentId}`
 holding `student_id`, `full_name`, `course`, `department` (renamed from the former

@@ -94,11 +94,30 @@ Not Cognito-JWT routes. The arcus companion apps (arcus-attendance-system, arcus
 X-Arcus-Service-Token: <ARCUS_SERVICE_TOKEN>
 ```
 
-The token is compared with `hash_equals` against backend env `ARCUS_SERVICE_TOKEN` (`config('services.arcus.service_token')`). A missing or wrong token → **401**; an unconfigured token → **503**. Optionally send `X-Arcus-Organization-Id: <org uuid>` (a leading `ORGANIZATION#` is stripped) to scope the call to one organization; omit it for cross-organization scope. The route is throttled with the admin limiter and is **not** consumed by the mapua-apex frontend — the arcus companion apps are separate deployments (tracked in `docs/unused_api_routes.md`).
+The token is compared with `hash_equals` against backend env `ARCUS_SERVICE_TOKEN` (`config('services.arcus.service_token')`). A missing or wrong token → **401**; an unconfigured token → **503**. Optionally send `X-Arcus-Organization-Id: <org uuid>` (a leading `ORGANIZATION#` is stripped) to scope the call to one organization; omit it for cross-organization scope. These routes are throttled with the admin limiter and are **not** consumed by the mapua-apex frontend — the arcus companion apps are separate deployments (tracked in `docs/unused_api_routes.md`).
 
 | Method | Endpoint | Example JSON |
 | :---- | :---- | :---- |
-| **GET** | `/api/v1/arcus/events` | **Response `200`** — published events the arcus attendance/evaluation apps pick from, as a collection of arcus event resources (excludes submissions whose `status` is `cancelled`). Optional `?window=attendance` \| `evaluation` (defaults to `attendance`); both companion apps now request `attendance`, so they list **only events happening today**. Scoped by `X-Arcus-Organization-Id` when present. |
+| **GET** | `/api/v1/arcus/events` | **Response `200`** — `{ data: ArcusEventResource[] }` for approved/finished submissions. Optional `?window=attendance` \| `evaluation` (defaults to `attendance`). Attendance requests the event-day window; evaluation requests the event day through the configured post-evaluation window (default 3 days), in Asia/Manila. Scoped by `X-Arcus-Organization-Id` when present. |
+| **GET** | `/api/v1/arcus/students/{studentId}/events` | **Response `200`** — `{ data: ArcusEventResource[] }`, restricted to events with an `EVENT#{eventId}/MEMBER#{studentId}` check-in. Evaluation sends `?window=evaluation`; omitted/other window values select `attendance`. The student ID is asserted by the Arcus server from the verified `custom:student_id` claim, never from browser-supplied identity. All organizations are considered; an empty result is valid. Uses batched attendance reads (100 keys per request with bounded retries), not a reverse student index. |
+| **GET** | `/api/v1/arcus/events/{eventId}/post-eval` | **Response `200`** — live participant aggregate plus Apex review status (shape below). Unknown event/submission → **404**; a supplied organization scope that does not own the linked submission → **403**. The Arcus evaluation server additionally enforces officer role and in-window event eligibility before forwarding this call. |
+
+The POSTEVAL response has no `data` wrapper:
+
+```json
+{
+  "event_id": "e001",
+  "submission_id": "s001",
+  "organization_id": "a1b2",
+  "attendance_count": 1,
+  "attendance": [{ "student_id": "2026000001", "full_name": "Example Student", "department": "Engineering", "member_organization": "Example Org", "scanned_at": "2026-10-15T01:00:00Z", "left_at": null }],
+  "evaluation_count": 1,
+  "evaluations": [{ "evaluation_id": "ev001", "student_id": "2026000001", "full_name": "Example Student", "participated": true, "filed_at": "2026-10-15T03:00:00Z" }],
+  "post_eval": { "posteval_id": "pe001", "status": "submitted", "submitted_at": "2026-10-15T04:00:00Z", "approved_at": null, "denied_at": null }
+}
+```
+
+Review selection prefers an active (`submitted`/`approved`) filing, otherwise the most recently submitted denied filing, and resolves that filing's `submission_id`. Orphaned filings are ignored. Without a filing, `post_eval.status` is `none`, its ID/timestamps are null, and the newest approved/finished submission is preferred (then the newest other submission). The live counts do not replace the frozen Apex POSTEVAL snapshot. Arcus cannot approve or finish an event.
 
 > The former `POST /api/v1/arcus/events/{event}/submissions/{submission}/finish` route is **retired**. A submission now reaches `finished` only when OSAAR approves its post-evaluation (see [Admin routes](#admin-routes)); the arcus-evaluation officer "finish" path was removed.
 

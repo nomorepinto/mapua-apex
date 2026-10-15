@@ -3,6 +3,8 @@
 namespace App\Aws\DynamoDb;
 
 use Aws\DynamoDb\DynamoDbClient;
+use Illuminate\Support\Sleep;
+use RuntimeException;
 
 final class DynamoDbItems
 {
@@ -86,6 +88,48 @@ final class DynamoDbItems
         $item = $result['Item'] ?? null;
 
         return is_array($item) ? $this->marshaller->unmarshal($item) : null;
+    }
+
+    /**
+     * @param  list<array{PK: string, SK: string}>  $keys
+     * @return list<array<string, mixed>>
+     */
+    public function batchGet(array $keys): array
+    {
+        $uniqueKeys = [];
+
+        foreach ($keys as $key) {
+            $uniqueKeys[$key['PK']."\0".$key['SK']] = $this->marshaller->marshal($key);
+        }
+
+        $table = $this->table();
+        $items = [];
+
+        foreach (array_chunk(array_values($uniqueKeys), 100) as $chunk) {
+            $pending = [$table => ['Keys' => $chunk, 'ConsistentRead' => true]];
+
+            for ($attempt = 0; $attempt < 5; $attempt++) {
+                $result = $this->dynamo->batchGetItem(['RequestItems' => $pending]);
+
+                foreach ($result['Responses'][$table] ?? [] as $item) {
+                    $items[] = $this->marshaller->unmarshal($item);
+                }
+
+                $pending = $result['UnprocessedKeys'] ?? [];
+
+                if ($pending === []) {
+                    break;
+                }
+
+                if ($attempt === 4) {
+                    throw new RuntimeException('DynamoDB batch read could not process all requested keys.');
+                }
+
+                Sleep::usleep(50000 * (2 ** $attempt));
+            }
+        }
+
+        return $items;
     }
 
     /**

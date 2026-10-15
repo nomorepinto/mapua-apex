@@ -32,6 +32,7 @@ final class InMemoryDynamoDb
     public function bindMock(MockInterface $mock): void
     {
         $mock->shouldReceive('getItem')->andReturnUsing($this->getItem(...));
+        $mock->shouldReceive('batchGetItem')->andReturnUsing($this->batchGetItem(...));
         $mock->shouldReceive('putItem')->andReturnUsing($this->putItem(...));
         $mock->shouldReceive('batchWriteItem')->andReturnUsing($this->batchWriteItem(...));
         $mock->shouldReceive('query')->andReturnUsing($this->query(...));
@@ -77,6 +78,29 @@ final class InMemoryDynamoDb
         $item = $this->table[$this->key($pk, $sk)] ?? null;
 
         return is_array($item) ? ['Item' => $item] : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function batchGetItem(array $args): array
+    {
+        $responses = [];
+
+        foreach ($args['RequestItems'] ?? [] as $table => $request) {
+            $responses[$table] = [];
+
+            foreach ($request['Keys'] as $key) {
+                $result = $this->getItem(['Key' => $key]);
+
+                if (isset($result['Item'])) {
+                    $responses[$table][] = $result['Item'];
+                }
+            }
+        }
+
+        return ['Responses' => $responses, 'UnprocessedKeys' => []];
     }
 
     /**

@@ -253,4 +253,8 @@ Route::middleware(['arcus.service', 'throttle:admin'])
     ->group(function (): void {
         Route::get('events', [EventController::class, 'index'])
             ->name('events.index');
+        Route::get('events/{eventId}/post-eval', [EventController::class, 'eventPostEval'])
+            ->name('events.post-eval');
+        Route::get('students/{studentId}/events', [EventController::class, 'studentEvents'])
+            ->name('students.events');
     });

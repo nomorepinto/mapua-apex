@@ -52,16 +52,17 @@ They are **not** dead code and must not be treated as orphaned.
 | :-- | :-- | :-- | :-- |
 | **GET** | `/api/v1/ping` | External health/liveness probes (`curl`, uptime monitors) | Returns `{ "ok": true }`; throttled with the student limiter. No SPA caller. |
 | **GET** | `/api/v1/arcus/events` | arcus companion apps (server-to-server) | Guarded by `arcus.service` (`X-Arcus-Service-Token`). The SPA's `lib/arcus-links.ts` only builds **deep links** to the arcus app UIs; it never calls this route. |
+| **GET** | `/api/v1/arcus/students/{studentId}/events` | Arcus Evaluation student landing/form | Service-authenticated; in-window events filtered by the verified student's check-ins. |
+| **GET** | `/api/v1/arcus/events/{eventId}/post-eval` | Arcus Evaluation officer workspace | Service-authenticated and organization-scoped; live participants plus Apex POSTEVAL status. |
 | **GET** | `/up` | Container / infra healthchecks | Laravel framework health route registered at the app root in `bootstrap/app.php` (`health: '/up'`), **not** under `/api/v1`. |
 
 > **Retired since the post-evaluation overhaul:** the former
 > `POST /api/v1/arcus/events/{event}/submissions/{submission}/finish` route has
 > been **deleted** from the backend. A submission now reaches `finished` only
 > when OSAAR approves its post-evaluation (a `POSTEVAL` going `submitted →
-> approved` transitions the linked `SUBMISSION` `approved → finished`). `GET
-> /api/v1/arcus/events` is now the only arcus server-to-server route; both
-> companion apps request `window=attendance`, so it lists only events happening
-> today.
+> approved` transitions the linked `SUBMISSION` `approved → finished`). The three
+> Arcus GET routes above remain active. Attendance uses `window=attendance`;
+> evaluation uses `window=evaluation` for the configured post-event period.
 
 ---
 

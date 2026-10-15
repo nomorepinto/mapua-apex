@@ -53,9 +53,13 @@ Index summary:
 | 29 | Org post-eval list (student dashboard) | Query | `GSI1PK = ORGANIZATION#id`, `GSI1SK` begins `POSTEVAL#` | GSI1 |
 | 30 | OSAAR post-eval queue (cross-org) | Query | per org `GSI1PK = ORGANIZATION#id`, `GSI1SK` begins `POSTEVAL#` (optional `status` filter) | GSI1 |
 | 31 | Single post-eval detail | GetItem | `PK = EVENT#id`, `SK = POSTEVAL#id` | Base |
-| 32 | Aggregate event participants (post-eval Section 3) | Query | `PK = EVENT#id`; split `SK` begins `MEMBER#` (attendance; resolve names via `PK = SK = MEMBER#{studentId}`) vs `EVALUATION#` | Base |
+| 32 | Aggregate event participants (post-eval Section 3) | Query | `PK = EVENT#id`; split `SK` begins `MEMBER#` (attendance; resolve names via `PK = SK = STUDENT#{studentId}`) vs `EVALUATION#` | Base |
 | 33 | Write post-eval (gated) | Query → PutItem | enforce submission approved/finished + window open (**422**) + no active POSTEVAL (**409**), freeze the snapshot, PutItem `PK = EVENT#id`, `SK = POSTEVAL#id` (`attribute_not_exists(PK)`) | Base + GSI1 |
 | 34 | Approve / deny post-eval (OSAAR) | UpdateItem | POSTEVAL `submitted → approved`/`denied`; on approve also SUBMISSION `approved → finished` (idempotent) | Base |
+| 35 | Arcus student: attended evaluatable events | Query → BatchGetItem | List published evaluation-window submissions across orgs, then check `PK = EVENT#id`, `SK = MEMBER#{verifiedStudentId}` in deduplicated batches of 100; retry unprocessed keys, fail on exhaustion | GSI1 + Base |
+| 36 | Arcus officer: live participants + review status | Query | `PK = EVENT#id`, prefixes `SUBMISSION#` and `POSTEVAL#`; prefer active/latest filing and its linked submission, enforce org scope, then aggregate participants (32) | Base |
+| 37 | Arcus student: file full response | TransactWriteItems | Full detail `PK = SK = EVALUATION#id`; full list `PK = EVALUATION`, `SK = filedAt#id`; slim `EVENT#id/EVALUATION#id` child, all conditional puts | Base |
+| 38 | Arcus officer: event-scoped export | Query → BatchGetItem | Query `EVENT#id`, `SK` begins `EVALUATION#`, then batch-read full `EVALUATION#id` detail records; filter/sort, return up to 100; PDF generation stays in browser | Base |
 
 ---
 
@@ -79,3 +83,5 @@ Index summary:
 | Student → Post-evals (entry + wizard) | SUBMISSION, POSTEVAL, EVENT children (MEMBER#/EVALUATION#) | 28, 31, 32, 33 |
 | Student dashboard → Post-eval panel | POSTEVAL | 29 |
 | OSAAR → Post-evals (queue + review) | POSTEVAL, SUBMISSION (finish on approve) | 30, 31, 32, 34 |
+| Arcus student → My events / form | SUBMISSION, attendance child, STUDENT profile, full/slim EVALUATION records | 35, 37 |
+| Arcus officer → Event workspace / export | SUBMISSION, POSTEVAL, attendance/evaluation children, full EVALUATION records | 32, 36, 38 |

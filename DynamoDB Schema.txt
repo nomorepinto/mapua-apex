@@ -71,17 +71,27 @@ On the last approve the backend also writes an "event scheduled" NOTIFICATION
 (system-created, not client-postable) that surfaces in the org_submitter
 Timeline Reminders and triggers an SES email with the arcus attendance and
 evaluation links.
-The arcus apps reach the backend over a single server-to-server endpoint (shared
-secret ARCUS_SERVICE_TOKEN, not a Cognito JWT): GET /api/v1/arcus/events lists
-approved/finished submissions whose stateless visibility window is open (derived
-per request from activity_details.date_of_event in Asia/Manila). Both companion
-apps now request window=attendance, so they list only events happening today
-(the event day). The former
-POST /api/v1/arcus/events/{event}/submissions/{submission}/finish route is
-RETIRED — a submission reaches "finished" only through OSAAR post-evaluation
-approval (see POSTEVAL). The 3-day evaluation window
-(ARCUS_POST_EVALUATION_WINDOW_DAYS) is retained server-side solely as the
-post-evaluation filing gate (WritePostEval), not for arcus visibility.
+The arcus apps reach the backend over three server-to-server GET endpoints
+(shared secret ARCUS_SERVICE_TOKEN, not a Cognito JWT):
+- /api/v1/arcus/events: approved/finished submissions in the requested window.
+  Attendance uses window=attendance (event day); evaluation uses window=evaluation
+  (event day through ARCUS_POST_EVALUATION_WINDOW_DAYS, default 3, Asia/Manila).
+  X-Arcus-Organization-Id scopes the list; omitted means cross-organization.
+- /api/v1/arcus/students/{studentId}/events?window=evaluation: published in-window
+  events filtered by BatchGetItem of EVENT#{eventId}/MEMBER#{studentId}. Keys are
+  deduplicated and chunked at 100, with strongly consistent reads and up to five
+  attempts for unprocessed keys; exhaustion fails rather than omitting attendance.
+  No reverse GSI is required. Arcus asserts studentId from the verified claim.
+  As with /events, omitting window selects attendance.
+- /api/v1/arcus/events/{eventId}/post-eval: SUBMISSION# and POSTEVAL# prefix reads,
+  then live attendance/evaluation aggregation after the organization scope check.
+  Prefer an active POSTEVAL, otherwise the latest denied filing by submitted_at,
+  and resolve its linked submission. Orphans are ignored. With no filing, prefer
+  the newest approved/finished submission and return post_eval.status=none with
+  null ID/timestamps. Unknown event returns 404; wrong organization returns 403.
+  Arcus additionally enforces officer role and event window before forwarding.
+The former POST /api/v1/arcus/events/{event}/submissions/{submission}/finish route
+is RETIRED — only OSAAR post-evaluation approval sets a submission to finished.
 
 SUBMISSION
 PK: EVENT#uuid
@@ -232,7 +242,8 @@ participation_snapshot: {
 GSI1PK: ORGANIZATION#uuid
 GSI1SK: POSTEVAL#uuid   (org discovery, mirrors SUBMISSION)
 
-One POSTEVAL per event, filed by the org submitter while the event's 3-day
+One active POSTEVAL per event; denied filings remain as history when re-filed.
+Filed by the org submitter while the event's 3-day
 evaluation window is open. WritePostEval gates the write: the linked SUBMISSION
 must be approved/finished (422 otherwise), EventWindow::EVALUATION must still be
 open (422 "The post-evaluation window is closed for this event."), and no
@@ -254,8 +265,9 @@ denied post-eval, or denying an approved one, aborts 422.
 
 EVENT-partition children written by the arcus companion apps (SAME physical
 table, keyed by the apex event_id — apex never writes these, it only reads them
-via AggregateEventParticipants to build a POSTEVAL participation_snapshot; both
-are capturable only on the event day, window=attendance):
+via AggregateEventParticipants to build a POSTEVAL participation_snapshot and
+serve the live officer panel). Attendance is captured on the event day;
+participant evaluations use the evaluation window and require a check-in.
 
 ATTENDANCE CHECK-IN (arcus-attendance scanner)
 PK: EVENT#uuid
@@ -277,7 +289,7 @@ Membership is now apex-owned (see ORGANIZATION MEMBER above), so registration no
 longer writes them and scripts/migrate_member_to_student.py deletes the
 leftovers.
 
-PARTICIPANT EVALUATION (arcus-evaluation officer form)
+PARTICIPANT EVALUATION (arcus-evaluation authenticated student form)
 PK: EVENT#uuid
 SK: EVALUATION#{evaluationId}
 evaluationId: string
@@ -286,10 +298,29 @@ fullName: string
 participated: "yes" | "no"
 filedAt: timestamp
 eventId: string   (the apex event id, for attribution)
-arcus-evaluation also stores its own detail/list items; this EVENT-partition
-copy exists so apex can query per event with begins_with(SK,'EVALUATION#').
-apex reads these camelCase attributes (with snake_case fallbacks) and normalizes
-participated to a boolean in the snapshot.
+This slim EVENT-partition copy supports begins_with(SK,'EVALUATION#'). Apex reads
+camelCase attributes (with snake_case fallbacks) and converts participated to a
+boolean explicitly ("no" is false).
+
+FULL EVALUATION RESPONSE (arcus-owned; schemaVersion 2)
+Detail: PK = SK = EVALUATION#{evaluationId}
+List: PK = EVALUATION, SK = {filedAt}#{evaluationId}
+Both store evaluationId, studentId, fullName, programYear, organizationName,
+department, recentActivity, dateParticipated, participated, filedAt, eventId,
+eventTitle, schemaVersion: 2, ratings: map of criterion ID -> number (1-5),
+discoverySources: map of source -> boolean, comments: string, othersSpecify: string.
+All 23 ratings are required for participated=yes; the nonparticipating form can
+omit ratings. Detail, list, and slim event child are written atomically through
+TransactWriteItems with attribute_not_exists(PK) on each Put.
+New records have no S3 bucket/key; the unchanged FM-SA-05-01 template is filled
+in the browser for preview/download and officer export. Legacy metadata remains
+visible but cannot regenerate PDFs without the original responses; old S3
+objects are not migrated or deleted.
+Officer export queries only the authorized EVENT partition, then BatchGetItem
+reads EVALUATION detail records in chunks of 100 with bounded retries. Responses
+are sorted newest-first and the UI returns at most 100 filtered records.
+Student identity is session-derived from Cognito custom:student_id; the server
+resolves the profile and rechecks in-window attendance before accepting a filing.
 
 NOTIFICATION
 PK: SUBMISSION#uuid
