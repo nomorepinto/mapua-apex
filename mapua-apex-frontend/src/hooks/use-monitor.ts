@@ -263,19 +263,32 @@ function normalizeActivityItem(item: any): ActivityNotification {
 
   let notifType: NotificationType = "submitted";
   const actionUpper = String(item.actionType ?? item.notif_type ?? item.action ?? "").toUpperCase();
+  // Non-submission CRUD (Organization / Signatory / Announcement)
+  const isSubmissionAction = actionUpper.includes("SUBMISSION");
   if (actionUpper.includes("DENY") || actionUpper.includes("DENIED")) {
     notifType = "denied";
   } else if (actionUpper.includes("RETURN") || actionUpper.includes("REVISION")) {
     notifType = "returned";
   } else if (actionUpper.includes("APPROVE") || actionUpper.includes("FULLY") || actionUpper.includes("FINAL")) {
     notifType = "approved";
+  } else if (!isSubmissionAction && (actionUpper === "DELETE" || actionUpper.endsWith("_DELETE"))) {
+    notifType = "deleted";
+  } else if (!isSubmissionAction && (actionUpper === "UPDATE" || actionUpper.endsWith("_UPDATE"))) {
+    notifType = "updated";
+  } else if (!isSubmissionAction && (actionUpper === "CREATE" || actionUpper.endsWith("_CREATE"))) {
+    notifType = "created";
   } else if (actionUpper.includes("CREATE") || actionUpper.includes("SUBMIT") || actionUpper.includes("STORE")) {
     notifType = "submitted";
   } else {
     notifType = (item.notif_type || item.actionType || "submitted") as any;
   }
 
-  const rawSubId = item.submission_id ?? item.submissionId ?? item.entityId ?? item.activityId ?? "SAAF-072A122A";
+  // For non-submission CRUD actions there is no event/proposal ID.
+  // Only look for a real submission_id when the action is submission-related.
+  const isAdminCrud = notifType === "created" || notifType === "updated" || notifType === "deleted";
+  const rawSubId = isAdminCrud
+    ? (item.submission_id ?? item.submissionId ?? null) // only accept explicit submission_id; don't fall back to entityId
+    : (item.submission_id ?? item.submissionId ?? item.entityId ?? item.activityId ?? null);
   const rawActId = item.activity_id ?? item.activityId ?? item.PK ?? item.id;
   const sentAt = item.sent_at ?? item.timestamp ?? item.created_at ?? new Date().toISOString();
 
@@ -295,9 +308,12 @@ function normalizeActivityItem(item: any): ActivityNotification {
     item.entityName ??
     `${item.userName || "User"} performed ${item.actionType || "action"}`;
 
+  // Resolve the formatted event ID, or "N/A" when there is no real submission.
+  const resolvedSubmissionId = rawSubId ? formatEventId(rawSubId) : "N/A";
+
   return {
-    activity_id: formatActivityId(rawActId, rawSubId + sentAt),
-    submission_id: formatEventId(rawSubId),
+    activity_id: formatActivityId(rawActId, (rawSubId ?? sentAt) + sentAt),
+    submission_id: resolvedSubmissionId,
     sent_at: sentAt,
     signatory: item.signatory ?? item.userName ?? item.user_name ?? item.userRole ?? item.userId ?? "System",
     notif_type: notifType,

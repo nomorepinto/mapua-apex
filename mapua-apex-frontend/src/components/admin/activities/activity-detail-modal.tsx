@@ -3,7 +3,6 @@ import type { ActivityNotification } from "@/types/logs";
 import { formatManila } from "@/lib/monitor-formatters";
 import {
   formatActivityId,
-  formatEventId,
   resolveUserDisplayName,
   resolveUserGroup,
 } from "@/hooks/use-monitor";
@@ -51,9 +50,13 @@ export function ActivityDetailModal({ notification, onClose }: ActivityDetailMod
                 </div>
                 <div>
                   <span className="text-neutral-400 block font-medium">EVENT ID</span>
-                  <span className="font-mono font-bold text-[#8B0000] text-xs">
-                    {formatEventId(notification.submission_id)}
-                  </span>
+                  {notification.submission_id && notification.submission_id !== "N/A" ? (
+                    <span className="font-mono font-bold text-[#8B0000] text-xs">
+                      {notification.submission_id}
+                    </span>
+                  ) : (
+                    <span className="font-mono text-neutral-400 text-xs italic">— No linked event</span>
+                  )}
                 </div>
                 <div>
                   <span className="text-neutral-400 block font-medium">USER</span>
