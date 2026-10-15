@@ -63,6 +63,7 @@ interface SignatoriesState {
   departmentItems: DepartmentOption[]
   editDepartmentItems: DepartmentOption[]
   takenRoles: ReturnType<typeof takenSingletonRoles>
+  canAddSignatory: boolean
   createPending: boolean
   bulkPending: boolean
   updatePending: boolean
@@ -237,8 +238,23 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
 
   async function handleAddOne(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!name.trim() || !role) {
+    const trimmed = name.trim()
+    if (!trimmed || !role) {
       setFormError("Name and role are required.")
+      return
+    }
+    if (name.startsWith(".")) {
+      setFormError("You cannot start with a special character .")
+      return
+    }
+    if (trimmed.length < 3 || trimmed.length > 30) {
+      setFormError("The required minimum character is 3 and a maximum of 30")
+      return
+    }
+    if (/[^\p{L}\s.]|\d/u.test(trimmed)) {
+      setFormError(
+        "Signatory name can only contain letters, spaces, and non-initial periods."
+      )
       return
     }
     if (takenRoles.has(role)) {
@@ -410,6 +426,12 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       departmentItems,
       editDepartmentItems,
       takenRoles,
+      canAddSignatory:
+        name.trim().length >= 3 &&
+        name.trim().length <= 30 &&
+        !/^[.]|[^\p{L}\s.]|\d/u.test(name.trim()) &&
+        role !== null &&
+        !takenRoles.has(role),
       createPending: createSignatory.isPending,
       bulkPending: bulkCreate.isPending,
       updatePending: updateSignatory.isPending,

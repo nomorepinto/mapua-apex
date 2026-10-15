@@ -292,6 +292,14 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       setFormError("Organization name is required.")
       return
     }
+    if (trimmed.length < 5 || trimmed.length > 100) {
+      setFormError("The required minimum character is 5 and a maximum of 100")
+      return
+    }
+    if (/[0-9]/.test(trimmed)) {
+      setFormError("Organization name cannot contain numbers.")
+      return
+    }
     if (existingNames.has(trimmed.toLowerCase())) {
       setFormError("That organization is already registered.")
       return
@@ -484,7 +492,14 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       missingShared,
       sharedAccountsReady,
       missingAssignable,
-      canAddOrganization: sharedAccountsReady && missingAssignable.length === 0,
+      canAddOrganization:
+        sharedAccountsReady &&
+        missingAssignable.length === 0 &&
+        name.trim().length >= 5 &&
+        name.trim().length <= 100 &&
+        !/[0-9]/.test(name) &&
+        Boolean(desks.adviser) &&
+        (isHigherCouncil || Boolean(desks.dean)),
       sharedAdminName: sharedAdmin?.name ?? "—",
       sharedCdmName: sharedCdm?.name ?? "—",
       sharedOsaarName: sharedOsaar?.name ?? "—",

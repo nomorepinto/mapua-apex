@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from "react"
 import { DownloadIcon, PlusIcon } from "lucide-react"
 import { CircleAlertIcon } from "lucide-react"
 
@@ -22,12 +23,23 @@ import {
   CardPanel,
   CardTitle,
 } from "@/components/ui/card"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Form } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { layout } from "@/config"
 import { downloadCsvTemplate } from "@/lib/parse-csv"
+
+/** Prevents typing 0-9 in letters-only fields */
+function blockDigitKeys(e: KeyboardEvent<HTMLInputElement>) {
+  if (/^[0-9]$/.test(e.key)) {
+    e.preventDefault()
+  }
+}
+
+function stripDigits(value: string): string {
+  return value.replace(/[0-9]/g, "")
+}
 
 export function AddOrganizationCard() {
   return (
@@ -42,6 +54,36 @@ export function AddOrganizationCard() {
 function AddOrganizationForm() {
   const { state, actions } = useOrganizationsPage()
 
+  const nameTrimmed = state.name.trim()
+  const hasNumbers = /[0-9]/.test(state.name)
+  const isLengthInvalid =
+    state.name.length > 0 &&
+    (nameTrimmed.length < 5 || nameTrimmed.length > 100)
+
+  const nameError =
+    (state.formError &&
+      (state.formError.toLowerCase().includes("name") ||
+        state.formError.includes("character"))
+      ? state.formError
+      : null) ??
+    (isLengthInvalid
+      ? "The required minimum character is 5 and a maximum of 100"
+      : null)
+
+  const isNameValid =
+    nameTrimmed.length >= 5 &&
+    nameTrimmed.length <= 100 &&
+    !hasNumbers
+
+  const areDesksValid =
+    Boolean(state.desks.adviser) &&
+    (state.isHigherCouncil || Boolean(state.desks.dean))
+
+  const canAdd =
+    state.canAddOrganization &&
+    isNameValid &&
+    areDesksValid
+
   return (
     <>
       <CardHeader>
@@ -55,18 +97,25 @@ function AddOrganizationForm() {
           <Field>
             <FieldLabel htmlFor="organization-name">Name</FieldLabel>
             <Input
-              aria-invalid={state.formError ? true : undefined}
+              aria-invalid={nameError ? true : undefined}
               autoComplete="off"
               id="organization-name"
               name="name"
-              onChange={(event) => actions.changeName(event.currentTarget.value)}
+              minLength={5}
+              maxLength={100}
+              onKeyDown={blockDigitKeys}
+              onChange={(event) =>
+                actions.changeName(
+                  stripDigits(event.currentTarget.value).slice(0, 100)
+                )
+              }
               placeholder="Mapua Computing Society"
               required
               type="text"
               value={state.name}
             />
-            {state.formError && state.formError.includes("name") ? (
-              <FieldError>{state.formError}</FieldError>
+            {nameError ? (
+              <p className="text-xs font-medium text-red-600">{nameError}</p>
             ) : null}
           </Field>
 
@@ -107,10 +156,10 @@ function AddOrganizationForm() {
           ) : null}
 
           {state.sharedAccountsReady &&
-          state.missingAssignable.some(
-            (item) => !(item.value === "dean" && state.isHigherCouncil)
-          ) &&
-          !state.signatoriesLoading ? (
+            state.missingAssignable.some(
+              (item) => !(item.value === "dean" && state.isHigherCouncil)
+            ) &&
+            !state.signatoriesLoading ? (
             <Alert variant="warning">
               <AlertTitle>Dean and adviser required</AlertTitle>
               <AlertDescription>
@@ -123,7 +172,9 @@ function AddOrganizationForm() {
             </Alert>
           ) : null}
 
-          {state.formError && !state.formError.includes("name") ? (
+          {state.formError &&
+            !state.formError.toLowerCase().includes("name") &&
+            !state.formError.includes("character") ? (
             <Alert variant="error">
               <CircleAlertIcon />
               <AlertTitle>Missing fields</AlertTitle>
@@ -133,7 +184,7 @@ function AddOrganizationForm() {
         </CardPanel>
         <CardFooter className="justify-end">
           <Button
-            disabled={!state.canAddOrganization}
+            disabled={!canAdd}
             loading={state.createPending}
             type="submit"
           >
