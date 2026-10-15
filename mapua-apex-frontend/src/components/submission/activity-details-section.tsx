@@ -3,6 +3,7 @@ import { FieldWarning } from "@/components/forms/field-warning"
 import { EventTimeFields } from "@/components/submission/event-time-fields"
 import { ONLINE_VENUE } from "@/components/submission/constants"
 import { useStudentCampusesQuery } from "@/hooks/use-campuses"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import {
   clockFromDraft,
   combineEventTime,
@@ -72,6 +73,8 @@ export function ActivityDetailsSection({
 }) {
   const storedEventName = useOrgStore((state) => state.eventName)
   const displayTitle = values.activityTitle || storedEventName || ""
+  const descriptionGibberish = useGibberishField(values.activityDescription || "")
+  const objectivesGibberish = useGibberishField(values.activityObjectives || "")
 
   useEffect(() => {
     if (!values.activityTitle && displayTitle) {
@@ -191,13 +194,18 @@ export function ActivityDetailsSection({
             name="activityDescription"
             value={values.activityDescription}
             minLength={100}
-            onChange={(e) => onChange("activityDescription", e.target.value)}
+            onChange={(e) => {
+              descriptionGibberish.reset()
+              onChange("activityDescription", e.target.value)
+            }}
+            onBlur={descriptionGibberish.onBlur}
             placeholder="Provide a comprehensive summary of the activity (minimum 100 characters required)..."
             rows={4}
             style={{ color: "#171717" }}
             className="min-h-24 rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900 placeholder:text-neutral-400"
             required
           />
+          {descriptionGibberish.indicator}
           <FieldWarning name="activityDescription" />
         </div>
 
@@ -214,13 +222,18 @@ export function ActivityDetailsSection({
             name="activityObjectives"
             value={values.activityObjectives}
             minLength={50}
-            onChange={(e) => onChange("activityObjectives", e.target.value)}
+            onChange={(e) => {
+              objectivesGibberish.reset()
+              onChange("activityObjectives", e.target.value)
+            }}
+            onBlur={objectivesGibberish.onBlur}
             placeholder="State the primary targets and outcomes (minimum 50 characters required)..."
             rows={4}
             style={{ color: "#171717" }}
             className="min-h-24 rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900 placeholder:text-neutral-400"
             required
           />
+          {objectivesGibberish.indicator}
           <FieldWarning name="activityObjectives" />
         </div>
 

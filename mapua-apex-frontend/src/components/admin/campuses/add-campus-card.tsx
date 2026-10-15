@@ -18,6 +18,7 @@ import { Form } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { layout } from "@/config"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import { classroomExampleNames } from "@/lib/campus-classroom-format"
 import { downloadCsvTemplate } from "@/lib/parse-csv"
 
@@ -33,6 +34,7 @@ export function AddCampusCard() {
 
 function AddCampusForm() {
   const { state, actions } = useCampusesPage()
+  const nameGibberish = useGibberishField(state.name)
 
   return (
     <>
@@ -52,12 +54,17 @@ function AddCampusForm() {
               autoComplete="off"
               id="campus-name"
               name="name"
-              onChange={(event) => actions.changeName(event.currentTarget.value)}
+              onChange={(event) => {
+                nameGibberish.reset()
+                actions.changeName(event.currentTarget.value)
+              }}
+              onBlur={nameGibberish.onBlur}
               placeholder="Makati Campus"
               required
               type="text"
               value={state.name}
             />
+            {nameGibberish.indicator}
             {state.formError ? <FieldError>{state.formError}</FieldError> : null}
           </Field>
           <div className="flex flex-col gap-4 rounded-lg border border-dashed p-3">
@@ -109,7 +116,11 @@ function AddCampusForm() {
         </CardPanel>
         <CardFooter className="justify-end">
           <Button
-            disabled={!state.name.trim()}
+            disabled={
+              !state.name.trim() ||
+              nameGibberish.state === "gibberish" ||
+              nameGibberish.state === "checking"
+            }
             loading={state.createPending}
             type="submit"
           >

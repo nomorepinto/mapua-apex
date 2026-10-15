@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { layout } from "@/config"
+import { checkGibberish, useGibberishField } from "@/hooks/use-gibberish-check"
 import { cn } from "@/lib/utils"
 
 const FACILITY_ITEMS: { label: string; value: "yes" | "no" }[] = [
@@ -20,6 +21,7 @@ const FACILITY_ITEMS: { label: string; value: "yes" | "no" }[] = [
 
 export function EventSetupForm() {
   const { state, actions } = useSubmissionsStart()
+  const eventNameGibberish = useGibberishField(state.eventName)
 
   return (
     <div id="submission-start-form" className={cn(layout.stack, "w-full")}>
@@ -30,7 +32,16 @@ export function EventSetupForm() {
 
       <form
         noValidate
-        onSubmit={actions.submit}
+        onSubmit={async (event) => {
+          event.preventDefault()
+          // Submit-time pass so the gate holds even when the field was never
+          // blurred; shares the session cache with the on-blur check.
+          if ((await checkGibberish(state.eventName)) === "gibberish") {
+            eventNameGibberish.check(state.eventName)
+            return
+          }
+          actions.submit(event)
+        }}
         className={cn(layout.section, "space-y-6")}
       >
         <Field className="w-full">
@@ -45,11 +56,16 @@ export function EventSetupForm() {
             maxLength={60}
             type="text"
             value={state.eventName}
-            onChange={(event) => actions.changeEventName(event.target.value)}
+            onChange={(event) => {
+              eventNameGibberish.reset()
+              actions.changeEventName(event.target.value)
+            }}
+            onBlur={eventNameGibberish.onBlur}
             className={cn(
               Boolean(state.error) && "!border-red-500 focus-visible:!ring-red-500"
             )}
           />
+          {eventNameGibberish.indicator}
           {state.error ? (
             <p className="mt-1.5 text-sm font-normal text-red-600">
               {state.error}

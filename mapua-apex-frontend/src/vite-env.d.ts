@@ -13,6 +13,9 @@ interface ImportMetaEnv {
   readonly VITE_TIME_FORMAT?: string
   // Local-only: lifts the 10-day minimum event-date lead when "true".
   readonly VITE_ALLOW_ANY_EVENT_DATE?: string
+  // Turns the gibberish input check on/off ("true" to enable). Mirrors the
+  // backend GIBBERISH_CHECK_ENABLED flag; unset/false keeps the feature inert.
+  readonly VITE_GIBBERISH_CHECK_ENABLED?: string
 }
 
 interface ImportMeta {

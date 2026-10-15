@@ -24,6 +24,13 @@ import type {
 } from "@/components/submission/saaf-stepper"
 import type { SaafDraft } from "@/components/submission/types"
 import {
+  saafStepGibberishFields,
+} from "@/components/submission/gibberish-fields"
+import {
+  checkGibberishFields,
+  gibberishIssueLines,
+} from "@/hooks/use-gibberish-check"
+import {
   firstIncompleteWizardStep,
   getReservationStepIssues,
   getSaafStepIssues,
@@ -179,6 +186,19 @@ export function SaafProvider({ children }: { children: ReactNode }) {
         )
       )
     }
+    // Verdicts already fetched for this step's free text. Continue runs a check pass
+    // before it lets the proponent leave, so an offending field is always named here
+    // as well — the block and the list can never disagree.
+    issues.push(
+      ...gibberishIssueLines(
+        saafStepGibberishFields(
+          targetStep,
+          draft,
+          includeReservation,
+          reservationDraft
+        )
+      )
+    )
     // A browser-level rule (required / minLength / pattern) that no field
     // warning covers has no label to name, so say what happened instead.
     if (form.hasHtmlIssue && issues.length === 0) {
@@ -187,30 +207,60 @@ export function SaafProvider({ children }: { children: ReactNode }) {
     return issues
   }
 
-  const goToStep = (next: WizardStepIndex) => {
-    if (next === step) return
-    if (next > farthestStep) {
-      // Never skip past a page that still has open items: take the proponent
-      // there and reveal it instead of silently ignoring the click.
-      const blocker =
-        firstIncompleteWizardStep(draft, includeReservation, reservationDraft) ?? next
-      if (blocker !== step) setStep(blocker)
-      form.validateStep(blocker, formRef.current)
-      return
-    }
-    if (next > step && !form.validateStep(step, formRef.current)) return
-    if (next < step) form.setShowErrors(false)
-    setStep(next)
+  /**
+   * Stops the proponent leaving a step whose free text the detector called
+   * gibberish. Most of these inputs live in `.map()` loops — one card per room, per
+   * proponent, per budget line — where a per-field hook cannot run, so the step
+   * checks its whole group of values instead. That also covers a field the user never
+   * blurred, and the verdicts land in the shared cache the issue list reads above.
+   */
+  const blockOnGibberish = async (targetStep: WizardStepIndex): Promise<boolean> => {
+    const fields = saafStepGibberishFields(
+      targetStep,
+      draft,
+      includeReservation,
+      reservationDraft
+    )
+    if (fields.length === 0) return false
+    if ((await checkGibberishFields(fields)).length === 0) return false
+    // Reveal the page summary, which now names every offending field.
+    form.setShowErrors(true)
     window.scrollTo({ top: 0, behavior: "smooth" })
+    return true
+  }
+
+  const goToStep = (next: WizardStepIndex) => {
+    void (async () => {
+      if (next === step) return
+      if (next > farthestStep) {
+        // Never skip past a page that still has open items: take the proponent
+        // there and reveal it instead of silently ignoring the click.
+        const blocker =
+          firstIncompleteWizardStep(draft, includeReservation, reservationDraft) ?? next
+        if (blocker !== step) setStep(blocker)
+        form.validateStep(blocker, formRef.current)
+        return
+      }
+      if (next > step) {
+        if (!form.validateStep(step, formRef.current)) return
+        if (await blockOnGibberish(step)) return
+      }
+      if (next < step) form.setShowErrors(false)
+      setStep(next)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    })()
   }
 
   const goNext = () => {
-    if (!form.validateStep(step, formRef.current)) return
-    if (step >= finalStep) return
-    const next = (step + 1) as WizardStepIndex
-    setAdvancedStep((current) => (next > current ? next : current))
-    setStep(next)
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    void (async () => {
+      if (!form.validateStep(step, formRef.current)) return
+      if (step >= finalStep) return
+      if (await blockOnGibberish(step)) return
+      const next = (step + 1) as WizardStepIndex
+      setAdvancedStep((current) => (next > current ? next : current))
+      setStep(next)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    })()
   }
 
   const goBack = () => {

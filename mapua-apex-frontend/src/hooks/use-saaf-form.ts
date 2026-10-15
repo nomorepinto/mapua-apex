@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "reac
 import { useFetcher, useNavigation } from "react-router"
 
 import { checkEmailExistence } from "@/hooks/use-email-existence"
+import { checkGibberishFields } from "@/hooks/use-gibberish-check"
+import { saafAllGibberishFields } from "@/components/submission/gibberish-fields"
 import { useScrollToTop } from "@/hooks/use-scroll-to-top"
 import { useHydrateEditingSubmission } from "@/hooks/use-hydrate-editing-submission"
 import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
@@ -64,12 +66,16 @@ export function useSaafForm() {
   // Set when the pre-submit mailbox-existence pass finds a proponent email
   // with no mailbox; resets on the next submit attempt and on email edits.
   const [mailboxError, setMailboxError] = useState<string | null>(null)
+  // Set when the pre-submit gibberish pass flags a free-text field. Resets on
+  // each submit attempt; only a conclusive "gibberish" verdict blocks (the
+  // detector and its proxy fail open, so outages never lock the user out).
+  const [gibberishError, setGibberishError] = useState<string | null>(null)
   const submitError =
     fetcher.data && fetcher.data.success === false
       ? fetcher.data.message ||
         Object.values(fetcher.data.errors ?? {})[0] ||
         "Failed to submit application. Please try again."
-      : mailboxError
+      : mailboxError || gibberishError
 
   // Directly select draft from Zustand with fallback to default. Memoized so the
   // validation callbacks below keep their identity between unrelated renders.
@@ -382,6 +388,7 @@ export function useSaafForm() {
     async (e: MouseEvent, form: HTMLFormElement | null): Promise<boolean> => {
       e.preventDefault()
       setMailboxError(null)
+      setGibberishError(null)
       if (!validateForm(form)) return false
 
       // Every field rule passed, so the page's cards have had their blur
@@ -402,10 +409,32 @@ export function useSaafForm() {
         return false
       }
 
+      // Same fail-open pattern for the free text the user typed by hand: every
+      // in-scope field across every step, each offender named in the message so the
+      // proponent knows which box to fix. Loop-rendered fields (per room, per
+      // proponent, per budget line) are covered because this reads the drafts rather
+      // than per-field hook state. The session cache makes an already-checked field
+      // resolve instantly here.
+      const flagged = await checkGibberishFields(
+        saafAllGibberishFields(
+          draft,
+          includeReservation,
+          withReservationDefaults(useOrgStore.getState().reservationDraft)
+        )
+      )
+      if (flagged.length > 0) {
+        setGibberishError(
+          `These fields look like gibberish: ${flagged.join(
+            ", "
+          )}. Please revise them.`
+        )
+        return false
+      }
+
       setShowConfirmModal(true)
       return true
     },
-    [draft.proponents, validateForm]
+    [draft, includeReservation, validateForm]
   )
 
   const handleConfirmProceed = useCallback(

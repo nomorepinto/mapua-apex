@@ -21,6 +21,14 @@ import {
   postEvalStepHasUserInput,
 } from "@/components/posteval/validate"
 import { usePostEvalForm } from "@/hooks/use-posteval-form"
+import {
+  checkGibberishFields,
+  gibberishIssueLines,
+} from "@/hooks/use-gibberish-check"
+import {
+  postEvalAllGibberishFields,
+  postEvalStepGibberishFields,
+} from "@/components/submission/gibberish-fields"
 import { useOrgStore } from "@/stores/org-store"
 
 type PostEvalFormModel = ReturnType<typeof usePostEvalForm>
@@ -109,6 +117,9 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
   const { draft } = form
   const [requestedStep, setStep] = useState<PostEvalStepIndex>(0)
   const [advancedStep, setAdvancedStep] = useState<PostEvalStepIndex>(0)
+  // Submit-time gibberish verdict for the event summary, surfaced through the same
+  // channel as other submit errors (the summary lives on step 0, so we jump back).
+  const [gibberishError, setGibberishError] = useState<string | null>(null)
 
   const step = requestedStep
   const farthestStep = Math.min(
@@ -116,32 +127,61 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
     FINAL_STEP
   ) as PostEvalStepIndex
 
-  const unresolvedStepIssues = (targetStep: PostEvalStepIndex): string[] =>
-    getPostEvalStepIssues(targetStep, draft)
+  const unresolvedStepIssues = (targetStep: PostEvalStepIndex): string[] => [
+    ...getPostEvalStepIssues(targetStep, draft),
+    // Named by the same verdicts the Continue gate produced, so the block and the
+    // list can never disagree.
+    ...gibberishIssueLines(postEvalStepGibberishFields(targetStep, draft)),
+  ]
+
+  /**
+   * Stops the user leaving a step whose free text the detector called gibberish.
+   * Added expense lines are rendered in a `.map()` loop, so the step checks the whole
+   * group of values rather than per-field hook state (which cannot exist in a loop).
+   */
+  const blockOnGibberish = async (
+    targetStep: PostEvalStepIndex
+  ): Promise<boolean> => {
+    const fields = postEvalStepGibberishFields(targetStep, draft)
+    if (fields.length === 0) return false
+    if ((await checkGibberishFields(fields)).length === 0) return false
+    // Reveal the page summary, which names every offending field.
+    form.setShowErrors(true)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+    return true
+  }
 
   const goToStep = (next: PostEvalStepIndex) => {
-    if (next === step) return
-    if (next > farthestStep) {
-      // Never skip past a page that still has open items: land the submitter on
-      // the blocker and reveal it instead of silently ignoring the click.
-      const blocker = firstIncompletePostEvalStep(draft) ?? next
-      if (blocker !== step) setStep(blocker)
-      form.validateStep(blocker)
-      return
-    }
-    if (next > step && !form.validateStep(step)) return
-    if (next < step) form.setShowErrors(false)
-    setStep(next)
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    void (async () => {
+      if (next === step) return
+      if (next > farthestStep) {
+        // Never skip past a page that still has open items: land the submitter on
+        // the blocker and reveal it instead of silently ignoring the click.
+        const blocker = firstIncompletePostEvalStep(draft) ?? next
+        if (blocker !== step) setStep(blocker)
+        form.validateStep(blocker)
+        return
+      }
+      if (next > step) {
+        if (!form.validateStep(step)) return
+        if (await blockOnGibberish(step)) return
+      }
+      if (next < step) form.setShowErrors(false)
+      setStep(next)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    })()
   }
 
   const goNext = () => {
-    if (!form.validateStep(step)) return
-    if (step >= FINAL_STEP) return
-    const next = (step + 1) as PostEvalStepIndex
-    setAdvancedStep((current) => (next > current ? next : current))
-    setStep(next)
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    void (async () => {
+      if (!form.validateStep(step)) return
+      if (step >= FINAL_STEP) return
+      if (await blockOnGibberish(step)) return
+      const next = (step + 1) as PostEvalStepIndex
+      setAdvancedStep((current) => (next > current ? next : current))
+      setStep(next)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    })()
   }
 
   const goBack = () => {
@@ -178,7 +218,7 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
       finalStep: FINAL_STEP,
       showErrors: form.showErrors,
       stepIssues: form.showErrors ? unresolvedStepIssues(step) : [],
-      submitError: form.submitError,
+      submitError: form.submitError || gibberishError,
       isSubmitting: form.isSubmitting,
       submissionLoading: form.submissionLoading,
       showConfirmClearModal: form.showConfirmClearModal,
@@ -205,13 +245,29 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
       confirmClear,
       closeConfirm: () => form.setShowConfirmModal(false),
       initiateSubmit: (event) => {
-        if (form.handleInitiateSubmit(event)) return
-        // Submit checks every page, so a rejection is usually about another
-        // page. Move there and reveal it rather than listing other pages' fields.
-        const blocker = firstIncompletePostEvalStep(draft)
-        if (blocker === null || blocker === step) return
-        setStep(blocker)
-        form.validateStep(blocker)
+        void (async () => {
+          const flagged = await checkGibberishFields(
+            postEvalAllGibberishFields(draft)
+          )
+          if (flagged.length > 0) {
+            // Stay on the review step: the submit-error alert only renders there,
+            // so the message is guaranteed visible instead of being navigated away.
+            setGibberishError(
+              `These fields look like gibberish: ${flagged.join(
+                ", "
+              )}. Please revise them before submitting.`
+            )
+            return
+          }
+          setGibberishError(null)
+          if (form.handleInitiateSubmit(event)) return
+          // Submit checks every page, so a rejection is usually about another
+          // page. Move there and reveal it rather than listing other pages' fields.
+          const blocker = firstIncompletePostEvalStep(draft)
+          if (blocker === null || blocker === step) return
+          setStep(blocker)
+          form.validateStep(blocker)
+        })()
       },
       confirmProceed: () => form.handleConfirmProceed(formRef.current),
       dismissSuccess: () => {

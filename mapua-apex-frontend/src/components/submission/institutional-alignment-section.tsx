@@ -2,6 +2,7 @@ import { FieldWarning } from "@/components/forms/field-warning"
 import { MISSION_STATEMENTS } from "@/components/submission/constants"
 import type { SaafDraft } from "@/components/submission/types"
 import { Textarea } from "@/components/ui/textarea"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import { cn } from "@/lib/utils"
 
 type AlignmentFields = Pick<
@@ -27,6 +28,10 @@ export function InstitutionalAlignmentSection({
   const coreValuesLen = (values.coreValuesExplanation || "").length
   const peoLen = (values.peoExplanation || "").length
   const sdgLen = (values.sdgExplanation || "").length
+
+  const coreValuesGibberish = useGibberishField(values.coreValuesExplanation || "")
+  const peoGibberish = useGibberishField(values.peoExplanation || "")
+  const sdgGibberish = useGibberishField(values.sdgExplanation || "")
 
   return (
     <div className="space-y-6 pt-4">
@@ -97,13 +102,18 @@ export function InstitutionalAlignmentSection({
             name="coreValuesExplanation"
             value={values.coreValuesExplanation}
             minLength={30}
-            onChange={(e) => onChange("coreValuesExplanation", e.target.value)}
+            onChange={(e) => {
+              coreValuesGibberish.reset()
+              onChange("coreValuesExplanation", e.target.value)
+            }}
+            onBlur={coreValuesGibberish.onBlur}
             placeholder="Discuss how the activity fosters these core values (minimum 30 characters required)..."
             rows={4}
             style={{ color: "#171717" }}
             className="mt-1 rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900 placeholder:text-neutral-400"
             required
           />
+          {coreValuesGibberish.indicator}
           <FieldWarning name="coreValuesExplanation" />
         </div>
 
@@ -126,12 +136,17 @@ export function InstitutionalAlignmentSection({
             name="peoExplanation"
             value={values.peoExplanation}
             minLength={30}
-            onChange={(e) => onChange("peoExplanation", e.target.value)}
+            onChange={(e) => {
+              peoGibberish.reset()
+              onChange("peoExplanation", e.target.value)
+            }}
+            onBlur={peoGibberish.onBlur}
             placeholder="Indicate which academic objectives are satisfied, if this applies."
             rows={4}
             style={{ color: "#171717" }}
             className="mt-1 rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900 placeholder:text-neutral-400"
           />
+          {peoGibberish.indicator}
           <FieldWarning name="peoExplanation" />
         </div>
 
@@ -153,13 +168,18 @@ export function InstitutionalAlignmentSection({
             name="sdgExplanation"
             value={values.sdgExplanation}
             minLength={30}
-            onChange={(e) => onChange("sdgExplanation", e.target.value)}
+            onChange={(e) => {
+              sdgGibberish.reset()
+              onChange("sdgExplanation", e.target.value)
+            }}
+            onBlur={sdgGibberish.onBlur}
             placeholder="Specify targeted SDGs and your audit methodology (minimum 30 characters required)..."
             rows={4}
             style={{ color: "#171717" }}
             className="mt-1 rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900 placeholder:text-neutral-400"
             required
           />
+          {sdgGibberish.indicator}
           <FieldWarning name="sdgExplanation" />
         </div>
       </div>

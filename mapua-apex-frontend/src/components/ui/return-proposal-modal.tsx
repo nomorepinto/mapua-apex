@@ -13,6 +13,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import { layout, modal } from "@/config"
 import { cn } from "@/lib/utils"
 import type { Activity } from "./activity.types"
@@ -64,8 +65,13 @@ const ReturnProposalModal = memo(function ReturnProposalModal({
   onSubmit,
 }: ReturnProposalModalProps) {
   const [reason, setReason] = useState("")
+  const reasonGibberish = useGibberishField(reason)
   const copy = COPY[variant]
-  const canSubmit = reason.trim().length > 0 && !isSubmitting
+  const canSubmit =
+    reason.trim().length > 0 &&
+    reasonGibberish.state !== "gibberish" &&
+    reasonGibberish.state !== "checking" &&
+    !isSubmitting
 
   useEffect(() => {
     if (!open) setReason("")
@@ -124,13 +130,18 @@ const ReturnProposalModal = memo(function ReturnProposalModal({
                 id="review-reason"
                 placeholder={copy.placeholder}
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={(e) => {
+                  reasonGibberish.reset()
+                  setReason(e.target.value)
+                }}
+                onBlur={reasonGibberish.onBlur}
                 required
                 maxLength={5000}
                 rows={5}
                 disabled={isSubmitting}
                 className="w-full resize-none text-sm"
               />
+              {reasonGibberish.indicator}
             </div>
             {error ? (
               <p className="text-sm font-semibold text-rose-600">{error}</p>

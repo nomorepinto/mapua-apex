@@ -21,10 +21,12 @@ import {
 import { Form } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { modal } from "@/config"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import { classroomExampleNames } from "@/lib/campus-classroom-format"
 
 export function EditCampusDialog() {
   const { state, actions } = useCampusesPage()
+  const nameGibberish = useGibberishField(state.editName)
 
   return (
     <Dialog
@@ -56,13 +58,16 @@ export function EditCampusDialog() {
               <Input
                 autoComplete="off"
                 id="edit-campus-name"
-                onChange={(event) =>
+                onChange={(event) => {
+                  nameGibberish.reset()
                   actions.changeEditName(event.currentTarget.value)
-                }
+                }}
+                onBlur={nameGibberish.onBlur}
                 required
                 type="text"
                 value={state.editName}
               />
+              {nameGibberish.indicator}
             </Field>
             <div className="flex flex-col gap-4 rounded-lg border border-dashed p-3">
               <p className="text-sm font-medium">Classroom name format</p>
@@ -136,7 +141,14 @@ export function EditCampusDialog() {
             <DialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
             </DialogClose>
-            <Button loading={state.updatePending} type="submit">
+            <Button
+              disabled={
+                nameGibberish.state === "gibberish" ||
+                nameGibberish.state === "checking"
+              }
+              loading={state.updatePending}
+              type="submit"
+            >
               Save changes
             </Button>
           </DialogFooter>

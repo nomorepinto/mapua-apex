@@ -40,6 +40,7 @@ import { layout } from "@/config"
 import { mutationErrorMessage, useOrganizationsQuery } from "@/hooks/use-admin"
 import { useAdminAvailabilityQuery } from "@/hooks/use-availability"
 import { useReservableBookingsQuery } from "@/hooks/use-bookings"
+import { checkGibberish, useGibberishField } from "@/hooks/use-gibberish-check"
 import {
   formatDisplayDate,
   getDateKey,
@@ -66,6 +67,7 @@ export function ReserveSection() {
   )
   const [selectedSlots, setSelectedSlots] = useState<number[]>([])
   const [reason, setReason] = useState("")
+  const reasonGibberish = useGibberishField(reason)
 
   // Fetch availability across the whole reservable window (today → ~6 months)
   // so the date picker's calendar can paint per-date availability dots, while
@@ -130,6 +132,14 @@ export function ReserveSection() {
 
   async function handleReserve() {
     if (!campusId || !selectedReservableId || !reserveDate || selectedSlots.length === 0) {
+      return
+    }
+    if ((await checkGibberish(reason.trim())) === "gibberish") {
+      toastManager.add({
+        title: "This text looks like gibberish",
+        description: "Please revise the reservation purpose before reserving.",
+        type: "error",
+      })
       return
     }
     try {
@@ -234,11 +244,16 @@ export function ReserveSection() {
               autoComplete="off"
               id="reserve-reason"
               maxLength={255}
-              onChange={(event) => setReason(event.currentTarget.value)}
+              onChange={(event) => {
+                reasonGibberish.reset()
+                setReason(event.currentTarget.value)
+              }}
+              onBlur={reasonGibberish.onBlur}
               placeholder="Maintenance, exam proctoring, …"
               type="text"
               value={reason}
             />
+            {reasonGibberish.indicator}
             <FieldDescription>Shown to CDM only; not part of any paper.</FieldDescription>
           </Field>
           <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm">

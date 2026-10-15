@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Arcus\EventController;
 use App\Http\Controllers\Api\V1\Osaar\PostEvalController as OsaarPostEvalController;
 use App\Http\Controllers\Api\V1\Public\AnnouncementController as PublicAnnouncementController;
 use App\Http\Controllers\Api\V1\Public\EmailValidationController as PublicEmailValidationController;
+use App\Http\Controllers\Api\V1\Public\GibberishDetectionController as PublicGibberishDetectionController;
 use App\Http\Controllers\Api\V1\SessionController;
 use App\Http\Controllers\Api\V1\Signatory\NotificationController as SignatoryNotificationController;
 use App\Http\Controllers\Api\V1\Signatory\ProfileController as SignatoryProfileController;
@@ -38,6 +39,7 @@ Route::middleware(['throttle:student'])->group(function (): void {
 Route::middleware(['throttle:student'])->prefix('public')->name('public.')->group(function (): void {
     Route::get('announcements', [PublicAnnouncementController::class, 'index'])->name('announcements.index');
     Route::get('validate-email', [PublicEmailValidationController::class, 'show'])->name('validate-email.show');
+    Route::post('detect-gibberish', [PublicGibberishDetectionController::class, 'detect'])->name('detect-gibberish.detect');
 });
 
 // Session lifecycle endpoints (open to any authenticated user role)

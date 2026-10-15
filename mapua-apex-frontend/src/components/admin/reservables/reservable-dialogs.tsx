@@ -32,6 +32,7 @@ import { Field, FieldLabel } from "@/components/ui/field"
 import { Form } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { modal } from "@/config"
+import { checkGibberish, useGibberishField } from "@/hooks/use-gibberish-check"
 import {
   countAvailableSlots,
   normalizeSchedule,
@@ -81,6 +82,7 @@ export function EditReservableDialog({
   // with a fresh `key` when a different reservable is opened, so no prop-sync
   // effect (and its cascading render) is needed.
   const [name, setName] = useState(reservable.name)
+  const nameGibberish = useGibberishField(name)
   const [type, setType] = useState<ReservableType>(reservable.type)
   const [schedule, setSchedule] = useState<ReservableSchedule>(() =>
     normalizeSchedule(reservable.schedule)
@@ -103,6 +105,10 @@ export function EditReservableDialog({
     const trimmed = name.trim()
     if (!trimmed) {
       setLocalError("Reservable name is required.")
+      return
+    }
+    if ((await checkGibberish(trimmed)) === "gibberish") {
+      setLocalError("This text looks like gibberish. Please revise it.")
       return
     }
     const duplicate = reservables.some(
@@ -167,13 +173,16 @@ export function EditReservableDialog({
                   autoComplete="off"
                   id="edit-reservable-name"
                   onChange={(event) => {
+                    nameGibberish.reset()
                     setName(event.currentTarget.value)
                     if (localError) setLocalError("")
                   }}
+                  onBlur={nameGibberish.onBlur}
                   required
                   type="text"
                   value={name}
                 />
+                {nameGibberish.indicator}
               </Field>
               <ReservableTypeField
                 id="edit-reservable-type"

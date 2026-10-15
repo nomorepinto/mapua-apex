@@ -15,6 +15,7 @@ import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DatePicker } from "@/components/ui/date-picker"
+import { GibberishValueHint } from "@/components/ui/gibberish-indicator"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -24,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { checkGibberish, isFlaggedGibberish } from "@/hooks/use-gibberish-check"
 import { useStudentRoomsAvailabilityQuery } from "@/hooks/use-availability"
 import { useStudentCampusesQuery } from "@/hooks/use-campuses"
 import { useStudentReservablesQuery } from "@/hooks/use-reservables"
@@ -696,6 +698,9 @@ export function ReservationFields() {
                     const cap = capacityRangeLabel(bounds)
                     const purposeLen = (room.remarks || "").trim().length
                     const isPurposeShort = purposeLen > 0 && purposeLen < 20
+                    // Loop-rendered field, so this reads the shared verdict cache
+                    // rather than owning hook state.
+                    const isPurposeGibberish = isFlaggedGibberish(room.remarks || "")
 
                     return (
                       <div
@@ -758,13 +763,16 @@ export function ReservationFields() {
                             onChange={(e) =>
                               actions.handleUpdateRemarks(room.id, e.target.value.slice(0, 150))
                             }
+                            onBlur={() => void checkGibberish(room.remarks || "")}
                             placeholder="State purpose of reservation (minimum 20 characters)..."
                             required
                             style={{ color: "#171717" }}
                             className={cn(
                               "w-full resize-y rounded-lg border border-neutral-300 bg-white p-2.5 text-xs leading-relaxed !text-neutral-900 placeholder:text-neutral-400 shadow-xs",
                               "focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900",
-                              isPurposeShort && "border-amber-500 focus:border-amber-500 focus:ring-amber-500"
+                              isPurposeShort && "border-amber-500 focus:border-amber-500 focus:ring-amber-500",
+                              isPurposeGibberish &&
+                                "!border-red-500 focus:!border-red-500 focus:!ring-red-500"
                             )}
                           />
                           {isPurposeShort && (
@@ -772,6 +780,7 @@ export function ReservationFields() {
                               Must be at least 20 characters ({20 - purposeLen} more needed).
                             </p>
                           )}
+                          <GibberishValueHint value={room.remarks || ""} />
                         </div>
                       </div>
                     )
@@ -1249,11 +1258,14 @@ function EquipmentSelector({
                         maxLength={50}
                         value={currentRemark}
                         onChange={(e) => onUpdateRemarks(item.id, e.target.value.slice(0, 50))}
+                        onBlur={() => void checkGibberish(currentRemark)}
                         placeholder="Remark / Purpose (min 5, max 50 chars)..."
                         className={cn(
                           "h-8 text-xs bg-white rounded-md border-neutral-300",
                           currentRemark.trim().length < 5 &&
-                            "border-amber-400 focus-visible:ring-amber-400"
+                            "border-amber-400 focus-visible:ring-amber-400",
+                          isFlaggedGibberish(currentRemark) &&
+                            "!border-red-500 focus-visible:!ring-red-500"
                         )}
                       />
                       {currentRemark.trim().length < 5 && (
@@ -1261,6 +1273,7 @@ function EquipmentSelector({
                           Must be at least 5 characters ({5 - currentRemark.trim().length} more needed).
                         </p>
                       )}
+                      <GibberishValueHint value={currentRemark} />
                     </div>
                   </div>
                 )

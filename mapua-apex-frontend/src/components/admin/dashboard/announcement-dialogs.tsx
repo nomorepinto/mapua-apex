@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/field"
 import { Form } from "@/components/ui/form"
 import { Textarea } from "@/components/ui/textarea"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import { ActivityBudgetTable } from "@/components/ui/activity-budget-table"
 import { ActivityReservationDetails } from "@/components/ui/activity-reservation-details"
 import { saveActivityAsPdf } from "@/lib/save-proposal-pdf"
@@ -464,6 +465,7 @@ export function SubmissionDetailDialog() {
 
 export function CreateAnnouncementDialog() {
   const { state, actions } = useAdminDashboard()
+  const contentGibberish = useGibberishField(state.createContent)
 
   return (
     <Dialog open={state.createOpen} onOpenChange={actions.setCreateOpen}>
@@ -482,13 +484,16 @@ export function CreateAnnouncementDialog() {
                 aria-invalid={state.createError ? true : undefined}
                 id="announcement-content"
                 maxLength={ANNOUNCEMENT_MAX}
-                onChange={(event) =>
+                onChange={(event) => {
+                  contentGibberish.reset()
                   actions.setCreateContent(event.currentTarget.value)
-                }
+                }}
+                onBlur={contentGibberish.onBlur}
                 required
                 rows={6}
                 value={state.createContent}
               />
+              {contentGibberish.indicator}
               <FieldDescription>
                 {state.createContent.length}/{ANNOUNCEMENT_MAX}
               </FieldDescription>
@@ -499,7 +504,14 @@ export function CreateAnnouncementDialog() {
             <DialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
             </DialogClose>
-            <Button loading={state.createPending} type="submit">
+            <Button
+              disabled={
+                contentGibberish.state === "gibberish" ||
+                contentGibberish.state === "checking"
+              }
+              loading={state.createPending}
+              type="submit"
+            >
               Post announcement
             </Button>
           </DialogFooter>
@@ -511,6 +523,7 @@ export function CreateAnnouncementDialog() {
 
 export function EditAnnouncementDialog() {
   const { state, actions } = useAdminDashboard()
+  const contentGibberish = useGibberishField(state.editContent)
 
   return (
     <Dialog
@@ -536,13 +549,16 @@ export function EditAnnouncementDialog() {
                 aria-invalid={state.editError ? true : undefined}
                 id="edit-announcement-content"
                 maxLength={ANNOUNCEMENT_MAX}
-                onChange={(event) =>
+                onChange={(event) => {
+                  contentGibberish.reset()
                   actions.setEditContent(event.currentTarget.value)
-                }
+                }}
+                onBlur={contentGibberish.onBlur}
                 required
                 rows={6}
                 value={state.editContent}
               />
+              {contentGibberish.indicator}
               <FieldDescription>
                 {state.editContent.length}/{ANNOUNCEMENT_MAX}
               </FieldDescription>
@@ -567,7 +583,14 @@ export function EditAnnouncementDialog() {
             <DialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
             </DialogClose>
-            <Button loading={state.editPending} type="submit">
+            <Button
+              disabled={
+                contentGibberish.state === "gibberish" ||
+                contentGibberish.state === "checking"
+              }
+              loading={state.editPending}
+              type="submit"
+            >
               Save changes
             </Button>
           </DialogFooter>

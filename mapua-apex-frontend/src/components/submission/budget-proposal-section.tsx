@@ -3,6 +3,7 @@ import { PlusIcon, Trash2Icon, XIcon } from "lucide-react"
 
 import { BUDGET_OPTIONS, QUANTITY_MAX_MAP, UNIT_MAP } from "@/components/submission/budget-options"
 import type { BudgetItem } from "@/components/submission/types"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import {
   blockNonDecimalKeys,
   blockNonIntegerKeys,
@@ -43,6 +44,10 @@ const BudgetRow = memo(function BudgetRow({
   const maxQty = QUANTITY_MAX_MAP[item.item] || 3
   // Check if this item has a fixed unit
   const fixedUnit = !isOthersItem ? UNIT_MAP[item.item] : undefined
+  // "Others" turns both the item and the unit into hand-typed text, so each gets
+  // its own blur check. The row is a component, so the per-field hook is available.
+  const itemGibberish = useGibberishField(item.item)
+  const unitGibberish = useGibberishField(item.unit)
 
   return (
     <tr className="hover:bg-neutral-50/60">
@@ -56,8 +61,15 @@ const BudgetRow = memo(function BudgetRow({
               maxLength={25}
               placeholder="Enter custom item..."
               style={{ color: "#171717" }}
-              onChange={(e) => onUpdate(item.id, "item", e.target.value)}
-              className="w-full rounded border border-transparent bg-transparent pl-3 pr-8 py-1 text-center text-sm !text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-300 focus:bg-white focus:outline-none"
+              onChange={(e) => {
+                itemGibberish.reset()
+                onUpdate(item.id, "item", e.target.value)
+              }}
+              onBlur={itemGibberish.onBlur}
+              className={cn(
+                "w-full rounded border border-transparent bg-transparent pl-3 pr-8 py-1 text-center text-sm !text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-300 focus:bg-white focus:outline-none",
+                itemGibberish.state === "gibberish" && "!border-red-500 focus:!border-red-500"
+              )}
             />
             <button
               type="button"
@@ -120,10 +132,15 @@ const BudgetRow = memo(function BudgetRow({
             placeholder="Unit"
             onChange={(e) => {
               const cleaned = e.target.value.replace(/[0-9]/g, "").slice(0, 10)
+              unitGibberish.reset()
               onUpdate(item.id, "unit", cleaned)
             }}
+            onBlur={unitGibberish.onBlur}
             style={{ color: "#171717" }}
-            className="w-full rounded border border-transparent bg-transparent py-1 text-center text-sm !text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-300 focus:bg-white focus:outline-none"
+            className={cn(
+              "w-full rounded border border-transparent bg-transparent py-1 text-center text-sm !text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-300 focus:bg-white focus:outline-none",
+              unitGibberish.state === "gibberish" && "!border-red-500 focus:!border-red-500"
+            )}
           />
         ) : (
           /* Standard items: show auto-filled unit as read-only text */

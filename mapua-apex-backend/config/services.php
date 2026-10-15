@@ -58,6 +58,25 @@ return [
         'api_key' => env('EMAILDETECTIVE_API_KEY', ''),
     ],
 
+    /*
+    | Gibberish detector. Proxied by POST /public/detect-gibberish so the key never
+    | reaches the browser. Gated by GIBBERISH_CHECK_ENABLED (default off): when the
+    | flag is false the endpoint short-circuits to is_gibberish=false and blocks no
+    | user, so the feature can be switched on for showcases without a code change.
+    |
+    | Verdicts are cached per exact string. GIBBERISH_DETECTOR_VERSION is part of the
+    | cache key: bump it whenever the detector's own thresholds are retuned and every
+    | verdict cached under the old tuning is dropped at once, instead of lingering
+    | until the TTL expires. GIBBERISH_CACHE_TTL is that window, in seconds.
+    */
+    'gibberish' => [
+        'enabled' => filter_var(env('GIBBERISH_CHECK_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'base_url' => env('GIBBERISH_API_URL', ''),
+        'api_key' => env('GIBBERISH_API_KEY', ''),
+        'version' => (string) env('GIBBERISH_DETECTOR_VERSION', '1'),
+        'cache_ttl' => (int) env('GIBBERISH_CACHE_TTL', 3600),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

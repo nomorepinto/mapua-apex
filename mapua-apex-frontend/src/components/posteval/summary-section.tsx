@@ -3,6 +3,7 @@ import {
   POST_EVAL_SUMMARY_MIN,
 } from "@/components/posteval/constants"
 import { Textarea } from "@/components/ui/textarea"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -23,6 +24,7 @@ export function SummarySection({
   const trimmedLength = value.trim().length
   const tooShort = trimmedLength < POST_EVAL_SUMMARY_MIN
   const invalid = showError && tooShort
+  const summaryGibberish = useGibberishField(value)
 
   return (
     <div className={layout.section}>
@@ -36,7 +38,11 @@ export function SummarySection({
         <Textarea
           name="section_summary"
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => {
+            summaryGibberish.reset()
+            onChange(event.target.value)
+          }}
+          onBlur={summaryGibberish.onBlur}
           rows={7}
           minLength={POST_EVAL_SUMMARY_MIN}
           maxLength={POST_EVAL_SUMMARY_MAX}
@@ -47,6 +53,7 @@ export function SummarySection({
             invalid && "border-red-400 focus-visible:border-red-500"
           )}
         />
+        {summaryGibberish.indicator}
 
         <div className="mt-2 flex items-center justify-between gap-3">
           <p

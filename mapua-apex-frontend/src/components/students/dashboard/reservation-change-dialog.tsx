@@ -23,6 +23,7 @@ import {
   useStoreReservationChangeMutation,
 } from "@/hooks/use-reservation-changes"
 import { useSubmissionDetailQuery } from "@/hooks/use-submissions"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import { formatDisplayDate } from "@/lib/dynamodb-adapters"
 import { getTodayManila } from "@/lib/monitor-formatters"
 import { slotLabel } from "@/lib/schedule-slots"
@@ -60,6 +61,7 @@ export function ReservationChangeDialog({
     useState<ReservationChangeRequestType>("reschedule")
   const [reason, setReason] = useState("")
   const [suggestedDate, setSuggestedDate] = useState("")
+  const reasonGibberish = useGibberishField(reason)
 
   const detailQuery = useSubmissionDetailQuery(eventId, submissionId)
   const changesQuery = useReservationChangesQuery(eventId, submissionId)
@@ -86,6 +88,8 @@ export function ReservationChangeDialog({
 
   const canSubmit =
     reason.trim().length > 0 &&
+    reasonGibberish.state !== "gibberish" &&
+    reasonGibberish.state !== "checking" &&
     !windowClosed &&
     !pendingChange &&
     !storeMutation.isPending
@@ -324,13 +328,18 @@ export function ReservationChangeDialog({
                   id="reservation-reason"
                   placeholder="Explain why you need to change this reservation…"
                   value={reason}
-                  onChange={(event) => setReason(event.target.value)}
+                  onChange={(event) => {
+                    reasonGibberish.reset()
+                    setReason(event.target.value)
+                  }}
+                  onBlur={reasonGibberish.onBlur}
                   required
                   maxLength={500}
                   rows={4}
                   disabled={windowClosed || storeMutation.isPending}
                   className="w-full resize-none text-sm"
                 />
+                {reasonGibberish.indicator}
                 <p className="text-right text-[11px] text-neutral-400">
                   {reason.length}/500
                 </p>

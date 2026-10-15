@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select"
 import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
 import { useEmailExistence } from "@/hooks/use-email-existence"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -93,6 +94,9 @@ export const ProponentCard = memo(function ProponentCard({
   // On-blur mailbox verification for this card's email field; format and
   // domain errors already surface through the FieldWarning context.
   const emailExistence = useEmailExistence()
+  // The only hand-typed prose on this card. Positions are short role titles, so
+  // this is the field where keyboard-mash most often appears.
+  const positionGibberish = useGibberishField(proponent.positionOfApplicant)
 
   const today = new Date().toISOString().split("T")[0]
   const submissionDate = proponent.dateOfSubmission || today
@@ -433,14 +437,21 @@ export const ProponentCard = memo(function ProponentCard({
             value={proponent.positionOfApplicant}
             maxLength={30}
             onKeyDown={blockDigitKeys}
-            onChange={(e) =>
+            onChange={(e) => {
+              positionGibberish.reset()
               onUpdate(proponent.id, "positionOfApplicant", stripDigits(e.target.value))
-            }
+            }}
+            onBlur={positionGibberish.onBlur}
             placeholder="President / Project Lead"
             style={{ color: "#171717" }}
-            className={FIELD_INPUT_CLASS}
+            className={cn(
+              FIELD_INPUT_CLASS,
+              positionGibberish.state === "gibberish" &&
+                "!border-red-500 focus:!border-red-500 focus:!ring-red-500"
+            )}
             required
           />
+          {positionGibberish.indicator}
           <FieldWarning name={`proponent.${proponent.id}.positionOfApplicant`} />
         </div>
 

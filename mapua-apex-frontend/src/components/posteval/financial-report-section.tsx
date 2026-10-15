@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { LoadingBlock } from "@/components/ui/loading-block"
+import { useGibberishField } from "@/hooks/use-gibberish-check"
 import { layout } from "@/config"
 import {
   blockNonDecimalKeys,
@@ -80,6 +81,9 @@ const AddedItemRow = memo(function AddedItemRow({
   const maxQty = QUANTITY_MAX_MAP[item.item] || 3
   const fixedUnit = !isOthersItem ? UNIT_MAP[item.item] : undefined
   const rowTotal = calculateRowTotal(item.quantity, item.pricePerUnit)
+  // Only the custom "Others" item name is free prose here; the unit is capped at
+  // five characters, below the length the detector is asked to judge.
+  const itemGibberish = useGibberishField(item.item)
 
   return (
     <tr className="hover:bg-neutral-50/60">
@@ -93,8 +97,15 @@ const AddedItemRow = memo(function AddedItemRow({
               maxLength={25}
               placeholder="Enter custom item..."
               style={{ color: "#171717" }}
-              onChange={(e) => onUpdate(item.id, "item", e.target.value)}
-              className="w-full rounded border border-transparent bg-transparent py-1 pl-3 pr-8 text-center text-sm !text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-300 focus:bg-white focus:outline-none"
+              onChange={(e) => {
+                itemGibberish.reset()
+                onUpdate(item.id, "item", e.target.value)
+              }}
+              onBlur={itemGibberish.onBlur}
+              className={cn(
+                "w-full rounded border border-transparent bg-transparent py-1 pl-3 pr-8 text-center text-sm !text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-300 focus:bg-white focus:outline-none",
+                itemGibberish.state === "gibberish" && "!border-red-500 focus:!border-red-500"
+              )}
             />
             <button
               type="button"
