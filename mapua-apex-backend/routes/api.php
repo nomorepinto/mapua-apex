@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Student\DeadlineController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\OrganizationController as StudentOrganizationController;
 use App\Http\Controllers\Api\V1\Student\SubmissionController as StudentSubmissionController;
+use App\Http\Controllers\Api\V1\Public\AnnouncementController as PublicAnnouncementController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['throttle:student'])->group(function (): void {
@@ -21,6 +22,10 @@ Route::middleware(['throttle:student'])->group(function (): void {
 });
 
 Route::prefix('v1')->name('v1.')->group(function (): void {
+    Route::prefix('public')->group(function (): void {
+        Route::get('/announcements', [PublicAnnouncementController::class, 'index']);
+    });
+
     Route::middleware(['cognito.jwt:student', 'throttle:student'])
         ->prefix('students')
         ->name('students.')

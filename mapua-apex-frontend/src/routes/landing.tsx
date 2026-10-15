@@ -149,13 +149,13 @@ export function LandingPage() {
                             <p className="mt-3 text-xs font-medium text-[#8B0000] hover:underline">Read full announcement &rarr;</p>
                           </div>
                         </DialogTrigger>
-                        <DialogPopup>
-                          <DialogHeader>
+                        <DialogPopup bottomStickOnMobile={false}>
+                          <DialogHeader className="px-6 pt-6 pb-2">
                             <DialogTitle className="text-lg font-semibold text-[#8B0000]">
                               {format(new Date(a.sent_at), "MMMM d, yyyy h:mm a")}
                             </DialogTitle>
                           </DialogHeader>
-                          <ScrollArea className="max-h-[60vh] px-6 py-4">
+                          <ScrollArea className="max-h-[60vh] px-6 pt-1 pb-6">
                             <p className="whitespace-pre-wrap text-neutral-800 leading-relaxed text-sm">
                               {a.content}
                             </p>

@@ -20,8 +20,8 @@ export function AnnouncementModal({ isOpen, onClose, selectedAnnouncement }: Ann
     : announcements;
 
   return (
-    <div className={modal.overlay}>
-      <div className={cn(modal.shell, modal.xl, modal.tall)}>
+    <div className={modal.overlayCenter}>
+      <div className={cn(modal.shell, modal.xl, modal.tall, "rounded-2xl")}>
         <div className={cn(modal.header, "bg-[#F8FAFC]")}>
           <div className="flex min-w-0 items-start gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#D9291C] text-white shadow-xs">

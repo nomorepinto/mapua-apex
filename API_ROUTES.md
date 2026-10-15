@@ -42,6 +42,16 @@ No Cognito JWT.
 
 ---
 
+## Public routes
+
+No Cognito JWT.
+
+| Method | Endpoint | Example JSON |
+| :---- | :---- | :---- |
+| **GET** | `/api/v1/public/announcements` | **Response `200`** — all announcements, newest `sent_at` first. Same objects as admin GET `/admins/announcements`, but completely unauthenticated. Used for the public landing page. <pre>{<br>  "data": [<br>    {<br>      "sent_at": "2026-09-15T08:00:00Z",<br>      "content": "OSAAR office hours are 9:00–17:00."<br>    }<br>  ]<br>}</pre> |
+
+---
+
 ## Routing (create / approve hops)
 
 Sequence starts at Adviser, then Dean (only when `activity_type` is `co-curricular`), then OSAAR, then CDM (only when `venue_reservation.has_reservation` is `true`). If the submitting organization’s `is_higher_council` is `true`, Dean is skipped even for co-curricular papers: Adviser, then OSAAR, then CDM when there is a reservation.
