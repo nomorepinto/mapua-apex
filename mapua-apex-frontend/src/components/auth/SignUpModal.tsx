@@ -28,7 +28,6 @@ export function SignUpModal({
   const [emailTouched, setEmailTouched] = useState(false)
 
   const [password, setPassword] = useState("")
-  const [passwordTouched, setPasswordTouched] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [capsLockActive, setCapsLockActive] = useState(false)
   const [numLockActive, setNumLockActive] = useState(false)
@@ -43,10 +42,13 @@ export function SignUpModal({
   const liveEmailError = (emailTouched || email.length > 0) ? validateEmailLive(email) : null
   const pwdReqs = checkPasswordRequirements(password)
 
-  const handlePasswordKeyEvent = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (typeof e.getModifierState === "function") {
-      setCapsLockActive(e.getModifierState("CapsLock"))
-      setNumLockActive(e.getModifierState("NumLock"))
+  const handlePasswordKeyEvent = (
+    e: React.KeyboardEvent<HTMLInputElement> | React.FocusEvent<HTMLInputElement>
+  ) => {
+    const nativeEvent = e.nativeEvent as KeyboardEvent
+    if (typeof nativeEvent.getModifierState === "function") {
+      setCapsLockActive(nativeEvent.getModifierState("CapsLock"))
+      setNumLockActive(nativeEvent.getModifierState("NumLock"))
     }
   }
 
@@ -57,7 +59,6 @@ export function SignUpModal({
     setErrorMessage(null)
     setFullNameTouched(true)
     setEmailTouched(true)
-    setPasswordTouched(true)
 
     const cleanName = fullName.trim()
     const cleanEmail = email.trim()
@@ -242,11 +243,7 @@ export function SignUpModal({
                 }}
                 onKeyDown={handlePasswordKeyEvent}
                 onKeyUp={handlePasswordKeyEvent}
-                onFocus={(e) => {
-                  setPasswordTouched(true)
-                  handlePasswordKeyEvent(e)
-                }}
-                onBlur={() => setPasswordTouched(true)}
+                onFocus={handlePasswordKeyEvent}
                 placeholder="Create a strong password"
                 required
                 disabled={isLoading}

@@ -45,10 +45,13 @@ export function SignInModal({
   // Real-time live email validation error
   const liveEmailError = (emailTouched || email.length > 0) ? validateEmailLive(email) : null
 
-  const handlePasswordKeyEvent = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (typeof e.getModifierState === "function") {
-      setCapsLockActive(e.getModifierState("CapsLock"))
-      setNumLockActive(e.getModifierState("NumLock"))
+  const handlePasswordKeyEvent = (
+    e: React.KeyboardEvent<HTMLInputElement> | React.FocusEvent<HTMLInputElement>
+  ) => {
+    const nativeEvent = e.nativeEvent as KeyboardEvent
+    if (typeof nativeEvent.getModifierState === "function") {
+      setCapsLockActive(nativeEvent.getModifierState("CapsLock"))
+      setNumLockActive(nativeEvent.getModifierState("NumLock"))
     }
   }
 
