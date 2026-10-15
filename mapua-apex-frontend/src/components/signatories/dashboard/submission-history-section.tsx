@@ -167,7 +167,6 @@ function HistoryTable({ filters, loading, onSelect, emptyLabel, hasRows }: Histo
           </TableBody>
         </Table>
       </div>
-    </div>
   )
 }
 

@@ -137,7 +137,6 @@ export function ReviewQueue() {
             </TableBody>
           </Table>
         </div>
-      </div>
     </section>
   )
 }
