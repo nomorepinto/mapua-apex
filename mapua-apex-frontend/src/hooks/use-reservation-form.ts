@@ -21,8 +21,9 @@ import {
   selectionDateRange,
   selectionTimeRange,
   toggleSlot,
+  withSelection,
 } from "@/lib/schedule-slots"
-import type { ApiReservable } from "@/lib/types"
+import type { ApiReservable, SlotSelection } from "@/lib/types"
 import { useOrgStore } from "@/stores/org-store"
 
 /**
@@ -105,6 +106,87 @@ export function useReservationForm() {
     []
   )
 
+  /** Select or replace primary room reservable */
+  /** Add a room to the picks list */
+  const handleAddRoom = useCallback(
+    (reservable: ApiReservable, initialSelections?: SlotSelection[], remarks: string = "") => {
+      const picks = currentPicks()
+      if (picks.some((p) => p.reservable_id === reservable.reservable_id)) {
+        return
+      }
+      const existingRooms = picks.filter((p) => p.type === "room")
+      const selectionsToUse =
+        existingRooms[0]?.selections && existingRooms[0].selections.length > 0
+          ? existingRooms[0].selections
+          : (initialSelections ?? [])
+      const fallbackRemarks =
+        remarks.trim() ||
+        (existingRooms[0]?.remarks && existingRooms[0].remarks.trim().length >= 20
+          ? existingRooms[0].remarks
+          : "")
+
+      const newRoomPick: ReservationPick = {
+        id: reservable.reservable_id,
+        reservable_id: reservable.reservable_id,
+        campus_id: reservable.campus_id,
+        name: reservable.name,
+        type: reservable.type,
+        min_participants: reservable.min_participants ?? null,
+        max_participants: reservable.max_participants ?? null,
+        selections: selectionsToUse,
+        remarks: fallbackRemarks,
+      }
+
+      const nonRooms = picks.filter((p) => p.type !== "room")
+      const updatedEquipment = nonRooms.map((eq) => ({
+        ...eq,
+        selections: selectionsToUse,
+      }))
+
+      commitPicks([...existingRooms, newRoomPick, ...updatedEquipment])
+    },
+    [currentPicks]
+  )
+
+  /** Select or replace primary room reservable */
+  const handleSelectRoom = useCallback(
+    (reservable: ApiReservable, initialSelections?: SlotSelection[]) => {
+      const picks = currentPicks()
+      const existingRooms = picks.filter((p) => p.type === "room")
+      if (existingRooms.length === 1 && existingRooms[0].reservable_id === reservable.reservable_id) {
+        return
+      }
+      if (existingRooms.length === 0) {
+        handleAddRoom(reservable, initialSelections)
+        return
+      }
+      // If single room replacement:
+      const existingSelections =
+        existingRooms[0]?.selections && existingRooms[0].selections.length > 0
+          ? existingRooms[0].selections
+          : (initialSelections ?? [])
+      const existingRemarks = existingRooms[0]?.remarks ?? ""
+      const newRoomPick: ReservationPick = {
+        id: reservable.reservable_id,
+        reservable_id: reservable.reservable_id,
+        campus_id: reservable.campus_id,
+        name: reservable.name,
+        type: reservable.type,
+        min_participants: reservable.min_participants ?? null,
+        max_participants: reservable.max_participants ?? null,
+        selections: existingSelections,
+        remarks: existingRemarks,
+      }
+      const nonRooms = picks.filter((p) => p.type !== "room")
+      const updatedEquipment = nonRooms.map((eq) => ({
+        ...eq,
+        selections: existingSelections,
+      }))
+      commitPicks([newRoomPick, ...updatedEquipment])
+    },
+    [currentPicks, handleAddRoom]
+  )
+
   /** Add a reservable to the pick list, or remove it when already picked. */
   const handleTogglePick = useCallback((reservable: ApiReservable) => {
     const picks = currentPicks()
@@ -149,14 +231,79 @@ export function useReservationForm() {
     [currentPicks]
   )
 
+  /** Set slots for a specific date across all room picks and keep equipment in sync */
+  const handleSetDateSlots = useCallback(
+    (date: string, slots: number[]) => {
+      const picks = currentPicks()
+      const next = picks.map((pick) => ({
+        ...pick,
+        selections: withSelection(pick.selections, date, slots),
+      }))
+      commitPicks(next)
+    },
+    [currentPicks]
+  )
+
   /** Toggle one slot on one date for a pick. */
   const handleToggleSlot = useCallback(
     (pickId: string, date: string, slot: number) => {
-      const next = currentPicks().map((pick) =>
-        pick.id === pickId
-          ? { ...pick, selections: toggleSlot(pick.selections, date, slot) }
-          : pick
-      )
+      const picks = currentPicks()
+      const target = picks.find((p) => p.id === pickId)
+      if (!target) return
+      const updatedSelections = toggleSlot(target.selections, date, slot)
+      const next = picks.map((pick) => {
+        if (pick.id === pickId) {
+          return { ...pick, selections: updatedSelections }
+        }
+        if (target.type === "room" && pick.type === "equipment") {
+          return { ...pick, selections: updatedSelections }
+        }
+        return pick
+      })
+      commitPicks(next)
+    },
+    [currentPicks]
+  )
+
+  /** Add an equipment reservable with remarks, synced to current room selections */
+  const handleAddEquipment = useCallback(
+    (reservable: ApiReservable, remarks: string) => {
+      const picks = currentPicks()
+      if (picks.some((p) => p.reservable_id === reservable.reservable_id)) {
+        return
+      }
+      const roomPicks = picks.filter((p) => p.type === "room")
+      const primaryRoom = roomPicks[0]
+      const trimmed = remarks.trim().slice(0, 50)
+      const finalRemarks =
+        trimmed ||
+        (primaryRoom?.remarks ? primaryRoom.remarks.slice(0, 50) : "Requested for event")
+
+      const newEquipment: ReservationPick = {
+        id: reservable.reservable_id,
+        reservable_id: reservable.reservable_id,
+        campus_id: reservable.campus_id,
+        name: reservable.name,
+        type: reservable.type,
+        min_participants: reservable.min_participants ?? null,
+        max_participants: reservable.max_participants ?? null,
+        selections: primaryRoom ? [...primaryRoom.selections] : [],
+        remarks: finalRemarks,
+      }
+      commitPicks([...picks, newEquipment])
+    },
+    [currentPicks]
+  )
+
+  /** Drop selections on dates no longer in the chosen range */
+  const handlePruneDates = useCallback(
+    (validDates: string[]) => {
+      const dateSet = new Set(validDates)
+      const picks = currentPicks()
+      const next = picks.map((p) => ({
+        ...p,
+        selections: p.selections.filter((s) => dateSet.has(s.date)),
+      }))
       commitPicks(next)
     },
     [currentPicks]
@@ -164,11 +311,13 @@ export function useReservationForm() {
 
   const handleUpdateRemarks = useCallback(
     (pickId: string, remarks: string) => {
-      const next = currentPicks().map((pick) =>
-        pick.id === pickId
-          ? { ...pick, remarks: remarks.slice(0, 150) }
-          : pick
-      )
+      const next = currentPicks().map((pick) => {
+        if (pick.id === pickId) {
+          const maxLen = pick.type === "equipment" ? 50 : 150
+          return { ...pick, remarks: remarks.slice(0, maxLen) }
+        }
+        return pick
+      })
       // Remarks never affect the event schedule, so skip the derived patch.
       useOrgStore.getState().patchReservationDraft({ picks: next })
     },
@@ -220,9 +369,14 @@ export function useReservationForm() {
     /** Today's date key — the earliest a slot can be reserved. */
     todayKey: getDateKey(startOfLocalDay()),
     handleSelectCampus,
+    handleSelectRoom,
+    handleAddRoom,
     handleTogglePick,
     handleRemovePick,
+    handleSetDateSlots,
     handleToggleSlot,
+    handleAddEquipment,
+    handlePruneDates,
     handleUpdateRemarks,
     handleClearForm,
     handleSavePdf,

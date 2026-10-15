@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQueries, useQuery } from "@tanstack/react-query"
 
 import { apiClient } from "@/lib/api-client"
 import type { ApiAvailability } from "@/lib/types"
@@ -69,5 +69,35 @@ export function useStudentAvailabilityQuery(
       return res.data
     },
     enabled: Boolean(campusId && reservableId),
+  })
+}
+
+/**
+ * Live per-date availability for multiple reservables in parallel (used to detect
+ * which rooms are booked during the proponent's selected event schedule).
+ */
+export function useStudentRoomsAvailabilityQuery(
+  campusId?: string | null,
+  reservableIds: string[] = [],
+  window?: AvailabilityWindow
+) {
+  return useQueries({
+    queries: reservableIds.map((reservableId) => ({
+      queryKey: RESERVATION_KEYS.studentAvailability(
+        campusId ?? "",
+        reservableId,
+        window?.start ?? "",
+        window?.end ?? ""
+      ),
+      queryFn: async () => {
+        const res = await apiClient.get<{ data: ApiAvailability }>(
+          `/students/campuses/${campusId}/reservables/${reservableId}/availability`,
+          { params: availabilityParams(window) }
+        )
+        return res.data
+      },
+      enabled: Boolean(campusId && reservableId),
+      staleTime: 60_000,
+    })),
   })
 }

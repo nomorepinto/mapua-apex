@@ -361,7 +361,7 @@ export function buildSaafApiPayload(
           date: selection.date,
           slots: [...selection.slots].sort((a, b) => a - b),
         })),
-        remarks: pick.remarks || "",
+        remarks: pick.remarks?.trim() || "Requested for event",
       })),
     },
   }
