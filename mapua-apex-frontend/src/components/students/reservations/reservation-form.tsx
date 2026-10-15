@@ -164,13 +164,14 @@ export function ReservationFields() {
   )
 
   const totalMaxCapacity = roomPicks.reduce((acc, r) => {
-    if (acc === null || r.max_participants === null) return null
-    return acc + r.max_participants
+    if (acc === null || (r.max_participants ?? null) === null) return null
+    return acc + r.max_participants!
   }, 0 as number | null)
 
   const minCapacity = roomPicks.reduce((acc, r) => {
-    if (r.min_participants === null) return acc
-    return acc === null ? r.min_participants : Math.min(acc, r.min_participants)
+    const min = r.min_participants ?? null
+    if (min === null) return acc
+    return acc === null ? min : Math.min(acc, min)
   }, null as number | null)
 
   const isUnderHeadcount =
