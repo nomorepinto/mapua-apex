@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   BoxesIcon,
   CalendarDaysIcon,
@@ -37,7 +37,7 @@ import {
   parseDateKey,
   startOfLocalDay,
 } from "@/lib/date-key"
-import { combineEventTime } from "@/components/submission/event-time"
+import { combineEventTime, parse24 } from "@/components/submission/event-time"
 import {
   INTERVAL_MINUTES,
   SLOT_COUNT,
@@ -371,6 +371,34 @@ export function ReservationFields() {
   const displayTimeOfEvent =
     saafDraft.timeOfEvent ||
     (derivedTimes ? combineEventTime(derivedTimes.start, derivedTimes.end) : "")
+
+  useEffect(() => {
+    if (derivedTimes) {
+      const timeStr = combineEventTime(derivedTimes.start, derivedTimes.end)
+      if (saafDraft.timeOfEvent !== timeStr) {
+        saafActions.updateField("timeOfEvent", timeStr)
+        saafActions.updateField("timeOfEventStart", derivedTimes.start)
+        saafActions.updateField("timeOfEventEnd", derivedTimes.end)
+        const startParts = parse24(derivedTimes.start)
+        const endParts = parse24(derivedTimes.end)
+        saafActions.updateField("timeOfEventStartHour", startParts.hour)
+        saafActions.updateField("timeOfEventStartMinute", startParts.minute)
+        saafActions.updateField("timeOfEventStartPeriod", startParts.period)
+        saafActions.updateField("timeOfEventEndHour", endParts.hour)
+        saafActions.updateField("timeOfEventEndMinute", endParts.minute)
+        saafActions.updateField("timeOfEventEndPeriod", endParts.period)
+      }
+    }
+  }, [derivedTimes, saafDraft.timeOfEvent, saafActions])
+
+  useEffect(() => {
+    if (startDate && saafDraft.dateOfEvent !== startDate) {
+      saafActions.updateField("dateOfEvent", startDate)
+    }
+    if (endDate && saafDraft.endDateOfEvent !== endDate) {
+      saafActions.updateField("endDateOfEvent", endDate)
+    }
+  }, [startDate, endDate, saafDraft.dateOfEvent, saafDraft.endDateOfEvent, saafActions])
 
   const handleConfirmAddRoom = () => {
     if (!selectedRoomToAdd) return
@@ -1116,7 +1144,9 @@ function EquipmentSelector({
     (eq) => !pickedEquipmentIds.has(eq.reservable_id)
   )
 
-  const isAddDisabled = !selectedEquipmentId || equipmentRemark.length > 50
+  const isRemarkValid =
+    equipmentRemark.trim().length >= 5 && equipmentRemark.length <= 50
+  const isAddDisabled = !selectedEquipmentId || !isRemarkValid
 
   const handleConfirmAddEquipment = () => {
     if (isAddDisabled) return
@@ -1198,17 +1228,19 @@ function EquipmentSelector({
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-[11px]">
                         <label className="text-[10px] font-medium text-neutral-600">
-                          Remark / Purpose
+                          Remark / Purpose <span className="text-red-500">*</span>
                         </label>
                         <span
                           className={cn(
                             "font-mono text-[10px]",
                             remarkLen > 50
                               ? "text-red-600 font-bold"
-                              : "text-neutral-400"
+                              : currentRemark.trim().length < 5
+                                ? "text-amber-600"
+                                : "text-emerald-600"
                           )}
                         >
-                          {remarkLen}/50 (max 50)
+                          {remarkLen}/50 (min 5, max 50)
                         </span>
                       </div>
                       <Input
@@ -1216,9 +1248,18 @@ function EquipmentSelector({
                         maxLength={50}
                         value={currentRemark}
                         onChange={(e) => onUpdateRemarks(item.id, e.target.value.slice(0, 50))}
-                        placeholder="Remark / Purpose (max 50 chars)..."
-                        className="h-8 text-xs bg-white rounded-md border-neutral-300"
+                        placeholder="Remark / Purpose (min 5, max 50 chars)..."
+                        className={cn(
+                          "h-8 text-xs bg-white rounded-md border-neutral-300",
+                          currentRemark.trim().length < 5 &&
+                            "border-amber-400 focus-visible:ring-amber-400"
+                        )}
                       />
+                      {currentRemark.trim().length < 5 && (
+                        <p className="text-[10px] text-amber-600">
+                          Must be at least 5 characters ({5 - currentRemark.trim().length} more needed).
+                        </p>
+                      )}
                     </div>
                   </div>
                 )
@@ -1268,17 +1309,19 @@ function EquipmentSelector({
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[11px]">
                     <label className="text-[10px] font-medium text-neutral-600">
-                      Equipment Remark / Purpose (optional)
+                      Equipment Remark / Purpose <span className="text-red-500">*</span>
                     </label>
                     <span
                       className={cn(
                         "font-mono text-[10px]",
                         equipmentRemark.length > 50
                           ? "text-red-600 font-bold"
-                          : "text-neutral-400"
+                          : equipmentRemark.trim().length < 5
+                            ? "text-amber-600"
+                            : "text-emerald-600 font-semibold"
                       )}
                     >
-                      {equipmentRemark.length}/50 (max 50)
+                      {equipmentRemark.length}/50 (min 5, max 50)
                     </span>
                   </div>
 
@@ -1286,10 +1329,15 @@ function EquipmentSelector({
                     <Input
                       type="text"
                       maxLength={50}
-                      placeholder="Remark / Purpose (max 50 chars)..."
+                      placeholder="Remark / Purpose (min 5, max 50 chars)..."
                       value={equipmentRemark}
                       onChange={(e) => setEquipmentRemark(e.target.value.slice(0, 50))}
-                      className="h-9 text-xs bg-white placeholder:text-neutral-400 rounded-md border-neutral-300 flex-1"
+                      className={cn(
+                        "h-9 text-xs bg-white placeholder:text-neutral-400 rounded-md border-neutral-300 flex-1",
+                        equipmentRemark.length > 0 &&
+                          equipmentRemark.trim().length < 5 &&
+                          "border-amber-400 focus-visible:ring-amber-400"
+                      )}
                     />
                     <Button
                       type="button"
@@ -1302,6 +1350,12 @@ function EquipmentSelector({
                       Add
                     </Button>
                   </div>
+
+                  {equipmentRemark.length > 0 && equipmentRemark.trim().length < 5 && (
+                    <p className="text-[10px] text-amber-600">
+                      Must be at least 5 characters ({5 - equipmentRemark.trim().length} more needed).
+                    </p>
+                  )}
                 </div>
               </div>
             )}

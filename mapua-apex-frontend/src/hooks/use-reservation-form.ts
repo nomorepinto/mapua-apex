@@ -9,7 +9,7 @@ import type {
   ReservationPick,
 } from "@/components/reservation/types"
 import { DEFAULT_SAAF_DRAFT } from "@/components/submission/constants"
-import { combineEventTime } from "@/components/submission/event-time"
+import { combineEventTime, parse24 } from "@/components/submission/event-time"
 import type { SaafDraft } from "@/components/submission/types"
 import { getDateKey, parseDateKey, startOfLocalDay } from "@/lib/date-key"
 import { getEventSchedule } from "@/lib/event-schedule"
@@ -48,6 +48,23 @@ function derivedSchedulePatch(picks: ReservationPick[]): Partial<SaafDraft> {
     timeOfEventStart: times?.start ?? "",
     timeOfEventEnd: times?.end ?? "",
     timeOfEvent: times ? combineEventTime(times.start, times.end) : "",
+  }
+  if (times) {
+    const startParts = parse24(times.start)
+    const endParts = parse24(times.end)
+    patch.timeOfEventStartHour = startParts.hour
+    patch.timeOfEventStartMinute = startParts.minute
+    patch.timeOfEventStartPeriod = startParts.period
+    patch.timeOfEventEndHour = endParts.hour
+    patch.timeOfEventEndMinute = endParts.minute
+    patch.timeOfEventEndPeriod = endParts.period
+  } else {
+    patch.timeOfEventStartHour = ""
+    patch.timeOfEventStartMinute = ""
+    patch.timeOfEventStartPeriod = ""
+    patch.timeOfEventEndHour = ""
+    patch.timeOfEventEndMinute = ""
+    patch.timeOfEventEndPeriod = ""
   }
   if (dates) {
     const weekday = parseDateKey(dates.start)?.toLocaleDateString("en-US", {
@@ -274,10 +291,7 @@ export function useReservationForm() {
       }
       const roomPicks = picks.filter((p) => p.type === "room")
       const primaryRoom = roomPicks[0]
-      const trimmed = remarks.trim().slice(0, 50)
-      const finalRemarks =
-        trimmed ||
-        (primaryRoom?.remarks ? primaryRoom.remarks.slice(0, 50) : "Requested for event")
+      const finalRemarks = remarks.trim().slice(0, 50)
 
       const newEquipment: ReservationPick = {
         id: reservable.reservable_id,

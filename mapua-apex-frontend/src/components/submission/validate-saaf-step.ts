@@ -516,15 +516,22 @@ export function getReservationStepIssue(
     return `Purpose for "${invalidRoomPurpose.name}" must be at least 20 characters.`
   }
 
-  // Equipment remark validation: maximum 50 characters (no minimum required)
+  // Equipment remark validation: required, minimum 5 characters, and maximum 50 characters
   const invalidEquipmentRemark = picks.find(
     (pick) =>
       pick.type === "equipment" &&
-      pick.remarks &&
-      pick.remarks.length > 50
+      (isBlank(pick.remarks) ||
+        pick.remarks.trim().length < 5 ||
+        pick.remarks.length > 50)
   )
   if (invalidEquipmentRemark) {
-    return `Remark for "${invalidEquipmentRemark.name}" must not exceed 50 characters.`
+    if (isBlank(invalidEquipmentRemark.remarks)) {
+      return `Add a purpose / remark for "${invalidEquipmentRemark.name}".`
+    }
+    if (invalidEquipmentRemark.remarks.length > 50) {
+      return `Remark for "${invalidEquipmentRemark.name}" must not exceed 50 characters.`
+    }
+    return `Remark for "${invalidEquipmentRemark.name}" must be at least 5 characters.`
   }
 
   const roomCoverage = new Map<string, Set<number>>()
