@@ -64,16 +64,30 @@ export function format24(parts: ClockParts): string {
   return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`
 }
 
-export function parse24(value: string): ClockParts {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim())
-  if (!match) return { ...EMPTY_CLOCK }
-  const hours = Number(match[1])
-  const minute = match[2]
-  if (!Number.isInteger(hours) || hours > 23 || Number(minute) > 59) {
-    return { ...EMPTY_CLOCK }
+export function parseClockString(value: string): ClockParts {
+  if (!value || typeof value !== "string") return { ...EMPTY_CLOCK }
+  const trimmed = value.trim()
+  const match12 = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(trimmed)
+  if (match12) {
+    return {
+      hour: String(Number(match12[1])),
+      minute: match12[2],
+      period: match12[3].toUpperCase() as Period,
+    }
   }
-  const period: Period = hours >= 12 ? "PM" : "AM"
-  return { hour: String(hours % 12 || 12), minute, period }
+  const match24 = /^(\d{1,2}):(\d{2})$/.exec(trimmed)
+  if (match24) {
+    const hours = Number(match24[1])
+    const minute = match24[2]
+    if (hours > 23 || Number(minute) > 59) return { ...EMPTY_CLOCK }
+    const period: Period = hours >= 12 ? "PM" : "AM"
+    return { hour: String(hours % 12 || 12), minute, period }
+  }
+  return { ...EMPTY_CLOCK }
+}
+
+export function parse24(value: string): ClockParts {
+  return parseClockString(value)
 }
 
 export function splitEventTime(value: string): { start: string; end: string } {
@@ -91,10 +105,14 @@ export function clockFromDraft(
   hour: string | undefined,
   minute: string | undefined,
   period: string | undefined,
-  fallback24: string
+  fallback: string
 ): ClockParts {
-  if (hour === undefined && minute === undefined && period === undefined) {
-    return parse24(fallback24)
+  if (hour && minute && (period === "AM" || period === "PM")) {
+    return { hour, minute, period }
+  }
+  if (fallback) {
+    const parsed = parseClockString(fallback)
+    if (parsed.hour && parsed.period) return parsed
   }
   return {
     hour: hour ?? "",

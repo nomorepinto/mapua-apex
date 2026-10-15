@@ -19,9 +19,14 @@ interface ReservationFormState {
 
 interface ReservationFormActions {
   handleSelectCampus: ReservationFormModel["handleSelectCampus"]
+  handleSelectRoom: ReservationFormModel["handleSelectRoom"]
+  handleAddRoom: ReservationFormModel["handleAddRoom"]
   handleTogglePick: ReservationFormModel["handleTogglePick"]
   handleRemovePick: ReservationFormModel["handleRemovePick"]
+  handleSetDateSlots: ReservationFormModel["handleSetDateSlots"]
   handleToggleSlot: ReservationFormModel["handleToggleSlot"]
+  handleAddEquipment: ReservationFormModel["handleAddEquipment"]
+  handlePruneDates: ReservationFormModel["handlePruneDates"]
   handleUpdateRemarks: ReservationFormModel["handleUpdateRemarks"]
   handleSavePdf: ReservationFormModel["handleSavePdf"]
   handleClearForm: ReservationFormModel["handleClearForm"]
@@ -58,9 +63,14 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
     },
     actions: {
       handleSelectCampus: form.handleSelectCampus,
+      handleSelectRoom: form.handleSelectRoom,
+      handleAddRoom: form.handleAddRoom,
       handleTogglePick: form.handleTogglePick,
       handleRemovePick: form.handleRemovePick,
+      handleSetDateSlots: form.handleSetDateSlots,
       handleToggleSlot: form.handleToggleSlot,
+      handleAddEquipment: form.handleAddEquipment,
+      handlePruneDates: form.handlePruneDates,
       handleUpdateRemarks: form.handleUpdateRemarks,
       handleSavePdf: form.handleSavePdf,
       handleClearForm: form.handleClearForm,

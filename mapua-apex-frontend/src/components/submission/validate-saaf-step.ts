@@ -37,7 +37,7 @@ const EMAIL_PATTERN =
 // Matches letters, spaces, hyphens, periods, and apostrophes (no digits)
 const LETTERS_ONLY_PATTERN = /^[\p{L}\s\-'.]+$/u
 // Positions can also include slashes, ampersands, and parentheses (e.g., "VP / Co-Lead")
-const POSITION_LETTERS_ONLY_PATTERN = /^[\p{L}\s\-'.\/&(),]+$/u
+const POSITION_LETTERS_ONLY_PATTERN = /^[\p{L}\s\-'./&(),]+$/u
 
 function isBlank(value: string | undefined): boolean {
   return !value || !value.trim()
@@ -98,6 +98,7 @@ const UNIQUE_PROPONENT_FIELDS: Array<{
 }> = [
     { field: "studentNumber", label: "student number" },
     { field: "contactNumber", label: "mobile number" },
+    { field: "emailAddress", label: "email address" },
     { field: "positionOfApplicant", label: "position of the applicant" },
     { field: "facebookLink", label: "Facebook link" },
   ]
@@ -503,15 +504,35 @@ export function getReservationStepIssue(
     return "Select at least one time slot for each chosen date."
   }
 
-  // Purpose validation: required and must be at least 20 characters
-  const invalidPurposePick = picks.find(
-    (pick) => isBlank(pick.remarks) || pick.remarks.trim().length < 20
+  // Room purpose validation: required and must be at least 20 characters (max 150)
+  const invalidRoomPurpose = picks.find(
+    (pick) =>
+      pick.type === "room" &&
+      (isBlank(pick.remarks) || pick.remarks.trim().length < 20)
   )
-  if (invalidPurposePick) {
-    if (isBlank(invalidPurposePick.remarks)) {
-      return `Add a purpose for "${invalidPurposePick.name}".`
+  if (invalidRoomPurpose) {
+    if (isBlank(invalidRoomPurpose.remarks)) {
+      return `Add a purpose for "${invalidRoomPurpose.name}".`
     }
-    return `Purpose for "${invalidPurposePick.name}" must be at least 20 characters.`
+    return `Purpose for "${invalidRoomPurpose.name}" must be at least 20 characters.`
+  }
+
+  // Equipment remark validation: required, minimum 5 characters, and maximum 50 characters
+  const invalidEquipmentRemark = picks.find(
+    (pick) =>
+      pick.type === "equipment" &&
+      (isBlank(pick.remarks) ||
+        pick.remarks.trim().length < 5 ||
+        pick.remarks.length > 50)
+  )
+  if (invalidEquipmentRemark) {
+    if (isBlank(invalidEquipmentRemark.remarks)) {
+      return `Add a purpose / remark for "${invalidEquipmentRemark.name}".`
+    }
+    if (invalidEquipmentRemark.remarks.length > 50) {
+      return `Remark for "${invalidEquipmentRemark.name}" must not exceed 50 characters.`
+    }
+    return `Remark for "${invalidEquipmentRemark.name}" must be at least 5 characters.`
   }
 
   const roomCoverage = new Map<string, Set<number>>()
@@ -539,20 +560,40 @@ export function getReservationStepIssue(
 
   const headcount = expectedParticipantsValue(expectedParticipants)
   if (headcount !== null) {
-    const overCapacity = picks.find(
-      (pick) =>
-        pick.type === "room" &&
+    const roomPicks = picks.filter((pick) => pick.type === "room")
+    if (roomPicks.length === 1) {
+      const single = roomPicks[0]
+      if (
         !withinCapacity(
-          { min: pick.min_participants, max: pick.max_participants },
+          { min: single.min_participants, max: single.max_participants },
           headcount
         )
-    )
-    if (overCapacity) {
-      return capacityIssue(
-        overCapacity.name,
-        { min: overCapacity.min_participants, max: overCapacity.max_participants },
-        headcount
-      )
+      ) {
+        return capacityIssue(
+          single.name,
+          { min: single.min_participants, max: single.max_participants },
+          headcount
+        )
+      }
+    } else if (roomPicks.length > 1) {
+      const totalMax = roomPicks.reduce((acc, r) => {
+        if (acc === null || (r.max_participants ?? null) === null) return null
+        return acc + r.max_participants!
+      }, 0 as number | null)
+
+      if (totalMax !== null && headcount > totalMax) {
+        return `The combined capacity of the reserved rooms (${totalMax} participants) cannot accommodate the expected participants (${headcount}). Please add another room.`
+      }
+
+      const minRequired = roomPicks.reduce((acc, r) => {
+        const min = r.min_participants ?? null
+        if (min === null) return acc
+        return acc === null ? min : Math.min(acc, min)
+      }, null as number | null)
+
+      if (minRequired !== null && headcount < minRequired) {
+        return `Expected participants (${headcount}) is below the minimum capacity (${minRequired}).`
+      }
     }
   }
 

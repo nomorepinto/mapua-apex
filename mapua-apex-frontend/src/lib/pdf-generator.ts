@@ -262,38 +262,6 @@ export function generateProposalPdf(
             },
         })
 
-        ry = (doc as any).lastAutoTable.finalY + 4
-
-        // Audiovisual Equipment Table
-        const avRows = (reservationData.avItems || []).map((a) => [
-            a.equipmentNeeded || "",
-            a.dateNeeded || "",
-            a.endDateNeeded || a.dateNeeded || "",
-            a.timeNeeded || "",
-            a.endTimeNeeded || a.timeNeeded || "",
-            a.remarks || "",
-        ])
-
-        autoTable(doc, {
-            startY: ry,
-            head: [
-                [
-                    {
-                        content: "Audiovisual Equipment",
-                        colSpan: 6,
-                        styles: { halign: "left" },
-                    },
-                ],
-                ["Equipment Needed", "Start Date", "End Date", "Start Time", "End Time", "Remarks"],
-            ],
-            headStyles: { fillColor: primaryRed, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
-            body: avRows,
-            styles: { fontSize: 7, cellPadding: 1.5, halign: "center" },
-            columnStyles: {
-                0: { halign: "left" },
-                5: { halign: "left" },
-            },
-        })
     }
 
     // Download Trigger
