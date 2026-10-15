@@ -1,566 +1,199 @@
-import {
-  AlertTriangle,
-  Bell,
-  CalendarCheck,
-  CalendarClock,
-  CalendarX,
-  CheckCircle,
-  CheckSquare,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  ExternalLink,
-  RotateCcw,
-  XCircle,
-} from "lucide-react"
+import { useMemo } from "react"
+import { Bell, ChevronDown, ChevronUp, Clock, User } from "lucide-react"
 
+import {
+  mapProposalStatus,
+  ProposalStatusBadge,
+  type ProposalDashboardStatus,
+} from "@/components/students/dashboard/student-calendar-card"
 import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
 import { layout } from "@/config"
-import { useReservationChangesQuery } from "@/hooks/use-reservation-changes"
-import { arcusAttendanceUrl, arcusEvaluationUrl } from "@/lib/arcus-links"
-import type {
-  ReservationNotifType,
-  ReviewNotice,
-} from "@/lib/dynamodb-adapters"
-import { getTodayManila } from "@/lib/monitor-formatters"
+import { formatDisplayDateTime } from "@/lib/dynamodb-adapters"
 import { cn } from "@/lib/utils"
+
+interface TimelineItem {
+  id: string
+  eventId?: string
+  submissionId?: string
+  date: string
+  dateStr: string
+  title: string
+  status: ProposalDashboardStatus
+  reviewer: string
+  comment?: string
+}
 
 export function RemindersPanel() {
   const { state, actions } = useStudentDashboard()
-  const reminderCount = state.reminders.length + state.reviewNotices.length
+  const { submissions, reviewNotices, reminders, remindersExpanded } = state
+
+  // Build live timeline items directly from real proposals, review notices, and deadlines
+  const timelineItems = useMemo<TimelineItem[]>(() => {
+    const items: TimelineItem[] = []
+
+    // 1. Add review notices from real submissions
+    reviewNotices.forEach((notice) => {
+      let mappedStatus: ProposalDashboardStatus = "Pending"
+      if (notice.notifType === "approved" || notice.notifType === "fully approved") {
+        mappedStatus = "Approved"
+      } else if (notice.notifType === "denied") {
+        mappedStatus = "Cancelled"
+      } else {
+        mappedStatus = "Pending"
+      }
+
+      items.push({
+        id: `notice-${notice.id}`,
+        eventId: notice.eventId,
+        submissionId: notice.submissionId,
+        date: notice.sentAt,
+        dateStr: formatDisplayDateTime(notice.sentAt),
+        title: notice.title,
+        status: mappedStatus,
+        reviewer: notice.signatoryLabel,
+        comment: notice.comment,
+      })
+    })
+
+    // 2. Add submission entries for proposals that have no review notices yet
+    // (ensuring a newly submitted proposal immediately shows in Timeline Reminders)
+    const coveredSubmissionIds = new Set(reviewNotices.map((n) => n.submissionId))
+
+    submissions.forEach((sub) => {
+      if (!coveredSubmissionIds.has(sub.submission_id)) {
+        const mappedStatus = mapProposalStatus(sub.status, sub.api_status)
+        items.push({
+          id: `sub-${sub.submission_id}`,
+          eventId: sub.event_id,
+          submissionId: sub.submission_id,
+          date: sub.sent_at,
+          dateStr: formatDisplayDateTime(sub.sent_at),
+          title: sub.activity_details.title,
+          status: mappedStatus,
+          reviewer: sub.current_signatory || "Adviser",
+          comment:
+            mappedStatus === "Approved"
+              ? "All signatory reviews completed."
+              : mappedStatus === "Cancelled"
+                ? "Submission cancelled."
+                : `Awaiting review by ${sub.current_signatory || "assigned signatory"}.`,
+        })
+      }
+    })
+
+    // 3. Add administrative deadline reminders if any exist
+    reminders.forEach((rem) => {
+      items.push({
+        id: `deadline-${rem.id}`,
+        date: rem.dateStr,
+        dateStr: rem.dateStr,
+        title: rem.title,
+        status: "Pending",
+        reviewer: "Administration",
+        comment: `${rem.statusText} (Due: ${rem.dueDateText})`,
+      })
+    })
+
+    // Sort newest first
+    items.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0))
+
+    return items
+  }, [submissions, reviewNotices, reminders])
 
   return (
-    <div className={layout.section}>
+    <div className={cn(layout.section, "overflow-hidden")}>
       <div
         onClick={actions.toggleReminders}
         className="group flex cursor-pointer items-center justify-between select-none"
       >
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-red-50 text-[#D9291C] transition-colors group-hover:bg-red-100">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-[#8B0000] transition-colors group-hover:bg-red-100">
             <Bell className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-[#1E293B] transition-colors group-hover:text-[#D9291C]">
+            <h2 className="text-base font-extrabold text-neutral-900 transition-colors group-hover:text-[#8B0000]">
               Timeline Reminders
             </h2>
-            <p className="text-[11px] text-neutral-600">
+            <p className="text-xs text-neutral-500">
               Institutional action items timeline
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {reminderCount > 0 ? (
-            <span className="rounded-lg border border-red-200/60 bg-red-50 px-2 py-0.5 text-[10px] font-extrabold text-[#D9291C]">
-              {reminderCount}
+          {timelineItems.length > 0 && (
+            <span className="rounded-full border border-red-200/70 bg-red-50 px-2 py-0.5 text-[10px] font-extrabold text-[#8B0000]">
+              {timelineItems.length}
             </span>
-          ) : null}
-          {state.remindersExpanded ? (
-            <ChevronUp className="h-5 w-5 text-neutral-600 transition-colors group-hover:text-[#1E293B]" />
+          )}
+          {remindersExpanded ? (
+            <ChevronUp className="h-4 w-4 text-neutral-500 transition-colors group-hover:text-neutral-900" />
           ) : (
-            <ChevronDown className="h-5 w-5 text-neutral-600 transition-colors group-hover:text-[#1E293B]" />
+            <ChevronDown className="h-4 w-4 text-neutral-500 transition-colors group-hover:text-neutral-900" />
           )}
         </div>
       </div>
 
-      {state.remindersExpanded ? <RemindersBody /> : null}
-    </div>
-  )
-}
-
-function RemindersBody() {
-  const { state } = useStudentDashboard()
-
-  return (
-    <div className="scrollbar-thin mt-4 max-h-[560px] overflow-y-auto border-t border-neutral-200 pt-3 pr-2">
-      {state.remindersLoading ? (
-        <div className="p-8 text-center text-sm text-neutral-500">
-          Loading reminders…
-        </div>
-      ) : state.reminders.length === 0 && state.reviewNotices.length === 0 ? (
-        <div className={cn(layout.empty, "gap-1.5 border border-neutral-200")}>
-          <Bell className="mb-1 h-6 w-6 text-neutral-300" />
-          <p className="font-bold text-[#1E293B]">No reminders at this time</p>
-          <p className="text-sm text-neutral-500">
-            Upcoming deadlines and review comments will appear here.
-          </p>
-        </div>
-      ) : (
-        <>
-          <DeniedNoticeList />
-          <ReturnedNoticeList />
-          <ApprovedNoticeList />
-          <ScheduledNoticeList />
-          <ReservationNoticeList />
-          <ImportantReminderList />
-          <UpcomingReminderList />
-        </>
-      )}
-    </div>
-  )
-}
-
-function DeniedNoticeList() {
-  const { state, actions } = useStudentDashboard()
-  if (state.deniedNotices.length === 0) return null
-
-  return (
-    <div>
-      <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-3 w-3 items-center justify-center rounded-full border-2 border-red-500 bg-white">
-          <div className="h-1.5 w-1.5 rounded-full bg-red-500"></div>
-        </div>
-        <h3 className="font-sans text-lg font-light tracking-wide text-[#D9291C]">
-          Denied
-        </h3>
-      </div>
-      <div className="ml-1.5 space-y-4 border-l-2 border-red-300 pl-4">
-        {state.deniedNotices.map((notice) => (
-          <button
-            key={notice.id}
-            type="button"
-            onClick={() => actions.selectNotice(notice)}
-            className="relative flex min-h-11 w-full items-start gap-3 rounded-xl p-1 text-left transition-colors hover:bg-red-50/60"
-          >
-            <div className="absolute top-0.5 -left-[27px] flex h-6 w-6 items-center justify-center rounded-md border border-red-300 bg-white text-red-600 shadow-2xs">
-              <AlertTriangle className="h-3.5 w-3.5" />
+      {remindersExpanded && (
+        <div className="scrollbar-thin mt-4 max-h-[460px] overflow-y-auto border-t border-neutral-100 pt-3 pr-1">
+          {state.remindersLoading ? (
+            <div className="p-8 text-center text-xs text-neutral-500">
+              Loading reminders…
             </div>
-            <div className="min-w-0 flex-1 pl-1">
-              <span className="mb-0.5 block text-sm text-neutral-500">
-                {notice.dateStr}
-              </span>
-              <h4 className="text-sm font-bold tracking-tight text-[#1E293B] uppercase">
-                {notice.title}
-              </h4>
-              <p className="mt-1 line-clamp-2 text-sm leading-snug font-semibold text-red-600">
-                {notice.comment}
+          ) : timelineItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 p-8 text-center">
+              <Bell className="mb-2 h-6 w-6 text-neutral-300" />
+              <p className="text-xs font-bold text-neutral-700">No reminders yet</p>
+              <p className="mt-0.5 text-[11px] text-neutral-500">
+                Timeline updates for your submitted proposals will appear here.
               </p>
             </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ReturnedNoticeList() {
-  const { state, actions } = useStudentDashboard()
-  if (state.returnedNotices.length === 0) return null
-
-  return (
-    <div className={state.deniedNotices.length > 0 ? "pt-4" : undefined}>
-      <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-3 w-3 items-center justify-center rounded-full border-2 border-amber-500 bg-white">
-          <div className="h-1.5 w-1.5 rounded-full bg-amber-500"></div>
-        </div>
-        <h3 className="font-sans text-lg font-light tracking-wide text-amber-800">
-          Returned
-        </h3>
-      </div>
-      <div className="ml-1.5 space-y-4 border-l-2 border-amber-300 pl-4">
-        {state.returnedNotices.map((notice) => (
-          <button
-            key={notice.id}
-            type="button"
-            onClick={() => actions.selectNotice(notice)}
-            className="relative flex min-h-11 w-full items-start gap-3 rounded-xl p-1 text-left transition-colors hover:bg-amber-50/60"
-          >
-            <div className="absolute top-0.5 -left-[27px] flex h-6 w-6 items-center justify-center rounded-md border border-amber-300 bg-white text-amber-700 shadow-2xs">
-              <RotateCcw className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0 flex-1 pl-1">
-              <span className="mb-0.5 block text-sm text-neutral-500">
-                {notice.dateStr}
-              </span>
-              <h4 className="text-sm font-bold tracking-tight text-[#1E293B] uppercase">
-                {notice.title}
-              </h4>
-              <p className="mt-1 line-clamp-2 text-sm leading-snug font-semibold text-amber-800">
-                {notice.comment}
-              </p>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ApprovedNoticeList() {
-  const { state, actions } = useStudentDashboard()
-  if (state.approvedNotices.length === 0) return null
-
-  const showTopSpacing =
-    state.deniedNotices.length + state.returnedNotices.length > 0
-
-  return (
-    <div className={showTopSpacing ? "pt-4" : undefined}>
-      <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-3 w-3 items-center justify-center rounded-full border-2 border-emerald-500 bg-white">
-          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
-        </div>
-        <h3 className="font-sans text-lg font-light tracking-wide text-emerald-700">
-          Approved
-        </h3>
-      </div>
-      <div className="ml-1.5 space-y-4 border-l-2 border-emerald-300 pl-4">
-        {state.approvedNotices.map((notice) => (
-          <button
-            key={notice.id}
-            type="button"
-            onClick={() => actions.selectNotice(notice)}
-            className="relative flex min-h-11 w-full items-start gap-3 rounded-xl p-1 text-left transition-colors hover:bg-emerald-50/60"
-          >
-            <div className="absolute top-0.5 -left-[27px] flex h-6 w-6 items-center justify-center rounded-md border border-emerald-300 bg-white text-emerald-600 shadow-2xs">
-              <CheckCircle className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0 flex-1 pl-1">
-              <span className="mb-0.5 block text-sm text-neutral-500">
-                {notice.dateStr}
-              </span>
-              <h4 className="text-sm font-bold tracking-tight text-[#1E293B] uppercase">
-                {notice.title}
-              </h4>
-              <p className="mt-1 line-clamp-2 text-sm leading-snug font-semibold text-emerald-700">
-                {notice.notifType === "fully approved"
-                  ? `Fully approved · ${notice.signatoryLabel}`
-                  : `Approved · ${notice.signatoryLabel}`}
-              </p>
-              {notice.comment ? (
-                <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-neutral-600">
-                  {notice.comment}
-                </p>
-              ) : null}
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ScheduledNoticeList() {
-  const { state, actions } = useStudentDashboard()
-  if (state.scheduledNotices.length === 0) return null
-
-  const showTopSpacing =
-    state.deniedNotices.length +
-      state.returnedNotices.length +
-      state.approvedNotices.length >
-    0
-
-  return (
-    <div className={showTopSpacing ? "pt-4" : undefined}>
-      <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-3 w-3 items-center justify-center rounded-full border-2 border-sky-500 bg-white">
-          <div className="h-1.5 w-1.5 rounded-full bg-sky-500"></div>
-        </div>
-        <h3 className="font-sans text-lg font-light tracking-wide text-sky-700">
-          Scheduled
-        </h3>
-      </div>
-      <div className="ml-1.5 space-y-4 border-l-2 border-sky-300 pl-4">
-        {state.scheduledNotices.map((notice) => (
-          <div
-            key={notice.id}
-            className="relative flex min-h-11 w-full items-start gap-3 rounded-xl p-1 text-left"
-          >
-            <div className="absolute top-0.5 -left-[27px] flex h-6 w-6 items-center justify-center rounded-md border border-sky-300 bg-white text-sky-600 shadow-2xs">
-              <CalendarClock className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0 flex-1 pl-1">
-              <button
-                type="button"
-                onClick={() => actions.selectNotice(notice)}
-                className="block w-full text-left transition-colors hover:text-sky-700"
-              >
-                <span className="mb-0.5 block text-sm text-neutral-500">
-                  {notice.dateStr}
-                </span>
-                <h4 className="text-sm font-bold tracking-tight text-[#1E293B] uppercase">
-                  {notice.title}
-                </h4>
-                <p className="mt-1 line-clamp-2 text-sm leading-snug font-semibold text-sky-700">
-                  Event scheduled
-                </p>
-                {notice.comment ? (
-                  <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-neutral-600">
-                    {notice.comment}
-                  </p>
-                ) : null}
-              </button>
-              <ScheduledNoticeActions notice={notice} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/**
- * Attendance/Evaluation deep links plus the reservation-change affordance for a
- * Scheduled notice. The Request-change button shows only while the paper is
- * still approved and inside the event-day window; once a request is pending it
- * is replaced by a badge until CDM resolves it. Renders nothing when no action
- * is available, so the timeline row stays clean.
- */
-function ScheduledNoticeActions({ notice }: { notice: ReviewNotice }) {
-  const { state, actions } = useStudentDashboard()
-  const changesQuery = useReservationChangesQuery(
-    notice.eventId,
-    notice.submissionId
-  )
-  const attendanceUrl = arcusAttendanceUrl()
-  const evaluationUrl = arcusEvaluationUrl()
-  const submission = state.findSubmission(notice.eventId, notice.submissionId)
-  const dateOfEvent = submission?.activity_details?.date_of_event ?? ""
-  const pending = (changesQuery.data ?? []).some(
-    (change) => change.status === "pending"
-  )
-  const windowClosed = Boolean(dateOfEvent) && getTodayManila() > dateOfEvent
-  const canRequest = submission?.status === "approved" && !windowClosed
-
-  if (!attendanceUrl && !evaluationUrl && !pending && !canRequest) return null
-
-  return (
-    <div className="mt-2 flex flex-wrap gap-2">
-      {attendanceUrl ? (
-        <a
-          href={attendanceUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 text-xs font-bold text-sky-700 transition-colors hover:bg-sky-50"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Attendance
-        </a>
-      ) : null}
-      {evaluationUrl ? (
-        <a
-          href={evaluationUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 text-xs font-bold text-sky-700 transition-colors hover:bg-sky-50"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Evaluation
-        </a>
-      ) : null}
-      {pending ? (
-        <span className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 text-xs font-bold text-amber-800">
-          <Clock className="h-3.5 w-3.5" />
-          Change requested — pending CDM
-        </span>
-      ) : canRequest ? (
-        <button
-          type="button"
-          onClick={() =>
-            actions.openReservationChange(notice.eventId, notice.submissionId)
-          }
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 text-xs font-bold text-sky-700 transition-colors hover:bg-sky-50"
-        >
-          <CalendarClock className="h-3.5 w-3.5" />
-          Request change
-        </button>
-      ) : null}
-    </div>
-  )
-}
-
-const RESERVATION_META: Record<
-  ReservationNotifType,
-  { label: string; textClass: string; Icon: typeof Clock }
-> = {
-  "reservation change requested": {
-    label: "Change requested · pending CDM",
-    textClass: "text-amber-800",
-    Icon: Clock,
-  },
-  "reservation change denied": {
-    label: "Change denied",
-    textClass: "text-red-600",
-    Icon: XCircle,
-  },
-  "reservation cancelled": {
-    label: "Event cancelled",
-    textClass: "text-red-600",
-    Icon: CalendarX,
-  },
-  "reservation rescheduled": {
-    label: "Event rescheduled",
-    textClass: "text-emerald-700",
-    Icon: CalendarCheck,
-  },
-}
-
-function ReservationNoticeList() {
-  const { state, actions } = useStudentDashboard()
-  if (state.reservationNotices.length === 0) return null
-
-  const showTopSpacing =
-    state.deniedNotices.length +
-      state.returnedNotices.length +
-      state.approvedNotices.length +
-      state.scheduledNotices.length >
-    0
-
-  return (
-    <div className={showTopSpacing ? "pt-4" : undefined}>
-      <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-3 w-3 items-center justify-center rounded-full border-2 border-violet-500 bg-white">
-          <div className="h-1.5 w-1.5 rounded-full bg-violet-500"></div>
-        </div>
-        <h3 className="font-sans text-lg font-light tracking-wide text-violet-700">
-          Reservation Changes
-        </h3>
-      </div>
-      <div className="ml-1.5 space-y-4 border-l-2 border-violet-300 pl-4">
-        {state.reservationNotices.map((notice) => {
-          const meta =
-            RESERVATION_META[notice.notifType as ReservationNotifType]
-          const Icon = meta.Icon
-          return (
-            <button
-              key={notice.id}
-              type="button"
-              onClick={() => actions.selectNotice(notice)}
-              className="relative flex min-h-11 w-full items-start gap-3 rounded-xl p-1 text-left transition-colors hover:bg-violet-50/60"
-            >
-              <div className="absolute top-0.5 -left-[27px] flex h-6 w-6 items-center justify-center rounded-md border border-violet-300 bg-white text-violet-600 shadow-2xs">
-                <Icon className="h-3.5 w-3.5" />
-              </div>
-              <div className="min-w-0 flex-1 pl-1">
-                <span className="mb-0.5 block text-sm text-neutral-500">
-                  {notice.dateStr}
-                </span>
-                <h4 className="text-sm font-bold tracking-tight text-[#1E293B] uppercase">
-                  {notice.title}
-                </h4>
-                <p
+          ) : (
+            <div className="space-y-3">
+              {timelineItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    if (item.eventId && item.submissionId) {
+                      actions.openTracker(item.eventId, item.submissionId)
+                    }
+                  }}
                   className={cn(
-                    "mt-1 text-sm leading-snug font-semibold",
-                    meta.textClass
+                    "w-full rounded-xl border border-neutral-200 bg-white p-3.5 text-left shadow-2xs transition-all",
+                    item.eventId && item.submissionId
+                      ? "hover:border-neutral-300 hover:bg-neutral-50/50 cursor-pointer"
+                      : "cursor-default"
                   )}
                 >
-                  {meta.label}
-                </p>
-                {notice.comment ? (
-                  <p className="mt-0.5 line-clamp-2 text-sm leading-snug text-neutral-600">
-                    {notice.comment}
-                  </p>
-                ) : null}
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1 text-[11px] font-semibold text-neutral-500">
+                      <Clock className="h-3 w-3" />
+                      {item.dateStr}
+                    </span>
+                    <ProposalStatusBadge status={item.status} />
+                  </div>
 
-function ImportantReminderList() {
-  const { state, actions } = useStudentDashboard()
-  if (state.importantReminders.length === 0) return null
+                  <h4 className="mt-1.5 text-xs font-bold text-neutral-900 leading-snug">
+                    {item.title}
+                  </h4>
 
-  return (
-    <div className={state.reviewNotices.length > 0 ? "pt-4" : undefined}>
-      <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-3 w-3 items-center justify-center rounded-full border-2 border-red-500 bg-white">
-          <div className="h-1.5 w-1.5 rounded-full bg-red-500"></div>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-neutral-600">
+                    <User className="h-3 w-3 text-neutral-400" />
+                    <span>Reviewer: <strong className="text-neutral-800">{item.reviewer}</strong></span>
+                  </div>
+
+                  {item.comment && (
+                    <p className="mt-2 line-clamp-2 rounded-lg bg-neutral-50 p-2 text-[11px] text-neutral-600">
+                      {item.comment}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <h3 className="font-sans text-lg font-light tracking-wide text-[#D9291C]">
-          Important
-        </h3>
-      </div>
-      <div className="ml-1.5 space-y-6 border-l-2 border-red-300 pl-4">
-        {state.importantReminders.map((item) => (
-          <div
-            key={item.id}
-            className="group relative flex items-start justify-between gap-3"
-          >
-            <div className="absolute top-0.5 -left-[27px] flex h-6 w-6 items-center justify-center rounded-md border border-red-300 bg-white text-red-600 shadow-2xs">
-              <AlertTriangle className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0 flex-1 pl-1">
-              <span className="mb-0.5 block font-sans text-[11px] text-[#64748B] italic">
-                {item.dateStr}
-              </span>
-              <h4 className="text-xs leading-tight font-bold tracking-tight text-[#1E293B] uppercase">
-                {item.title}{" "}
-                <span className="font-mono font-semibold text-neutral-500">
-                  ({item.code})
-                </span>
-              </h4>
-              <p className="mt-1 text-xs leading-snug font-semibold text-red-600">
-                {item.statusText}
-              </p>
-              <p className="mt-0.5 text-[11px] font-medium text-[#64748B]">
-                Due Date: {item.dueDateText}
-              </p>
-            </div>
-            <button
-              onClick={() => actions.dismissReminder(item.id)}
-              className="mt-1 min-h-11 shrink-0 cursor-pointer rounded bg-neutral-200/80 px-3 py-1 text-[11px] font-bold text-[#475569] transition-all hover:bg-neutral-300"
-            >
-              Dismiss
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function UpcomingReminderList() {
-  const { state, actions } = useStudentDashboard()
-  if (state.upcomingReminders.length === 0) return null
-
-  return (
-    <div className="pt-2">
-      <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-3 w-3 items-center justify-center rounded-full border-2 border-neutral-400 bg-white">
-          <div className="h-1.5 w-1.5 rounded-full bg-neutral-400"></div>
-        </div>
-        <h3 className="font-sans text-lg font-light tracking-wide text-[#475569]">
-          Upcoming
-        </h3>
-      </div>
-      <div className="ml-1.5 space-y-6 border-l-2 border-neutral-200 pl-4">
-        {state.upcomingReminders.map((item) => (
-          <div
-            key={item.id}
-            className="group relative flex items-start justify-between gap-3"
-          >
-            <div className="absolute top-0.5 -left-[27px] flex h-6 w-6 items-center justify-center rounded-md border border-neutral-300 bg-white text-[#64748B] shadow-2xs">
-              <CheckSquare className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0 flex-1 pl-1">
-              <span className="mb-0.5 block font-sans text-[11px] text-[#64748B] italic">
-                {item.dateStr}
-              </span>
-              <h4 className="text-xs leading-tight font-bold tracking-tight text-[#1E293B] uppercase">
-                {item.title}{" "}
-                <span className="font-mono font-semibold text-neutral-500">
-                  ({item.code})
-                </span>
-              </h4>
-              <p className="mt-1 text-xs leading-snug font-semibold text-[#334155]">
-                {item.statusText}
-              </p>
-              <p className="mt-0.5 text-[11px] font-medium text-[#64748B]">
-                Due Date: {item.dueDateText}
-              </p>
-            </div>
-            <button
-              onClick={() => actions.dismissReminder(item.id)}
-              className="mt-1 min-h-11 shrink-0 cursor-pointer rounded bg-neutral-200/80 px-3 py-1 text-[11px] font-bold text-[#475569] transition-all hover:bg-neutral-300"
-            >
-              Dismiss
-            </button>
-          </div>
-        ))}
-      </div>
+      )}
     </div>
   )
 }
