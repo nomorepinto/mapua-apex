@@ -98,6 +98,7 @@ const UNIQUE_PROPONENT_FIELDS: Array<{
 }> = [
     { field: "studentNumber", label: "student number" },
     { field: "contactNumber", label: "mobile number" },
+    { field: "emailAddress", label: "email address" },
     { field: "positionOfApplicant", label: "position of the applicant" },
     { field: "facebookLink", label: "Facebook link" },
   ]
