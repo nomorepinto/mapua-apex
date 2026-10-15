@@ -13,8 +13,15 @@ import { RootErrorBoundary, NotFoundPage } from "@/components/layout/error-bound
 
 function RouteFallback() {
   return (
-    <div className={layout.fallback} role="status" aria-live="polite">
-      Loading page…
+    <div className={layout.center}>
+      <div
+        aria-live="polite"
+        className="flex flex-col items-center space-y-4"
+        role="status"
+      >
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#8B0000] border-t-transparent" />
+        <p className="text-sm font-medium text-neutral-600">Loading page…</p>
+      </div>
     </div>
   )
 }

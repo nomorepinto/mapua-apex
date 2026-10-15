@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { layout } from "@/config"
 import {
   useAvailableOrganizationsQuery,
@@ -96,7 +97,7 @@ export function CollaboratorsSection({
       </div>
 
       {organizationsQuery.isLoading ? (
-        <p className="text-sm text-neutral-500">Loading organizations…</p>
+        <LoadingBlock label="Loading organizations" rows={2} rowClassName="h-10 w-full" />
       ) : organizationsQuery.isError ? (
         <p className="text-sm text-red-600">
           Could not load the organization list.

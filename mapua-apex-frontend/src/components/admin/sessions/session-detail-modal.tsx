@@ -1,5 +1,6 @@
 import { XIcon, LaptopIcon } from "lucide-react";
 import type { Session } from "@/types/logs";
+import { LoadingBlock } from "@/components/ui/loading-block";
 import { formatManila } from "@/lib/monitor-formatters";
 import { SessionRoleBadge } from "./session-role-badge";
 
@@ -37,7 +38,7 @@ export function SessionDetailModal({
           </div>
 
           {isLoading ? (
-            <div className="py-12 text-center text-neutral-400">Loading session timeline...</div>
+            <LoadingBlock label="Loading session timeline" rowClassName="h-16 w-full" />
           ) : session ? (
             <div className="space-y-6">
               {/* Identity Card */}

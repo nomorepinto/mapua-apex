@@ -3,6 +3,7 @@ import { CalendarCheckIcon, ClipboardListIcon } from "lucide-react"
 import { useEventParticipantsQuery } from "@/hooks/use-postevals"
 import { formatDisplayDateTime } from "@/lib/dynamodb-adapters"
 import { layout } from "@/config"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { cn } from "@/lib/utils"
 
 function StatCard({
@@ -57,9 +58,12 @@ export function AttendanceEvaluationSection({ eventId }: { eventId: string }) {
       </div>
 
       {isPending ? (
-        <div className={layout.empty}>
-          <p className="text-sm text-neutral-500">Loading participation data…</p>
-        </div>
+        <LoadingBlock
+          className="grid grid-cols-1 gap-3 space-y-0 sm:grid-cols-2"
+          label="Loading participation data"
+          rows={2}
+          rowClassName="h-16 w-full rounded-xl"
+        />
       ) : isError ? (
         <div className={layout.empty}>
           <p className="text-sm text-neutral-500">

@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -97,11 +98,8 @@ export function AdminSubmissionsSection() {
           <TableBody>
             {state.submissionsLoading ? (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="py-12 text-center text-sm text-neutral-400"
-                >
-                  Loading submissions…
+                <TableCell colSpan={6} className="py-4">
+                  <LoadingBlock label="Loading submissions" />
                 </TableCell>
               </TableRow>
             ) : state.submissionsError ? (

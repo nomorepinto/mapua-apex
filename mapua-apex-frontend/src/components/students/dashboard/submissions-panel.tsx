@@ -8,6 +8,7 @@ import {
 } from "@/components/students/dashboard/student-calendar-card"
 import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
 import { Input } from "@/components/ui/input"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import {
   Table,
   TableBody,
@@ -78,11 +79,8 @@ export function SubmissionsPanel() {
           <TableBody className="divide-y divide-neutral-100 bg-white">
             {state.submissionsLoading ? (
               <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="py-12 text-center text-sm font-semibold text-neutral-500"
-                >
-                  Loading proposals…
+                <TableCell colSpan={7} className="py-4">
+                  <LoadingBlock label="Loading proposals" />
                 </TableCell>
               </TableRow>
             ) : state.submissionsError ? (

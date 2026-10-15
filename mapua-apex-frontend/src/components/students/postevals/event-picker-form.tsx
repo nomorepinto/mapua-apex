@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { layout } from "@/config"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { formatDisplayDate } from "@/lib/dynamodb-adapters"
 import { cn } from "@/lib/utils"
 
@@ -43,7 +44,7 @@ export function EventPickerForm() {
         className={cn(layout.section, "space-y-6")}
       >
         {state.isLoading ? (
-          <p className="text-sm text-neutral-600">Loading eligible events…</p>
+          <LoadingBlock label="Loading eligible events" rows={2} rowClassName="h-10 w-full" />
         ) : state.loadError ? (
           <p className="text-sm font-medium text-red-600">
             We couldn't load your events. Please try again.

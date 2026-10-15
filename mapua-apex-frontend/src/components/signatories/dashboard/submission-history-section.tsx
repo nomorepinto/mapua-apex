@@ -16,6 +16,7 @@ import {
   type ActivityTableFilters,
 } from "@/hooks/use-activity-table-filters"
 import { useReviewDashboardContext } from "@/components/signatories/dashboard/review-dashboard-context"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { layout } from "@/config"
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -112,8 +113,8 @@ function HistoryTable({ filters, loading, onSelect, emptyLabel, hasRows }: Histo
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-14 text-center text-sm text-neutral-400">
-                  Loading history…
+                <TableCell colSpan={6} className="py-4">
+                  <LoadingBlock label="Loading history" />
                 </TableCell>
               </TableRow>
             ) : filters.rows.length === 0 ? (

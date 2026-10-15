@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { layout } from "@/config"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import {
   MONTH_NAMES,
   WEEKDAY_NAMES,
@@ -932,9 +933,10 @@ export function CdmCalendarSection() {
               {/* Day Content for Selected Date with Dedicated Scrollbar */}
               <div className="scrollbar-thin mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1.5 [scrollbar-width:thin] [scrollbar-color:#CBD5E1_transparent]">
                 {isDataLoading ? (
-                  <div className="py-12 text-center text-xs text-neutral-400">
-                    Loading reservations…
-                  </div>
+                  <LoadingBlock
+                    label="Loading reservations"
+                    rowClassName="h-16 w-full rounded-lg"
+                  />
                 ) : dayViewMode === "rooms" ? (
                   /* Expected Rooms List View */
                   expectedRoomsOnSelectedDate.length === 0 ? (

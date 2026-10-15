@@ -1,6 +1,7 @@
 import { Megaphone } from "lucide-react"
 
 import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { formatDisplayDateTime } from "@/lib/dynamodb-adapters"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
@@ -21,9 +22,7 @@ export function AnnouncementsPanel() {
       </div>
 
       {state.announcementsLoading ? (
-        <p className="rounded-xl bg-neutral-50 p-6 text-center text-xs font-medium text-neutral-500">
-          Loading announcements…
-        </p>
+        <LoadingBlock label="Loading announcements" rowClassName="h-16 w-full rounded-xl" />
       ) : state.announcementsError ? (
         <p className="rounded-xl bg-red-50 p-6 text-center text-xs font-medium text-rose-700">
           Could not load announcements.

@@ -7,6 +7,7 @@ import {
   type ProposalDashboardStatus,
 } from "@/components/students/dashboard/student-calendar-card"
 import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { layout } from "@/config"
 import { formatDisplayDateTime } from "@/lib/dynamodb-adapters"
 import { cn } from "@/lib/utils"
@@ -137,9 +138,7 @@ export function RemindersPanel() {
       {remindersExpanded && (
         <div className="scrollbar-thin mt-4 max-h-[460px] overflow-y-auto border-t border-neutral-100 pt-3 pr-1">
           {state.remindersLoading ? (
-            <div className="p-8 text-center text-xs text-neutral-500">
-              Loading reminders…
-            </div>
+            <LoadingBlock label="Loading reminders" rowClassName="h-16 w-full rounded-xl" />
           ) : timelineItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 p-8 text-center">
               <Bell className="mb-2 h-6 w-6 text-neutral-300" />

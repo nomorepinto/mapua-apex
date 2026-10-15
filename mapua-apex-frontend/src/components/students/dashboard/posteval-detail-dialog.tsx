@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { usePostEvalDetailQuery } from "@/hooks/use-postevals"
 import { modal } from "@/config"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { cn } from "@/lib/utils"
 
 /**
@@ -60,9 +61,11 @@ export function PostEvalDetailDialog({
 
         <DialogPanel className="flex-1 overflow-y-auto bg-neutral-50/50 px-4 py-6 sm:px-8">
           {isPending ? (
-            <p className="py-12 text-center text-sm text-neutral-500">
-              Loading post-evaluation…
-            </p>
+            <LoadingBlock
+              className="py-6"
+              label="Loading post-evaluation"
+              rowClassName="h-24 w-full"
+            />
           ) : isError || !data ? (
             <p className="py-12 text-center text-sm font-semibold text-rose-600">
               Could not load this post-evaluation.

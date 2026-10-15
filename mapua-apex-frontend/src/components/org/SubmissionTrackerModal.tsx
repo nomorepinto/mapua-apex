@@ -24,6 +24,8 @@ import {
   signatoryChainLabel,
 } from "@/lib/dynamodb-adapters"
 import { brand, modal } from "@/config"
+import { LoadingBlock } from "@/components/ui/loading-block"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -226,10 +228,10 @@ export function SubmissionTrackerModal({
 
         <DialogPanel className="flex-1 overflow-y-auto bg-white px-4 py-6 text-neutral-800 sm:px-8">
           {detailQuery.isLoading ? (
-            <div className="flex items-center justify-center p-12 text-sm text-neutral-500">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin text-[#8B0000]" />
-              <span>Loading submission details…</span>
-            </div>
+            <LoadingBlock
+              label="Loading submission details"
+              rowClassName="h-24 w-full"
+            />
           ) : detailQuery.isError ? (
             <p className="text-sm font-semibold text-rose-600">
               Could not load this submission. Try again from the dashboard.
@@ -285,10 +287,11 @@ export function SubmissionTrackerModal({
 
                 <div className="pt-2.5">
                   {notificationsQuery.isLoading ? (
-                    <div className="flex items-center gap-2 py-2 text-xs text-neutral-500">
-                      <Loader2 className="size-3.5 animate-spin text-amber-700" />
-                      <span>Loading reviewer feedback…</span>
-                    </div>
+                    <LoadingBlock
+                      label="Loading reviewer feedback"
+                      rows={2}
+                      rowClassName="h-4 w-full"
+                    />
                   ) : latestReturnNotification?.comment ? (
                     <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium text-neutral-800">
                       {latestReturnNotification.comment}
@@ -364,10 +367,11 @@ export function SubmissionTrackerModal({
 
                 <div className="pt-2.5">
                   {notificationsQuery.isLoading ? (
-                    <div className="flex items-center gap-2 py-2 text-xs text-neutral-500">
-                      <Loader2 className="size-3.5 animate-spin text-amber-700" />
-                      <span>Loading reviewer feedback…</span>
-                    </div>
+                    <LoadingBlock
+                      label="Loading reviewer feedback"
+                      rows={2}
+                      rowClassName="h-4 w-full"
+                    />
                   ) : latestReturnNotification?.comment ? (
                     <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium text-neutral-800">
                       {latestReturnNotification.comment}
@@ -523,7 +527,15 @@ export function SubmissionTrackerModal({
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="text-base font-bold text-neutral-900">Progress Tracking</h3>
                   <span className="text-xs text-neutral-500 font-medium">
-                    {notificationsQuery.isLoading ? "Loading notifications…" : "From review notifications"}
+                    {notificationsQuery.isLoading ? (
+                      <Skeleton
+                        aria-label="Loading notifications"
+                        className="h-3 w-36"
+                        role="status"
+                      />
+                    ) : (
+                      "From review notifications"
+                    )}
                   </span>
                 </div>
 

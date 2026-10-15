@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { layout } from "@/config"
 import {
   blockNonDecimalKeys,
@@ -305,11 +306,8 @@ export function FinancialReportSection({
             <tbody className="divide-y divide-neutral-200">
               {isLoading ? (
                 <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-6 text-center text-sm text-neutral-500"
-                  >
-                    Loading approved budget…
+                  <td colSpan={5} className="px-4 py-4">
+                    <LoadingBlock label="Loading approved budget" />
                   </td>
                 </tr>
               ) : budgetItems.length === 0 ? (

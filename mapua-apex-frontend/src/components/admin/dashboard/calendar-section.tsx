@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 
 import { useAdminDashboard } from "@/components/admin/dashboard/admin-dashboard-context"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -720,9 +721,10 @@ export function AdminCalendarSection() {
               {/* Applications List for Selected Date */}
               <div className="scrollbar-thin mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1.5 [scrollbar-width:thin] [scrollbar-color:#CBD5E1_transparent]">
                 {submissionsLoading ? (
-                  <div className="py-12 text-center text-xs text-neutral-400">
-                    Loading applications…
-                  </div>
+                  <LoadingBlock
+                    label="Loading applications"
+                    rowClassName="h-16 w-full rounded-lg"
+                  />
                 ) : submissionsError ? (
                   <div className="py-12 text-center text-xs text-rose-600">
                     Failed to load applications.

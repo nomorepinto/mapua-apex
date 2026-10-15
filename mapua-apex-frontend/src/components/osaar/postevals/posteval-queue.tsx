@@ -7,6 +7,7 @@ import {
   usePostEvalsReview,
   type PostEvalSelection,
 } from "@/components/osaar/postevals/postevals-review-context"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import {
   Table,
   TableBody,
@@ -180,8 +181,8 @@ export function PostEvalQueue() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-14 text-center text-sm text-neutral-400">
-                    Loading post-evaluations…
+                  <TableCell colSpan={7} className="py-4">
+                    <LoadingBlock label="Loading post-evaluations" />
                   </TableCell>
                 </TableRow>
               ) : isError ? (

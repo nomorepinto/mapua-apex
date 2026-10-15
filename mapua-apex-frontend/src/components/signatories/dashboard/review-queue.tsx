@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useReviewDashboardContext } from "@/components/signatories/dashboard/review-dashboard-context"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { layout } from "@/config"
 
 export function ReviewQueue() {
@@ -103,11 +104,8 @@ export function ReviewQueue() {
             <TableBody>
               {state.isLoading ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="py-14 text-center text-sm text-neutral-400"
-                  >
-                    Loading your review queue…
+                  <TableCell colSpan={7} className="py-4">
+                    <LoadingBlock label="Loading your review queue" />
                   </TableCell>
                 </TableRow>
               ) : filters.rows.length === 0 ? (

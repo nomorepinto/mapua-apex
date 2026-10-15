@@ -39,6 +39,7 @@ import { ActivityBudgetTable } from "@/components/ui/activity-budget-table"
 import { ActivityReservationDetails } from "@/components/ui/activity-reservation-details"
 import { saveActivityAsPdf } from "@/lib/save-proposal-pdf"
 import { brand, modal } from "@/config"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { formatDocumentId } from "@/lib/dynamodb-adapters"
 import { cn } from "@/lib/utils"
 
@@ -143,10 +144,10 @@ export function SubmissionDetailDialog() {
 
         <DialogPanel className="flex-1 overflow-y-auto bg-white px-4 py-6 text-neutral-800 sm:px-8">
           {state.detailLoading ? (
-            <div className="flex items-center justify-center p-12 text-sm text-neutral-500">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin text-[#8B0000]" />
-              <span>Loading submission details…</span>
-            </div>
+            <LoadingBlock
+              label="Loading submission details"
+              rowClassName="h-24 w-full"
+            />
           ) : state.detailError ? (
             <p className="text-sm font-semibold text-rose-600">
               Could not load this submission.

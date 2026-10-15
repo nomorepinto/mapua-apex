@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -50,11 +51,8 @@ export function AdminAnnouncementsSection() {
           <TableBody>
             {state.announcementsLoading ? (
               <TableRow>
-                <TableCell
-                  colSpan={2}
-                  className="py-12 text-center text-sm text-neutral-400"
-                >
-                  Loading announcements…
+                <TableCell colSpan={2} className="py-4">
+                  <LoadingBlock label="Loading announcements" />
                 </TableCell>
               </TableRow>
             ) : state.announcementsError ? (

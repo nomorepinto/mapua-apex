@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { useOsaarPostEvalDetailQuery } from "@/hooks/use-postevals"
 import { modal } from "@/config"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { cn } from "@/lib/utils"
 
 /**
@@ -85,9 +86,11 @@ export function PostEvalReviewDialog() {
             {data ? (
               <PostEvalDetailBody postEval={data} />
             ) : isPending ? (
-              <p className="py-12 text-center text-sm text-neutral-500">
-                Loading post-evaluation…
-              </p>
+              <LoadingBlock
+                className="py-6"
+                label="Loading post-evaluation"
+                rowClassName="h-24 w-full"
+              />
             ) : isError ? (
               <p className="py-12 text-center text-sm font-semibold text-rose-600">
                 Could not load this post-evaluation.

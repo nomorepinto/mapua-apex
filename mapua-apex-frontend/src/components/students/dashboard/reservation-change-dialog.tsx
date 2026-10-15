@@ -16,6 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { toastManager } from "@/components/ui/toast"
 import { layout, modal } from "@/config"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { mutationErrorMessage } from "@/hooks/use-admin"
 import {
   useReservationChangesQuery,
@@ -150,8 +151,11 @@ export function ReservationChangeDialog({
         </DialogHeader>
 
         {detailQuery.isLoading ? (
-          <DialogPanel className="p-10 text-center text-sm text-neutral-500">
-            Loading reservation…
+          <DialogPanel className="p-6">
+            <LoadingBlock
+              label="Loading reservation"
+              rowClassName="h-24 w-full"
+            />
           </DialogPanel>
         ) : pendingChange ? (
           <>

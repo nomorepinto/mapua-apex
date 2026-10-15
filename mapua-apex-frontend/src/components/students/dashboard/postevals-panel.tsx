@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
+import { LoadingBlock } from "@/components/ui/loading-block"
 import { useOrgPostEvalsQuery } from "@/hooks/use-postevals"
 import {
   apiPostEvalToDashboardRow,
@@ -150,11 +151,8 @@ export function PostEvalsPanel() {
           <TableBody className="divide-y divide-neutral-50">
             {isPending ? (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="py-12 text-center text-sm font-semibold text-neutral-600"
-                >
-                  Loading post-evaluations…
+                <TableCell colSpan={6} className="py-4">
+                  <LoadingBlock label="Loading post-evaluations" />
                 </TableCell>
               </TableRow>
             ) : isError ? (
