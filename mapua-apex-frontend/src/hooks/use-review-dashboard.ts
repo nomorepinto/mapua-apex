@@ -18,6 +18,7 @@ import {
   useSignatoryHistoryQuery,
   useSignatoryQueueQuery,
   useSignatorySubmissionDetailQuery,
+  useSubmissionBookingConflictsQuery,
   useUpdateEventClassificationMutation,
 } from "@/hooks/use-signatory"
 import { apiSubmissionToActivity, formatDocumentId } from "@/lib/dynamodb-adapters"
@@ -258,6 +259,12 @@ export function useReviewDashboard() {
     )
   }, [activeKeys, reviewActivities])
 
+  const bookingConflictsQuery = useSubmissionBookingConflictsQuery(
+    activeKeys?.eventId,
+    activeKeys?.submissionId,
+    isCdm && !isReadOnly
+  )
+
   return {
     role,
     roleLabel,
@@ -286,6 +293,9 @@ export function useReviewDashboard() {
       approveMutation.isPending || returnMutation.isPending || denyMutation.isPending,
     isUpdatingClassification: updateClassificationMutation.isPending,
     isReadOnly,
+    /** CDM only: slots the open paper's holds collide with (empty when approvable). */
+    bookingConflicts: isCdm && !isReadOnly ? bookingConflictsQuery.data ?? [] : [],
+    isCheckingBookingConflicts: isCdm && !isReadOnly && bookingConflictsQuery.isLoading,
     actionError,
     handleDeptSelect,
     handleOrgSelect,

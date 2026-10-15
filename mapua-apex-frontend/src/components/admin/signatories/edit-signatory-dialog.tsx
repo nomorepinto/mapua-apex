@@ -1,6 +1,15 @@
 import { CircleAlertIcon } from "lucide-react"
 
+import { takenSingletonRoles } from "@/components/admin-osa/signatory-roles"
 import { DepartmentSelect } from "@/components/admin/signatories/department-select"
+import {
+  SIGNATORY_NAME_MAX,
+  SIGNATORY_NAME_MIN,
+  blockInvalidSignatoryNameKeys,
+  isSignatoryNameValid,
+  sanitizeSignatoryName,
+  signatoryNameLiveErrors,
+} from "@/components/admin/signatories/signatory-name"
 import { useSignatoriesPage } from "@/components/admin/signatories/signatories-context"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -28,6 +37,24 @@ import { modal } from "@/config"
 
 export function EditSignatoryDialog() {
   const { state, actions } = useSignatoriesPage()
+
+  const signatoryErrors = signatoryNameLiveErrors(state.editName)
+  if (
+    state.editError &&
+    state.editError.toLowerCase().includes("name") &&
+    !signatoryErrors.includes(state.editError)
+  ) {
+    signatoryErrors.push(state.editError)
+  }
+
+  const takenRoles = takenSingletonRoles(
+    state.signatories,
+    state.editing?.signatory_id
+  )
+  const canSave =
+    isSignatoryNameValid(state.editName) &&
+    state.editRole !== null &&
+    !takenRoles.has(state.editRole)
 
   return (
     <Dialog
@@ -57,15 +84,26 @@ export function EditSignatoryDialog() {
             <Field>
               <FieldLabel htmlFor="edit-signatory-name">Name</FieldLabel>
               <Input
+                aria-invalid={signatoryErrors.length > 0 ? true : undefined}
                 autoComplete="off"
                 id="edit-signatory-name"
+                minLength={SIGNATORY_NAME_MIN}
+                maxLength={SIGNATORY_NAME_MAX}
+                onKeyDown={blockInvalidSignatoryNameKeys}
                 onChange={(event) =>
-                  actions.changeEditName(event.currentTarget.value)
+                  actions.changeEditName(
+                    sanitizeSignatoryName(event.currentTarget.value)
+                  )
                 }
                 required
                 type="text"
                 value={state.editName}
               />
+              {signatoryErrors.map((err) => (
+                <p key={err} className="text-xs font-medium text-red-600">
+                  {err}
+                </p>
+              ))}
             </Field>
             <Field>
               <FieldLabel>Role</FieldLabel>
@@ -94,7 +132,8 @@ export function EditSignatoryDialog() {
                 value={state.editDepartment}
               />
             ) : null}
-            {state.editError ? (
+            {state.editError &&
+            !state.editError.toLowerCase().includes("name") ? (
               <Alert variant="error">
                 <CircleAlertIcon />
                 <AlertTitle>Could not save</AlertTitle>
@@ -120,7 +159,7 @@ export function EditSignatoryDialog() {
             <DialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
             </DialogClose>
-            <Button loading={state.updatePending} type="submit">
+            <Button disabled={!canSave} loading={state.updatePending} type="submit">
               Save changes
             </Button>
           </DialogFooter>

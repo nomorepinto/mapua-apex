@@ -168,6 +168,9 @@ export interface ApiAvailability {
 
 export type BookingSource = "submission" | "cdm"
 
+/** Submission holds stay `pending` (not occupying slots) until CDM approves the paper. */
+export type BookingApprovalStatus = "pending" | "approved"
+
 export interface ApiBooking {
   booking_id: string
   reservable_id: string
@@ -175,6 +178,9 @@ export interface ApiBooking {
   reservable_type: ReservableType
   campus_id: string
   source: BookingSource
+  approval_status: BookingApprovalStatus
+  approved_at?: string | null
+  approved_by?: string | null
   timestamp: string
   schedule_selected: SlotSelection[]
   /** CDM manual bookings only. */
@@ -184,6 +190,18 @@ export interface ApiBooking {
   organization_id?: string | null
   submission_id?: string | null
   event_id?: string | null
+}
+
+export type BookingConflictReason = "taken" | "not_offered" | "capacity" | "missing_reservable"
+
+/** One slot a paper's pending hold would collide with if approved now. */
+export interface BookingConflict {
+  reservable_id: string
+  reservable_name: string
+  date: string | null
+  slot: number | null
+  reason: BookingConflictReason
+  message: string
 }
 
 /** A reservable picked in the SAAF venue reservation, with its date+slot selections. */

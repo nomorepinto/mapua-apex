@@ -69,6 +69,7 @@ class SubmissionBookingTest extends TestCase
         $booking = $db->find($refs[0]['pk'], $refs[0]['sk']);
         $this->assertIsArray($booking);
         $this->assertSame('submission', $booking['source'] ?? null);
+        $this->assertSame('pending', $booking['approval_status'] ?? null);
         $this->assertSame('ORGANIZATION#a1b2', $booking['GSI5PK'] ?? null);
         $this->assertSame($submissionId, $booking['submission_id'] ?? null);
         $this->assertSame([['date' => self::DATE, 'slots' => [0, 1]]], $booking['schedule_selected'] ?? null);
@@ -86,6 +87,22 @@ class SubmissionBookingTest extends TestCase
 
         $this->assertCount(0, $this->itemsWithSkPrefix($db, 'SUBMISSION#'));
         $this->assertCount(1, $this->itemsWithSkPrefix($db, 'BOOKING#'));
+    }
+
+    public function test_two_papers_may_request_the_same_slot_while_both_are_pending(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        $this->seedCatalog($db);
+
+        $this->withStudentAuth()
+            ->postJson('/api/v1/students/submissions', $this->payloadWithReservation([0]))
+            ->assertCreated();
+
+        $this->withStudentAuth()
+            ->postJson('/api/v1/students/submissions', $this->payloadWithReservation([0]))
+            ->assertCreated();
+
+        $this->assertCount(2, $this->itemsWithSkPrefix($db, 'BOOKING#'));
     }
 
     public function test_room_participant_bounds_reject_an_oversized_headcount(): void

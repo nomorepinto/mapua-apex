@@ -140,8 +140,10 @@ and 9:00 PM, end not earlier than start, and start ≠ end.
 Legacy items stored before this shape may still carry `equipment_requested` /
 `function_rooms` / `audiovisual_equipment`; reads tolerate both. On submit each
 selection is validated against the reservable's weekly template and existing
-BOOKINGs, then written as `source:"submission"` holds — a slot taken in the
-meantime aborts with **409** and persists nothing.
+approved BOOKINGs, then written as `source:"submission"` holds with
+`approval_status: "pending"` — a slot taken in the meantime aborts with **409**
+and persists nothing. Pending holds do not occupy slots until the CDM desk
+approves the paper (see BOOKING).
 
 ---
 
@@ -393,6 +395,20 @@ released on deny/return/re-edit via the SUBMISSION's `booking_refs`:
 | `GSI5PK` | string | `ORGANIZATION#uuid` — owning org (org booking list) |
 | `GSI5SK` | timestamp | `timestamp` |
 | `event_id` / `submission_id` / `organization_id` | string | Bare uuids for traceability and read-only CDM labelling |
+| `approval_status` | string | `pending` (written on SAAF submit/re-edit) \| `approved`. Absent on legacy items, which read as approved |
+| `approved_at` | timestamp | Sparse — stamped when CDM approves the paper |
+| `approved_by` | string | Sparse — `SIGNATORY#uuid` of the approving CDM signatory |
+
+Only **approved** holds occupy slots. On the paper's last approval (the CDM
+desk, which is always last when a venue is reserved) `ApproveSubmission`
+re-checks every `booking_refs` hold against the approved bookings — a slot taken
+in the meantime aborts **409** with nothing written, leaving the paper on the CDM
+desk to return or deny — then flips each hold to `approved`. The CDM review screen
+reads the same check (without writing) from
+`GET /signatories/events/{event}/submissions/{submission}/booking-conflicts`.
+Pending holds are still listed on the CDM Reserve/View page (labelled) and still
+block reservable deletion. Legacy holds are stamped by
+`scripts/backfill_booking_approval.py`.
 
 Manual (`source: "cdm"`) carries **no** GSI5 and **no** submission linkage (so it
 never surfaces in an org's list); it is released only by CDM delete:
@@ -403,7 +419,8 @@ never surfaces in an org's list); it is released only by CDM delete:
 | `reason` | string | Optional purpose note (omitted when blank) |
 
 Both flavors share one availability engine: a slot is free only when the weekly
-template allows it AND no BOOKING (either source) occupies that date+slot.
+template allows it AND no approved BOOKING (either source; manual holds always
+count) occupies that date+slot.
 Conflict detection runs on the base RESERVABLE partition — never GSI5 — so it
 works before the (operator-provisioned) organization index exists.
 
@@ -414,6 +431,8 @@ RESERVATION_CHANGE resolution: a same-reservable date/slot change patches
 `booking_refs` entry stays valid); a room swap deletes the old BOOKING and
 recreates a `source:"submission"` hold under the new RESERVABLE partition,
 swapping the `booking_refs` entry to the new keys in the same submission update.
+The recreated hold is written `approval_status: "approved"` (the paper is already
+approved).
 
 ---
 

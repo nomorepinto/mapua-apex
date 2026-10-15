@@ -121,6 +121,8 @@ Route::middleware(['cognito.jwt:signatory', 'throttle:signatory', 'activity.log'
         Route::get('submissions/history', [SignatorySubmissionController::class, 'history'])->name('submissions.history');
         Route::get('events/{event}/submissions/{submission}', [SignatorySubmissionController::class, 'show'])
             ->name('submissions.show');
+        Route::get('events/{event}/submissions/{submission}/booking-conflicts', [SignatorySubmissionController::class, 'bookingConflicts'])
+            ->name('submissions.booking-conflicts');
         Route::post('events/{event}/submissions/{submission}/approve', [SignatorySubmissionController::class, 'approve'])
             ->middleware('throttle:signatory-write')
             ->name('submissions.approve');

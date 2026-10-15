@@ -61,6 +61,8 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
         isCampusDesk: dashboard.isCampusDesk,
         isUpdatingClassification: dashboard.isUpdatingClassification,
         isReadOnly: dashboard.isReadOnly,
+        bookingConflicts: dashboard.bookingConflicts,
+        isCheckingBookingConflicts: dashboard.isCheckingBookingConflicts,
         actionError: dashboard.actionError,
       },
       actions: {

@@ -112,8 +112,11 @@ export function ReserveSection() {
   }, [organizationsQuery.data])
 
   const manualBookings = bookings.filter((booking) => booking.source === "cdm")
-  const submissionBookings = bookings.filter(
-    (booking) => booking.source === "submission"
+  const approvedSubmissionBookings = bookings.filter(
+    (booking) => booking.source === "submission" && booking.approval_status !== "pending"
+  )
+  const pendingSubmissionBookings = bookings.filter(
+    (booking) => booking.source === "submission" && booking.approval_status === "pending"
   )
 
   function toggleReserveSlot(slot: number) {
@@ -327,7 +330,8 @@ export function ReserveSection() {
             <CardTitle>Existing holds</CardTitle>
             <CardDescription>
               Release manual holds you created. Submission holds are read-only —
-              they are released by deny, return, or re-edit.
+              they are released by deny, return, or re-edit. Requests pending
+              CDM approval don't occupy their slots until you approve the paper.
             </CardDescription>
           </CardHeader>
           <CardPanel className="p-0">
@@ -347,7 +351,11 @@ export function ReserveSection() {
               </Empty>
             ) : (
               <ul className="flex flex-col divide-y divide-neutral-200">
-                {[...manualBookings, ...submissionBookings].map((booking) => (
+                {[
+                  ...manualBookings,
+                  ...approvedSubmissionBookings,
+                  ...pendingSubmissionBookings,
+                ].map((booking) => (
                   <BookingRow
                     booking={booking}
                     key={booking.booking_id}
@@ -382,9 +390,10 @@ function BookingRow({
   releasePending: boolean
 }) {
   const isManual = booking.source === "cdm"
+  const isPending = !isManual && booking.approval_status === "pending"
 
   return (
-    <li className="flex items-start gap-3 px-4 py-3">
+    <li className={cn("flex items-start gap-3 px-4 py-3", isPending && "opacity-70")}>
       <div
         className={cn(
           "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
@@ -410,6 +419,11 @@ function BookingRow({
           >
             {isManual ? "CDM" : "Org"}
           </span>
+          {isPending ? (
+            <span className="rounded-sm border border-dashed border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+              Pending CDM approval
+            </span>
+          ) : null}
         </div>
         <p className="mt-0.5 text-xs text-neutral-600">
           {formatSelections(booking)}

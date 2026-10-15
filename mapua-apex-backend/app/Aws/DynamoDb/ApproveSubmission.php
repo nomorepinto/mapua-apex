@@ -10,6 +10,7 @@ final class ApproveSubmission
         private SignatorySequenceResolver $sequence,
         private GetEvent $events,
         private NotificationRecords $notifications,
+        private BookingRecords $bookings,
     ) {}
 
     /**
@@ -38,6 +39,8 @@ final class ApproveSubmission
         $fullyApproved = $nextSignatory === null;
 
         if ($fullyApproved) {
+            $this->approveBookings($signatoryId, $submission);
+
             $set = ['status' => 'approved'];
 
             if ($needsBackfill) {
@@ -107,6 +110,31 @@ final class ApproveSubmission
         );
 
         return $submission;
+    }
+
+    /**
+     * The final (CDM) approval is what turns the paper's pending holds into real
+     * reservations. Any slot taken by an approved booking in the meantime aborts
+     * 409 before the submission or its bookings are written.
+     *
+     * @param  array<string, mixed>  $submission
+     */
+    private function approveBookings(string $signatoryId, array $submission): void
+    {
+        $refs = is_array($submission['booking_refs'] ?? null) ? array_values($submission['booking_refs']) : [];
+
+        if ($refs === []) {
+            return;
+        }
+
+        $expected = data_get($submission, 'activity_details.expected_participants');
+        $conflicts = $this->bookings->conflictsForRefs($refs, is_numeric($expected) ? (int) $expected : null);
+
+        if ($conflicts !== []) {
+            abort(409, str_replace(' Pick another time.', '', $conflicts[0]['message']).' Return or deny this proposal so the organization can pick another time.');
+        }
+
+        $this->bookings->approveRefs($refs, $signatoryId);
     }
 
     /**

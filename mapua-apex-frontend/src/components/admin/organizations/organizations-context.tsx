@@ -18,6 +18,7 @@ import {
   withSharedDesks,
   type AssignableDesks,
 } from "@/components/admin/organizations/organization-desks"
+import { organizationNameError } from "@/components/admin/organizations/organization-name"
 import { toastManager } from "@/components/ui/toast"
 import {
   useBulkCreateOrganizationsMutation,
@@ -287,17 +288,9 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
   async function handleAddOne(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmed = name.trim()
-
-    if (!trimmed) {
-      setFormError("Organization name is required.")
-      return
-    }
-    if (trimmed.length < 5 || trimmed.length > 100) {
-      setFormError("The required minimum character is 5 and a maximum of 100")
-      return
-    }
-    if (/[0-9]/.test(trimmed)) {
-      setFormError("Organization name cannot contain numbers.")
+    const nameError = organizationNameError(name)
+    if (nameError) {
+      setFormError(nameError)
       return
     }
     if (existingNames.has(trimmed.toLowerCase())) {
@@ -386,8 +379,9 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
     }
 
     const trimmed = editName.trim()
-    if (!trimmed) {
-      setEditError("Organization name is required.")
+    const nameError = organizationNameError(editName)
+    if (nameError) {
+      setEditError(nameError)
       return
     }
     const duplicate = organizations.some(

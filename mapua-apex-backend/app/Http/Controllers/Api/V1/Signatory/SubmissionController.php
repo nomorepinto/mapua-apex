@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Signatory;
 
 use App\Aws\DynamoDb\ApproveSubmission;
+use App\Aws\DynamoDb\BookingRecords;
 use App\Aws\DynamoDb\DenySubmission;
 use App\Aws\DynamoDb\DynamoDbItems;
 use App\Aws\DynamoDb\DynamoKeys;
@@ -15,6 +16,7 @@ use App\Http\CognitoIdentity;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Signatory\DenySubmissionRequest;
 use App\Http\Resources\Api\V1\SubmissionResource;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -39,32 +41,64 @@ class SubmissionController extends Controller
         ListSignatoryHistory $historyService,
     ): SubmissionResource {
         $item = $submissions->require($event, $submission);
-        $signatoryId = CognitoIdentity::signatoryId($request);
+        $this->requireVisible($item, CognitoIdentity::signatoryId($request), $event, $submission, $historyService);
+
+        $item['signatory_chain'] = $chain->handle($item);
+
+        return new SubmissionResource($item);
+    }
+
+    /**
+     * Slots this paper's pending holds would collide with if approved now.
+     */
+    public function bookingConflicts(
+        Request $request,
+        string $event,
+        string $submission,
+        GetSubmission $submissions,
+        ListSignatoryHistory $historyService,
+        BookingRecords $bookings,
+    ): JsonResponse {
+        $item = $submissions->require($event, $submission);
+        $this->requireVisible($item, CognitoIdentity::signatoryId($request), $event, $submission, $historyService);
+
+        $refs = is_array($item['booking_refs'] ?? null) ? array_values($item['booking_refs']) : [];
+        $expected = data_get($item, 'activity_details.expected_participants');
+
+        return response()->json([
+            'data' => $refs === [] ? [] : $bookings->conflictsForRefs($refs, is_numeric($expected) ? (int) $expected : null),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function requireVisible(
+        array $item,
+        string $signatoryId,
+        string $event,
+        string $submission,
+        ListSignatoryHistory $historyService,
+    ): void {
         $signatoryKey = DynamoKeys::signatory($signatoryId);
 
         $isOnDesk = ($item['current_signatory'] ?? null) === $signatoryKey;
         $inSequence = in_array($signatoryKey, (array) ($item['signatory_sequence'] ?? []), true);
 
-        if (! $isOnDesk && ! $inSequence) {
-            $hist = $historyService->handle($signatoryId);
-            $eventKey = DynamoKeys::event($event);
-            $subKey = DynamoKeys::submission($submission);
-            $foundInHistory = false;
-            foreach ($hist as $h) {
-                if (($h['PK'] ?? null) === $eventKey && ($h['SK'] ?? null) === $subKey) {
-                    $foundInHistory = true;
-                    break;
-                }
-            }
+        if ($isOnDesk || $inSequence) {
+            return;
+        }
 
-            if (! $foundInHistory) {
-                abort(404);
+        $eventKey = DynamoKeys::event($event);
+        $subKey = DynamoKeys::submission($submission);
+
+        foreach ($historyService->handle($signatoryId) as $h) {
+            if (($h['PK'] ?? null) === $eventKey && ($h['SK'] ?? null) === $subKey) {
+                return;
             }
         }
 
-        $item['signatory_chain'] = $chain->handle($item);
-
-        return new SubmissionResource($item);
+        abort(404);
     }
 
     public function approve(
