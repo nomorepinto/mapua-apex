@@ -389,6 +389,78 @@ export function parseReservableCsv(text: string): {
   return { rows: parsed, errors }
 }
 
+export type MemberCsvRow = {
+  lastname: string
+  firstname: string
+  student_number: string
+}
+
+const MEMBER_LASTNAME_ALIASES = ["lastname", "last_name", "last name", "surname"]
+const MEMBER_FIRSTNAME_ALIASES = ["firstname", "first_name", "first name", "given name"]
+const MEMBER_STUDENT_NUMBER_ALIASES = ["student_number", "student number", "studentnumber", "student_id", "student id", "id"]
+
+export const MEMBER_CSV_TEMPLATE = `lastname,firstname,student_number\nDela Cruz,Juan,202100001\nSantos,Maria,202100002\n`
+
+/**
+ * Parse a member CSV of lastname, firstname, student_number.
+ * A header row is optional.
+ */
+export function parseMemberCsv(text: string): {
+  rows: MemberCsvRow[]
+  errors: string[]
+} {
+  const rows = parseCsvRows(text)
+  const errors: string[] = []
+
+  if (rows.length === 0) {
+    return { rows: [], errors: ["CSV is empty."] }
+  }
+
+  const first = rows[0]
+  const hasHeader =
+    headerIndex(first, MEMBER_LASTNAME_ALIASES) >= 0 ||
+    headerIndex(first, MEMBER_FIRSTNAME_ALIASES) >= 0 ||
+    headerIndex(first, MEMBER_STUDENT_NUMBER_ALIASES) >= 0
+  const header = hasHeader ? first : ["lastname", "firstname", "student_number"]
+  const start = hasHeader ? 1 : 0
+
+  const lastnameIdx =
+    headerIndex(header, MEMBER_LASTNAME_ALIASES) >= 0
+      ? headerIndex(header, MEMBER_LASTNAME_ALIASES)
+      : 0
+  const firstnameIdx =
+    headerIndex(header, MEMBER_FIRSTNAME_ALIASES) >= 0
+      ? headerIndex(header, MEMBER_FIRSTNAME_ALIASES)
+      : 1
+  const studentNumberIdx =
+    headerIndex(header, MEMBER_STUDENT_NUMBER_ALIASES) >= 0
+      ? headerIndex(header, MEMBER_STUDENT_NUMBER_ALIASES)
+      : 2
+
+  const parsed: MemberCsvRow[] = []
+
+  for (let i = start; i < rows.length; i++) {
+    const row = rows[i]
+    const lastname = row[lastnameIdx]?.trim() ?? ""
+    const firstname = row[firstnameIdx]?.trim() ?? ""
+    const studentNumber = row[studentNumberIdx]?.trim() ?? ""
+    const line = i + 1
+
+    if (!lastname && !firstname && !studentNumber) {
+      continue
+    }
+
+    if (!lastname || !firstname || !studentNumber) {
+      errors.push(`Row ${line}: expected lastname, firstname, and student_number.`)
+      continue
+    }
+
+    parsed.push({ lastname, firstname, student_number: studentNumber })
+  }
+
+  return { rows: parsed, errors }
+}
+
 export function downloadCsvTemplate(filename: string, contents: string) {
   const blob = new Blob([contents], { type: "text/csv;charset=utf-8" })
   const url = URL.createObjectURL(blob)

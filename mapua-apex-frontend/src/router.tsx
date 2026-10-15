@@ -123,6 +123,16 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "members",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { StudentMembersPage } = await import(
+            "@/routes/students/members"
+          )
+          return { Component: StudentMembersPage }
+        },
+      },
+      {
         path: "*",
         Component: () => <Navigate to="/students/dashboard" replace />,
       },

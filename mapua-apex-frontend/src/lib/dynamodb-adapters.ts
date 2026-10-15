@@ -241,6 +241,18 @@ export type CreateSignatoryPayload = {
   department?: string
 }
 
+export interface ApiMember {
+  student_number: string
+  lastname: string
+  firstname: string
+}
+
+export type CreateMemberPayload = {
+  student_number: string
+  lastname: string
+  firstname: string
+}
+
 export function buildSignatoryPayload(
   name: string,
   role: ApiSignatoryRole,

@@ -3,7 +3,9 @@
 namespace Tests\Fakes;
 
 use App\Aws\DynamoDb\ItemMarshaller;
+use Aws\Command;
 use Aws\DynamoDb\DynamoDbClient;
+use Aws\DynamoDb\Exception\DynamoDbException;
 use Mockery;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -31,6 +33,7 @@ final class InMemoryDynamoDb
     {
         $mock->shouldReceive('getItem')->andReturnUsing($this->getItem(...));
         $mock->shouldReceive('putItem')->andReturnUsing($this->putItem(...));
+        $mock->shouldReceive('batchWriteItem')->andReturnUsing($this->batchWriteItem(...));
         $mock->shouldReceive('query')->andReturnUsing($this->query(...));
         $mock->shouldReceive('scan')->andReturnUsing($this->scan(...));
         $mock->shouldReceive('updateItem')->andReturnUsing($this->updateItem(...));
@@ -85,9 +88,50 @@ final class InMemoryDynamoDb
         $item = $args['Item'] ?? [];
         $pk = $item['PK']['S'] ?? '';
         $sk = $item['SK']['S'] ?? '';
-        $this->table[$this->key($pk, $sk)] = $item;
+        $key = $this->key($pk, $sk);
+
+        $condition = $args['ConditionExpression'] ?? null;
+
+        if ($condition === 'attribute_not_exists(SK)' && isset($this->table[$key])) {
+            throw new DynamoDbException(
+                'The conditional request failed.',
+                new Command('PutItem', $args),
+                ['code' => 'ConditionalCheckFailedException', 'type' => 'client'],
+            );
+        }
+
+        $this->table[$key] = $item;
 
         return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array{UnprocessedItems: array<string, mixed>}
+     */
+    private function batchWriteItem(array $args): array
+    {
+        $requestItems = $args['RequestItems'] ?? [];
+
+        foreach ($requestItems as $tableName => $operations) {
+            foreach ($operations as $operation) {
+                if (isset($operation['PutRequest']['Item'])) {
+                    $item = $operation['PutRequest']['Item'];
+                    $pk = $item['PK']['S'] ?? '';
+                    $sk = $item['SK']['S'] ?? '';
+                    $this->table[$this->key($pk, $sk)] = $item;
+                }
+
+                if (isset($operation['DeleteRequest']['Key'])) {
+                    $key = $operation['DeleteRequest']['Key'];
+                    $pk = $key['PK']['S'] ?? '';
+                    $sk = $key['SK']['S'] ?? '';
+                    unset($this->table[$this->key($pk, $sk)]);
+                }
+            }
+        }
+
+        return ['UnprocessedItems' => []];
     }
 
     /**

@@ -3,9 +3,16 @@
 Items intentionally deferred out of the post-evaluation overhaul. They are
 tracked here so they are not lost, but are **not** part of the current change.
 
-## 1. Merge the three apps' data sources into one unified schema
+## ~~1. Merge the three apps' data sources into one unified schema~~
 
-**Status:** Deferred — too risky right now.
+**Status:** ~~Deferred — too risky right now.~~ **Partially resolved** — the
+org **member roster** is now unified under apex: mapua-apex owns the
+`ORGANIZATION#{org}` + `MEMBER#{student_number}` items (managed via
+`/api/v1/students/members`), and `arcus-attendance-system` reads that roster for
+its "Allow members only" scanner toggle instead of writing its own parallel
+`ORGANIZATION` + `MEMBER` join rows. The arcus STUDENT profile
+(`PK=SK=STUDENT#{student_number}`) stays arcus-owned and is a separate concern.
+Full org / event unification (the broader goal below) remains **deferred**.
 
 **Goal:** Have the two arcus companion apps (`arcus-attendance-system`,
 `arcus-evaluation-system`) read mapua-apex's authoritative

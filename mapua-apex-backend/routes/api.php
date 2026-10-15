@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\Signatory\ProfileController as SignatoryProfileC
 use App\Http\Controllers\Api\V1\Signatory\SubmissionController as SignatorySubmissionController;
 use App\Http\Controllers\Api\V1\Student\AnnouncementController as StudentAnnouncementController;
 use App\Http\Controllers\Api\V1\Student\DeadlineController;
+use App\Http\Controllers\Api\V1\Student\MemberController as StudentMemberController;
 use App\Http\Controllers\Api\V1\Student\NotificationController;
 use App\Http\Controllers\Api\V1\Student\OrganizationController as StudentOrganizationController;
 use App\Http\Controllers\Api\V1\Student\PostEvalController as StudentPostEvalController;
@@ -91,6 +92,20 @@ Route::middleware(['cognito.jwt:student', 'throttle:student', 'activity.log'])
             ->name('submissions.reservation-change.store');
         Route::get('events/{event}/submissions/{submission}/reservation-changes', [StudentReservationChangeController::class, 'index'])
             ->name('submissions.reservation-changes.index');
+        // Organization member roster management.
+        Route::get('members', [StudentMemberController::class, 'index'])->name('members.index');
+        Route::post('members', [StudentMemberController::class, 'store'])
+            ->middleware('throttle:student-write')
+            ->name('members.store');
+        Route::post('members/bulk', [StudentMemberController::class, 'bulkStore'])
+            ->middleware('throttle:student-write')
+            ->name('members.bulk-store');
+        Route::put('members/{studentId}', [StudentMemberController::class, 'update'])
+            ->middleware('throttle:student-write')
+            ->name('members.update');
+        Route::delete('members/{studentId}', [StudentMemberController::class, 'destroy'])
+            ->middleware('throttle:student-write')
+            ->name('members.destroy');
     });
 
 Route::middleware(['cognito.jwt:signatory', 'throttle:signatory', 'activity.log'])

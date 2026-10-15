@@ -25,6 +25,25 @@ no COLLABORATION POINTER rows (PK = ORGANIZATION#id, SK begins COLLAB#);
 otherwise it returns 409 and leaves the item untouched. Delete does not rewrite
 student Cognito custom:organization_id.
 
+ORGANIZATION MEMBER (apex-owned roster)
+PK: ORGANIZATION#uuid
+SK: MEMBER#studentId
+lastname: string
+firstname: string
+student_number: string
+
+The organization's member roster, owned and managed by mapua-apex through
+/api/v1/students/members (GET list, POST one, POST bulk CSV import, PUT edit
+name, DELETE remove). A create is guarded by attribute_not_exists(SK), so a
+student number is unique within the org (409 on duplicate); bulk import writes
+in 25-item BatchWriteItem chunks and reports duplicates as skipped rather than
+failing the batch. This is the authoritative membership list — arcus-attendance's
+"Allow members only" scanner toggle reads these rows (GetItem
+PK=ORGANIZATION#{org}, SK=MEMBER#{studentId}) to decide whether a scanned
+student may check in to that org's event. It is distinct from the arcus STUDENT
+profile (arcus-owned identity, see ATTENDANCE CHECK-IN below) and replaces the
+deprecated arcus-written ORGANIZATION + MEMBER join rows noted there.
+
 EVENT
 PK: EVENT#uuid
 SK: EVENT#uuid
@@ -244,9 +263,19 @@ SK: MEMBER#{studentId}
 member_organization: string
 scannedAt: timestamp
 leftAt: timestamp   (sparse)
-The student's profile is a separate item PK = SK = MEMBER#{studentId} holding
-student_id, full_name, department; AggregateEventParticipants resolves each
-check-in's name from that profile item.
+The student's profile is a separate arcus-owned item PK = SK = STUDENT#{studentId}
+holding student_id, full_name, course, department (renamed from the former
+MEMBER# profile). The EVENT check-in SK above stays MEMBER#{studentId} because
+apex splits an EVENT partition's children by SK prefix (MEMBER# = attendance,
+EVALUATION# = evaluation); AggregateEventParticipants resolves each check-in's
+name by reading the STUDENT#{studentId} profile.
+
+DEPRECATED: arcus-attendance registration used to write its own ORGANIZATION +
+MEMBER join rows (PK = ORGANIZATION#uuid, SK = MEMBER#{studentId}, carrying
+organization_id + student_id but NO lastname/firstname) to track membership.
+Membership is now apex-owned (see ORGANIZATION MEMBER above), so registration no
+longer writes them and scripts/migrate_member_to_student.py deletes the
+leftovers.
 
 PARTICIPANT EVALUATION (arcus-evaluation officer form)
 PK: EVENT#uuid

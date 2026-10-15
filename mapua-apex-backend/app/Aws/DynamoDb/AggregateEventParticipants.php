@@ -10,8 +10,8 @@ namespace App\Aws\DynamoDb;
  * as children of the apex EVENT partition:
  *   - arcus-attendance  -> PK=EVENT#{id}, SK=MEMBER#{studentId}   (check-ins)
  *   - arcus-evaluation  -> PK=EVENT#{id}, SK=EVALUATION#{evalId}  (filings)
- * A single query on the EVENT partition therefore yields both datasets; member
- * names are resolved from the MEMBER#{studentId} profile items (PK=SK).
+ * A single query on the EVENT partition therefore yields both datasets; student
+ * names are resolved from the STUDENT#{studentId} profile items (PK=SK).
  *
  * The result is frozen onto the POSTEVAL item at submit time so the snapshot a
  * submitter filed with never drifts as later scans/evaluations arrive.
@@ -62,7 +62,7 @@ final class AggregateEventParticipants
     }
 
     /**
-     * Resolve each check-in against its MEMBER profile (PK=SK=MEMBER#{studentId}).
+     * Resolve each check-in against its STUDENT profile (PK=SK=STUDENT#{studentId}).
      *
      * @param  list<array<string, mixed>>  $checkIns
      * @return list<array<string, mixed>>
@@ -74,7 +74,8 @@ final class AggregateEventParticipants
         foreach ($checkIns as $checkIn) {
             $sk = (string) ($checkIn['SK'] ?? '');
             $studentId = DynamoKeys::strip($sk, 'MEMBER#') ?? '';
-            $member = $studentId !== '' ? $this->items->get($sk, $sk) : null;
+            $studentKey = $studentId !== '' ? DynamoKeys::student($studentId) : '';
+            $member = $studentKey !== '' ? $this->items->get($studentKey, $studentKey) : null;
             $member = is_array($member) ? $member : [];
 
             $roster[] = [

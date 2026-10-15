@@ -1,4 +1,4 @@
-import { ClipboardListIcon, HomeIcon, PlusCircleIcon, WrenchIcon } from "lucide-react"
+import { ClipboardListIcon, HomeIcon, PlusCircleIcon, UsersIcon, WrenchIcon } from "lucide-react"
 import { Outlet } from "react-router"
 
 import { AppSidebar } from "@/components/layout/app-sidebar"
@@ -21,6 +21,11 @@ const STUDENT_NAV = [
     label: "Post-evals",
     to: "/students/postevals",
     icon: ClipboardListIcon,
+  },
+  {
+    label: "Members",
+    to: "/students/members",
+    icon: UsersIcon,
   },
   {
     label: "Tools",

@@ -240,22 +240,41 @@ final class DynamoFixtures
     }
 
     /**
-     * A MEMBER profile item (PK=SK=MEMBER#{studentId}) used to resolve names.
+     * An apex-owned organization member (PK=ORGANIZATION#{orgId}, SK=MEMBER#{studentId}).
      */
-    public static function member(
+    public static function organizationMember(
+        InMemoryDynamoDb $db,
+        string $studentId,
+        string $org = 'a1b2',
+        string $lastName = 'Dela Cruz',
+        string $firstName = 'Juan',
+    ): void {
+        $db->seed([
+            'PK' => 'ORGANIZATION#'.$org,
+            'SK' => 'MEMBER#'.$studentId,
+            'lastname' => $lastName,
+            'firstname' => $firstName,
+            'student_number' => $studentId,
+        ]);
+    }
+
+    /**
+     * An arcus-attendance STUDENT profile item (PK=SK=STUDENT#{studentId}) used
+     * to resolve check-in names.
+     */
+    public static function student(
         InMemoryDynamoDb $db,
         string $studentId,
         string $fullName = 'Juan Dela Cruz',
         string $department = 'CCIS',
     ): void {
         $db->seed([
-            'PK' => 'MEMBER#'.$studentId,
-            'SK' => 'MEMBER#'.$studentId,
+            'PK' => 'STUDENT#'.$studentId,
+            'SK' => 'STUDENT#'.$studentId,
             'student_id' => $studentId,
             'full_name' => $fullName,
             'department' => $department,
             'course' => 'BSCS',
-            'current_organization' => 'a1b2',
         ]);
     }
 

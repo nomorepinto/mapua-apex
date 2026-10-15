@@ -30,6 +30,24 @@ final class DynamoKeys
         return 'POSTEVAL#'.self::strip($id, 'POSTEVAL#');
     }
 
+    /**
+     * SK for an organization member inside its ORGANIZATION partition.
+     */
+    public static function member(string $studentId): string
+    {
+        return 'MEMBER#'.self::strip($studentId, 'MEMBER#');
+    }
+
+    /**
+     * PK=SK for an arcus-attendance student profile item. Check-in rows in an
+     * EVENT partition carry SK=MEMBER#{studentId}; the matching profile that
+     * holds the student's name/course/department lives at STUDENT#{studentId}.
+     */
+    public static function student(string $studentId): string
+    {
+        return 'STUDENT#'.self::strip($studentId, 'STUDENT#');
+    }
+
     public static function signatory(string $id): string
     {
         return 'SIGNATORY#'.self::strip($id, 'SIGNATORY#');

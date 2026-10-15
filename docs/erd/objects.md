@@ -30,6 +30,33 @@ approval sequence. `osaar` and `cdm` desks are campus-wide (from
 
 ---
 
+## ORGANIZATION_MEMBER
+
+The organization's member roster, **owned and managed by mapua-apex** (not by the
+arcus apps). One item per member, sharing the org's partition so the whole roster
+is read in a single query. Managed through `/api/v1/students/members` and read by
+the arcus-attendance "Allow members only" scanner toggle to decide whether a
+scanned student may check in.
+
+| Property | Type | Notes |
+|---|---|---|
+| `PK` | string | `ORGANIZATION#uuid` (parent org partition) |
+| `SK` | string | `MEMBER#studentId` |
+| `lastname` | string | |
+| `firstname` | string | |
+| `student_number` | string | Bare student number (the `SK` without the `MEMBER#` prefix) |
+
+Created with an `attribute_not_exists(SK)` guard, so a student number is unique
+within the org (**409** on duplicate). Bulk CSV import writes in 25-item
+`BatchWriteItem` chunks and reports duplicates as skipped (`failed[]`) rather than
+failing the batch (max 500 rows/request). This is the authoritative membership
+list. It is **distinct** from the arcus STUDENT profile (arcus-owned identity,
+below) and **replaces** the deprecated arcus-written `ORGANIZATION` + `MEMBER`
+join rows (same `PK`/`SK` shape but carrying `organization_id` + `student_id` and
+no names), which `scripts/migrate_member_to_student.py` removes.
+
+---
+
 ## EVENT
 
 A filing/event that owns one or more submissions. Its partition also holds the
@@ -242,10 +269,18 @@ Both are capturable only on the event day (`window = attendance`).
 | Attendance check-in | `EVENT#uuid` | `MEMBER#{studentId}` | `member_organization`, `scannedAt`, `leftAt` (sparse) |
 | Participant evaluation | `EVENT#uuid` | `EVALUATION#{evaluationId}` | `evaluationId`, `studentId`, `fullName`, `participated` (`"yes"`/`"no"`), `filedAt`, `eventId` |
 
-The scanner also keeps a student **profile** item at `PK = SK = MEMBER#{studentId}`
-holding `student_id`, `full_name`, `department`; apex resolves each check-in's
-name from it. apex reads these camelCase attributes (with snake_case fallbacks)
-and normalizes `participated` to a boolean in the snapshot.
+The scanner also keeps a student **profile** item at `PK = SK = STUDENT#{studentId}`
+holding `student_id`, `full_name`, `course`, `department` (renamed from the former
+`MEMBER#` profile; the EVENT check-in `SK` above stays `MEMBER#{studentId}` because
+apex splits an event partition's children by `SK` prefix). apex resolves each
+check-in's name by reading the `STUDENT#{studentId}` profile. apex reads these
+camelCase attributes (with snake_case fallbacks) and normalizes `participated` to
+a boolean in the snapshot.
+
+The "Allow members only" gate reads the apex-owned **ORGANIZATION_MEMBER** roster
+(`PK = ORGANIZATION#uuid`, `SK = MEMBER#{studentId}`), **not** this profile. arcus
+registration no longer writes any `ORGANIZATION` + `MEMBER` join row; the former
+ones are deprecated and removed by `scripts/migrate_member_to_student.py`.
 
 ---
 

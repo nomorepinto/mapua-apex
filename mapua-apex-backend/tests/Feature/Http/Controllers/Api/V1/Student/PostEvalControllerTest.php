@@ -133,7 +133,7 @@ class PostEvalControllerTest extends TestCase
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::organization($db);
         $this->seedSubmission($db, 'e001', 's001', 'approved', $this->day());
-        DynamoFixtures::member($db, '2021-00123');
+        DynamoFixtures::student($db, '2021-00123');
         DynamoFixtures::checkIn($db, 'e001', '2021-00123');
         DynamoFixtures::evaluation($db, 'e001', 'ev001', '2021-00123');
 
@@ -240,7 +240,7 @@ class PostEvalControllerTest extends TestCase
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::organization($db);
         DynamoFixtures::postEval($db);
-        DynamoFixtures::member($db, '2021-00123');
+        DynamoFixtures::student($db, '2021-00123');
         DynamoFixtures::checkIn($db, 'e001', '2021-00123');
 
         $this->withStudentAuth()->getJson('/api/v1/students/events/e001/postevals/pe001')
@@ -254,7 +254,7 @@ class PostEvalControllerTest extends TestCase
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::organization($db);
         DynamoFixtures::event($db);
-        DynamoFixtures::member($db, '2021-00123');
+        DynamoFixtures::student($db, '2021-00123');
         DynamoFixtures::checkIn($db, 'e001', '2021-00123');
         DynamoFixtures::evaluation($db, 'e001', 'ev001', '2021-00123');
         DynamoFixtures::evaluation($db, 'e001', 'ev002', '2021-00124', 'Maria Santos', false);
