@@ -49,9 +49,11 @@ export function ReviewQueue() {
       </div>
 
       <div className={layout.sectionFlush}>
-        <div className={layout.tableWrap}>
-          <Table className={layout.table}>
-            <TableHeader>
+        <Table
+          className={layout.table}
+          containerClassName="max-h-[36rem] overflow-auto"
+        >
+          <TableHeader className="sticky top-0 z-10 bg-white shadow-xs [&_th]:bg-white">
               <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-500 uppercase hover:bg-transparent!">
                 <TableHead className="px-6 py-4 font-bold text-neutral-500">
                   DOCUMENT ID
@@ -132,7 +134,6 @@ export function ReviewQueue() {
               )}
             </TableBody>
           </Table>
-        </div>
       </div>
     </section>
   )

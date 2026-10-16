@@ -10,12 +10,14 @@ export type TableVariant = "default" | "card"
 export type TableProps = React.ComponentProps<"table"> & {
   variant?: TableVariant
   render?: useRender.ComponentProps<"div">["render"]
+  containerClassName?: string
 }
 
 export function Table({
   className,
   variant = "default",
   render,
+  containerClassName,
   ...props
 }: TableProps): React.ReactElement {
   const defaultProps = {
@@ -29,7 +31,7 @@ export function Table({
         {...props}
       />
     ),
-    className: "relative w-full overflow-x-auto",
+    className: cn("relative w-full overflow-x-auto", containerClassName),
     "data-slot": "table-container",
     "data-variant": variant,
   }
