@@ -27,7 +27,9 @@ export function SaafClassificationStep() {
       <ActivityClassificationSection
         activityType={draft.activityType}
         totalOrgMembers={draft.totalOrgMembers}
-        onActivityTypeChange={(value) => actions.updateField("activityType", value)}
+        onActivityTypeChange={(value) =>
+          actions.updateField("activityType", value)
+        }
         onTotalOrgMembersChange={(value) =>
           actions.updateField("totalOrgMembers", value)
         }
@@ -45,11 +47,9 @@ export function SaafPeopleStep() {
     <SaafStepPanel index={1}>
       <ProponentsSection
         proponents={draft.proponents}
-        departmentValues={draft.departmentValues}
         onUpdate={actions.handleUpdateProponent}
         onRemove={actions.handleRemoveProponent}
         onAdd={actions.handleAddProponent}
-        onDepartmentChange={actions.handleDepartmentChange}
       />
       <CollaboratorsSection
         value={draft.dependentOrgs}
@@ -188,10 +188,7 @@ function SaafContinueActions() {
       <button
         type="button"
         onClick={actions.goNext}
-        className={cn(
-          brand.action,
-          !state.currentStepComplete && "opacity-70"
-        )}
+        className={cn(brand.action, !state.currentStepComplete && "opacity-70")}
       >
         Continue
       </button>
@@ -211,7 +208,11 @@ function SaafReviewActions() {
   return (
     <div className="space-y-3">
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
-        <button type="button" onClick={actions.goBack} className={brand.actionGhost}>
+        <button
+          type="button"
+          onClick={actions.goBack}
+          className={brand.actionGhost}
+        >
           Back
         </button>
       </div>

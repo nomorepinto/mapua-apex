@@ -156,7 +156,7 @@ export const RESERVATION_NOTIF_TYPES: readonly ReservationNotifType[] = [
 ]
 
 export function isReservationNotifType(
-  value: string,
+  value: string
 ): value is ReservationNotifType {
   return (RESERVATION_NOTIF_TYPES as readonly string[]).includes(value)
 }
@@ -198,12 +198,7 @@ export interface ApiAnnouncement {
   content: string
 }
 
-export type ApiSignatoryRole =
-  | "adviser"
-  | "admin"
-  | "cdm"
-  | "dean"
-  | "osaar"
+export type ApiSignatoryRole = "adviser" | "admin" | "cdm" | "dean" | "osaar"
 
 export type OrganizationDeskRole = "adviser" | "admin" | "cdm" | "dean"
 export type OrganizationAssignableDeskRole = "dean" | "adviser"
@@ -225,6 +220,7 @@ export interface ApiSignatory {
 export interface ApiOrganization {
   organization_id: string
   name: string
+  department?: string | null
   is_higher_council?: boolean
   signatories?: ApiOrganizationSignatory[]
 }
@@ -308,7 +304,8 @@ export function buildSaafApiPayload(
       suffix: p.suffix || "",
       student_number: p.studentNumber || "",
       program_and_year: p.programAndYear || "",
-      date_of_submission: p.dateOfSubmission || new Date().toISOString().split("T")[0],
+      date_of_submission:
+        p.dateOfSubmission || new Date().toISOString().split("T")[0],
       department: saafDraft.departmentValues?.[p.id] || p.department || "",
       position_of_applicant: p.positionOfApplicant || p.position || "",
       org_or_course_section: p.orgOrCourseSection || "",
@@ -322,7 +319,8 @@ export function buildSaafApiPayload(
       objectives: saafDraft.activityObjectives || "",
       venue: saafDraft.activityVenue || "",
       date_of_event: saafDraft.dateOfEvent || "",
-      end_date_of_event: saafDraft.endDateOfEvent || saafDraft.dateOfEvent || "",
+      end_date_of_event:
+        saafDraft.endDateOfEvent || saafDraft.dateOfEvent || "",
       day_of_event: saafDraft.dayOfEvent || "",
       time_of_event: saafDraft.timeOfEvent || "",
       expected_participants: Number(saafDraft.expectedParticipants) || 0,
@@ -363,7 +361,9 @@ export function buildSaafApiPayload(
         })),
         remarks: pick.remarks?.trim() || "",
         // Equipment-only: include the requested unit count (defaults to 1 for unlimited equipment).
-        ...(pick.type === "equipment" ? { quantity_requested: pick.quantity ?? 1 } : {}),
+        ...(pick.type === "equipment"
+          ? { quantity_requested: pick.quantity ?? 1 }
+          : {}),
       })),
     },
   }
@@ -375,20 +375,36 @@ export function buildSaafApiPayload(
 export function getSubmissionStatusMeta(status: string) {
   switch (status.toLowerCase()) {
     case "approved":
-      return { label: "Approved", color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" }
+      return {
+        label: "Approved",
+        color: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+      }
     case "denied":
-      return { label: "Denied", color: "bg-rose-500/10 text-rose-600 border-rose-200" }
+      return {
+        label: "Denied",
+        color: "bg-rose-500/10 text-rose-600 border-rose-200",
+      }
     case "returned":
-      return { label: "Returned", color: "bg-amber-500/10 text-amber-600 border-amber-200" }
+      return {
+        label: "Returned",
+        color: "bg-amber-500/10 text-amber-600 border-amber-200",
+      }
     case "cancelled":
-      return { label: "Cancelled", color: "bg-neutral-500/10 text-neutral-600 border-neutral-300" }
+      return {
+        label: "Cancelled",
+        color: "bg-neutral-500/10 text-neutral-600 border-neutral-300",
+      }
     case "pending":
     default:
-      return { label: "Under Review", color: "bg-amber-500/10 text-amber-600 border-amber-200" }
+      return {
+        label: "Under Review",
+        color: "bg-amber-500/10 text-amber-600 border-amber-200",
+      }
   }
 }
 
-export type DashboardSubmissionStatus = "Under Review" | "Approved" | "Returned" | "Denied" | "Cancelled"
+export type DashboardSubmissionStatus =
+  "Under Review" | "Approved" | "Returned" | "Denied" | "Cancelled"
 
 export interface DashboardSubmissionRow {
   event_id: string
@@ -523,7 +539,10 @@ export function formatDocumentId(id?: string | null, prefix = "SAAF"): string {
   if (!id || id === "—") return "—"
   const cleaned = id.replace(/^(SUBMISSION#|EVENT#)/i, "")
   const targetId = cleaned.includes(":") ? cleaned.split(":").pop()! : cleaned
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId)
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      targetId
+    )
   if (isUuid) {
     return `${prefix}-${targetId.slice(0, 8).toUpperCase()}`
   }
@@ -554,7 +573,11 @@ function resolveExpectedRoles(options?: {
   activityType?: string
   hasVenue?: boolean
   isHigherCouncil?: boolean
-  orgSignatories?: Array<{ role?: string; signatory_id?: string; name?: string }>
+  orgSignatories?: Array<{
+    role?: string
+    signatory_id?: string
+    name?: string
+  }>
   signatorySequence?: string[]
 }): string[] {
   const sequence = options?.signatorySequence
@@ -578,7 +601,11 @@ function resolveExpectedRoles(options?: {
  */
 export function formatSignatoryRole(
   signatoryIdOrRole?: string | null,
-  orgSignatories?: Array<{ role?: string; signatory_id?: string; name?: string }>,
+  orgSignatories?: Array<{
+    role?: string
+    signatory_id?: string
+    name?: string
+  }>,
   fallbackIndex?: number,
   activityType?: string,
   hasVenue?: boolean,
@@ -586,10 +613,14 @@ export function formatSignatoryRole(
 ): string {
   if (!signatoryIdOrRole || signatoryIdOrRole === "—") return "—"
 
-  const raw = signatoryIdOrRole.replace(/^SIGNATORY#/i, "").trim().toLowerCase()
+  const raw = signatoryIdOrRole
+    .replace(/^SIGNATORY#/i, "")
+    .trim()
+    .toLowerCase()
 
   // Match standard role names
-  if (raw === "adviser" || raw.includes("adviser") || raw.startsWith("adv")) return "Adviser"
+  if (raw === "adviser" || raw.includes("adviser") || raw.startsWith("adv"))
+    return "Adviser"
   if (raw === "dean" || raw.includes("dean")) return "Dean"
   if (raw === "osaar" || raw.includes("osaar") || raw === "osa") return "OSAAR"
   if (raw === "cdm" || raw.includes("cdm")) return "CDM"
@@ -641,7 +672,9 @@ export function formatSignatoryRole(
   }
 
   // If it's a UUID and nothing matched, default to Adviser for index 0
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)
+  ) {
     return "Signatory"
   }
 
@@ -655,7 +688,10 @@ export function formatSignatoryRole(
  * the shared campus desks (OSAAR, CDM), which have no organization — it renders
  * as the bare role.
  */
-export function signatoryChainLabel(link: ApiSignatoryChainLink, qualifyOrg = true): string {
+export function signatoryChainLabel(
+  link: ApiSignatoryChainLink,
+  qualifyOrg = true
+): string {
   const role = formatSignatoryRole(link.role || link.signatory_id)
   const org = qualifyOrg ? link.organization_name?.trim() : ""
   return org ? `${org}'s ${role}` : role
@@ -690,19 +726,25 @@ export function organizationNameFor(
   const id = (organizationId || "").replace(/^ORGANIZATION#/i, "")
   if (!id) return "—"
   const match = organizations.find(
-    (organization) => organization.organization_id.replace(/^ORGANIZATION#/i, "") === id
+    (organization) =>
+      organization.organization_id.replace(/^ORGANIZATION#/i, "") === id
   )
   return match?.name || id
 }
 
 export function apiSubmissionToDashboardRow(
   submission: ApiSubmission,
-  orgSignatories?: Array<{ role?: string; signatory_id?: string; name?: string }>,
+  orgSignatories?: Array<{
+    role?: string
+    signatory_id?: string
+    name?: string
+  }>,
   organizations?: Array<{ organization_id: string; name: string }>
 ): DashboardSubmissionRow {
   const meta = getSubmissionStatusMeta(submission.status)
   const firstProponent = submission.proponents?.[0]
-  const title = submission.activity_details?.title_and_nature || "Untitled activity"
+  const title =
+    submission.activity_details?.title_and_nature || "Untitled activity"
   const budget = submission.activity_details?.proposed_budget
   const isApproved = submission.status === "approved"
 
@@ -730,10 +772,14 @@ export function apiSubmissionToDashboardRow(
       ),
     department: departmentAbbreviation(firstProponent?.department),
     id: submission.submission_id,
-    activity_classification: submission.activity_classification?.activity_type || "extra-curricular",
-    nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,
+    activity_classification:
+      submission.activity_classification?.activity_type || "extra-curricular",
+    nature:
+      (submission.activity_classification?.nature as "major" | "minor") ||
+      undefined,
     current_signatory: currentSignatoryLabel,
-    target_date: submission.activity_details?.date_of_event || submission.sent_at,
+    target_date:
+      submission.activity_details?.date_of_event || submission.sent_at,
     date_of_event: submission.activity_details?.date_of_event,
     end_date_of_event: submission.activity_details?.end_date_of_event,
     requires_venue: Boolean(submission.venue_reservation?.has_reservation),
@@ -751,8 +797,12 @@ export function apiSubmissionToDashboardRow(
       ),
       time: submission.activity_details?.time_of_event || "",
       expected_attendees: submission.activity_details?.expected_participants,
-      budget: typeof budget === "number" ? `₱${budget.toLocaleString("en-PH")}` : "—",
-      proponent: formatProponentName(firstProponent) || firstProponent?.org_or_course_section || "",
+      budget:
+        typeof budget === "number" ? `₱${budget.toLocaleString("en-PH")}` : "—",
+      proponent:
+        formatProponentName(firstProponent) ||
+        firstProponent?.org_or_course_section ||
+        "",
       requirements: [],
     },
     status: meta.label as DashboardSubmissionStatus,
@@ -765,7 +815,8 @@ export function apiSubmissionToDashboardRow(
 
 export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
   const firstProponent = submission.proponents?.[0]
-  const title = submission.activity_details?.title_and_nature || "Untitled activity"
+  const title =
+    submission.activity_details?.title_and_nature || "Untitled activity"
   const budget = submission.activity_details?.proposed_budget
   const objectivesText = submission.activity_details?.objectives || ""
   const objectives = objectivesText
@@ -805,7 +856,8 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
   // shape when present; fall back to the legacy free-text shape for stored
   // items that predate the migration.
   const reservations = submission.venue_reservation?.reservations
-  const hasNewReservations = Array.isArray(reservations) && reservations.length > 0
+  const hasNewReservations =
+    Array.isArray(reservations) && reservations.length > 0
 
   const derivedRooms = hasNewReservations
     ? (reservations ?? [])
@@ -820,19 +872,23 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
               dateNeeded: selection.date,
               endDateNeeded: selection.date,
               timeNeeded: slots.length ? slotStart(slots[0]) : "",
-              endTimeNeeded: slots.length ? slotEnd(slots[slots.length - 1]) : "",
+              endTimeNeeded: slots.length
+                ? slotEnd(slots[slots.length - 1])
+                : "",
             }
           })
         )
-    : (submission.venue_reservation?.function_rooms?.items || []).map((item) => ({
-        roomNeeded: item.room_needed,
-        classroomName: item.classroom_name,
-        remarks: item.remarks || "",
-        dateNeeded: item.date_needed,
-        endDateNeeded: item.end_date_needed,
-        timeNeeded: item.time_needed,
-        endTimeNeeded: item.end_time_needed,
-      }))
+    : (submission.venue_reservation?.function_rooms?.items || []).map(
+        (item) => ({
+          roomNeeded: item.room_needed,
+          classroomName: item.classroom_name,
+          remarks: item.remarks || "",
+          dateNeeded: item.date_needed,
+          endDateNeeded: item.end_date_needed,
+          timeNeeded: item.time_needed,
+          endTimeNeeded: item.end_time_needed,
+        })
+      )
 
   const derivedEquipment = hasNewReservations
     ? (reservations ?? [])
@@ -842,11 +898,13 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
           purpose: pick.remarks || "",
           remark: "",
         }))
-    : (submission.venue_reservation?.equipment_requested?.items || []).map((item) => ({
-        name: item.name,
-        purpose: item.purpose || "",
-        remark: item.remark || "",
-      }))
+    : (submission.venue_reservation?.equipment_requested?.items || []).map(
+        (item) => ({
+          name: item.name,
+          purpose: item.purpose || "",
+          remark: item.remark || "",
+        })
+      )
 
   const derivedAv = hasNewReservations
     ? []
@@ -864,7 +922,10 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     eventId: submission.event_id,
     submissionId: submission.submission_id,
     title,
-    org: submission.organization_name || firstProponent?.org_or_course_section || "Organization",
+    org:
+      submission.organization_name ||
+      firstProponent?.org_or_course_section ||
+      "Organization",
     department: firstProponent?.department || "—",
     departmentCode: departmentAbbreviation(firstProponent?.department),
     date: formatDisplayDateRange(
@@ -875,17 +936,25 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     submittedDate: formatDisplayDate(submission.sent_at),
     submittedAt: submission.sent_at || "",
     representative: formatProponentName(firstProponent) || "—",
-    type: submission.activity_classification?.activity_type || "extra-curricular",
-    nature: (submission.activity_classification?.nature as "major" | "minor") || undefined,
+    type:
+      submission.activity_classification?.activity_type || "extra-curricular",
+    nature:
+      (submission.activity_classification?.nature as "major" | "minor") ||
+      undefined,
     decision,
     status,
-    description: submission.activity_details?.description || "No description provided.",
+    description:
+      submission.activity_details?.description || "No description provided.",
     venue: submission.activity_details?.venue || "—",
-    expectedParticipants: submission.activity_details?.expected_participants || 0,
+    expectedParticipants:
+      submission.activity_details?.expected_participants || 0,
     proposedBudget:
       typeof budget === "number" ? `₱${budget.toLocaleString("en-PH")}` : "—",
     proponents: (submission.proponents || []).map((proponent) => ({
-      role: proponent.position_title || proponent.position_of_applicant || "Proponent",
+      role:
+        proponent.position_title ||
+        proponent.position_of_applicant ||
+        "Proponent",
       name: formatProponentName(proponent) || proponent.student_number || "—",
     })),
     objectives:
@@ -899,8 +968,7 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
       (item, idx) => {
         const qty = Number(item.quantity) || 0
         const price = Number(item.price_per_unit) || 0
-        const total =
-          typeof item.total === "number" ? item.total : qty * price
+        const total = typeof item.total === "number" ? item.total : qty * price
         return {
           item: item.item_no || `Item ${idx + 1}`,
           unit: item.unit ?? 1,
@@ -921,7 +989,8 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
               acc +
               (typeof curr.total === "number"
                 ? curr.total
-                : (Number(curr.quantity) || 0) * (Number(curr.price_per_unit) || 0)),
+                : (Number(curr.quantity) || 0) *
+                  (Number(curr.price_per_unit) || 0)),
             0
           ),
   }
@@ -935,13 +1004,21 @@ export function apiNotificationsToStepper(
     activityType?: string
     hasVenue?: boolean
     isHigherCouncil?: boolean
-    orgSignatories?: Array<{ role?: string; signatory_id?: string; name?: string }>
+    orgSignatories?: Array<{
+      role?: string
+      signatory_id?: string
+      name?: string
+    }>
     signatorySequence?: string[]
     signatoryChain?: ApiSignatoryChainLink[]
   }
 ): TrackerStepper {
-  const sorted = [...notifications].sort((a, b) => a.sent_at.localeCompare(b.sent_at))
-  const fullyApproved = sorted.some((item) => item.notif_type === "fully approved")
+  const sorted = [...notifications].sort((a, b) =>
+    a.sent_at.localeCompare(b.sent_at)
+  )
+  const fullyApproved = sorted.some(
+    (item) => item.notif_type === "fully approved"
+  )
   const isAllApproved = fullyApproved || apiStatus === "approved"
 
   const stripId = (value?: string | null): string =>
@@ -984,7 +1061,9 @@ export function apiNotificationsToStepper(
     notif_type: ApiNotification["notif_type"]
     comment?: string
   }> = sorted.map((item, i) => ({
-    key: useChain ? stripId(item.signatory) : roleForNotification(item.signatory, i),
+    key: useChain
+      ? stripId(item.signatory)
+      : roleForNotification(item.signatory, i),
     sent_at: item.sent_at,
     notif_type: item.notif_type,
     comment: item.comment,
@@ -994,7 +1073,11 @@ export function apiNotificationsToStepper(
   // missing from the derived expectations (the chain path is already complete).
   if (!useChain) {
     for (const n of resolvedNotifs) {
-      if (n.key !== "Signatory" && n.key !== "System" && !steps.some((s) => s.key === n.key)) {
+      if (
+        n.key !== "Signatory" &&
+        n.key !== "System" &&
+        !steps.some((s) => s.key === n.key)
+      ) {
         steps.push({ key: n.key, label: n.key })
       }
     }
@@ -1021,7 +1104,9 @@ export function apiNotificationsToStepper(
     // Check if there's a blocked (denied/returned) notification
     const blocked = [...resolvedNotifs]
       .reverse()
-      .find((item) => item.notif_type === "denied" || item.notif_type === "returned")
+      .find(
+        (item) => item.notif_type === "denied" || item.notif_type === "returned"
+      )
     if (blocked) {
       currentStepIdx = Math.max(
         0,
@@ -1035,7 +1120,8 @@ export function apiNotificationsToStepper(
   const assigneesList: TrackerAssignee[] = steps.map((step, idx) => {
     const latest = latestByKey.get(step.key)
     let state: TrackerAssignee["state"] = "queued"
-    let statusText = idx === 0 ? "Queued" : `Queued (Awaiting ${steps[idx - 1].label})`
+    let statusText =
+      idx === 0 ? "Queued" : `Queued (Awaiting ${steps[idx - 1].label})`
 
     if (isAllApproved || idx < currentStepIdx) {
       state = "completed"
@@ -1045,10 +1131,11 @@ export function apiNotificationsToStepper(
     } else if (idx === currentStepIdx) {
       state = "current"
       if (latest?.notif_type === "denied" || apiStatus === "denied") {
-        statusText = latest?.comment
-          ? `Denied — ${latest.comment}`
-          : "Denied"
-      } else if (latest?.notif_type === "returned" || apiStatus === "returned") {
+        statusText = latest?.comment ? `Denied — ${latest.comment}` : "Denied"
+      } else if (
+        latest?.notif_type === "returned" ||
+        apiStatus === "returned"
+      ) {
         statusText = latest?.comment
           ? `Returned for revision — ${latest.comment}`
           : "Returned for revision"
@@ -1067,14 +1154,17 @@ export function apiNotificationsToStepper(
     state: isAllApproved ? "completed" : "queued",
   })
 
-  const completedCount = isAllApproved ? steps.length : Math.max(0, currentStepIdx)
+  const completedCount = isAllApproved
+    ? steps.length
+    : Math.max(0, currentStepIdx)
   const remainingSteps = Math.max(0, steps.length - completedCount)
 
   return {
     fullSteps,
     currentStepIdx: isAllApproved ? steps.length : currentStepIdx,
     isAllApproved,
-    progressPercent: steps.length > 0 ? Math.round((completedCount / steps.length) * 100) : 0,
+    progressPercent:
+      steps.length > 0 ? Math.round((completedCount / steps.length) * 100) : 0,
     remainingSteps,
     assigneesList,
   }
@@ -1103,7 +1193,9 @@ export function apiDeadlinesToReminders(
       dateStr: formatDisplayDate(deadline.sent_at),
       title: titleByEvent.get(deadline.event_id) || "Upcoming deadline",
       code: deadline.event_id,
-      statusText: isUrgent ? "Action needed before the deadline" : "Scheduled deadline",
+      statusText: isUrgent
+        ? "Action needed before the deadline"
+        : "Scheduled deadline",
       dueDateText: formatDisplayDate(deadline.deadline),
       isUrgent,
     }
@@ -1113,19 +1205,28 @@ export function apiDeadlinesToReminders(
 export function apiNotificationsToReviewNotices(
   submissions: ApiSubmission[],
   notificationsBySubmission: Map<string, ApiNotification[]>,
-  orgSignatories?: Array<{ role?: string; signatory_id?: string; name?: string }>
+  orgSignatories?: Array<{
+    role?: string
+    signatory_id?: string
+    name?: string
+  }>
 ): ReviewNotice[] {
   const notices: ReviewNotice[] = []
 
   for (const submission of submissions) {
-    const notifications = notificationsBySubmission.get(submission.submission_id) || []
+    const notifications =
+      notificationsBySubmission.get(submission.submission_id) || []
     const title =
       submission.activity_details?.title_and_nature || submission.submission_id
 
     for (const item of notifications) {
       const comment = (item.comment || "").trim()
       // Denied/returned notices require a reason; approvals are recorded without one.
-      if (!comment && (item.notif_type === "denied" || item.notif_type === "returned")) continue
+      if (
+        !comment &&
+        (item.notif_type === "denied" || item.notif_type === "returned")
+      )
+        continue
 
       notices.push({
         id: `${submission.submission_id}:${item.sent_at}`,
@@ -1209,11 +1310,21 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
   return {
     saaf: {
       ...DEFAULT_SAAF_DRAFT,
-      activityType: submission.activity_classification?.activity_type || DEFAULT_SAAF_DRAFT.activityType,
-      totalOrgMembers: String(submission.activity_classification?.total_org_members ?? ""),
-      expectedParticipants: String(submission.activity_details?.expected_participants ?? ""),
-      individualContribution: String(submission.activity_details?.individual_contribution ?? ""),
-      proposedBudget: String(submission.activity_details?.proposed_budget ?? ""),
+      activityType:
+        submission.activity_classification?.activity_type ||
+        DEFAULT_SAAF_DRAFT.activityType,
+      totalOrgMembers: String(
+        submission.activity_classification?.total_org_members ?? ""
+      ),
+      expectedParticipants: String(
+        submission.activity_details?.expected_participants ?? ""
+      ),
+      individualContribution: String(
+        submission.activity_details?.individual_contribution ?? ""
+      ),
+      proposedBudget: String(
+        submission.activity_details?.proposed_budget ?? ""
+      ),
       dayOfEvent: submission.activity_details?.day_of_event || "",
       departmentValues,
       activityTitle: submission.activity_details?.title_and_nature || "",
@@ -1226,13 +1337,21 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
         submission.activity_details?.date_of_event ||
         "",
       timeOfEvent: submission.activity_details?.time_of_event || "",
-      mission1: Boolean(submission.institutional_alignment?.mission_statements?.competitive),
-      mission2: Boolean(submission.institutional_alignment?.mission_statements?.research),
-      mission3: Boolean(submission.institutional_alignment?.mission_statements?.solutions),
-      coreValuesExplanation: submission.institutional_alignment?.core_values_explanation || "",
+      mission1: Boolean(
+        submission.institutional_alignment?.mission_statements?.competitive
+      ),
+      mission2: Boolean(
+        submission.institutional_alignment?.mission_statements?.research
+      ),
+      mission3: Boolean(
+        submission.institutional_alignment?.mission_statements?.solutions
+      ),
+      coreValuesExplanation:
+        submission.institutional_alignment?.core_values_explanation || "",
       peoExplanation: submission.institutional_alignment?.peo_explanation || "",
       sdgExplanation: submission.institutional_alignment?.sdg_explanation || "",
-      proponents: proponents.length > 0 ? proponents : [createEmptyProponent("1")],
+      proponents:
+        proponents.length > 0 ? proponents : [createEmptyProponent("1")],
       budgetItems,
       dependentOrgs: submission.collaboration?.dependent_organization_ids || [],
     },
@@ -1241,7 +1360,9 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
   }
 }
 
-export function omitEventIdFromPayload<T extends { event_id?: string }>(payload: T) {
+export function omitEventIdFromPayload<T extends { event_id?: string }>(
+  payload: T
+) {
   const rest = { ...payload }
   delete rest.event_id
   return rest
@@ -1338,12 +1459,21 @@ export type DashboardPostEvalStatus = "Submitted" | "Approved" | "Denied"
 export function getPostEvalStatusMeta(status: string) {
   switch ((status || "").toLowerCase()) {
     case "approved":
-      return { label: "Approved", color: "bg-emerald-500/10 text-emerald-600 border-emerald-200" }
+      return {
+        label: "Approved",
+        color: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+      }
     case "denied":
-      return { label: "Denied", color: "bg-rose-500/10 text-rose-600 border-rose-200" }
+      return {
+        label: "Denied",
+        color: "bg-rose-500/10 text-rose-600 border-rose-200",
+      }
     case "submitted":
     default:
-      return { label: "Submitted", color: "bg-amber-500/10 text-amber-600 border-amber-200" }
+      return {
+        label: "Submitted",
+        color: "bg-amber-500/10 text-amber-600 border-amber-200",
+      }
   }
 }
 
@@ -1371,7 +1501,9 @@ export interface DashboardPostEvalRow {
 /**
  * Maps a backend post-eval to the student dashboard / OSAAR queue row shape.
  */
-export function apiPostEvalToDashboardRow(postEval: ApiPostEval): DashboardPostEvalRow {
+export function apiPostEvalToDashboardRow(
+  postEval: ApiPostEval
+): DashboardPostEvalRow {
   const meta = getPostEvalStatusMeta(postEval.status)
   return {
     event_id: postEval.event_id,
@@ -1409,7 +1541,10 @@ export function buildPostEvalApiPayload(draft: PostEvalDraft) {
     0
   )
   const actualGrandTotal =
-    budgetItems.reduce((sum, item) => sum + (Number(item.actualAmount) || 0), 0) +
+    budgetItems.reduce(
+      (sum, item) => sum + (Number(item.actualAmount) || 0),
+      0
+    ) +
     addedItems.reduce((sum, item) => sum + (Number(item.actualAmount) || 0), 0)
 
   return {
@@ -1421,14 +1556,16 @@ export function buildPostEvalApiPayload(draft: PostEvalDraft) {
         item: item.item,
         unit: item.unit || null,
         quantity: item.quantity === "" ? null : Number(item.quantity),
-        budgeted_total: item.budgetedTotal === "" ? null : Number(item.budgetedTotal),
+        budgeted_total:
+          item.budgetedTotal === "" ? null : Number(item.budgetedTotal),
         actual_amount: Number(item.actualAmount) || 0,
       })),
       added_items: addedItems.map((item) => ({
         item: item.item,
         unit: item.unit || null,
         quantity: item.quantity === "" ? null : Number(item.quantity),
-        price_per_unit: item.pricePerUnit === "" ? null : Number(item.pricePerUnit),
+        price_per_unit:
+          item.pricePerUnit === "" ? null : Number(item.pricePerUnit),
         actual_amount: Number(item.actualAmount) || 0,
       })),
       initial_grand_total: initialGrandTotal,

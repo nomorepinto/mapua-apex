@@ -23,9 +23,7 @@ import type {
   WizardStepIndex,
 } from "@/components/submission/saaf-stepper"
 import type { SaafDraft } from "@/components/submission/types"
-import {
-  saafStepGibberishFields,
-} from "@/components/submission/gibberish-fields"
+import { saafStepGibberishFields } from "@/components/submission/gibberish-fields"
 import {
   checkGibberishFields,
   gibberishIssueLines,
@@ -75,7 +73,6 @@ interface SaafFormActions {
   handleUpdateProponent: SaafFormModel["handleUpdateProponent"]
   handleRemoveProponent: SaafFormModel["handleRemoveProponent"]
   handleAddProponent: SaafFormModel["handleAddProponent"]
-  handleDepartmentChange: SaafFormModel["handleDepartmentChange"]
   handleUpdateBudgetItem: SaafFormModel["handleUpdateBudgetItem"]
   handleRemoveBudgetItem: SaafFormModel["handleRemoveBudgetItem"]
   handleAddBudgetItem: SaafFormModel["handleAddBudgetItem"]
@@ -115,12 +112,20 @@ function earnedStepFromDraft(
 
   for (const index of stepsToCheck) {
     if (includeReservation && index === 2) {
-      if (!isReservationStepComplete(reservationDraft, draft.activityVenue, draft.expectedParticipants) ||
-        !isSaafStepComplete(2, draft, true)) {
+      if (
+        !isReservationStepComplete(
+          reservationDraft,
+          draft.activityVenue,
+          draft.expectedParticipants
+        ) ||
+        !isSaafStepComplete(2, draft, true)
+      ) {
         break
       }
     } else {
-      if (!isSaafStepComplete(index as SaafStepIndex, draft, includeReservation)) {
+      if (
+        !isSaafStepComplete(index as SaafStepIndex, draft, includeReservation)
+      ) {
         break
       }
     }
@@ -160,7 +165,12 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   const farthestStep = Math.min(
     Math.max(
       advancedStep,
-      earnedStepFromDraft(draft, finalStep, includeReservation, reservationDraft)
+      earnedStepFromDraft(
+        draft,
+        finalStep,
+        includeReservation,
+        reservationDraft
+      )
     ),
     finalStep
   ) as WizardStepIndex
@@ -214,7 +224,9 @@ export function SaafProvider({ children }: { children: ReactNode }) {
    * checks its whole group of values instead. That also covers a field the user never
    * blurred, and the verdicts land in the shared cache the issue list reads above.
    */
-  const blockOnGibberish = async (targetStep: WizardStepIndex): Promise<boolean> => {
+  const blockOnGibberish = async (
+    targetStep: WizardStepIndex
+  ): Promise<boolean> => {
     const fields = saafStepGibberishFields(
       targetStep,
       draft,
@@ -236,7 +248,11 @@ export function SaafProvider({ children }: { children: ReactNode }) {
         // Never skip past a page that still has open items: take the proponent
         // there and reveal it instead of silently ignoring the click.
         const blocker =
-          firstIncompleteWizardStep(draft, includeReservation, reservationDraft) ?? next
+          firstIncompleteWizardStep(
+            draft,
+            includeReservation,
+            reservationDraft
+          ) ?? next
         if (blocker !== step) setStep(blocker)
         form.validateStep(blocker, formRef.current)
         return
@@ -271,18 +287,26 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   // Step 2 is Reservation when includeReservation is true
   const currentStepComplete =
     includeReservation && step === 2
-      ? isReservationStepComplete(reservationDraft, draft.activityVenue, draft.expectedParticipants) &&
-      isSaafStepComplete(2, draft, true)
+      ? isReservationStepComplete(
+          reservationDraft,
+          draft.activityVenue,
+          draft.expectedParticipants
+        ) && isSaafStepComplete(2, draft, true)
       : isSaafStepComplete(step as SaafStepIndex, draft, includeReservation)
 
   const formComplete =
     isSaafDraftComplete(draft, includeReservation) &&
     (!includeReservation ||
-      isReservationStepComplete(reservationDraft, draft.activityVenue, draft.expectedParticipants))
+      isReservationStepComplete(
+        reservationDraft,
+        draft.activityVenue,
+        draft.expectedParticipants
+      ))
 
   const canClear =
     includeReservation && step === 2
-      ? reservationHasUserInput(reservationDraft) || saafStepHasUserInput(2 as SaafStepIndex, draft)
+      ? reservationHasUserInput(reservationDraft) ||
+        saafStepHasUserInput(2 as SaafStepIndex, draft)
       : saafStepHasUserInput(step as SaafStepIndex, draft)
 
   const value: SaafFormContextValue = {
@@ -320,7 +344,6 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       handleUpdateProponent: form.handleUpdateProponent,
       handleRemoveProponent: form.handleRemoveProponent,
       handleAddProponent: form.handleAddProponent,
-      handleDepartmentChange: form.handleDepartmentChange,
       handleUpdateBudgetItem: form.handleUpdateBudgetItem,
       handleRemoveBudgetItem: form.handleRemoveBudgetItem,
       handleAddBudgetItem: form.handleAddBudgetItem,

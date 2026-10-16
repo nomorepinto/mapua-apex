@@ -21,6 +21,9 @@ Rename those people in place (PUT /signatories on the same id).
 admin may occupy a desk but is not in the approval sequence.
 GET /public/organizations scans these base items without authentication and
 returns only the bare organization_id and name for the account signup picker.
+GET /students/organization also resolves the assigned dean's SIGNATORY item and
+returns its uppercase department as a derived response field (null when no dean
+or dean department is configured). The department is not copied onto this item.
 DELETE /admins/organizations/{id} is guarded: it removes the ORGANIZATION item
 only when the org owns no EVENT/SUBMISSION rows (GSI1PK = ORGANIZATION#id) and
 no COLLABORATION POINTER rows (PK = ORGANIZATION#id, SK begins COLLAB#);
@@ -127,6 +130,8 @@ proponents: [{
   position_of_applicant, org_or_course_section, contact_number,
   email_address, facebook_link
 }]
+The student UI locks every proponent department to the submitting
+organization's derived dean department; a missing configuration blocks submit.
 activity_details: {
   title_and_nature, description, objectives, venue,
   date_of_event, day_of_event, time_of_event,

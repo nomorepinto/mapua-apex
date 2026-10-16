@@ -1,6 +1,10 @@
 import type { CSSProperties } from "react"
 
-import type { BudgetItem, Proponent, SaafDraft } from "@/components/submission/types"
+import type {
+  BudgetItem,
+  Proponent,
+  SaafDraft,
+} from "@/components/submission/types"
 import type { SaafStepIndex } from "@/components/submission/saaf-stepper"
 
 export interface DepartmentItem {
@@ -17,12 +21,30 @@ export const DEPARTMENT_GROUPS: readonly DepartmentGroup[] = [
   {
     campus: "Intramuros Campus",
     departments: [
-      { code: "ARIDBE", name: "School of Architecture, Industrial Design, and the Built Environment" },
-      { code: "CBMES", name: "School of Chemical, Biological, and Materials Engineering and Sciences" },
-      { code: "CEGE", name: "School of Civil, Environmental, and Geological Engineering" },
-      { code: "EECE", name: "School of Electrical, Electronics, and Computer Engineering" },
-      { code: "IE-EM", name: "School of Industrial Engineering and Engineering Management" },
-      { code: "MME", name: "School of Mechanical, Manufacturing, and Energy Engineering" },
+      {
+        code: "ARIDBE",
+        name: "School of Architecture, Industrial Design, and the Built Environment",
+      },
+      {
+        code: "CBMES",
+        name: "School of Chemical, Biological, and Materials Engineering and Sciences",
+      },
+      {
+        code: "CEGE",
+        name: "School of Civil, Environmental, and Geological Engineering",
+      },
+      {
+        code: "EECE",
+        name: "School of Electrical, Electronics, and Computer Engineering",
+      },
+      {
+        code: "IE-EM",
+        name: "School of Industrial Engineering and Engineering Management",
+      },
+      {
+        code: "MME",
+        name: "School of Mechanical, Manufacturing, and Energy Engineering",
+      },
       { code: "SFSE", name: "School of Foundational Studies and Education" },
       { code: "DLA", name: "Department of Liberal Arts" },
       { code: "MATH", name: "Department of Mathematics" },
@@ -51,20 +73,79 @@ export const DEPARTMENT_GROUPS: readonly DepartmentGroup[] = [
   },
 ] as const
 
-export const ALL_DEPARTMENT_ITEMS: readonly DepartmentItem[] = DEPARTMENT_GROUPS.flatMap(
-  (group) => group.departments
-)
+export const ALL_DEPARTMENT_ITEMS: readonly DepartmentItem[] =
+  DEPARTMENT_GROUPS.flatMap((group) => group.departments)
 
-export const DEPARTMENTS = ALL_DEPARTMENT_ITEMS.map((dept) => dept.name) as readonly string[]
+export const DEPARTMENTS = ALL_DEPARTMENT_ITEMS.map(
+  (dept) => dept.name
+) as readonly string[]
 
 export type Department = (typeof DEPARTMENTS)[number]
 
-export function getDepartmentItem(nameOrCode: string | null | undefined): DepartmentItem | undefined {
+const DEPARTMENT_CODE_ALIASES: Readonly<Record<string, string>> = {
+  CCIS: "SOIT",
+  COLLEGEOFCOMPUTERANDINFORMATIONSCIENCE: "SOIT",
+  SEECE: "EECE",
+  MEMME: "MME",
+  SMS: "SMDA",
+  SLA: "DLA",
+}
+
+function normalizeDepartmentLookup(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/&/g, " AND ")
+    .replace(/[^A-Z0-9]+/g, "")
+}
+
+export function getDepartmentItem(
+  nameOrCode: string | null | undefined
+): DepartmentItem | undefined {
   if (!nameOrCode) return undefined
-  const needle = nameOrCode.trim().toUpperCase()
-  return ALL_DEPARTMENT_ITEMS.find(
-    (d) => d.code.toUpperCase() === needle || d.name.toUpperCase() === needle
+  const needle = normalizeDepartmentLookup(nameOrCode)
+  if (!needle) return undefined
+
+  const embeddedAlias = Object.entries(DEPARTMENT_CODE_ALIASES).find(
+    ([alias]) =>
+      alias.length > 10
+        ? needle.includes(alias)
+        : new RegExp(`(^|[^A-Z0-9])${alias}([^A-Z0-9]|$)`, "i").test(nameOrCode)
+  )?.[1]
+  const canonicalNeedle =
+    DEPARTMENT_CODE_ALIASES[needle] ?? embeddedAlias ?? needle
+  const exact = ALL_DEPARTMENT_ITEMS.find(
+    (department) =>
+      normalizeDepartmentLookup(department.code) === canonicalNeedle ||
+      normalizeDepartmentLookup(department.name) === canonicalNeedle
   )
+  if (exact) return exact
+
+  // Admin imports and older records can contain labels such as
+  // "School of Information Technology (SOIT)" or "SOIT - Makati". Prefer an
+  // explicit known code before trying a full-name containment match.
+  const upperValue = nameOrCode.toUpperCase()
+  const codeMatch = [...ALL_DEPARTMENT_ITEMS]
+    .sort((left, right) => right.code.length - left.code.length)
+    .find((department) => {
+      const codePattern = department.code
+        .split("-")
+        .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("[\\s-]*")
+      return new RegExp(`(^|[^A-Z0-9])${codePattern}([^A-Z0-9]|$)`, "i").test(
+        upperValue
+      )
+    })
+  if (codeMatch) return codeMatch
+
+  return ALL_DEPARTMENT_ITEMS.find((department) => {
+    const normalizedName = normalizeDepartmentLookup(department.name)
+    return (
+      needle.includes(normalizedName) ||
+      (needle.length >= 8 && normalizedName.includes(needle))
+    )
+  })
 }
 
 export const COLLEGE_YEAR_LEVEL_OPTIONS = [
@@ -84,7 +165,9 @@ export const YEAR_LEVEL_OPTIONS = [
 
 export type YearLevel = (typeof YEAR_LEVEL_OPTIONS)[number]
 
-export function isShsDepartment(nameOrCode: string | null | undefined): boolean {
+export function isShsDepartment(
+  nameOrCode: string | null | undefined
+): boolean {
   if (!nameOrCode) return false
   const item = getDepartmentItem(nameOrCode)
   const code = item?.code ?? nameOrCode.trim().toUpperCase()
@@ -128,9 +211,18 @@ export const DEPARTMENT_PROGRAMS: Record<string, readonly ProgramItem[]> = {
     { code: "PhD-ChE", name: "PhD in Chemical Engineering" },
     { code: "PhD-CHM", name: "PhD in Chemistry" },
     { code: "PhD-MSE", name: "PhD in Materials Science and Engineering" },
-    { code: "BSBE → MSBE", name: "BS Biological Engineering → MS Biological Engineering" },
-    { code: "BSChE → MSChE", name: "BS Chemical Engineering → MS Chemical Engineering" },
-    { code: "BSMSE → MSMSE", name: "BS Materials Science and Engineering → MS Materials Science and Engineering" },
+    {
+      code: "BSBE → MSBE",
+      name: "BS Biological Engineering → MS Biological Engineering",
+    },
+    {
+      code: "BSChE → MSChE",
+      name: "BS Chemical Engineering → MS Chemical Engineering",
+    },
+    {
+      code: "BSMSE → MSMSE",
+      name: "BS Materials Science and Engineering → MS Materials Science and Engineering",
+    },
   ],
   CEGE: [
     { code: "BSCE", name: "BS Civil Engineering" },
@@ -138,14 +230,26 @@ export const DEPARTMENT_PROGRAMS: Record<string, readonly ProgramItem[]> = {
     { code: "BS-GEO", name: "BS Geology" },
     { code: "BSCEM", name: "BS Construction Engineering and Management" },
     { code: "BSGSE", name: "BS Geological Science and Engineering" },
-    { code: "BSCE + BSMSE", name: "BS Civil Engineering + BS Materials Science and Engineering" },
-    { code: "BSCE + BS-ENSE", name: "BS Civil Engineering + BS Environmental and Sanitary Engineering" },
+    {
+      code: "BSCE + BSMSE",
+      name: "BS Civil Engineering + BS Materials Science and Engineering",
+    },
+    {
+      code: "BSCE + BS-ENSE",
+      name: "BS Civil Engineering + BS Environmental and Sanitary Engineering",
+    },
     { code: "MSCE", name: "MS Civil Engineering" },
     { code: "MSCEM", name: "MS Construction Engineering and Management" },
     { code: "MSEnE", name: "MS Environmental Engineering" },
     { code: "PhD-EnE", name: "PhD in Environmental Engineering" },
-    { code: "BSCE → MSCE", name: "BS Civil Engineering → MS Civil Engineering" },
-    { code: "BSCEM → MSCEM", name: "BS Construction Engineering and Management → MS Construction Engineering and Management" },
+    {
+      code: "BSCE → MSCE",
+      name: "BS Civil Engineering → MS Civil Engineering",
+    },
+    {
+      code: "BSCEM → MSCEM",
+      name: "BS Construction Engineering and Management → MS Construction Engineering and Management",
+    },
   ],
   EECE: [
     { code: "BSEE", name: "BS Electrical Engineering" },
@@ -154,15 +258,27 @@ export const DEPARTMENT_PROGRAMS: Record<string, readonly ProgramItem[]> = {
     { code: "BSAIE", name: "BS Artificial Intelligence Engineering" },
     { code: "ME-CpE", name: "Master of Engineering in Computer Engineering" },
     { code: "ME-EE", name: "Master of Engineering in Electrical Engineering" },
-    { code: "ME-ECE", name: "Master of Engineering in Electronics Engineering" },
+    {
+      code: "ME-ECE",
+      name: "Master of Engineering in Electronics Engineering",
+    },
     { code: "MSCpE", name: "MS Computer Engineering" },
     { code: "MSEE", name: "MS Electrical Engineering" },
     { code: "MSECE", name: "MS Electronics Engineering" },
     { code: "PhD-CpE", name: "PhD in Computer Engineering" },
     { code: "PhD-ECE", name: "PhD in Electronics Engineering" },
-    { code: "BSECE → MSECE", name: "BS Electronics Engineering → MS Electronics Engineering" },
-    { code: "BSEE → MSEE", name: "BS Electrical Engineering → MS Electrical Engineering" },
-    { code: "BSCpE → MSCpE", name: "BS Computer Engineering → MS Computer Engineering" },
+    {
+      code: "BSECE → MSECE",
+      name: "BS Electronics Engineering → MS Electronics Engineering",
+    },
+    {
+      code: "BSEE → MSEE",
+      name: "BS Electrical Engineering → MS Electrical Engineering",
+    },
+    {
+      code: "BSCpE → MSCpE",
+      name: "BS Computer Engineering → MS Computer Engineering",
+    },
   ],
   "IE-EM": [
     { code: "BSIE", name: "BS Industrial Engineering" },
@@ -171,22 +287,40 @@ export const DEPARTMENT_PROGRAMS: Record<string, readonly ProgramItem[]> = {
     { code: "MSEM", name: "MS Engineering Management" },
     { code: "MSIE", name: "MS Industrial Engineering" },
     { code: "PhD-IE", name: "PhD in Industrial Engineering" },
-    { code: "BSIE → MSIE", name: "BS Industrial Engineering → MS Industrial Engineering" },
-    { code: "BSManE → MSSEM", name: "BS Management Engineering → MS Service Engineering and Management" },
+    {
+      code: "BSIE → MSIE",
+      name: "BS Industrial Engineering → MS Industrial Engineering",
+    },
+    {
+      code: "BSManE → MSSEM",
+      name: "BS Management Engineering → MS Service Engineering and Management",
+    },
   ],
   MME: [
     { code: "BSME", name: "BS Mechanical Engineering" },
     { code: "BSEnE", name: "BS Energy Engineering" },
     { code: "BSMfgE", name: "BS Manufacturing Engineering" },
-    { code: "BSME + BSBE", name: "BS Mechanical Engineering + BS Biological Engineering" },
-    { code: "BSME + BSMSE", name: "BS Mechanical Engineering + BS Materials Science and Engineering" },
+    {
+      code: "BSME + BSBE",
+      name: "BS Mechanical Engineering + BS Biological Engineering",
+    },
+    {
+      code: "BSME + BSMSE",
+      name: "BS Mechanical Engineering + BS Materials Science and Engineering",
+    },
     { code: "MSME", name: "MS Mechanical Engineering" },
     { code: "PhD-ME", name: "PhD in Mechanical Engineering" },
-    { code: "BSME → MSME", name: "BS Mechanical Engineering → MS Mechanical Engineering" },
+    {
+      code: "BSME → MSME",
+      name: "BS Mechanical Engineering → MS Mechanical Engineering",
+    },
   ],
   SFSE: [
     { code: "BSTC", name: "BS Technical Communication" },
-    { code: "BPE-SWM", name: "Bachelor of Physical Education Major in Sports Wellness and Management" },
+    {
+      code: "BPE-SWM",
+      name: "Bachelor of Physical Education Major in Sports Wellness and Management",
+    },
     { code: "BS-PHY", name: "BS Physics" },
   ],
   DLA: [
@@ -201,14 +335,20 @@ export const DEPARTMENT_PROGRAMS: Record<string, readonly ProgramItem[]> = {
     { code: "BSDS", name: "BS Data Science" },
   ],
   PE: [
-    { code: "BPE-SWM", name: "Bachelor of Physical Education Major in Sports Wellness and Management" },
+    {
+      code: "BPE-SWM",
+      name: "Bachelor of Physical Education Major in Sports Wellness and Management",
+    },
     { code: "PE", name: "Physical Education" },
   ],
   PHYS: [
     { code: "BS-PHY", name: "BS Physics" },
     { code: "BS-PHY + BSECE", name: "BS Physics + BS Electronics Engineering" },
     { code: "BS-PHY + BSEE", name: "BS Physics + BS Electrical Engineering" },
-    { code: "BS-PHY + BSMSE", name: "BS Physics + BS Materials Science and Engineering" },
+    {
+      code: "BS-PHY + BSMSE",
+      name: "BS Physics + BS Materials Science and Engineering",
+    },
   ],
   "SHS-INTRA": [
     { code: "STEM", name: "Science, Technology, Engineering, and Mathematics" },
@@ -228,8 +368,14 @@ export const DEPARTMENT_PROGRAMS: Record<string, readonly ProgramItem[]> = {
     { code: "MSCS", name: "MS Computer Science" },
     { code: "PhD-CS", name: "PhD in Computer Science" },
     { code: "BSCS → MSCS", name: "BS Computer Science → MS Computer Science" },
-    { code: "BSIS → MANAL", name: "BS Information Systems → Master in Business Analytics" },
-    { code: "BSIT → MIT", name: "BS Information Technology → Master in Information Technology" },
+    {
+      code: "BSIS → MANAL",
+      name: "BS Information Systems → Master in Business Analytics",
+    },
+    {
+      code: "BSIT → MIT",
+      name: "BS Information Technology → Master in Information Technology",
+    },
   ],
   SMDA: [
     { code: "BADF", name: "BA Digital Film" },
@@ -258,8 +404,14 @@ export const DEPARTMENT_PROGRAMS: Record<string, readonly ProgramItem[]> = {
     { code: "MBA", name: "Master in Business Administration" },
     { code: "MANAL", name: "Master in Business Analytics" },
     { code: "DBA", name: "Doctor of Business Administration" },
-    { code: "BSA → MANAL", name: "BS Accountancy → Master in Business Analytics" },
-    { code: "BSBA → MANAL", name: "BS Business Administration → Master in Business Analytics" },
+    {
+      code: "BSA → MANAL",
+      name: "BS Accountancy → Master in Business Analytics",
+    },
+    {
+      code: "BSBA → MANAL",
+      name: "BS Business Administration → Master in Business Analytics",
+    },
   ],
   "SHS-HEALTH": [
     { code: "BA-PSY", name: "BA Psychology" },
@@ -273,12 +425,8 @@ export const DEPARTMENT_PROGRAMS: Record<string, readonly ProgramItem[]> = {
     { code: "BA-PSY → MAPSY", name: "BA Psychology → MA Psychology" },
     { code: "BS-PSY → MAPSY", name: "BS Psychology → MA Psychology" },
   ],
-  SON: [
-    { code: "BSN", name: "BS Nursing" },
-  ],
-  SOM: [
-    { code: "MD", name: "Doctor of Medicine" },
-  ],
+  SON: [{ code: "BSN", name: "BS Nursing" }],
+  SOM: [{ code: "MD", name: "Doctor of Medicine" }],
   "SHS-MAKATI": [
     { code: "STEM", name: "Science, Technology, Engineering, and Mathematics" },
     { code: "ABM", name: "Accountancy, Business, and Management" },
@@ -300,7 +448,9 @@ ALL_DEPARTMENT_ITEMS.forEach((dept) => {
   }
 })
 
-export function getDepartmentPrograms(deptNameOrCode: string | null | undefined): readonly ProgramItem[] {
+export function getDepartmentPrograms(
+  deptNameOrCode: string | null | undefined
+): readonly ProgramItem[] {
   const item = getDepartmentItem(deptNameOrCode)
   if (!item) return []
   return DEPARTMENT_PROGRAMS[item.code] ?? []
@@ -313,12 +463,16 @@ export function getProgramItem(
   if (!progNameOrCode) return undefined
   const programs = getDepartmentPrograms(deptNameOrCode)
   const needle = progNameOrCode.trim().toUpperCase()
-  const found = programs.find((p) => p.code.toUpperCase() === needle || p.name.toUpperCase() === needle)
+  const found = programs.find(
+    (p) => p.code.toUpperCase() === needle || p.name.toUpperCase() === needle
+  )
   if (found) return found
 
   // Global fallback across all programs
   for (const list of Object.values(DEPARTMENT_PROGRAMS)) {
-    const match = list.find((p) => p.code.toUpperCase() === needle || p.name.toUpperCase() === needle)
+    const match = list.find(
+      (p) => p.code.toUpperCase() === needle || p.name.toUpperCase() === needle
+    )
     if (match) return match
   }
   return undefined

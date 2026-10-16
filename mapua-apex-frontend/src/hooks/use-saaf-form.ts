@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+} from "react"
 import { useFetcher, useNavigation } from "react-router"
 
 import { checkEmailExistence } from "@/hooks/use-email-existence"
@@ -10,6 +16,7 @@ import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import {
   createEmptyProponent,
   DEFAULT_SAAF_DRAFT,
+  getDepartmentItem,
   MAX_PROPONENTS,
   ONLINE_VENUE,
 } from "@/components/submission/constants"
@@ -86,7 +93,9 @@ export function useSaafForm() {
       ...DEFAULT_SAAF_DRAFT,
       ...(saafDraft ?? {}),
       activityTitle:
-        saafDraft?.activityTitle || eventName || DEFAULT_SAAF_DRAFT.activityTitle,
+        saafDraft?.activityTitle ||
+        eventName ||
+        DEFAULT_SAAF_DRAFT.activityTitle,
       proponents: saafDraft?.proponents ?? DEFAULT_SAAF_DRAFT.proponents,
       budgetItems: saafDraft?.budgetItems ?? DEFAULT_SAAF_DRAFT.budgetItems,
       departmentValues:
@@ -99,6 +108,8 @@ export function useSaafForm() {
 
   const currentOrgQuery = useCurrentOrganizationQuery()
   const organizationName = currentOrgQuery.data?.name || ""
+  const organizationDepartment =
+    getDepartmentItem(currentOrgQuery.data?.department)?.code || ""
 
   // Ensure submission date is always locked to today's date upon opening
   useEffect(() => {
@@ -108,9 +119,7 @@ export function useSaafForm() {
       ...(useOrgStore.getState().saafDraft ?? {}),
     }
     const proponents = current.proponents ?? DEFAULT_SAAF_DRAFT.proponents
-    const needsDateUpdate = proponents.some(
-      (p) => p.dateOfSubmission !== today
-    )
+    const needsDateUpdate = proponents.some((p) => p.dateOfSubmission !== today)
 
     if (needsDateUpdate) {
       useOrgStore.getState().patchSaafDraft({
@@ -139,6 +148,35 @@ export function useSaafForm() {
       })),
     })
   }, [organizationName, draft.proponents])
+
+  // A proponent's department is controlled by the dean assigned to the
+  // organization. Stamp every row with that department, including restored
+  // drafts and newly added proponents. Once the lookup settles, an unconfigured
+  // organization is deliberately stamped blank so required-field validation
+  // prevents submission.
+  useEffect(() => {
+    if (currentOrgQuery.isPending) return
+
+    const departmentValues = Object.fromEntries(
+      draft.proponents.map((proponent) => [
+        proponent.id,
+        organizationDepartment,
+      ])
+    )
+    const unchanged = draft.proponents.every(
+      (proponent) =>
+        draft.departmentValues[proponent.id] === organizationDepartment
+    )
+
+    if (!unchanged) {
+      useOrgStore.getState().patchSaafDraft({ departmentValues })
+    }
+  }, [
+    currentOrgQuery.isPending,
+    draft.departmentValues,
+    draft.proponents,
+    organizationDepartment,
+  ])
 
   // Reset drafts on successful submission
   useEffect(() => {
@@ -203,13 +241,6 @@ export function useSaafForm() {
     []
   )
 
-  const handleDepartmentChange = useCallback((id: string, value: string) => {
-    const current = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
-    useOrgStore.getState().patchSaafDraft({
-      departmentValues: { ...current.departmentValues, [id]: value },
-    })
-  }, [])
-
   const handleAddBudgetItem = useCallback(() => {
     const current = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
     useOrgStore.getState().patchSaafDraft({
@@ -272,30 +303,35 @@ export function useSaafForm() {
     }
   }, [grandTotal])
 
-  const revealInvalidFields = useCallback((root: ParentNode) => {
-    setShowErrors(false)
-    requestAnimationFrame(() => {
-      setShowErrors(true)
-    })
-    window.setTimeout(() => {
-      // Land the reader on the summary, which names every open field on the
-      // page, and still move focus to the first offender without a second
-      // viewport jump fighting the summary.
-      document
-        .getElementById(SAAF_STEP_ISSUES_ID)
-        ?.scrollIntoView({ behavior: "smooth", block: "start" })
-      const firstInvalid = root.querySelector<HTMLElement>(
-        STEP_INVALID_FOCUS_SELECTOR
-      )
-      firstInvalid?.focus({ preventScroll: true })
-    }, 50)
-  }, [setShowErrors])
+  const revealInvalidFields = useCallback(
+    (root: ParentNode) => {
+      setShowErrors(false)
+      requestAnimationFrame(() => {
+        setShowErrors(true)
+      })
+      window.setTimeout(() => {
+        // Land the reader on the summary, which names every open field on the
+        // page, and still move focus to the first offender without a second
+        // viewport jump fighting the summary.
+        document
+          .getElementById(SAAF_STEP_ISSUES_ID)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" })
+        const firstInvalid = root.querySelector<HTMLElement>(
+          STEP_INVALID_FOCUS_SELECTOR
+        )
+        firstInvalid?.focus({ preventScroll: true })
+      }, 50)
+    },
+    [setShowErrors]
+  )
 
   const validateStep = useCallback(
     (step: WizardStepIndex, form: HTMLFormElement | null): boolean => {
       if (!form) return false
 
-      const panel = form.querySelector<HTMLElement>(`[data-saaf-step="${step}"]`)
+      const panel = form.querySelector<HTMLElement>(
+        `[data-saaf-step="${step}"]`
+      )
       const htmlValid = panel ? isStepHtmlValid(panel) : false
       const issues = getSaafStepIssues(
         step as SaafStepIndex,
@@ -396,11 +432,13 @@ export function useSaafForm() {
       // cache dedups repeats, so settled emails resolve instantly here) and
       // block only on a conclusive "invalid" — outages resolve to
       // "unavailable" and let the submit through (fail open).
-      const emails = [...new Set(
-        draft.proponents
-          .map((p) => p.emailAddress.trim().toLowerCase())
-          .filter(Boolean)
-      )]
+      const emails = [
+        ...new Set(
+          draft.proponents
+            .map((p) => p.emailAddress.trim().toLowerCase())
+            .filter(Boolean)
+        ),
+      ]
       const states = await Promise.all(emails.map(checkEmailExistence))
       if (states.some((state) => state === "invalid")) {
         setMailboxError(
@@ -471,7 +509,6 @@ export function useSaafForm() {
     handleAddProponent,
     handleRemoveProponent,
     handleUpdateProponent,
-    handleDepartmentChange,
     handleAddBudgetItem,
     handleRemoveBudgetItem,
     handleUpdateBudgetItem,

@@ -18,7 +18,28 @@ class OrganizationControllerTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.organization_id', 'a1b2')
             ->assertJsonPath('data.name', 'Mapua Computing Society')
+            ->assertJsonPath('data.department', null)
             ->assertJsonPath('data.is_higher_council', false);
+    }
+
+    public function test_returns_the_department_of_the_assigned_dean(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::organization($db, signatories: [
+            ['role' => 'dean', 'signatory_id' => 'dean001'],
+        ]);
+        $db->seed([
+            'PK' => 'SIGNATORY#dean001',
+            'SK' => 'SIGNATORY#dean001',
+            'name' => 'Dr. Maria Santos',
+            'role' => 'dean',
+            'department' => 'ccis',
+        ]);
+
+        $this->withStudentAuth()
+            ->getJson('/api/v1/students/organization')
+            ->assertOk()
+            ->assertJsonPath('data.department', 'CCIS');
     }
 
     public function test_returns_404_when_the_jwt_organization_does_not_exist(): void

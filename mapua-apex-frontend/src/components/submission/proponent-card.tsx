@@ -3,7 +3,6 @@ import { AlertCircle, Loader2, Trash2Icon } from "lucide-react"
 
 import { FieldWarning } from "@/components/forms/field-warning"
 import {
-  DEPARTMENT_GROUPS,
   FIELD_INPUT_CLASS,
   getDepartmentItem,
   getDepartmentPrograms,
@@ -24,8 +23,6 @@ import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
-  SelectGroup,
-  SelectGroupLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -78,7 +75,6 @@ interface ProponentCardProps {
   organizationName: string
   onUpdate: (id: string, field: keyof Proponent, value: string) => void
   onRemove: (id: string) => void
-  onDepartmentChange: (id: string, value: string) => void
 }
 
 export const ProponentCard = memo(function ProponentCard({
@@ -89,7 +85,6 @@ export const ProponentCard = memo(function ProponentCard({
   organizationName,
   onUpdate,
   onRemove,
-  onDepartmentChange,
 }: ProponentCardProps) {
   // On-blur mailbox verification for this card's email field; format and
   // domain errors already surface through the FieldWarning context.
@@ -114,8 +109,11 @@ export const ProponentCard = memo(function ProponentCard({
   const availablePrograms = getDepartmentPrograms(selectedDeptCode)
   const programOptions =
     selectedProgCode &&
-      !availablePrograms.some((p) => p.code === selectedProgCode)
-      ? [{ code: selectedProgCode, name: selectedProgCode }, ...availablePrograms]
+    !availablePrograms.some((p) => p.code === selectedProgCode)
+      ? [
+          { code: selectedProgCode, name: selectedProgCode },
+          ...availablePrograms,
+        ]
       : availablePrograms
 
   const yearOptions = getYearLevelOptions(selectedDeptCode || departmentValue)
@@ -152,7 +150,9 @@ export const ProponentCard = memo(function ProponentCard({
             value={proponent.firstName}
             maxLength={35}
             onKeyDown={blockDigitKeys}
-            onChange={(e) => onUpdate(proponent.id, "firstName", stripDigits(e.target.value))}
+            onChange={(e) =>
+              onUpdate(proponent.id, "firstName", stripDigits(e.target.value))
+            }
             placeholder="First Name"
             style={{ color: "#171717" }}
             className={FIELD_INPUT_CLASS}
@@ -187,7 +187,9 @@ export const ProponentCard = memo(function ProponentCard({
             value={proponent.lastName}
             maxLength={30}
             onKeyDown={blockDigitKeys}
-            onChange={(e) => onUpdate(proponent.id, "lastName", stripDigits(e.target.value))}
+            onChange={(e) =>
+              onUpdate(proponent.id, "lastName", stripDigits(e.target.value))
+            }
             placeholder="Last Name"
             style={{ color: "#171717" }}
             className={FIELD_INPUT_CLASS}
@@ -202,8 +204,11 @@ export const ProponentCard = memo(function ProponentCard({
           <Select
             value={
               SUFFIX_OPTIONS.find(
-                (opt) => opt.value.toLowerCase() === (proponent.suffix || "").toLowerCase()
-              )?.value ?? (proponent.suffix || "none")
+                (opt) =>
+                  opt.value.toLowerCase() ===
+                  (proponent.suffix || "").toLowerCase()
+              )?.value ??
+              (proponent.suffix || "none")
             }
             onValueChange={(val) => {
               if (typeof val === "string") {
@@ -211,9 +216,7 @@ export const ProponentCard = memo(function ProponentCard({
               }
             }}
           >
-            <SelectTrigger
-              className="h-9.5 w-full min-w-0 truncate rounded-lg border-neutral-300 bg-white !text-neutral-900"
-            >
+            <SelectTrigger className="h-9.5 w-full min-w-0 truncate rounded-lg border-neutral-300 bg-white !text-neutral-900">
               <SelectValue placeholder="None">
                 {proponent.suffix || "None"}
               </SelectValue>
@@ -223,7 +226,11 @@ export const ProponentCard = memo(function ProponentCard({
               style={SELECT_CONTENT_STYLE}
             >
               {SUFFIX_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className={SELECT_ITEM_CLASS}>
+                <SelectItem
+                  key={opt.value}
+                  value={opt.value}
+                  className={SELECT_ITEM_CLASS}
+                >
                   {opt.label}
                 </SelectItem>
               ))}
@@ -257,7 +264,10 @@ export const ProponentCard = memo(function ProponentCard({
               onUpdate(
                 proponent.id,
                 "studentNumber",
-                sanitizeIntegerInput(e.target.value).slice(0, STUDENT_NUMBER_LENGTH)
+                sanitizeIntegerInput(e.target.value).slice(
+                  0,
+                  STUDENT_NUMBER_LENGTH
+                )
               )
             }
             style={{ color: "#171717" }}
@@ -271,63 +281,17 @@ export const ProponentCard = memo(function ProponentCard({
           <label className="block text-xs font-medium text-neutral-700">
             Department <span className="text-red-500">*</span>
           </label>
-          <Select
+          <Input
             value={selectedDeptCode}
-            onValueChange={(val) => {
-              if (typeof val === "string") {
-                onDepartmentChange(proponent.id, val)
-                const newPrograms = getDepartmentPrograms(val)
-                const isProgValid = Boolean(
-                  selectedProgCode &&
-                  newPrograms.some((p) => p.code === selectedProgCode)
-                )
-                const newYearOptions = getYearLevelOptions(val)
-                const isYearValid = Boolean(
-                  currentYear &&
-                  (newYearOptions as readonly string[]).includes(currentYear)
-                )
-
-                const nextProg = isProgValid ? selectedProgCode : ""
-                const nextYear = isYearValid ? currentYear : ""
-
-                if (!isProgValid || !isYearValid) {
-                  const combined =
-                    nextProg && nextYear
-                      ? `${nextProg} - ${nextYear}`
-                      : nextProg || nextYear
-                  onUpdate(proponent.id, "programAndYear", combined)
-                }
-              }
-            }}
-          >
-            <SelectTrigger
-              className={cn(
-                "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
-                !selectedDeptCode && "saaf-glow-invalid"
-              )}
-            >
-              <SelectValue placeholder="Select Department">
-                {selectedDeptCode || "Select Department"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent
-              className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
-              style={SELECT_CONTENT_STYLE}
-            >
-              {DEPARTMENT_GROUPS.map((group) => (
-                <SelectGroup key={group.campus}>
-                  <SelectGroupLabel className="px-2 py-1.5 text-xs font-semibold text-neutral-500">
-                    {group.campus}
-                  </SelectGroupLabel>
-                  {group.departments.map((dept) => (
-                    <SelectItem key={dept.code} value={dept.code} className={SELECT_ITEM_CLASS}>
-                      {dept.name} ({dept.code})
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
+            placeholder="Assigned by organization dean"
+            readOnly
+            aria-readonly="true"
+            className={cn(
+              FIELD_INPUT_CLASS,
+              "cursor-not-allowed bg-neutral-100/70",
+              !selectedDeptCode && "saaf-glow-invalid"
+            )}
+          />
           <input
             type="hidden"
             name={`proponent_${index}_department`}
@@ -355,17 +319,21 @@ export const ProponentCard = memo(function ProponentCard({
               className={cn(
                 "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
                 !selectedDeptCode &&
-                "cursor-not-allowed bg-neutral-100/70 text-neutral-400 opacity-70",
+                  "cursor-not-allowed bg-neutral-100/70 text-neutral-400 opacity-70",
                 selectedDeptCode && !selectedProgCode && "saaf-glow-invalid"
               )}
             >
               <SelectValue
                 placeholder={
-                  selectedDeptCode ? "Select Program" : "Select Department first"
+                  selectedDeptCode
+                    ? "Select Program"
+                    : "Select Department first"
                 }
               >
                 {selectedProgCode ||
-                  (selectedDeptCode ? "Select Program" : "Select Department first")}
+                  (selectedDeptCode
+                    ? "Select Program"
+                    : "Select Department first")}
               </SelectValue>
             </SelectTrigger>
             <SelectContent
@@ -373,8 +341,14 @@ export const ProponentCard = memo(function ProponentCard({
               style={SELECT_CONTENT_STYLE}
             >
               {programOptions.map((prog) => (
-                <SelectItem key={prog.code} value={prog.code} className={SELECT_ITEM_CLASS}>
-                  {prog.name === prog.code ? prog.code : `${prog.name} (${prog.code})`}
+                <SelectItem
+                  key={prog.code}
+                  value={prog.code}
+                  className={SELECT_ITEM_CLASS}
+                >
+                  {prog.name === prog.code
+                    ? prog.code
+                    : `${prog.name} (${prog.code})`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -439,7 +413,11 @@ export const ProponentCard = memo(function ProponentCard({
             onKeyDown={blockDigitKeys}
             onChange={(e) => {
               positionGibberish.reset()
-              onUpdate(proponent.id, "positionOfApplicant", stripDigits(e.target.value))
+              onUpdate(
+                proponent.id,
+                "positionOfApplicant",
+                stripDigits(e.target.value)
+              )
             }}
             onBlur={positionGibberish.onBlur}
             placeholder="President / Project Lead"
@@ -452,7 +430,9 @@ export const ProponentCard = memo(function ProponentCard({
             required
           />
           {positionGibberish.indicator}
-          <FieldWarning name={`proponent.${proponent.id}.positionOfApplicant`} />
+          <FieldWarning
+            name={`proponent.${proponent.id}.positionOfApplicant`}
+          />
         </div>
 
         <div className="space-y-1.5">
@@ -466,7 +446,7 @@ export const ProponentCard = memo(function ProponentCard({
             tabIndex={-1}
             placeholder="Organization Name"
             style={{ color: "#171717" }}
-            className={`${FIELD_INPUT_CLASS} cursor-not-allowed bg-neutral-100/70 select-none px-3`}
+            className={`${FIELD_INPUT_CLASS} cursor-not-allowed bg-neutral-100/70 px-3 select-none`}
             required
           />
           <FieldWarning name={`proponent.${proponent.id}.orgOrCourseSection`} />
@@ -482,7 +462,7 @@ export const ProponentCard = memo(function ProponentCard({
             readOnly
             tabIndex={-1}
             style={{ color: "#171717" }}
-            className={`${FIELD_INPUT_CLASS} cursor-not-allowed bg-neutral-100/70 select-none px-3`}
+            className={`${FIELD_INPUT_CLASS} cursor-not-allowed bg-neutral-100/70 px-3 select-none`}
           />
           <input
             type="hidden"
@@ -512,7 +492,10 @@ export const ProponentCard = memo(function ProponentCard({
               }
             }}
             onBlur={() => {
-              if (proponent.contactNumber === "09" || proponent.contactNumber === "0") {
+              if (
+                proponent.contactNumber === "09" ||
+                proponent.contactNumber === "0"
+              ) {
                 onUpdate(proponent.id, "contactNumber", "")
               }
             }}
@@ -560,9 +543,11 @@ export const ProponentCard = memo(function ProponentCard({
             </p>
           )}
           {emailExistence.state === "invalid" && (
-            <p className="flex items-start gap-1 text-[11px] text-red-600 animate-in fade-in">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-              <span>No mailbox exists for this address. Please double-check it.</span>
+            <p className="animate-in fade-in flex items-start gap-1 text-[11px] text-red-600">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                No mailbox exists for this address. Please double-check it.
+              </span>
             </p>
           )}
         </div>

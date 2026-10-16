@@ -1,25 +1,25 @@
-import { PlusIcon } from "lucide-react"
+import { CircleAlertIcon, Loader2, PlusIcon } from "lucide-react"
 
 import { ProponentCard } from "@/components/submission/proponent-card"
-import { MAX_PROPONENTS } from "@/components/submission/constants"
+import {
+  getDepartmentItem,
+  MAX_PROPONENTS,
+} from "@/components/submission/constants"
 import type { Proponent } from "@/components/submission/types"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import { layout } from "@/config"
 
 export function ProponentsSection({
   proponents,
-  departmentValues,
   onUpdate,
   onRemove,
   onAdd,
-  onDepartmentChange,
 }: {
   proponents: Proponent[]
-  departmentValues: Record<string, string>
   onUpdate: (id: string, field: keyof Proponent, value: string) => void
   onRemove: (id: string) => void
   onAdd: () => void
-  onDepartmentChange: (id: string, value: string) => void
 }) {
   const canRemove = proponents.length > 1
   const atMax = proponents.length >= MAX_PROPONENTS
@@ -27,20 +27,47 @@ export function ProponentsSection({
   // auto-filled rather than typed.
   const currentOrgQuery = useCurrentOrganizationQuery()
   const organizationName = currentOrgQuery.data?.name || ""
+  const configuredDepartment = currentOrgQuery.data?.department?.trim() || ""
+  const organizationDepartment =
+    getDepartmentItem(configuredDepartment)?.code || ""
+  const departmentIsMissing =
+    !currentOrgQuery.isPending && organizationDepartment === ""
 
   return (
     <div className={layout.stack}>
+      {currentOrgQuery.isPending ? (
+        <Alert>
+          <Loader2 className="animate-spin" />
+          <AlertTitle>Resolving organization department</AlertTitle>
+          <AlertDescription>
+            Loading the department assigned to your organization&apos;s dean.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {departmentIsMissing ? (
+        <Alert variant="error">
+          <CircleAlertIcon />
+          <AlertTitle>Organization department cannot be resolved</AlertTitle>
+          <AlertDescription>
+            {configuredDepartment
+              ? `The assigned dean's department (“${configuredDepartment}”) does not match a supported department.`
+              : "A dean with a department must be assigned to your organization."}{" "}
+            Please contact an administrator before submitting.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {proponents.map((proponent, index) => (
         <ProponentCard
           key={proponent.id}
           proponent={proponent}
           index={index}
           canRemove={canRemove}
-          departmentValue={departmentValues[proponent.id] ?? ""}
+          departmentValue={organizationDepartment}
           organizationName={organizationName}
           onUpdate={onUpdate}
           onRemove={onRemove}
-          onDepartmentChange={onDepartmentChange}
         />
       ))}
 

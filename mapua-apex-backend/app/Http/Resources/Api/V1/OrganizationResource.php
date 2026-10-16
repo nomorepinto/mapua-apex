@@ -18,6 +18,7 @@ class OrganizationResource extends JsonResource
         return [
             'organization_id' => DynamoKeys::strip($item['PK'] ?? null, 'ORGANIZATION#'),
             'name' => $item['name'] ?? null,
+            'department' => $item['department'] ?? null,
             'is_higher_council' => ($item['is_higher_council'] ?? false) === true,
             'signatories' => $this->signatories($item['signatories'] ?? []),
         ];
