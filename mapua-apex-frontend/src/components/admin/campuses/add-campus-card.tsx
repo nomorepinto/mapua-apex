@@ -1,6 +1,13 @@
 import { DownloadIcon, PlusIcon } from "lucide-react"
 
 import { CsvFileField } from "@/components/admin-osa/csv-file-field"
+import {
+  CAMPUS_NAME_MAX,
+  CAMPUS_NAME_MIN,
+  campusNameLiveError,
+  isCampusNameValid,
+  sanitizeCampusName,
+} from "@/components/admin/campuses/campus-name"
 import { CAMPUS_CSV_TEMPLATE } from "@/components/admin/campuses/campus-options"
 import { useCampusesPage } from "@/components/admin/campuses/campuses-context"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -36,6 +43,24 @@ function AddCampusForm() {
   const { state, actions } = useCampusesPage()
   const nameGibberish = useGibberishField(state.name)
 
+  const nameError =
+    (state.formError &&
+      (state.formError.toLowerCase().includes("name") ||
+        state.formError.includes("character") ||
+        state.formError.toLowerCase().includes("campus"))
+      ? state.formError
+      : null) ?? campusNameLiveError(state.name)
+
+  const isNameValid = isCampusNameValid(state.name)
+
+  const otherError =
+    state.formError &&
+      !state.formError.toLowerCase().includes("name") &&
+      !state.formError.includes("character") &&
+      !state.formError.toLowerCase().includes("campus")
+      ? state.formError
+      : null
+
   return (
     <>
       <CardHeader>
@@ -50,13 +75,17 @@ function AddCampusForm() {
           <Field>
             <FieldLabel htmlFor="campus-name">Name</FieldLabel>
             <Input
-              aria-invalid={state.formError ? true : undefined}
+              aria-invalid={nameError ? true : undefined}
               autoComplete="off"
               id="campus-name"
               name="name"
+              minLength={CAMPUS_NAME_MIN}
+              maxLength={CAMPUS_NAME_MAX}
               onChange={(event) => {
                 nameGibberish.reset()
-                actions.changeName(event.currentTarget.value)
+                actions.changeName(
+                  sanitizeCampusName(event.currentTarget.value)
+                )
               }}
               onBlur={nameGibberish.onBlur}
               placeholder="Makati Campus"
@@ -65,7 +94,10 @@ function AddCampusForm() {
               value={state.name}
             />
             {nameGibberish.indicator}
-            {state.formError ? <FieldError>{state.formError}</FieldError> : null}
+            {nameError ? (
+              <p className="text-xs font-medium text-red-600">{nameError}</p>
+            ) : null}
+            {otherError ? <FieldError>{otherError}</FieldError> : null}
           </Field>
           <div className="flex flex-col gap-4 rounded-lg border border-dashed p-3">
             <p className="text-sm font-medium">Classroom name format</p>
@@ -117,7 +149,7 @@ function AddCampusForm() {
         <CardFooter className="justify-end">
           <Button
             disabled={
-              !state.name.trim() ||
+              !isNameValid ||
               nameGibberish.state === "gibberish" ||
               nameGibberish.state === "checking"
             }
