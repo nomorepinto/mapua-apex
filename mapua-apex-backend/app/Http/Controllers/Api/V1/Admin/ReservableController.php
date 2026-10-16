@@ -33,6 +33,7 @@ class ReservableController extends Controller
             $this->participantBound($validated['min_participants'] ?? null),
             $this->participantBound($validated['max_participants'] ?? null),
             $request->boolean('is_classroom'),
+            $this->quantityBound($validated['max_quantity'] ?? null),
         );
 
         return (new ReservableResource($item))->response()->setStatusCode(201);
@@ -55,6 +56,7 @@ class ReservableController extends Controller
             $this->participantBound($validated['min_participants'] ?? null),
             $this->participantBound($validated['max_participants'] ?? null),
             $request->boolean('is_classroom'),
+            $this->quantityBound($validated['max_quantity'] ?? null),
         ));
     }
 
@@ -69,6 +71,14 @@ class ReservableController extends Controller
      * Normalise a participant bound to int|null (validation already gated the shape).
      */
     private function participantBound(mixed $value): ?int
+    {
+        return is_numeric($value) ? (int) $value : null;
+    }
+
+    /**
+     * Normalise an equipment quantity bound to int|null.
+     */
+    private function quantityBound(mixed $value): ?int
     {
         return is_numeric($value) ? (int) $value : null;
     }

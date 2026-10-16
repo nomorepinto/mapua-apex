@@ -26,6 +26,7 @@ interface ReservationFormActions {
   handleSetDateSlots: ReservationFormModel["handleSetDateSlots"]
   handleToggleSlot: ReservationFormModel["handleToggleSlot"]
   handleAddEquipment: ReservationFormModel["handleAddEquipment"]
+  handleUpdateEquipmentQuantity: ReservationFormModel["handleUpdateEquipmentQuantity"]
   handlePruneDates: ReservationFormModel["handlePruneDates"]
   handleUpdateRemarks: ReservationFormModel["handleUpdateRemarks"]
   handleSavePdf: ReservationFormModel["handleSavePdf"]
@@ -70,6 +71,7 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
       handleSetDateSlots: form.handleSetDateSlots,
       handleToggleSlot: form.handleToggleSlot,
       handleAddEquipment: form.handleAddEquipment,
+      handleUpdateEquipmentQuantity: form.handleUpdateEquipmentQuantity,
       handlePruneDates: form.handlePruneDates,
       handleUpdateRemarks: form.handleUpdateRemarks,
       handleSavePdf: form.handleSavePdf,

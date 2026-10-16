@@ -104,6 +104,8 @@ export function AddReservableSection() {
   const [bounds, setBounds] = useState<ParticipantBound>({ min: "", max: "" })
   // Room-only classroom flag; dropped on equipment and when the campus has no format.
   const [isClassroom, setIsClassroom] = useState(false)
+  // Equipment-only max quantity; cleared when type switches to room.
+  const [maxQuantity, setMaxQuantity] = useState("")
   const [schedule, setSchedule] = useState(() => allAvailableSchedule())
   const [formError, setFormError] = useState("")
   const [search, setSearch] = useState("")
@@ -206,11 +208,13 @@ export function AddReservableSection() {
         ...participantBoundPayload(stripCapacityForType(type, bounds)),
         is_classroom: classroom,
         schedule,
+        max_quantity: type === "equipment" && maxQuantity !== "" ? parseInt(maxQuantity, 10) : null,
       })
       setName("")
       setType("room")
       setBounds({ min: "", max: "" })
       setIsClassroom(false)
+      setMaxQuantity("")
       setSchedule(allAvailableSchedule())
       setFormError("")
       toastManager.add({
@@ -348,10 +352,27 @@ export function AddReservableSection() {
                     setType(next)
                     setBounds((current) => stripCapacityForType(next, current))
                     if (next !== "room") setIsClassroom(false)
+                    if (next !== "equipment") setMaxQuantity("")
                     if (formError) setFormError("")
                   }}
                   value={type}
                 />
+                {type === "equipment" && (
+                  <Field>
+                    <FieldLabel htmlFor="add-reservable-max-quantity">Max Quantity <span className="text-muted-foreground font-normal">(optional)</span></FieldLabel>
+                    <Input
+                      id="add-reservable-max-quantity"
+                      min={1}
+                      onChange={(event) => {
+                        setMaxQuantity(event.currentTarget.value)
+                        if (formError) setFormError("")
+                      }}
+                      placeholder="e.g. 10"
+                      type="number"
+                      value={maxQuantity}
+                    />
+                  </Field>
+                )}
                 <ReservableCapacityFieldsForm
                   bounds={bounds}
                   disabled={createReservable.isPending}

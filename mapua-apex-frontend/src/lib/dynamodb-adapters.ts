@@ -362,6 +362,8 @@ export function buildSaafApiPayload(
           slots: [...selection.slots].sort((a, b) => a - b),
         })),
         remarks: pick.remarks?.trim() || "",
+        // Equipment-only: include the requested unit count (defaults to 1 for unlimited equipment).
+        ...(pick.type === "equipment" ? { quantity_requested: pick.quantity ?? 1 } : {}),
       })),
     },
   }

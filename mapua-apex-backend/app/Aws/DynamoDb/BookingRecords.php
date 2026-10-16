@@ -69,6 +69,8 @@ final class BookingRecords
     /**
      * Effective availability for a reservable across [start, end]: per date, the
      * booked slots and the still-free slots (weekly template minus bookings).
+     * For equipment with a max_quantity, also returns booked_quantity and
+     * remaining_quantity per date.
      *
      * @param  array<string, mixed>  $reservable
      * @return array{schedule: array<string, list<bool>>, dates: array<string, array{booked_slots: list<int>, available_slots: list<int>}>}
@@ -77,7 +79,14 @@ final class BookingRecords
     {
         $schedule = ReservableSchedule::normalize($reservable['schedule'] ?? []);
         $reservableId = DynamoKeys::strip($reservable['SK'] ?? null, 'RESERVABLE#') ?? '';
+        $isEquipment = ($reservable['type'] ?? null) === 'equipment';
+        $maxQuantity = $isEquipment && is_numeric($reservable['max_quantity'] ?? null)
+            ? (int) $reservable['max_quantity']
+            : null;
         $occupied = $this->occupiedSlots($reservableId, []);
+        $bookedQuantities = $maxQuantity !== null
+            ? $this->bookedQuantitiesByDate($reservableId)
+            : [];
         $dates = [];
 
         foreach ($this->dateRange($start, $end) as $date) {
@@ -93,13 +102,21 @@ final class BookingRecords
                 }
             }
 
-            $dates[$date] = [
+            $entry = [
                 'booked_slots' => array_values(array_map('intval', $bookedSlots)),
                 'available_slots' => $available,
             ];
+
+            if ($maxQuantity !== null) {
+                $bookedQty = $bookedQuantities[$date] ?? 0;
+                $entry['booked_quantity'] = $bookedQty;
+                $entry['remaining_quantity'] = max(0, $maxQuantity - $bookedQty);
+            }
+
+            $dates[$date] = $entry;
         }
 
-        return ['schedule' => $schedule, 'dates' => $dates];
+        return ['schedule' => $schedule, 'dates' => $dates, 'max_quantity' => $maxQuantity];
     }
 
     /**
@@ -352,6 +369,13 @@ final class BookingRecords
                 'submission_id' => $context['submission_id'],
                 'organization_id' => $context['organization_id'],
             ];
+
+            // Store the requested unit count for equipment bookings.
+            $quantityRequested = $entry['reservation']['quantity_requested'] ?? null;
+
+            if (($entry['reservable']['type'] ?? null) === 'equipment' && is_numeric($quantityRequested)) {
+                $item['quantity_requested'] = (int) $quantityRequested;
+            }
 
             $items[] = $item;
             $refs[] = ['pk' => $pk, 'sk' => $sk];
@@ -627,6 +651,39 @@ final class BookingRecords
         }
 
         return $occupied;
+    }
+
+    /**
+     * Sum of quantity_requested across all approved bookings under a reservable,
+     * keyed by date. Used to compute remaining_quantity for equipment with a max_quantity.
+     *
+     * @return array<string, int>  date => total units booked
+     */
+    private function bookedQuantitiesByDate(string $reservableId): array
+    {
+        $bookings = $this->items->query([
+            'KeyConditionExpression' => 'PK = :pk AND begins_with(SK, :sk)',
+            'ExpressionAttributeValues' => [
+                ':pk' => ['S' => DynamoKeys::reservable($reservableId)],
+                ':sk' => ['S' => 'BOOKING#'],
+            ],
+        ]);
+
+        $quantities = [];
+
+        foreach ($bookings as $booking) {
+            if (! self::isApproved($booking)) {
+                continue;
+            }
+
+            $qty = is_numeric($booking['quantity_requested'] ?? null) ? (int) $booking['quantity_requested'] : 1;
+
+            foreach ($this->selections($booking) as $selection) {
+                $quantities[$selection['date']] = ($quantities[$selection['date']] ?? 0) + $qty;
+            }
+        }
+
+        return $quantities;
     }
 
     /**

@@ -27,6 +27,8 @@ class ReservableAvailabilityResource extends JsonResource
             'type' => $reservable['type'] ?? null,
             'schedule' => $data['schedule'] ?? [],
             'dates' => $data['dates'] ?? [],
+            // Equipment-only; null = unlimited.
+            'max_quantity' => $data['max_quantity'] ?? null,
         ];
     }
 }

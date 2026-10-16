@@ -53,22 +53,22 @@ final class ReservableRecords
      * @param  array<string, mixed>  $schedule
      * @return array<string, mixed>
      */
-    public function create(string $campusId, string $name, string $type, array $schedule, ?int $minParticipants = null, ?int $maxParticipants = null, bool $isClassroom = false): array
+    public function create(string $campusId, string $name, string $type, array $schedule, ?int $minParticipants = null, ?int $maxParticipants = null, bool $isClassroom = false, ?int $maxQuantity = null): array
     {
-        return $this->write($campusId, (string) Str::uuid(), $name, $type, $schedule, $minParticipants, $maxParticipants, $isClassroom);
+        return $this->write($campusId, (string) Str::uuid(), $name, $type, $schedule, $minParticipants, $maxParticipants, $isClassroom, $maxQuantity);
     }
 
     /**
      * @param  array<string, mixed>  $schedule
      * @return array<string, mixed>
      */
-    public function update(string $campusId, string $reservableId, string $name, string $type, array $schedule, ?int $minParticipants = null, ?int $maxParticipants = null, bool $isClassroom = false): array
+    public function update(string $campusId, string $reservableId, string $name, string $type, array $schedule, ?int $minParticipants = null, ?int $maxParticipants = null, bool $isClassroom = false, ?int $maxQuantity = null): array
     {
         if ($this->get($campusId, $reservableId) === null) {
             abort(404);
         }
 
-        return $this->write($campusId, $reservableId, $name, $type, $schedule, $minParticipants, $maxParticipants, $isClassroom);
+        return $this->write($campusId, $reservableId, $name, $type, $schedule, $minParticipants, $maxParticipants, $isClassroom, $maxQuantity);
     }
 
     /**
@@ -112,7 +112,7 @@ final class ReservableRecords
      * @param  array<string, mixed>  $schedule
      * @return array<string, mixed>
      */
-    private function write(string $campusId, string $id, string $name, string $type, array $schedule, ?int $minParticipants, ?int $maxParticipants, bool $isClassroom): array
+    private function write(string $campusId, string $id, string $name, string $type, array $schedule, ?int $minParticipants, ?int $maxParticipants, bool $isClassroom, ?int $maxQuantity = null): array
     {
         $type = Str::lower($type);
 
@@ -131,6 +131,10 @@ final class ReservableRecords
 
         if ($type === 'room' && $isClassroom) {
             $item['is_classroom'] = true;
+        }
+
+        if ($type === 'equipment' && $maxQuantity !== null) {
+            $item['max_quantity'] = $maxQuantity;
         }
 
         $this->items->put($item);

@@ -59,6 +59,9 @@ export function ActivitiesFilterBar({
           <option value="approved">approved</option>
           <option value="returned">returned</option>
           <option value="denied">denied</option>
+          <option value="created">created</option>
+          <option value="updated">updated</option>
+          <option value="deleted">deleted</option>
         </select>
       </div>
 
