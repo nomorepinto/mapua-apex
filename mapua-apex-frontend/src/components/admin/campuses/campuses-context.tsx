@@ -17,6 +17,7 @@ import {
   useDeleteCampusMutation,
   useUpdateCampusMutation,
 } from "@/hooks/use-campuses"
+import { campusNameError } from "@/components/admin/campuses/campus-name"
 import {
   MAX_PREFIXES,
   isValidPrefixToken,
@@ -211,8 +212,9 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
     event.preventDefault()
     const trimmed = name.trim()
 
-    if (!trimmed) {
-      setFormError("Campus name is required.")
+    const nameErr = campusNameError(name)
+    if (nameErr) {
+      setFormError(nameErr)
       return
     }
     if (existingNames.has(trimmed.toLowerCase())) {
@@ -279,8 +281,9 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
     }
 
     const trimmed = editName.trim()
-    if (!trimmed) {
-      setEditError("Campus name is required.")
+    const nameErr = campusNameError(editName)
+    if (nameErr) {
+      setEditError(nameErr)
       return
     }
     const duplicate = campuses.some(

@@ -231,9 +231,15 @@ export async function cognitoSignIn(username: string, password: string): Promise
 /**
  * 2. Sign Up
  */
-export async function cognitoSignUp(fullName: string, email: string, password: string) {
+export async function cognitoSignUp(
+  fullName: string,
+  email: string,
+  password: string,
+  organizationId: string
+) {
   const { clientId } = getCognitoConfig()
   const cleanEmail = email.trim()
+  const cleanOrganizationId = organizationId.trim()
 
   const data = await callCognitoApi("SignUp", {
     ClientId: clientId,
@@ -242,6 +248,7 @@ export async function cognitoSignUp(fullName: string, email: string, password: s
     UserAttributes: [
       { Name: "email", Value: cleanEmail },
       { Name: "name", Value: fullName.trim() },
+      { Name: "custom:organization_id", Value: cleanOrganizationId },
     ],
   })
 
