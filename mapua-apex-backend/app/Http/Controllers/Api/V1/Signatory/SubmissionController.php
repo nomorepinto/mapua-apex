@@ -12,6 +12,7 @@ use App\Aws\DynamoDb\ListSignatoryHistory;
 use App\Aws\DynamoDb\ListSignatoryQueue;
 use App\Aws\DynamoDb\ReturnSubmission;
 use App\Aws\DynamoDb\SignatoryChainResolver;
+use App\Aws\DynamoDb\SignatoryDesk;
 use App\Http\CognitoIdentity;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Signatory\DenySubmissionRequest;
@@ -82,7 +83,7 @@ class SubmissionController extends Controller
     ): void {
         $signatoryKey = DynamoKeys::signatory($signatoryId);
 
-        $isOnDesk = ($item['current_signatory'] ?? null) === $signatoryKey;
+        $isOnDesk = SignatoryDesk::isOwnedBy($item, $signatoryId);
         $inSequence = in_array($signatoryKey, (array) ($item['signatory_sequence'] ?? []), true);
 
         if ($isOnDesk || $inSequence) {
@@ -152,7 +153,7 @@ class SubmissionController extends Controller
         $item = $submissions->require($event, $submission);
         $signatory = CognitoIdentity::signatoryId($request);
 
-        if (($item['current_signatory'] ?? null) !== 'SIGNATORY#'.$signatory) {
+        if (! SignatoryDesk::isOwnedBy($item, $signatory)) {
             abort(404);
         }
 

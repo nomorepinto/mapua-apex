@@ -99,6 +99,36 @@ class SubmissionControllerTest extends TestCase
         $response->assertNotFound();
     }
 
+    public function test_queue_index_can_recover_a_stale_current_signatory_property(): void
+    {
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::event($db);
+        DynamoFixtures::submission($db, [
+            // The GSI places the paper on CDM's queue, but this duplicated
+            // property was left behind by an older/incomplete write.
+            'current_signatory' => 'SIGNATORY#adv001',
+            'GSI2PK' => 'SIGNATORY#cdm001',
+            'signatory_sequence' => ['SIGNATORY#adv001', 'SIGNATORY#cdm001'],
+        ]);
+
+        // The stale duplicate must not let the former desk action the paper.
+        $this->withSignatoryAuth()
+            ->postJson('/api/v1/signatories/events/e001/submissions/s001/approve')
+            ->assertNotFound();
+
+        $this->withSignatoryAuth(['custom:signatory_id' => 'cdm001'])
+            ->getJson('/api/v1/signatories/events/e001/submissions/s001')
+            ->assertOk();
+
+        $this->withSignatoryAuth(['custom:signatory_id' => 'cdm001'])
+            ->postJson('/api/v1/signatories/events/e001/submissions/s001/approve')
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved');
+
+        $stored = $db->find('EVENT#e001', 'SUBMISSION#s001');
+        $this->assertArrayNotHasKey('GSI2PK', $stored ?? []);
+    }
+
     public function test_approve_advances_to_osaar_for_extra_curricular_venue_events(): void
     {
         $this->freezeTime();
