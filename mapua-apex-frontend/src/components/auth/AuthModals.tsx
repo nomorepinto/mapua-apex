@@ -1,4 +1,7 @@
+import { useState } from "react"
+
 import { useAuthModalStore } from "@/stores/auth-modal-store"
+import { AuthInactivityDialog } from "./AuthInactivityDialog"
 import { SignInModal } from "./SignInModal"
 import { SignUpModal } from "./SignUpModal"
 import { VerifyEmailModal } from "./VerifyEmailModal"
@@ -14,6 +17,7 @@ export { useAuthModalStore as useAuthModals } from "@/stores/auth-modal-store"
  *   const { openSignIn, openSignUp } = useAuthModals()
  */
 export function AuthModals() {
+  const [inactivityDialogOpen, setInactivityDialogOpen] = useState(false)
   const {
     view,
     verificationEmail,
@@ -32,6 +36,7 @@ export function AuthModals() {
         onSwitchToSignUp={openSignUp}
         onSwitchToForgotPassword={openForgotPassword}
         onRequireVerification={(email) => openVerifyEmail(email)}
+        onInactivityTimeout={() => setInactivityDialogOpen(true)}
         onSuccess={() => {
           try {
             localStorage.setItem("apex_last_active_at", Date.now().toString())
@@ -49,6 +54,7 @@ export function AuthModals() {
         onClose={closeModal}
         onSwitchToSignIn={openSignIn}
         onRequireVerification={(email) => openVerifyEmail(email)}
+        onInactivityTimeout={() => setInactivityDialogOpen(true)}
       />
 
       <VerifyEmailModal
@@ -68,6 +74,11 @@ export function AuthModals() {
         onSuccess={() => {
           openSignIn()
         }}
+      />
+
+      <AuthInactivityDialog
+        open={inactivityDialogOpen}
+        onOpenChange={setInactivityDialogOpen}
       />
     </>
   )

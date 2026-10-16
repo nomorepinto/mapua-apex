@@ -24,6 +24,7 @@ export interface SignUpModalProps {
   onClose: () => void
   onSwitchToSignIn: () => void
   onRequireVerification: (email: string) => void
+  onInactivityTimeout?: () => void
 }
 
 export function SignUpModal({
@@ -31,6 +32,7 @@ export function SignUpModal({
   onClose,
   onSwitchToSignIn,
   onRequireVerification,
+  onInactivityTimeout,
 }: SignUpModalProps) {
   const [fullName, setFullName] = useState("")
   const [fullNameTouched, setFullNameTouched] = useState(false)
@@ -69,6 +71,7 @@ export function SignUpModal({
         setErrorMessage(null)
         resetEmailExistence()
         onClose()
+        onInactivityTimeout?.()
       }, SIGNUP_INACTIVITY_TIMEOUT_MS)
     }
     const activityEvents = ["pointerdown", "keydown", "input", "focusin"] as const
@@ -84,7 +87,13 @@ export function SignUpModal({
         window.removeEventListener(eventName, resetTimer)
       )
     }
-  }, [isLoading, isOpen, onClose, resetEmailExistence])
+  }, [
+    isLoading,
+    isOpen,
+    onClose,
+    onInactivityTimeout,
+    resetEmailExistence,
+  ])
 
   if (!isOpen) return null
 

@@ -1,10 +1,18 @@
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { X, AlertCircle, AlertTriangle, Clock, Eye, EyeOff, HelpCircle, Info, Loader2 } from "lucide-react"
 import apexBrandLogo from "@/assets/apex-brand.svg"
 import { cognitoSignIn } from "@/lib/cognito-auth"
 import { useSignInLockout } from "@/hooks/use-sign-in-lockout"
 import { useEmailExistence } from "@/hooks/use-email-existence"
 import { validateEmailLive, validateEmailDomain } from "@/lib/auth-validation"
+
+const configuredInactivitySeconds = Number(
+  import.meta.env.VITE_SIGNIN_INACTIVITY_TIMEOUT_SECONDS
+)
+const SIGNIN_INACTIVITY_TIMEOUT_MS =
+  Number.isFinite(configuredInactivitySeconds) && configuredInactivitySeconds > 0
+    ? configuredInactivitySeconds * 1000
+    : 3000
 
 export interface SignInModalProps {
   isOpen: boolean
@@ -13,6 +21,7 @@ export interface SignInModalProps {
   onSwitchToForgotPassword: () => void
   onRequireVerification?: (email: string) => void
   onSuccess?: () => void
+  onInactivityTimeout?: () => void
 }
 
 export function SignInModal({
@@ -22,6 +31,7 @@ export function SignInModal({
   onSwitchToForgotPassword,
   onRequireVerification,
   onSuccess,
+  onInactivityTimeout,
 }: SignInModalProps) {
   const [email, setEmail] = useState("")
   const [emailTouched, setEmailTouched] = useState(false)
@@ -42,6 +52,48 @@ export function SignInModal({
   } = useSignInLockout()
 
   const emailExistence = useEmailExistence()
+  const resetEmailExistence = emailExistence.reset
+
+  useEffect(() => {
+    if (!isOpen || isLoading) return
+
+    let timeoutId: number
+    const resetTimer = () => {
+      window.clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(() => {
+        setEmail("")
+        setEmailTouched(false)
+        setPassword("")
+        setShowPassword(false)
+        setCapsLockActive(false)
+        setNumLockActive(false)
+        setIsWrongPassword(false)
+        setErrorMessage(null)
+        resetEmailExistence()
+        onClose()
+        onInactivityTimeout?.()
+      }, SIGNIN_INACTIVITY_TIMEOUT_MS)
+    }
+    const activityEvents = ["pointerdown", "keydown", "input", "focusin"] as const
+
+    activityEvents.forEach((eventName) =>
+      window.addEventListener(eventName, resetTimer)
+    )
+    resetTimer()
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      activityEvents.forEach((eventName) =>
+        window.removeEventListener(eventName, resetTimer)
+      )
+    }
+  }, [
+    isLoading,
+    isOpen,
+    onClose,
+    onInactivityTimeout,
+    resetEmailExistence,
+  ])
 
   if (!isOpen) return null
 

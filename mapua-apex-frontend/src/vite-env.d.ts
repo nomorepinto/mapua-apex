@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_COGNITO_REDIRECT_URI: string
   readonly VITE_COGNITO_POST_LOGOUT_REDIRECT_URI: string
   readonly VITE_COGNITO_SCOPES: string
+  readonly VITE_SIGNIN_INACTIVITY_TIMEOUT_SECONDS?: string
   readonly VITE_SIGNUP_INACTIVITY_TIMEOUT_SECONDS?: string
   readonly VITE_ARCUS_ATTENDANCE_URL: string
   readonly VITE_ARCUS_EVALUATION_URL: string
