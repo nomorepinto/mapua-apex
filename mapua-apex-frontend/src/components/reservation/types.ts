@@ -21,6 +21,10 @@ export interface ReservationPick extends ReservableCapacityFields {
   selections: SlotSelection[]
   /** Optional purpose note carried through to the booking. */
   remarks: string
+  /** Equipment-only; how many units the student is requesting. */
+  quantity?: number
+  /** Equipment-only; mirrors the reservable's max_quantity for cap enforcement (null = unlimited). */
+  max_quantity?: number | null
 }
 
 /**

@@ -282,9 +282,9 @@ export function useReservationForm() {
     [currentPicks]
   )
 
-  /** Add an equipment reservable with remarks, synced to current room selections */
+  /** Add an equipment reservable with remarks and a unit quantity, synced to current room selections */
   const handleAddEquipment = useCallback(
-    (reservable: ApiReservable, remarks: string) => {
+    (reservable: ApiReservable, remarks: string, quantity: number = 1) => {
       const picks = currentPicks()
       if (picks.some((p) => p.reservable_id === reservable.reservable_id)) {
         return
@@ -292,6 +292,8 @@ export function useReservationForm() {
       const roomPicks = picks.filter((p) => p.type === "room")
       const primaryRoom = roomPicks[0]
       const finalRemarks = remarks.trim().slice(0, 50)
+      const maxQ = reservable.max_quantity ?? null
+      const clampedQuantity = maxQ !== null ? Math.min(Math.max(1, quantity), maxQ) : Math.max(1, quantity)
 
       const newEquipment: ReservationPick = {
         id: reservable.reservable_id,
@@ -303,8 +305,24 @@ export function useReservationForm() {
         max_participants: reservable.max_participants ?? null,
         selections: primaryRoom ? [...primaryRoom.selections] : [],
         remarks: finalRemarks,
+        quantity: clampedQuantity,
+        max_quantity: maxQ,
       }
       commitPicks([...picks, newEquipment])
+    },
+    [currentPicks]
+  )
+
+  /** Adjust the quantity for an existing equipment pick */
+  const handleUpdateEquipmentQuantity = useCallback(
+    (pickId: string, quantity: number) => {
+      const next = currentPicks().map((pick) => {
+        if (pick.id !== pickId || pick.type !== "equipment") return pick
+        const maxQ = pick.max_quantity ?? null
+        const clamped = maxQ !== null ? Math.min(Math.max(1, quantity), maxQ) : Math.max(1, quantity)
+        return { ...pick, quantity: clamped }
+      })
+      useOrgStore.getState().patchReservationDraft({ picks: next })
     },
     [currentPicks]
   )
@@ -390,6 +408,7 @@ export function useReservationForm() {
     handleSetDateSlots,
     handleToggleSlot,
     handleAddEquipment,
+    handleUpdateEquipmentQuantity,
     handlePruneDates,
     handleUpdateRemarks,
     handleClearForm,

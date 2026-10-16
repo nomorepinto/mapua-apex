@@ -148,12 +148,18 @@ export interface ApiReservable extends ReservableCapacityFields {
   capacity_label?: string | null
   /** Room-only flag; true when the room must match the campus classroom name format. */
   is_classroom?: boolean
+  /** Equipment-only; null = unlimited. */
+  max_quantity?: number | null
 }
 
 /** Per-date availability for one reservable, as returned by the availability endpoint. */
 export interface ApiAvailabilityDate {
   booked_slots: number[]
   available_slots: number[]
+  /** Equipment-only (when max_quantity is set); total units booked across all approved bookings on this date. */
+  booked_quantity?: number | null
+  /** Equipment-only; units still bookable (max_quantity - booked_quantity). */
+  remaining_quantity?: number | null
 }
 
 export interface ApiAvailability {
@@ -164,6 +170,8 @@ export interface ApiAvailability {
   schedule: ReservableSchedule
   /** Keyed by `YYYY-MM-DD`. Dates outside the queried window are absent. */
   dates: Record<string, ApiAvailabilityDate>
+  /** Equipment-only; null = unlimited. */
+  max_quantity?: number | null
 }
 
 export type BookingSource = "submission" | "cdm"
@@ -190,6 +198,8 @@ export interface ApiBooking {
   organization_id?: string | null
   submission_id?: string | null
   event_id?: string | null
+  /** Equipment-only; number of units requested on this booking. */
+  quantity_requested?: number | null
 }
 
 export type BookingConflictReason = "taken" | "not_offered" | "capacity" | "missing_reservable"
@@ -230,6 +240,8 @@ export type CreateReservablePayload = ReservableCapacityFields & {
   type: ReservableType
   schedule: ReservableSchedule
   is_classroom?: boolean
+  /** Equipment-only; null = unlimited. */
+  max_quantity?: number | null
 }
 
 export type CreateBookingPayload = {

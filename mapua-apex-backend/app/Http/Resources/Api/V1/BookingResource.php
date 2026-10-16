@@ -36,6 +36,10 @@ class BookingResource extends JsonResource
             ),
             'submission_id' => $item['submission_id'] ?? null,
             'event_id' => $item['event_id'] ?? null,
+            // Equipment-only; units requested on this booking (null for rooms).
+            'quantity_requested' => is_numeric($item['quantity_requested'] ?? null)
+                ? (int) $item['quantity_requested']
+                : null,
         ];
     }
 }

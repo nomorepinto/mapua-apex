@@ -67,7 +67,10 @@ export function AdminMonitorActivitiesPage() {
         if (f === "approved" && !norm.includes("approve")) return false;
         if (f === "returned" && !norm.includes("return") && !norm.includes("revision")) return false;
         if (f === "denied" && !norm.includes("deny")) return false;
-        if (f === "submitted" && !norm.includes("submit") && !norm.includes("create")) return false;
+        if (f === "submitted" && norm !== "submitted") return false;
+        if (f === "created" && norm !== "created") return false;
+        if (f === "updated" && norm !== "updated") return false;
+        if (f === "deleted" && norm !== "deleted") return false;
       }
 
       if (activitySearch) {

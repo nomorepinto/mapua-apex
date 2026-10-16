@@ -82,6 +82,8 @@ final class SaafSubmissionRules
             'venue_reservation.reservations.*.selections.*.date' => ['required', 'date_format:Y-m-d'],
             'venue_reservation.reservations.*.selections.*.slots' => ['required', 'array', 'min:1'],
             'venue_reservation.reservations.*.selections.*.slots.*' => ['integer', 'between:0,'.(\App\Aws\DynamoDb\ReservableSchedule::SLOTS - 1)],
+            // Equipment-only; how many units of this item the student is requesting.
+            'venue_reservation.reservations.*.quantity_requested' => ['nullable', 'integer', 'min:1'],
         ];
 
         if ($requireEventId) {

@@ -688,7 +688,7 @@ export function ReservationFields() {
 
               {/* List of Reserved Rooms */}
               {roomPicks.length > 0 && (
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[26rem] overflow-y-auto pr-0.5">
                   {roomPicks.map((room) => {
                     const roomAvail = roomAvailabilityMap.get(room.reservable_id)
                     const isBooked = isRoomBookedDuring(roomAvail, activeScheduleSelections)
@@ -921,6 +921,7 @@ export function ReservationFields() {
           campusId={campusId}
           onAddEquipment={actions.handleAddEquipment}
           onUpdateRemarks={actions.handleUpdateRemarks}
+          onUpdateQuantity={actions.handleUpdateEquipmentQuantity}
           onRemove={actions.handleRemovePick}
           picks={picks}
           rooms={roomPicks}
@@ -1132,17 +1133,20 @@ function EquipmentSelector({
   rooms,
   onAddEquipment,
   onUpdateRemarks,
+  onUpdateQuantity,
   onRemove,
 }: {
   picks: ReservationPick[]
   campusId: string
   rooms: ReservationPick[]
-  onAddEquipment: (reservable: ApiReservable, remarks: string) => void
+  onAddEquipment: (reservable: ApiReservable, remarks: string, quantity: number) => void
   onUpdateRemarks: (pickId: string, remarks: string) => void
+  onUpdateQuantity: (pickId: string, quantity: number) => void
   onRemove: (pickId: string) => void
 }) {
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>("")
   const [equipmentRemark, setEquipmentRemark] = useState<string>("")
+  const [equipmentQuantity, setEquipmentQuantity] = useState<string>("1")
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   const reservablesQuery = useStudentReservablesQuery(campusId || null)
@@ -1154,9 +1158,17 @@ function EquipmentSelector({
     (eq) => !pickedEquipmentIds.has(eq.reservable_id)
   )
 
+  // The currently selected equipment item (for capping quantity)
+  const selectedEquipmentItem = availableEquipment.find(
+    (eq) => eq.reservable_id === selectedEquipmentId
+  )
+  const selectedMaxQ = selectedEquipmentItem?.max_quantity ?? null
+
   const isRemarkValid =
     equipmentRemark.trim().length >= 5 && equipmentRemark.length <= 50
-  const isAddDisabled = !selectedEquipmentId || !isRemarkValid
+  const parsedQty = parseInt(equipmentQuantity, 10)
+  const isQtyValid = !isNaN(parsedQty) && parsedQty >= 1 && (selectedMaxQ === null || parsedQty <= selectedMaxQ)
+  const isAddDisabled = !selectedEquipmentId || !isRemarkValid || !isQtyValid
 
   const handleConfirmAddEquipment = () => {
     if (isAddDisabled) return
@@ -1165,9 +1177,10 @@ function EquipmentSelector({
     )
     if (!reservable) return
 
-    onAddEquipment(reservable, equipmentRemark.trim().slice(0, 50))
+    onAddEquipment(reservable, equipmentRemark.trim().slice(0, 50), Math.max(1, parsedQty))
     setSelectedEquipmentId("")
     setEquipmentRemark("")
+    setEquipmentQuantity("1")
   }
 
   return (
@@ -1212,10 +1225,12 @@ function EquipmentSelector({
               No equipment requested yet. Use the dropdown below to add equipment.
             </p>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 max-h-[26rem] overflow-y-auto pr-0.5">
               {equipmentPicks.map((item) => {
                 const currentRemark = item.remarks || ""
                 const remarkLen = currentRemark.length
+                const maxQ = item.max_quantity ?? null
+                const currentQty = item.quantity ?? 1
                 return (
                   <div
                     key={item.id}
@@ -1233,6 +1248,31 @@ function EquipmentSelector({
                       >
                         <Trash2Icon className="size-3.5" />
                       </button>
+                    </div>
+
+                    {/* Quantity controls */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-medium text-neutral-600 shrink-0">Quantity:</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onUpdateQuantity(item.id, currentQty - 1)}
+                          disabled={currentQty <= 1}
+                          className="size-5 rounded border border-neutral-300 bg-white text-neutral-600 text-xs flex items-center justify-center hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          aria-label="Decrease quantity"
+                        >−</button>
+                        <span className="min-w-[1.5rem] text-center text-xs font-semibold text-neutral-900">{currentQty}</span>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateQuantity(item.id, currentQty + 1)}
+                          disabled={maxQ !== null && currentQty >= maxQ}
+                          className="size-5 rounded border border-neutral-300 bg-white text-neutral-600 text-xs flex items-center justify-center hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          aria-label="Increase quantity"
+                        >+</button>
+                      </div>
+                      {maxQ !== null && (
+                        <span className="text-[10px] text-neutral-500 ml-1">/ {maxQ} max</span>
+                      )}
                     </div>
 
                     <div className="space-y-1">
@@ -1302,7 +1342,10 @@ function EquipmentSelector({
                       value: eq.reservable_id,
                       label: eq.name,
                     }))}
-                    onValueChange={(val) => setSelectedEquipmentId(val ?? "")}
+                    onValueChange={(val) => {
+                      setSelectedEquipmentId(val ?? "")
+                      setEquipmentQuantity("1")
+                    }}
                   >
                     <SelectTrigger
                       aria-label="Select equipment"
@@ -1313,12 +1356,61 @@ function EquipmentSelector({
                     <SelectPopup>
                       {availableEquipment.map((eq) => (
                         <SelectItem key={eq.reservable_id} value={eq.reservable_id}>
-                          {eq.name}
+                          <span className="flex items-center justify-between w-full gap-3">
+                            <span>{eq.name}</span>
+                            {eq.max_quantity != null && (
+                              <span className="text-[10px] text-neutral-400 shrink-0">{eq.max_quantity} available</span>
+                            )}
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectPopup>
                   </Select>
                 </div>
+
+                {/* Quantity field — shown when an item with a max_quantity cap is selected */}
+                {selectedEquipmentId && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <label className="text-[10px] font-medium text-neutral-600">
+                        Quantity {selectedMaxQ != null && <span className="text-neutral-400">(max {selectedMaxQ})</span>}
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEquipmentQuantity(String(Math.max(1, (parseInt(equipmentQuantity, 10) || 1) - 1)))}
+                        disabled={(parseInt(equipmentQuantity, 10) || 1) <= 1}
+                        className="size-8 rounded border border-neutral-300 bg-white text-neutral-600 text-sm flex items-center justify-center hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >−</button>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={selectedMaxQ ?? undefined}
+                        value={equipmentQuantity}
+                        onChange={(e) => {
+                          const v = e.currentTarget.value
+                          setEquipmentQuantity(v)
+                        }}
+                        className="h-8 w-20 text-center text-xs bg-white rounded-md border-neutral-300"
+                        aria-label="Equipment quantity"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cur = parseInt(equipmentQuantity, 10) || 1
+                          const next = selectedMaxQ != null ? Math.min(selectedMaxQ, cur + 1) : cur + 1
+                          setEquipmentQuantity(String(next))
+                        }}
+                        disabled={selectedMaxQ != null && (parseInt(equipmentQuantity, 10) || 1) >= selectedMaxQ}
+                        className="size-8 rounded border border-neutral-300 bg-white text-neutral-600 text-sm flex items-center justify-center hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >+</button>
+                      {!isQtyValid && parseInt(equipmentQuantity, 10) > 1 && (
+                        <span className="text-[10px] text-red-500">Exceeds max ({selectedMaxQ})</span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[11px]">

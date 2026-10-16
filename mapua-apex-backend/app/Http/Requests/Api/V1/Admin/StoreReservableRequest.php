@@ -32,6 +32,8 @@ class StoreReservableRequest extends FormRequest
             // Room-only classroom flag; when set the name must match the campus
             // classroom naming format. Dropped for equipment at write time.
             'is_classroom' => ['nullable', 'boolean'],
+            // Equipment-only; absent/null means unlimited units available.
+            'max_quantity' => ['nullable', 'integer', 'min:1'],
         ];
 
         // Each present day column must be exactly 12 booleans (one per 70-min slot).
@@ -58,6 +60,12 @@ class StoreReservableRequest extends FormRequest
 
             if (is_numeric($min) && is_numeric($max) && (int) $min > (int) $max) {
                 $validator->errors()->add('min_participants', 'The minimum participants cannot exceed the maximum.');
+            }
+
+            // max_quantity is equipment-only; emit an informational error when
+            // it is sent for a room so the caller knows the field was ignored.
+            if ($this->input('type') === 'room' && $this->input('max_quantity') !== null) {
+                $validator->errors()->add('max_quantity', 'max_quantity only applies to equipment, not rooms.');
             }
 
             if ($this->input('type') !== 'room' || ! filter_var($this->input('is_classroom'), FILTER_VALIDATE_BOOLEAN)) {

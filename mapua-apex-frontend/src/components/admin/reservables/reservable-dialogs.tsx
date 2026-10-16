@@ -48,6 +48,8 @@ export interface ReservableDraft {
   min_participants: number | null
   max_participants: number | null
   is_classroom: boolean
+  /** Equipment-only; null = unlimited. */
+  max_quantity: number | null
 }
 
 /**
@@ -91,6 +93,12 @@ export function EditReservableDialog({
     participantBoundsFromValues(reservable.min_participants, reservable.max_participants)
   )
   const [isClassroom, setIsClassroom] = useState(() => reservable.is_classroom === true)
+  // Equipment-only; seeded from the stored value (null when absent or when type = room).
+  const [maxQuantity, setMaxQuantity] = useState<string>(() =>
+    reservable.type === "equipment" && reservable.max_quantity != null
+      ? String(reservable.max_quantity)
+      : ""
+  )
   const [localError, setLocalError] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -144,6 +152,7 @@ export function EditReservableDialog({
       schedule,
       ...participantBoundPayload(stripCapacityForType(type, bounds)),
       is_classroom: classroom,
+      max_quantity: type === "equipment" && maxQuantity !== "" ? parseInt(maxQuantity, 10) : null,
     })
   }
 
@@ -190,10 +199,27 @@ export function EditReservableDialog({
                   setType(next)
                   setBounds((current) => stripCapacityForType(next, current))
                   if (next !== "room") setIsClassroom(false)
+                  if (next !== "equipment") setMaxQuantity("")
                   if (localError) setLocalError("")
                 }}
                 value={type}
               />
+              {type === "equipment" && (
+                <Field>
+                  <FieldLabel htmlFor="edit-reservable-max-quantity">Max Quantity <span className="text-muted-foreground font-normal">(optional)</span></FieldLabel>
+                  <Input
+                    id="edit-reservable-max-quantity"
+                    min={1}
+                    onChange={(event) => {
+                      setMaxQuantity(event.currentTarget.value)
+                      if (localError) setLocalError("")
+                    }}
+                    placeholder="e.g. 10"
+                    type="number"
+                    value={maxQuantity}
+                  />
+                </Field>
+              )}
               <ReservableCapacityFieldsForm
                 bounds={bounds}
                 disabled={savePending}

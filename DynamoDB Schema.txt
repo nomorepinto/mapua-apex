@@ -424,6 +424,7 @@ schedule: {
 min_participants: number   (room-only; N attribute, optional = no lower limit)
 max_participants: number   (room-only; N attribute, optional = no upper limit)
 is_classroom: bool         (room-only; true when the name must match the campus classroom format)
+max_quantity: number       (equipment-only; N attribute, optional = absent means unlimited)
 
 The recurring weekly availability template. Days run monday..saturday (Sunday
 is never reservable and is not stored); each present day is exactly 12
@@ -452,6 +453,16 @@ a classroom naming rule and that this room's name matches
 classroom_name_prefixes/classroom_name_digits note above. Enforced at reservable
 create/update only; the SAAF reservation step and CSV import do not set it.
 
+max_quantity caps how many units of an equipment item may be booked across all
+approved holds on a given date (e.g. a campus has 10 laptops: max_quantity=10).
+It is persisted ONLY when type is "equipment" -- sending it for a room returns
+422 (StoreReservableRequest after() cross-field check). When absent (or null),
+the item is treated as unlimited. The availability endpoint derives
+booked_quantity (sum of quantity_requested across all approved BOOKINGs for that
+date) and remaining_quantity (max_quantity - booked_quantity, floor 0) from
+BookingRecords::bookedQuantitiesByDate; these are returned in the per-date
+availability map alongside booked_slots/available_slots.
+
 BOOKING (a concrete hold on a reservable's slots for specific dates)
 PK: RESERVABLE#uuid
 SK: BOOKING#uuid
@@ -479,6 +490,10 @@ so the owning org can list its holds and CDM can label them read-only:
                             legacy items, which read as approved)
   approved_at: string       (sparse; stamped when CDM approves the paper)
   approved_by: SIGNATORY#uuid  (sparse; the approving CDM signatory)
+  quantity_requested: number   (equipment-only; N attribute; how many units of
+                               the item the student requested -- absent on room
+                               bookings and legacy equipment bookings, where 1
+                               is assumed when computing booked_quantity)
 Only approved holds occupy slots. ApproveSubmission flips every booking_refs
 hold to "approved" on the paper's last (CDM) approval, after re-checking them
 against the approved bookings (409, nothing written, on conflict). A hold
