@@ -25,6 +25,8 @@ LAMBDA_HANDLER = "lambda_function.lambda_handler"
 LAMBDA_RUNTIME = "python3.12"
 ORGANIZATION_ATTRIBUTE = "custom:organization_id"
 PERMISSION_STATEMENT_ID = "AllowCognitoPostConfirmation"
+REQUIRED_READ_ATTRIBUTES = {"email", "name", ORGANIZATION_ATTRIBUTE}
+REQUIRED_WRITE_ATTRIBUTES = {"email", "name", ORGANIZATION_ATTRIBUTE}
 
 UPDATABLE_CLIENT_FIELDS = (
     "ClientName",
@@ -330,13 +332,17 @@ def ensure_client_attributes(cognito: Any, *, dry_run: bool) -> None:
     write_attributes = list(client.get("WriteAttributes", []))
     changed = False
 
-    for attributes in (read_attributes, write_attributes):
-        if ORGANIZATION_ATTRIBUTE not in attributes:
-            attributes.append(ORGANIZATION_ATTRIBUTE)
+    for attribute in sorted(REQUIRED_READ_ATTRIBUTES):
+        if attribute not in read_attributes:
+            read_attributes.append(attribute)
+            changed = True
+    for attribute in sorted(REQUIRED_WRITE_ATTRIBUTES):
+        if attribute not in write_attributes:
+            write_attributes.append(attribute)
             changed = True
 
     if not changed:
-        print(f"App client already allows {ORGANIZATION_ATTRIBUTE}")
+        print("App client already allows the signup attributes.")
         return
 
     request: dict[str, Any] = {
@@ -350,11 +356,28 @@ def ensure_client_attributes(cognito: Any, *, dry_run: bool) -> None:
     request["WriteAttributes"] = write_attributes
 
     if dry_run:
-        print(f"Would allow {ORGANIZATION_ATTRIBUTE} on app client {CLIENT_ID}")
+        print(f"Would allow the signup attributes on app client {CLIENT_ID}")
         return
 
     cognito.update_user_pool_client(**request)
-    print(f"App client now allows {ORGANIZATION_ATTRIBUTE}")
+    for _ in range(30):
+        current = cognito.describe_user_pool_client(
+            UserPoolId=USER_POOL_ID,
+            ClientId=CLIENT_ID,
+        )["UserPoolClient"]
+        current_read = set(current.get("ReadAttributes", []))
+        current_write = set(current.get("WriteAttributes", []))
+        if (
+            REQUIRED_READ_ATTRIBUTES <= current_read
+            and REQUIRED_WRITE_ATTRIBUTES <= current_write
+        ):
+            print("App client now allows the signup attributes.")
+            return
+        time.sleep(2)
+
+    raise RuntimeError(
+        "Cognito did not activate the signup attribute permissions within 60 seconds."
+    )
 
 
 def connect_trigger(
@@ -391,11 +414,36 @@ def connect_trigger(
     pool = cognito.describe_user_pool(UserPoolId=USER_POOL_ID)["UserPool"]
     lambda_config = dict(pool.get("LambdaConfig", {}))
     lambda_config["PostConfirmation"] = function_arn
+    auto_verified_attributes = list(pool.get("AutoVerifiedAttributes", []))
+    if "email" not in auto_verified_attributes:
+        auto_verified_attributes.append("email")
     cognito.update_user_pool(
         UserPoolId=USER_POOL_ID,
         LambdaConfig=lambda_config,
+        AutoVerifiedAttributes=auto_verified_attributes,
     )
-    print(f"Post Confirmation trigger attached to {USER_POOL_ID}")
+
+    for _ in range(30):
+        current_pool = cognito.describe_user_pool(UserPoolId=USER_POOL_ID)["UserPool"]
+        trigger_ready = (
+            current_pool.get("LambdaConfig", {}).get("PostConfirmation")
+            == function_arn
+        )
+        verification_ready = "email" in current_pool.get(
+            "AutoVerifiedAttributes", []
+        )
+        if trigger_ready and verification_ready:
+            print(
+                f"Post Confirmation trigger and email auto-verification "
+                f"are active on {USER_POOL_ID}"
+            )
+            return
+        time.sleep(2)
+
+    raise RuntimeError(
+        "Cognito did not activate the trigger and email auto-verification "
+        "within 60 seconds."
+    )
 
 
 def deploy(*, dry_run: bool = False) -> None:

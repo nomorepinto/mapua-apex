@@ -34,6 +34,8 @@ import argparse
 import html
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -51,6 +53,27 @@ MARGIN_IN = 0.6
 CONTENT_W_PX = int(PAGE_W_PX - 2 * MARGIN_IN * 96)   # ~700
 # Leave headroom for the section heading above the diagram.
 DIAGRAM_MAX_H_PX = int(PAGE_H_PX - 2 * MARGIN_IN * 96 - 70)
+
+
+def cached_mermaid_source(url: str, timeout_ms: int) -> str:
+    """Download Mermaid with Python so Chromium only loads local files."""
+    cached = Path(tempfile.gettempdir()) / "mapua_apex_mermaid.min.js"
+    if cached.is_file() and cached.stat().st_size > 100_000:
+        return cached.as_uri()
+
+    try:
+        with urllib.request.urlopen(
+            url,
+            timeout=max(1, timeout_ms // 1000),
+        ) as response:
+            cached.write_bytes(response.read())
+    except (OSError, urllib.error.URLError) as exc:
+        sys.exit(
+            f"[error] could not download Mermaid from {url}: {exc}\n"
+            "        Download mermaid.min.js manually and pass --mermaid-js."
+        )
+
+    return cached.as_uri()
 
 
 CSS = """
@@ -240,7 +263,11 @@ def render_pdf(html_str: str, out_path: Path, timeout_ms: int, keep_html: bool) 
                 "        Run:  playwright install chromium"
             )
         page = browser.new_page(viewport={"width": PAGE_W_PX, "height": PAGE_H_PX})
-        page.goto(tmp.as_uri(), wait_until="networkidle")
+        page.goto(
+            tmp.as_uri(),
+            wait_until="domcontentloaded",
+            timeout=timeout_ms,
+        )
         try:
             page.wait_for_function("window.__renderDone === true", timeout=timeout_ms)
         except Exception:  # noqa: BLE001
@@ -276,7 +303,11 @@ def main() -> None:
     if not mmd_files and not md_files:
         sys.exit(f"[error] no .mmd or .md inputs found in {directory}")
 
-    mermaid_src = Path(args.mermaid_js).resolve().as_uri() if args.mermaid_js else args.mermaid_cdn
+    mermaid_src = (
+        Path(args.mermaid_js).resolve().as_uri()
+        if args.mermaid_js
+        else cached_mermaid_source(args.mermaid_cdn, args.timeout)
+    )
 
     out_path = Path(args.out) if args.out else directory / "mapua-apex-data-model.pdf"
     out_path = out_path.resolve()

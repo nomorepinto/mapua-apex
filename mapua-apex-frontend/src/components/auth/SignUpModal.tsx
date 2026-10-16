@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { X, AlertCircle, AlertTriangle, Check, Circle, Eye, EyeOff, Info, Loader2 } from "lucide-react"
 import apexBrandLogo from "@/assets/apex-brand.svg"
 import { OrganizationSelect } from "@/components/auth/OrganizationSelect"
@@ -10,6 +10,14 @@ import {
   validateFullName,
   checkPasswordRequirements,
 } from "@/lib/auth-validation"
+
+const configuredInactivitySeconds = Number(
+  import.meta.env.VITE_SIGNUP_INACTIVITY_TIMEOUT_SECONDS
+)
+const SIGNUP_INACTIVITY_TIMEOUT_MS =
+  Number.isFinite(configuredInactivitySeconds) && configuredInactivitySeconds > 0
+    ? configuredInactivitySeconds * 1000
+    : 3000
 
 export interface SignUpModalProps {
   isOpen: boolean
@@ -40,6 +48,43 @@ export function SignUpModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const emailExistence = useEmailExistence()
+  const resetEmailExistence = emailExistence.reset
+
+  useEffect(() => {
+    if (!isOpen || isLoading) return
+
+    let timeoutId: number
+    const resetTimer = () => {
+      window.clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(() => {
+        setFullName("")
+        setFullNameTouched(false)
+        setEmail("")
+        setEmailTouched(false)
+        setOrganizationId("")
+        setPassword("")
+        setShowPassword(false)
+        setCapsLockActive(false)
+        setNumLockActive(false)
+        setErrorMessage(null)
+        resetEmailExistence()
+        onClose()
+      }, SIGNUP_INACTIVITY_TIMEOUT_MS)
+    }
+    const activityEvents = ["pointerdown", "keydown", "input", "focusin"] as const
+
+    activityEvents.forEach((eventName) =>
+      window.addEventListener(eventName, resetTimer)
+    )
+    resetTimer()
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      activityEvents.forEach((eventName) =>
+        window.removeEventListener(eventName, resetTimer)
+      )
+    }
+  }, [isLoading, isOpen, onClose, resetEmailExistence])
 
   if (!isOpen) return null
 
