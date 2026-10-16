@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { X, AlertCircle, AlertTriangle, Check, Circle, Eye, EyeOff, Info, Loader2 } from "lucide-react"
 import apexBrandLogo from "@/assets/apex-brand.svg"
+import { OrganizationSelect } from "@/components/auth/OrganizationSelect"
 import { cognitoSignUp } from "@/lib/cognito-auth"
 import { useEmailExistence } from "@/hooks/use-email-existence"
 import {
@@ -28,6 +29,7 @@ export function SignUpModal({
 
   const [email, setEmail] = useState("")
   const [emailTouched, setEmailTouched] = useState(false)
+  const [organizationId, setOrganizationId] = useState("")
 
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -99,13 +101,19 @@ export function SignUpModal({
       return
     }
 
-    // 3. Password requirements check
+    // 3. Organization selection
+    if (!organizationId) {
+      setErrorMessage("Please select your organization.")
+      return
+    }
+
+    // 4. Password requirements check
     if (!pwdReqs.allValid) {
       setErrorMessage("Please ensure your password satisfies all security requirements.")
       return
     }
 
-    // 4. Mailbox-existence gate: block only on a conclusive "invalid" answer
+    // 5. Mailbox-existence gate: block only on a conclusive "invalid" answer
     // (checker outages resolve to "unavailable" and fail open).
     const existence = await emailExistence.check(cleanEmail)
     if (existence === "invalid") {
@@ -117,7 +125,7 @@ export function SignUpModal({
 
     try {
       // Direct AWS Cognito Sign Up
-      await cognitoSignUp(cleanName, cleanEmail, password)
+      await cognitoSignUp(cleanName, cleanEmail, password, organizationId)
 
       // Move to email verification modal
       onRequireVerification(cleanEmail)
@@ -262,6 +270,18 @@ export function SignUpModal({
               </p>
             )}
           </div>
+
+          <OrganizationSelect
+            disabled={isLoading}
+            invalid={errorMessage === "Please select your organization."}
+            onValueChange={(nextOrganizationId) => {
+              setOrganizationId(nextOrganizationId)
+              if (errorMessage === "Please select your organization.") {
+                setErrorMessage(null)
+              }
+            }}
+            value={organizationId}
+          />
 
           {/* Password field */}
           <div className="space-y-1.5 text-left">

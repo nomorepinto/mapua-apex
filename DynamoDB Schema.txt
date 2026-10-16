@@ -19,6 +19,8 @@ OSAAR and CDM are campus-wide: OSAAR_SIGNATORY_ID and
 CDM_SIGNATORY_ID in the API env (plain uuid or SIGNATORY#uuid).
 Rename those people in place (PUT /signatories on the same id).
 admin may occupy a desk but is not in the approval sequence.
+GET /public/organizations scans these base items without authentication and
+returns only the bare organization_id and name for the account signup picker.
 DELETE /admins/organizations/{id} is guarded: it removes the ORGANIZATION item
 only when the org owns no EVENT/SUBMISSION rows (GSI1PK = ORGANIZATION#id) and
 no COLLABORATION POINTER rows (PK = ORGANIZATION#id, SK begins COLLAB#);
