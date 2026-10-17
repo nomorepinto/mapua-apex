@@ -1,7 +1,8 @@
 /**
  * Direct AWS Cognito Identity Provider Authentication Service
  *
- * Implements InitiateAuth (USER_PASSWORD_AUTH), SignUp, ConfirmSignUp,
+ * Implements InitiateAuth (USER_PASSWORD_AUTH), the NEW_PASSWORD_REQUIRED
+ * challenge for admin-created temporary passwords, SignUp, ConfirmSignUp,
  * ResendConfirmationCode, ForgotPassword, and ConfirmForgotPassword.
  * Synchronizes session with OIDC storage format for seamless app-wide integration.
  */
@@ -18,6 +19,28 @@ export interface CognitoSessionData {
 export interface CognitoAuthError {
   code: string
   message: string
+}
+
+/** Cognito session for an admin-created account that still has a temporary password. */
+export interface NewPasswordChallenge {
+  code: "NEW_PASSWORD_REQUIRED"
+  message: string
+  session: string
+  username: string
+  requiredAttributes: string[]
+}
+
+export function isNewPasswordChallenge(err: unknown): err is NewPasswordChallenge {
+  if (!err || typeof err !== "object") return false
+  const candidate = err as Partial<NewPasswordChallenge>
+  return (
+    candidate.code === "NEW_PASSWORD_REQUIRED" &&
+    typeof candidate.session === "string" &&
+    candidate.session.length > 0 &&
+    typeof candidate.username === "string" &&
+    candidate.username.length > 0 &&
+    Array.isArray(candidate.requiredAttributes)
+  )
 }
 
 function getCognitoConfig() {
@@ -117,6 +140,12 @@ export function mapCognitoError(errorType: string, rawMessage: string): CognitoA
           message: "Self-service sign-up is currently disabled in your AWS Cognito User Pool. Please enable 'Allow self-service sign-up' in the AWS Console.",
         }
       }
+      if (rawMessage.toLowerCase().includes("session")) {
+        return {
+          code: type,
+          message: "This sign-in step expired. Sign in again with your temporary password.",
+        }
+      }
       return {
         code: type,
         message: rawMessage || "Incorrect email or password. Please verify your credentials.",
@@ -137,9 +166,20 @@ export function mapCognitoError(errorType: string, rawMessage: string): CognitoA
         message: "An account with this email address already exists. Please sign in instead.",
       }
     case "InvalidPasswordException":
+      if (/previous|history/i.test(rawMessage)) {
+        return {
+          code: type,
+          message: "Choose a password that is different from your temporary password.",
+        }
+      }
       return {
         code: type,
         message: "Password does not meet requirements: must be at least 8 characters with numbers, lowercase, and uppercase letters.",
+      }
+    case "PasswordHistoryPolicyViolationException":
+      return {
+        code: type,
+        message: "Choose a password that is different from your temporary password.",
       }
     case "CodeMismatchException":
       return {
@@ -193,6 +233,50 @@ async function callCognitoApi(target: string, body: Record<string, unknown>) {
   return data
 }
 
+function parseRequiredAttributes(raw: unknown): string[] {
+  let values: unknown = raw
+  if (typeof raw === "string") {
+    const trimmed = raw.trim()
+    if (!trimmed) return []
+    try {
+      values = JSON.parse(trimmed)
+    } catch {
+      return []
+    }
+  }
+  if (!Array.isArray(values)) return []
+
+  return values
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim().replace(/^userAttributes\./, ""))
+    .filter((item) => item.length > 0)
+}
+
+function readNewPasswordChallenge(
+  data: {
+    Session?: string
+    ChallengeParameters?: { USER_ID_FOR_SRP?: string; requiredAttributes?: unknown }
+  },
+  fallbackUsername: string
+): NewPasswordChallenge {
+  const session = typeof data.Session === "string" ? data.Session : ""
+  const username = data.ChallengeParameters?.USER_ID_FOR_SRP || fallbackUsername
+  if (!session || !username) {
+    throw {
+      code: "NEW_PASSWORD_REQUIRED",
+      message: "Password change is required, but Cognito did not return a session. Sign in again.",
+    }
+  }
+
+  return {
+    code: "NEW_PASSWORD_REQUIRED",
+    message: "This account is using a temporary password. Set a new password to continue.",
+    session,
+    username,
+    requiredAttributes: parseRequiredAttributes(data.ChallengeParameters?.requiredAttributes),
+  }
+}
+
 /**
  * 1. Sign In via USER_PASSWORD_AUTH
  */
@@ -215,16 +299,58 @@ export async function cognitoSignIn(username: string, password: string): Promise
   }
 
   if (data.ChallengeName === "NEW_PASSWORD_REQUIRED") {
-    const error: CognitoAuthError = {
-      code: "NEW_PASSWORD_REQUIRED",
-      message: "First-time login detected. Password change required.",
-    }
-    throw error
+    throw readNewPasswordChallenge(data, cleanUsername)
   }
 
   throw {
     code: "UnknownChallenge",
     message: `Authentication challenge received: ${data.ChallengeName}`,
+  }
+}
+
+/**
+ * Completes the NEW_PASSWORD_REQUIRED challenge from an admin-created account.
+ * `attributes` are only the attributes Cognito listed in requiredAttributes.
+ */
+export async function cognitoCompleteNewPassword(
+  username: string,
+  newPassword: string,
+  session: string,
+  attributes: Record<string, string> = {}
+): Promise<CognitoSessionData> {
+  const { clientId } = getCognitoConfig()
+  const challengeResponses: Record<string, string> = {
+    USERNAME: username,
+    NEW_PASSWORD: newPassword,
+  }
+
+  for (const [key, value] of Object.entries(attributes)) {
+    const trimmed = value.trim()
+    if (!trimmed) continue
+    const name = key.startsWith("userAttributes.") ? key : `userAttributes.${key}`
+    challengeResponses[name] = trimmed
+  }
+
+  const data = await callCognitoApi("RespondToAuthChallenge", {
+    ChallengeName: "NEW_PASSWORD_REQUIRED",
+    ClientId: clientId,
+    Session: session,
+    ChallengeResponses: challengeResponses,
+  })
+
+  if (data.AuthenticationResult) {
+    return storeCognitoSession(data.AuthenticationResult)
+  }
+
+  if (data.ChallengeName === "NEW_PASSWORD_REQUIRED") {
+    throw readNewPasswordChallenge(data, username)
+  }
+
+  throw {
+    code: data.ChallengeName || "UnknownChallenge",
+    message: data.ChallengeName
+      ? `Additional verification is required (${data.ChallengeName}). This sign-in screen cannot complete that step.`
+      : "Password was not updated. Please try again.",
   }
 }
 
