@@ -41,7 +41,7 @@ export type AdminFilterColumn =
 /** Selected values per filterable column; an empty list means "no filter". */
 export type AdminColumnFilters = Record<AdminFilterColumn, string[]>
 
-/** Sort direction of the sortable Submitted column; null = default order. */
+/** Sort direction of the sortable Submitted column. Starts newest-first. */
 export type DateSortDirection = "asc" | "desc" | null
 
 const EMPTY_COLUMN_FILTERS: AdminColumnFilters = {
@@ -151,7 +151,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
   const [columnFilters, setColumnFilters] =
     useState<AdminColumnFilters>(EMPTY_COLUMN_FILTERS)
   const [dateSortDirection, setDateSortDirection] =
-    useState<DateSortDirection>(null)
+    useState<DateSortDirection>("desc")
   const [selectedKeys, setSelectedKeys] = useState<{
     eventId: string
     submissionId: string

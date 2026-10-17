@@ -60,6 +60,7 @@ class SignatorySequenceResolverTest extends TestCase
             ['role' => 'adviser', 'signatory_id' => 'adv002'],
             ['role' => 'dean', 'signatory_id' => 'dean002'],
         ]);
+        $this->seedCampusDesks($db);
 
         $ids = $this->app->make(SignatorySequenceResolver::class)->signatoryIdsForCollaboration(
             'a1b2',
@@ -81,6 +82,7 @@ class SignatorySequenceResolverTest extends TestCase
             ['role' => 'adviser', 'signatory_id' => 'adv002'],
             ['role' => 'dean', 'signatory_id' => 'dean002'],
         ]);
+        $this->seedCampusDesks($db);
 
         $ids = $this->app->make(SignatorySequenceResolver::class)->signatoryIdsForCollaboration(
             'a1b2',
@@ -102,6 +104,7 @@ class SignatorySequenceResolverTest extends TestCase
             ['role' => 'adviser', 'signatory_id' => 'adv002'],
             ['role' => 'dean', 'signatory_id' => 'dean002'],
         ], isHigherCouncil: true);
+        $this->seedCampusDesks($db);
 
         $ids = $this->app->make(SignatorySequenceResolver::class)->signatoryIdsForCollaboration(
             'a1b2',
@@ -124,6 +127,7 @@ class SignatorySequenceResolverTest extends TestCase
             ['role' => 'adviser', 'signatory_id' => 'dean001'],
             ['role' => 'dean', 'signatory_id' => 'dean002'],
         ]);
+        $this->seedCampusDesks($db);
 
         $ids = $this->app->make(SignatorySequenceResolver::class)->signatoryIdsForCollaboration(
             'a1b2',
@@ -140,6 +144,7 @@ class SignatorySequenceResolverTest extends TestCase
         DynamoFixtures::organization($db, 'a1b2', 'Proponent', [
             ['role' => 'adviser', 'signatory_id' => 'adv001'],
         ]);
+        $this->seedCampusDesks($db, withCdm: true);
 
         $ids = $this->app->make(SignatorySequenceResolver::class)->signatoryIdsForCollaboration(
             'a1b2',
@@ -165,6 +170,15 @@ class SignatorySequenceResolverTest extends TestCase
             ['dep1'],
             $this->submission('extra-curricular', false),
         );
+    }
+
+    private function seedCampusDesks(InMemoryDynamoDb $db, bool $withCdm = false): void
+    {
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar', 'campus');
+
+        if ($withCdm) {
+            DynamoFixtures::signatory($db, 'cdm001', 'cdm', 'campus');
+        }
     }
 
     /**

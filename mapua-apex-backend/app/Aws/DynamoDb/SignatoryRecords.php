@@ -35,6 +35,29 @@ final class SignatoryRecords
     }
 
     /**
+     * Plain id of the single SIGNATORY with this role (GSI4 `ROLE#{ROLE}`).
+     * Zero matches and more than one match both return null so a campus desk
+     * is never chosen arbitrarily.
+     */
+    public function findIdByRole(string $role): ?string
+    {
+        $items = $this->items->query([
+            'IndexName' => 'GSI4',
+            'KeyConditionExpression' => 'GSI4PK = :role',
+            'ExpressionAttributeValues' => [
+                ':role' => ['S' => DynamoKeys::roleIndex($role)],
+            ],
+            'Limit' => 2,
+        ], allPages: false);
+
+        if (count($items) !== 1) {
+            return null;
+        }
+
+        return DynamoKeys::strip($items[0]['PK'] ?? null, 'SIGNATORY#');
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function create(string $name, string $role, ?string $department = null): array

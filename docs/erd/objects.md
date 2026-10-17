@@ -25,8 +25,9 @@ person occupies each approval role for this org.
 
 Allowed desk roles are stored in the order `adviser → dean → osaar → cdm → admin`
 regardless of write order. `admin` may hold a desk but is **not** part of the
-approval sequence. `osaar` and `cdm` desks are campus-wide (from
-`OSAAR_SIGNATORY_ID` / `CDM_SIGNATORY_ID` in the API env), not stored per org.
+approval sequence. `osaar` and `cdm` are campus-wide: routing uses the single
+SIGNATORY item whose role is `osaar` or `cdm` (`GSI4PK` `ROLE#OSAAR` /
+`ROLE#CDM`), not a per-org desk.
 
 ---
 

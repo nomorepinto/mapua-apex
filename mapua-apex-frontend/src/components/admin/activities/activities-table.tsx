@@ -2,6 +2,8 @@ import { ChevronRightIcon, ChevronLeftIcon, AlertTriangleIcon } from "lucide-rea
 import type { ActivityNotification } from "@/types/logs";
 import { formatManila, formatDateUnambiguous } from "@/lib/monitor-formatters";
 import { formatActivityId, resolveUserDisplayName } from "@/hooks/use-monitor";
+import type { ActivitySortDirection } from "@/hooks/use-activity-table-filters";
+import { ActivitySortHeader } from "@/components/signatories/dashboard/activity-sort-header";
 import { ActivityBadge } from "./activity-badge";
 
 interface ActivitiesTableProps {
@@ -18,6 +20,8 @@ interface ActivitiesTableProps {
   onPageSizeChange: (size: number) => void;
   startDate: string;
   endDate: string;
+  sortDirection: ActivitySortDirection;
+  onSort: () => void;
 }
 
 export function ActivitiesTable({
@@ -34,6 +38,8 @@ export function ActivitiesTable({
   onPageSizeChange,
   startDate,
   endDate,
+  sortDirection,
+  onSort,
 }: ActivitiesTableProps) {
   return (
     <div className="rounded-2xl bg-white shadow-xs border border-neutral-200 overflow-hidden flex flex-col justify-between">
@@ -41,7 +47,12 @@ export function ActivitiesTable({
         <table className="w-full text-left text-xs">
           <thead className="sticky top-0 z-10 bg-neutral-50 text-neutral-500 font-semibold border-b border-neutral-200 shadow-2xs">
             <tr>
-              <th className="px-4 py-3.5">Sent At (Manila)</th>
+              <ActivitySortHeader
+                className="h-auto bg-neutral-50 px-4 py-3.5"
+                direction={sortDirection}
+                label="Sent At (Manila)"
+                onSort={onSort}
+              />
               <th className="px-4 py-3.5">ACTIVITY ID</th>
               <th className="px-4 py-3.5">USER</th>
               <th className="px-4 py-3.5">TYPE</th>

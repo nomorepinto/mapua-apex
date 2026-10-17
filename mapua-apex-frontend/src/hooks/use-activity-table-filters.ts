@@ -53,7 +53,7 @@ export interface ActivityTableFilters {
  * Each table calls it with its own activity list, so the queue and history stay
  * independently searchable. Search is a case-insensitive match over every
  * visible column; column filters combine as OR within a column and AND across
- * columns; the submitted timestamp drives chronological sorting when active.
+ * columns; the submitted timestamp sorts newest-first until the header is toggled.
  */
 export function useActivityTableFilters(
   activities: Activity[],
@@ -62,7 +62,7 @@ export function useActivityTableFilters(
   const [search, setSearch] = useState("")
   const [columnFilters, setColumnFilters] =
     useState<ActivityColumnFilters>(EMPTY_COLUMN_FILTERS)
-  const [sortDirection, setSortDirection] = useState<ActivitySortDirection>(null)
+  const [sortDirection, setSortDirection] = useState<ActivitySortDirection>("desc")
 
   const statusValue = useCallback(
     (activity: Activity): string =>

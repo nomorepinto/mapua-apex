@@ -16,6 +16,7 @@ class SignatoryChainResolverTest extends TestCase
             ['role' => 'adviser', 'signatory_id' => 'adv001'],
             ['role' => 'dean', 'signatory_id' => 'dean001'],
         ]);
+        $this->seedCampusSignatory($db, 'osaar001', 'osaar');
 
         $chain = $this->resolve([
             'GSI1PK' => 'ORGANIZATION#a1b2',
@@ -40,6 +41,7 @@ class SignatoryChainResolverTest extends TestCase
             ['role' => 'adviser', 'signatory_id' => 'adv002'],
             ['role' => 'dean', 'signatory_id' => 'dean002'],
         ]);
+        $this->seedCampusSignatory($db, 'osaar001', 'osaar');
 
         $chain = $this->resolve([
             'GSI1PK' => 'ORGANIZATION#a1b2',
@@ -68,6 +70,8 @@ class SignatoryChainResolverTest extends TestCase
         DynamoFixtures::organization($db, 'a1b2', 'Proponent', [
             ['role' => 'adviser', 'signatory_id' => 'adv001'],
         ]);
+        $this->seedCampusSignatory($db, 'osaar001', 'osaar');
+        $this->seedCampusSignatory($db, 'cdm001', 'cdm');
 
         $chain = $this->resolve([
             'GSI1PK' => 'ORGANIZATION#a1b2',
@@ -92,6 +96,7 @@ class SignatoryChainResolverTest extends TestCase
             ['role' => 'adviser', 'signatory_id' => 'dean001'],
             ['role' => 'dean', 'signatory_id' => 'dean002'],
         ]);
+        $this->seedCampusSignatory($db, 'osaar001', 'osaar');
 
         $chain = $this->resolve([
             'GSI1PK' => 'ORGANIZATION#a1b2',
@@ -111,6 +116,22 @@ class SignatoryChainResolverTest extends TestCase
         InMemoryDynamoDb::bind($this);
 
         $this->assertSame([], $this->resolve(['GSI1PK' => 'ORGANIZATION#a1b2']));
+    }
+
+    /**
+     * A campus SIGNATORY row with no organization desk, so the chain leaves
+     * organization_id null and reads the role from the item.
+     */
+    private function seedCampusSignatory(InMemoryDynamoDb $db, string $id, string $role): void
+    {
+        $db->seed([
+            'PK' => 'SIGNATORY#'.$id,
+            'SK' => 'SIGNATORY#'.$id,
+            'name' => $id,
+            'role' => $role,
+            'GSI4PK' => 'ROLE#'.strtoupper($role),
+            'GSI4SK' => 'SIGNATORY#'.$id,
+        ]);
     }
 
     /**

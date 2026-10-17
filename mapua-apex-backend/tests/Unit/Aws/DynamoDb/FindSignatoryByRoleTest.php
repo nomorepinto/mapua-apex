@@ -9,13 +9,17 @@ use Tests\TestCase;
 
 class FindSignatoryByRoleTest extends TestCase
 {
-    public function test_osaar_and_cdm_come_from_env_not_the_org_desk_list(): void
+    public function test_osaar_and_cdm_come_from_signatory_rows_not_the_org_desk_list(): void
     {
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::organization($db, signatories: [
             ['role' => 'adviser', 'signatory_id' => 'adv001'],
             ['role' => 'dean', 'signatory_id' => 'dean001'],
+            ['role' => 'osaar', 'signatory_id' => 'desk-osaar'],
+            ['role' => 'cdm', 'signatory_id' => 'desk-cdm'],
         ]);
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar', 'other-org');
+        DynamoFixtures::signatory($db, 'cdm001', 'cdm', 'other-org');
 
         $finder = $this->app->make(FindSignatoryByRole::class);
 
@@ -25,19 +29,18 @@ class FindSignatoryByRoleTest extends TestCase
         $this->assertSame('cdm001', $finder->handle('a1b2', 'cdm'));
     }
 
-    public function test_campus_ids_accept_a_signatory_prefix(): void
+    public function test_missing_campus_signatory_returns_null(): void
     {
-        config(['services.signatories.osaar_id' => 'SIGNATORY#campus-osaar']);
+        InMemoryDynamoDb::bind($this);
 
-        $this->assertSame(
-            'campus-osaar',
-            $this->app->make(FindSignatoryByRole::class)->handle('a1b2', 'osaar'),
-        );
+        $this->assertNull($this->app->make(FindSignatoryByRole::class)->handle('a1b2', 'osaar'));
     }
 
-    public function test_missing_campus_env_returns_null(): void
+    public function test_more_than_one_campus_signatory_returns_null(): void
     {
-        config(['services.signatories.osaar_id' => '']);
+        $db = InMemoryDynamoDb::bind($this);
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar', 'other-org');
+        DynamoFixtures::signatory($db, 'osaar002', 'osaar', 'other-org');
 
         $this->assertNull($this->app->make(FindSignatoryByRole::class)->handle('a1b2', 'osaar'));
     }

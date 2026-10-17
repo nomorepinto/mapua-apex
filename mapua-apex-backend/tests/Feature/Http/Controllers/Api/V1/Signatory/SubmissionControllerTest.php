@@ -158,6 +158,7 @@ class SubmissionControllerTest extends TestCase
         DynamoFixtures::signatory($db, 'adv001', 'adviser');
         DynamoFixtures::signatory($db, 'dean001', 'dean');
         DynamoFixtures::signatory($db, 'osaar001', 'osaar');
+        DynamoFixtures::signatory($db, 'cdm001', 'cdm');
         DynamoFixtures::submission($db, [
             'activity_classification' => [
                 'activity_type' => 'co-curricular',

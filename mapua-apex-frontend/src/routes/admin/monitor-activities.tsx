@@ -18,6 +18,7 @@ import { ActivityStatCards } from "@/components/admin/activities/activity-stat-c
 import { ActivitiesFilterBar } from "@/components/admin/activities/activities-filter-bar";
 import { ActivitiesTable } from "@/components/admin/activities/activities-table";
 import { ActivityDetailModal } from "@/components/admin/activities/activity-detail-modal";
+import type { ActivitySortDirection } from "@/hooks/use-activity-table-filters";
 
 export function AdminMonitorActivitiesPage() {
   // Filter State (Default range = yesterday to today Manila)
@@ -30,6 +31,7 @@ export function AdminMonitorActivitiesPage() {
   // Pagination State
   const [pageSize, setPageSize] = useState<number>(25);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [sortDirection, setSortDirection] = useState<ActivitySortDirection>("desc");
 
   // Modal Detail State
   const [selectedNotification, setSelectedNotification] = useState<ActivityNotification | null>(null);
@@ -94,12 +96,24 @@ export function AdminMonitorActivitiesPage() {
     });
   }, [rawNotifications, notifTypeFilter, activitySearch, signatorySearch]);
 
-  const totalPages = Math.ceil(filteredNotifications.length / pageSize) || 1;
+  const sortedNotifications = useMemo(() => {
+    const sorted = [...filteredNotifications].sort(
+      (a, b) => (Date.parse(a.sent_at) || 0) - (Date.parse(b.sent_at) || 0)
+    );
+    return sortDirection === "desc" ? sorted.reverse() : sorted;
+  }, [filteredNotifications, sortDirection]);
+
+  const totalPages = Math.ceil(sortedNotifications.length / pageSize) || 1;
 
   const paginatedNotifications = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filteredNotifications.slice(start, start + pageSize);
-  }, [filteredNotifications, currentPage, pageSize]);
+    return sortedNotifications.slice(start, start + pageSize);
+  }, [sortedNotifications, currentPage, pageSize]);
+
+  const toggleSort = () => {
+    setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    setCurrentPage(1);
+  };
 
   // CSV Export handler
   const handleExportCsv = () => {
@@ -111,7 +125,7 @@ export function AdminMonitorActivitiesPage() {
       "Type",
       "Remarks / Comment",
     ];
-    const rows = filteredNotifications.map((n) => [
+    const rows = sortedNotifications.map((n) => [
       formatManila(n.sent_at),
       n.activity_id || formatActivityId(undefined, n.sent_at),
       formatEventId(n.submission_id),
@@ -202,7 +216,9 @@ export function AdminMonitorActivitiesPage() {
           onSelectNotification={setSelectedNotification}
           currentPage={currentPage}
           pageSize={pageSize}
-          totalEntries={filteredNotifications.length}
+          totalEntries={sortedNotifications.length}
+          sortDirection={sortDirection}
+          onSort={toggleSort}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
           onPageSizeChange={(size) => {

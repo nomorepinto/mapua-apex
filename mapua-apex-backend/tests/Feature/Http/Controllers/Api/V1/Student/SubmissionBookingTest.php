@@ -16,6 +16,8 @@ class SubmissionBookingTest extends TestCase
     {
         DynamoFixtures::event($db);
         DynamoFixtures::signatory($db, 'adv001', 'adviser');
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar');
+        DynamoFixtures::signatory($db, 'cdm001', 'cdm');
         DynamoFixtures::campus($db, 'c001');
         DynamoFixtures::reservable($db, 'c001', 'r001');
     }

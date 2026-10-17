@@ -95,20 +95,11 @@ final class SignatoryChainResolver
     }
 
     /**
-     * Resolve the role for a signatory that no involved organization desk holds —
-     * the shared campus desks (OSAAR, CDM) configured by id, falling back to the
-     * signatory record's own role.
+     * Role for a signatory that no involved organization desk holds. Campus desks
+     * (OSAAR, CDM) are SIGNATORY rows, so the stored role is the label.
      */
     private function campusOrRecordRole(string $signatoryId): ?string
     {
-        foreach (['osaar', 'cdm'] as $role) {
-            $configured = DynamoKeys::strip(config('services.signatories.'.$role.'_id'), 'SIGNATORY#');
-
-            if (is_string($configured) && $configured !== '' && $configured === $signatoryId) {
-                return $role;
-            }
-        }
-
         $signatory = $this->signatories->get($signatoryId);
 
         return is_string($signatory['role'] ?? null) && $signatory['role'] !== ''

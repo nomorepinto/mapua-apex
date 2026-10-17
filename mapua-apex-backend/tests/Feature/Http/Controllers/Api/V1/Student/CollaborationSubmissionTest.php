@@ -24,6 +24,8 @@ class CollaborationSubmissionTest extends TestCase
         DynamoFixtures::organization($db, 'dep1', 'Dependent One', [
             ['role' => 'adviser', 'signatory_id' => 'adv002'],
         ]);
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar', 'campus');
+        DynamoFixtures::signatory($db, 'cdm001', 'cdm', 'campus');
 
         $response = $this->withStudentAuth()->postJson(
             '/api/v1/students/submissions',
@@ -113,6 +115,8 @@ class CollaborationSubmissionTest extends TestCase
         DynamoFixtures::organization($db, 'dep1', 'Dependent One', [
             ['role' => 'adviser', 'signatory_id' => 'adv002'],
         ]);
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar', 'campus');
+        DynamoFixtures::signatory($db, 'cdm001', 'cdm', 'campus');
         DynamoFixtures::event($db, org: 'a1b2');
         DynamoFixtures::submission($db, [
             'status' => 'returned',
@@ -137,6 +141,8 @@ class CollaborationSubmissionTest extends TestCase
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::event($db, org: 'a1b2');
         DynamoFixtures::submission($db, [
+            'GSI1PK' => 'ORGANIZATION#a1b2',
+            'GSI1SK' => 'SUBMISSION#s001',
             'collaboration' => ['dependent_organization_ids' => ['ORGANIZATION#dep1']],
         ]);
         $db->seed([
@@ -171,6 +177,14 @@ class CollaborationSubmissionTest extends TestCase
         ]);
         DynamoFixtures::organization($db, 'dep1', 'Dependent One', [
             ['role' => 'adviser', 'signatory_id' => 'adv002'],
+        ]);
+        $db->seed([
+            'PK' => 'SIGNATORY#osaar001',
+            'SK' => 'SIGNATORY#osaar001',
+            'name' => 'OSAAR Officer',
+            'role' => 'osaar',
+            'GSI4PK' => 'ROLE#OSAAR',
+            'GSI4SK' => 'SIGNATORY#osaar001',
         ]);
         DynamoFixtures::event($db, org: 'a1b2');
         DynamoFixtures::submission($db, [

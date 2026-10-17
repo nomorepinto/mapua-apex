@@ -94,7 +94,7 @@ export type FilterColumn =
 /** Selected values per filterable column; an empty list means "no filter". */
 export type ColumnFilters = Record<FilterColumn, string[]>
 
-/** Sort direction of the sortable DATE APPLIED column; null = default order. */
+/** Sort direction of the sortable DATE APPLIED column. Starts newest-first. */
 export type DateSortDirection = "asc" | "desc" | null
 
 /** Collaboration categories for the EVENT TITLE filter, matching CollabBadge. */
@@ -154,7 +154,7 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
   const [columnFilters, setColumnFilters] =
     useState<ColumnFilters>(EMPTY_COLUMN_FILTERS)
   const [dateSortDirection, setDateSortDirection] =
-    useState<DateSortDirection>(null)
+    useState<DateSortDirection>("desc")
   const [dismissedReminderIds, setDismissedReminderIds] = useState<string[]>([])
   const [selectedNotice, setSelectedNotice] = useState<ReviewNotice | null>(null)
   const [reservationChangeTarget, setReservationChangeTarget] = useState<{

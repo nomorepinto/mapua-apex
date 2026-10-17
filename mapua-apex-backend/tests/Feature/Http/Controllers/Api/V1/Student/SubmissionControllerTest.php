@@ -325,6 +325,8 @@ class SubmissionControllerTest extends TestCase
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::event($db);
         DynamoFixtures::signatory($db, 'adv001', 'adviser');
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar');
+        DynamoFixtures::signatory($db, 'cdm001', 'cdm');
 
         $response = $this->withStudentAuth()->postJson(
             '/api/v1/students/submissions',
@@ -384,16 +386,16 @@ class SubmissionControllerTest extends TestCase
         $this->assertSame($stored['signatory_sequence'][0] ?? null, $stored['current_signatory'] ?? null);
     }
 
-    public function test_creates_a_submission_when_osaar_and_cdm_are_only_in_env(): void
+    public function test_rejects_a_submission_when_campus_signatories_are_missing(): void
     {
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::event($db);
         DynamoFixtures::signatory($db, 'adv001', 'adviser');
 
-        $response = $this->withStudentAuth()->postJson('/api/v1/students/submissions', SaafPayload::valid());
-
-        $response->assertCreated()
-            ->assertJsonPath('data.current_signatory', 'adv001');
+        $this->withStudentAuth()
+            ->postJson('/api/v1/students/submissions', SaafPayload::valid())
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'No osaar signatory is configured.');
     }
 
     public function test_updates_a_returned_submission_and_keeps_it_on_the_same_desk(): void
@@ -451,6 +453,8 @@ class SubmissionControllerTest extends TestCase
         DynamoFixtures::event($db);
         DynamoFixtures::signatory($db, 'adv001', 'adviser');
         DynamoFixtures::signatory($db, 'dean001', 'dean');
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar');
+        DynamoFixtures::signatory($db, 'cdm001', 'cdm');
 
         $payload = SaafPayload::valid([
             'activity_classification' => [

@@ -11,7 +11,10 @@ final class FindSignatoryByRole
      */
     private const CAMPUS_ROLES = ['osaar', 'cdm'];
 
-    public function __construct(private OrganizationRecords $organizations) {}
+    public function __construct(
+        private OrganizationRecords $organizations,
+        private SignatoryRecords $signatories,
+    ) {}
 
     public function handle(string $organizationId, string $role): ?string
     {
@@ -38,6 +41,6 @@ final class FindSignatoryByRole
 
     private function campusDeskId(string $role): ?string
     {
-        return DynamoKeys::strip(config('services.signatories.'.$role.'_id'), 'SIGNATORY#');
+        return $this->signatories->findIdByRole($role);
     }
 }

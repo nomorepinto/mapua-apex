@@ -23,6 +23,7 @@ class SubmissionEmailTest extends TestCase
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::event($db);
         DynamoFixtures::signatory($db, 'adv001', 'adviser');
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar');
         DynamoFixtures::signatory($db, 'cdm001', 'cdm');
 
         $this->withStudentAuth()->postJson('/api/v1/students/submissions', SaafPayload::valid())
@@ -195,6 +196,7 @@ class SubmissionEmailTest extends TestCase
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::event($db);
         DynamoFixtures::signatory($db, 'adv001', 'adviser');
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar');
         DynamoFixtures::signatory($db, 'cdm001', 'cdm');
         DynamoFixtures::submission($db, [
             'status' => 'returned',
@@ -216,6 +218,7 @@ class SubmissionEmailTest extends TestCase
         $db = InMemoryDynamoDb::bind($this);
         DynamoFixtures::event($db);
         DynamoFixtures::signatory($db, 'adv001', 'adviser');
+        DynamoFixtures::signatory($db, 'osaar001', 'osaar');
         DynamoFixtures::signatory($db, 'cdm001', 'cdm');
         DynamoFixtures::submission($db, [
             'signatory_sequence' => ['SIGNATORY#adv001', 'SIGNATORY#cdm001'],

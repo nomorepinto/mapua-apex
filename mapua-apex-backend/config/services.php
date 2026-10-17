@@ -29,15 +29,6 @@ return [
     ],
 
     /*
-    | Campus-wide desks. There is one OSAAR and one CDM; change the person's
-    | name in place (PUT /signatories) rather than minting a new uuid.
-    */
-    'signatories' => [
-        'osaar_id' => env('OSAAR_SIGNATORY_ID', ''),
-        'cdm_id' => env('CDM_SIGNATORY_ID', ''),
-    ],
-
-    /*
     | Arcus companion apps. Links are embedded in the approval email sent to the
     | org_submitter when a proposal is fully approved; the post-evaluation window
     | is the number of days after the event that evaluation stays open.

@@ -1,6 +1,8 @@
 import { ChevronRightIcon, ChevronLeftIcon, AlertTriangleIcon } from "lucide-react";
 import type { Session } from "@/types/logs";
 import { formatManila, formatDateUnambiguous } from "@/lib/monitor-formatters";
+import type { ActivitySortDirection } from "@/hooks/use-activity-table-filters";
+import { ActivitySortHeader } from "@/components/signatories/dashboard/activity-sort-header";
 import { SessionRoleBadge } from "./session-role-badge";
 
 interface SessionsTableProps {
@@ -17,6 +19,8 @@ interface SessionsTableProps {
   onPageSizeChange: (size: number) => void;
   startDate: string;
   endDate: string;
+  sortDirection: ActivitySortDirection;
+  onSort: () => void;
 }
 
 export function SessionsTable({
@@ -33,6 +37,8 @@ export function SessionsTable({
   onPageSizeChange,
   startDate,
   endDate,
+  sortDirection,
+  onSort,
 }: SessionsTableProps) {
   return (
     <div className="rounded-2xl bg-white shadow-xs border border-neutral-200 overflow-hidden flex flex-col justify-between">
@@ -42,7 +48,12 @@ export function SessionsTable({
             <tr>
               <th className="px-4 py-3.5">User</th>
               <th className="px-4 py-3.5">Role</th>
-              <th className="px-4 py-3.5">Time In (Manila)</th>
+              <ActivitySortHeader
+                className="h-auto bg-neutral-50 px-4 py-3.5"
+                direction={sortDirection}
+                label="Time In (Manila)"
+                onSort={onSort}
+              />
               <th className="px-4 py-3.5">Time Out</th>
               <th className="px-4 py-3.5">Status</th>
               <th className="px-4 py-3.5">IP Address</th>

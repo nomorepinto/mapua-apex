@@ -21,6 +21,7 @@ import { PeakHoursHeatmapCard } from "@/components/admin/sessions/peak-hours-hea
 import { SessionsFilterBar } from "@/components/admin/sessions/sessions-filter-bar";
 import { SessionsTable } from "@/components/admin/sessions/sessions-table";
 import { SessionDetailModal } from "@/components/admin/sessions/session-detail-modal";
+import type { ActivitySortDirection } from "@/hooks/use-activity-table-filters";
 
 export function AdminMonitorSessionsPage() {
   // Filter State (Default range = yesterday to today Manila)
@@ -34,6 +35,7 @@ export function AdminMonitorSessionsPage() {
   // Pagination State
   const [pageSize, setPageSize] = useState<number>(25);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [sortDirection, setSortDirection] = useState<ActivitySortDirection>("desc");
 
   // Modal Selection State
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -164,13 +166,25 @@ export function AdminMonitorSessionsPage() {
     });
   }, [rawSessions, userSearch, roleFilter, statusFilter]);
 
+  const sortedSessions = useMemo(() => {
+    const sorted = [...filteredSessions].sort(
+      (a, b) => (Date.parse(a.timeIn) || 0) - (Date.parse(b.timeIn) || 0)
+    );
+    return sortDirection === "desc" ? sorted.reverse() : sorted;
+  }, [filteredSessions, sortDirection]);
+
   // Client-side pagination slice
-  const totalSessionPages = Math.ceil(filteredSessions.length / pageSize) || 1;
+  const totalSessionPages = Math.ceil(sortedSessions.length / pageSize) || 1;
 
   const paginatedSessions = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filteredSessions.slice(start, start + pageSize);
-  }, [filteredSessions, currentPage, pageSize]);
+    return sortedSessions.slice(start, start + pageSize);
+  }, [sortedSessions, currentPage, pageSize]);
+
+  const toggleSort = () => {
+    setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    setCurrentPage(1);
+  };
 
   // CSV Export handler
   const handleExportCsv = () => {
@@ -185,7 +199,7 @@ export function AdminMonitorSessionsPage() {
       "Status",
       "IP Address",
     ];
-    const rows = filteredSessions.map((s) => [
+    const rows = sortedSessions.map((s) => [
       s.sessionId,
       s.userName,
       s.userEmail,
@@ -311,7 +325,9 @@ export function AdminMonitorSessionsPage() {
           onSelectSession={setSelectedSessionId}
           currentPage={currentPage}
           pageSize={pageSize}
-          totalEntries={filteredSessions.length}
+          totalEntries={sortedSessions.length}
+          sortDirection={sortDirection}
+          onSort={toggleSort}
           totalPages={totalSessionPages}
           onPageChange={setCurrentPage}
           onPageSizeChange={(size) => {

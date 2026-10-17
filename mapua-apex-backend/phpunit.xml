@@ -23,8 +23,6 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="OSAAR_SIGNATORY_ID" value="osaar001"/>
-        <env name="CDM_SIGNATORY_ID" value="cdm001"/>
         <env name="AWS_DEFAULT_REGION" value="us-east-1"/>
         <env name="AWS_COGNITO_USER_POOL_ID" value="us-east-1_test"/>
         <env name="AWS_COGNITO_CLIENT_ID" value="test-client"/>
