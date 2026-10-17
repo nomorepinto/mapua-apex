@@ -10,7 +10,6 @@ import type {
 export const SIGNATORY_ROLE_ITEMS = [
   { label: "Dean", value: "dean" },
   { label: "Adviser", value: "adviser" },
-  { label: "Admin", value: "admin" },
   { label: "CDM", value: "cdm" },
   { label: "OSAAR", value: "osaar" },
 ] as const
@@ -21,13 +20,11 @@ export const ORGANIZATION_ASSIGNABLE_DESK_ITEMS = [
 ] as const
 
 export const SHARED_SIGNATORY_ROLE_ITEMS = [
-  { label: "Admin", value: "admin" },
   { label: "CDM", value: "cdm" },
   { label: "OSAAR", value: "osaar" },
 ] as const
 
 export const SINGLETON_SIGNATORY_ROLES: readonly ApiSignatoryRole[] = [
-  "admin",
   "cdm",
   "osaar",
 ]
@@ -40,9 +37,16 @@ const ROLE_ORDER = Object.fromEntries(
   SIGNATORY_ROLE_ITEMS.map((item, index) => [item.value, index])
 ) as Record<SignatoryRoleValue, number>
 
+const SIGNATORY_ROLE_LABELS: Record<string, string> = {
+  dean: "Dean",
+  adviser: "Adviser",
+  cdm: "CDM",
+  osaar: "OSAAR",
+  admin: "Admin",
+}
+
 export function signatoryRoleLabel(role: string): string {
-  const match = SIGNATORY_ROLE_ITEMS.find((item) => item.value === role)
-  return match?.label ?? role
+  return SIGNATORY_ROLE_LABELS[role] ?? role
 }
 
 export function roleFromCognitoGroups(groups: string[]): ApiSignatoryRole | undefined {

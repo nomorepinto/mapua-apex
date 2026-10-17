@@ -123,8 +123,8 @@ function AddSignatoryForm() {
               </SelectPopup>
             </Select>
             <FieldDescription>
-              Dean, adviser, admin, CDM, or OSAAR. Admin, CDM, and OSAAR are
-              limited to one account each.
+              Dean, adviser, CDM, or OSAAR. CDM and OSAAR are limited to one
+              account each.
             </FieldDescription>
           </Field>
 
@@ -197,8 +197,8 @@ function ImportSignatoriesCsv() {
               {state.csvPayloads.payloads.length === 1 ? "" : "s"}
             </AlertTitle>
             <AlertDescription>
-              Extra admin, CDM, or OSAAR rows are skipped. Department is ignored
-              unless the role is dean.
+              Extra CDM or OSAAR rows are skipped. Department is ignored unless
+              the role is dean.
             </AlertDescription>
           </Alert>
         ) : null}

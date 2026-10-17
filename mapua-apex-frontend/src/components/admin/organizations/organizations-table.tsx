@@ -77,8 +77,8 @@ export function OrganizationsTableCard() {
               </EmptyMedia>
               <EmptyTitle>No organizations yet</EmptyTitle>
               <EmptyDescription>
-                Register shared admin, CDM, and OSAAR accounts, then assign a
-                dean and adviser to each organization.
+                Register shared CDM and OSAAR accounts, then assign a dean and
+                adviser to each organization.
               </EmptyDescription>
             </EmptyHeader>
             {!state.sharedAccountsReady ? (
@@ -92,8 +92,8 @@ export function OrganizationsTableCard() {
         ) : (
           <>
             <div className="text-muted-foreground border-b px-6 py-3 text-sm">
-              Shared desks: Admin {state.sharedAdminName} · CDM{" "}
-              {state.sharedCdmName} · OSAAR {state.sharedOsaarName}
+              Shared desks: CDM {state.sharedCdmName} · OSAAR{" "}
+              {state.sharedOsaarName}
             </div>
             <div className="px-4 pb-4 sm:px-6 sm:pb-6 md:px-7 md:pb-7">
               <Table>

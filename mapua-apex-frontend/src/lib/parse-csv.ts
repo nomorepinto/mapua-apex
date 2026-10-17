@@ -121,7 +121,6 @@ export type OrganizationCsvRow = {
 const ROLE_ALIASES: Record<string, SignatoryRole> = {
   adviser: "adviser",
   advisor: "adviser",
-  admin: "admin",
   cdm: "cdm",
   dean: "dean",
   osaar: "osaar",
@@ -198,7 +197,7 @@ export function parseSignatoryCsv(text: string): {
     const role = parseSignatoryRole(roleRaw)
     if (!name || !role) {
       errors.push(
-        `Row ${line}: expected name and role (dean | adviser | admin | cdm | osaar).`
+        `Row ${line}: expected name and role (dean | adviser | cdm | osaar).`
       )
       continue
     }
@@ -235,7 +234,7 @@ function parseCsvBoolean(value: string): boolean | null {
  * Parse an organization CSV.
  * Columns: name, dean, adviser, is_higher_council. A header row is optional.
  * The dean column may be left empty for higher-council rows (they skip the
- * dean desk). Shared admin / CDM / OSAAR desks are not in the file.
+ * dean desk). Shared CDM and OSAAR desks are not in the file.
  */
 export function parseOrganizationCsv(text: string): {
   rows: OrganizationCsvRow[]

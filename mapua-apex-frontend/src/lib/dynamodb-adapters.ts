@@ -200,9 +200,9 @@ export interface ApiAnnouncement {
 
 export type ApiSignatoryRole = "adviser" | "admin" | "cdm" | "dean" | "osaar"
 
-export type OrganizationDeskRole = "adviser" | "admin" | "cdm" | "dean"
+export type OrganizationDeskRole = "adviser" | "admin" | "cdm" | "dean" | "osaar"
 export type OrganizationAssignableDeskRole = "dean" | "adviser"
-export type SharedSignatoryRole = "admin" | "cdm" | "osaar"
+export type SharedSignatoryRole = "cdm" | "osaar"
 
 export interface ApiOrganizationSignatory {
   role: OrganizationDeskRole

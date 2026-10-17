@@ -65,7 +65,6 @@ interface OrganizationsState {
   sharedAccountsReady: boolean
   missingAssignable: typeof ORGANIZATION_ASSIGNABLE_DESK_ITEMS[number][]
   canAddOrganization: boolean
-  sharedAdminName: string
   sharedCdmName: string
   sharedOsaarName: string
   peopleById: Map<string, ApiSignatory>
@@ -177,7 +176,6 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
     (item) => deskOptions[item.value].length === 0
   )
 
-  const sharedAdmin = findByRole(signatories, "admin")
   const sharedCdm = findByRole(signatories, "cdm")
   const sharedOsaar = findByRole(signatories, "osaar")
 
@@ -236,7 +234,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       )
       if (!assignments) {
         errors.push(
-          `${row.name}: admin, CDM, and OSAAR accounts must exist before importing organizations.`
+          `${row.name}: CDM and OSAAR accounts must exist before importing organizations.`
         )
         continue
       }
@@ -298,7 +296,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       return
     }
     if (!sharedAccountsReady) {
-      setFormError("Register shared admin, CDM, and OSAAR accounts first.")
+      setFormError("Register shared CDM and OSAAR accounts first.")
       return
     }
     if (!desks.adviser) {
@@ -312,7 +310,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
 
     const assignments = withSharedDesks(desks.dean, desks.adviser, signatories)
     if (!assignments) {
-      setFormError("Register shared admin, CDM, and OSAAR accounts first.")
+      setFormError("Register shared CDM and OSAAR accounts first.")
       return
     }
 
@@ -342,7 +340,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
 
   async function handleCsvImport() {
     if (!sharedAccountsReady) {
-      setCsvError("Register shared admin, CDM, and OSAAR accounts first.")
+      setCsvError("Register shared CDM and OSAAR accounts first.")
       return
     }
 
@@ -408,7 +406,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       signatories
     )
     if (!assignments) {
-      setEditError("Register shared admin, CDM, and OSAAR accounts first.")
+      setEditError("Register shared CDM and OSAAR accounts first.")
       return
     }
 
@@ -494,7 +492,6 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         !/[0-9]/.test(name) &&
         Boolean(desks.adviser) &&
         (isHigherCouncil || Boolean(desks.dean)),
-      sharedAdminName: sharedAdmin?.name ?? "—",
       sharedCdmName: sharedCdm?.name ?? "—",
       sharedOsaarName: sharedOsaar?.name ?? "—",
       peopleById,

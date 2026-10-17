@@ -20,7 +20,7 @@ export const NO_DEPARTMENT: DepartmentOption = {
 }
 
 export const SIGNATORY_CSV_TEMPLATE =
-  "name,role,department\nProf. Juan Dela Cruz,adviser,\nDean Maria Santos,dean,SOIT\nMaria Santos,admin,\nEngr. Leo Cruz,cdm,\nAtty. Kim Ramos,osaar,\n"
+  "name,role,department\nProf. Juan Dela Cruz,adviser,\nDean Maria Santos,dean,SOIT\nEngr. Leo Cruz,cdm,\nAtty. Kim Ramos,osaar,\n"
 
 export function departmentOption(code?: string | null): DepartmentOption | null {
   if (!code) {

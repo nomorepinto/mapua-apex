@@ -73,7 +73,7 @@ function AddOrganizationForm() {
       <CardHeader>
         <CardTitle>Add organization</CardTitle>
         <CardDescription>
-          Admin and CDM are not selected here — they share one account each.
+          CDM and OSAAR are not selected here — they share one account each.
         </CardDescription>
       </CardHeader>
       <Form className="contents" onSubmit={actions.handleAddOne}>
@@ -190,7 +190,7 @@ function ImportOrganizationsCsv() {
         <CardTitle>Import CSV</CardTitle>
         <CardDescription>
           Four columns: organization name, dean, adviser, is_higher_council. The
-          dean may be left empty for higher councils. Shared admin and CDM are
+          dean may be left empty for higher councils. Shared CDM and OSAAR are
           attached automatically.
         </CardDescription>
       </CardHeader>
