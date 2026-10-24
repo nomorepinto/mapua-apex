@@ -25,6 +25,10 @@
 # lambda.handler, Function URL auth NONE with payload format 2.0. This
 # workflow sets the runtime and handler after each code update. It does not
 # change memory, timeout, architecture, or environment.
+#
+# package-lock.json is written by npm 11. Node 22's bundled npm 10 treats
+# that lockfile as out of sync (Missing: typescript@5.9.3) and fails npm ci.
+# Both jobs install npm 11.21.1 before npm ci.
 
 name: Deploy Nest API
 
@@ -58,6 +62,9 @@ jobs:
           cache: npm
           cache-dependency-path: mapua-apex-backend-nest/package-lock.json
 
+      - name: Use npm 11
+        run: npm install -g npm@11.21.1
+
       - run: npm ci
       - run: npm run lint
       - run: npm test
@@ -83,6 +90,9 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: mapua-apex-backend-nest/package-lock.json
+
+      - name: Use npm 11
+        run: npm install -g npm@11.21.1
 
       - name: Require deploy settings
         run: |
