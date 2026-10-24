@@ -7,6 +7,12 @@ interface ImportMetaEnv {
   readonly VITE_COGNITO_REDIRECT_URI: string
   readonly VITE_COGNITO_POST_LOGOUT_REDIRECT_URI: string
   readonly VITE_COGNITO_SCOPES: string
+  readonly VITE_API_BASE_URL?: string
+  readonly VITE_API_TOKEN_STUDENT?: string
+  readonly VITE_API_TOKEN_SIGNATORY?: string
+  readonly VITE_API_TOKEN_ADMIN?: string
+  // "true" serves the admin monitor pages from local sample data.
+  readonly VITE_MOCK_MONITOR?: string
   readonly VITE_SIGNIN_INACTIVITY_TIMEOUT_SECONDS?: string
   readonly VITE_SIGNUP_INACTIVITY_TIMEOUT_SECONDS?: string
   readonly VITE_ARCUS_ATTENDANCE_URL: string

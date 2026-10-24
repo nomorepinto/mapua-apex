@@ -5,12 +5,17 @@
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1"
+const SESSION_STORAGE_KEY = "apex_session_id"
+const SESSION_READY_EVENT = "apex:session_ready"
+const SESSION_FAILED_EVENT = "apex:session_failed"
+const SESSION_WAIT_MS = 20_000
 
-const API_TOKEN_STUDENT = import.meta.env.VITE_API_TOKEN_STUDENT as string | undefined
+const API_TOKEN_STUDENT = import.meta.env.VITE_API_TOKEN_STUDENT as
+  string | undefined
 const API_TOKEN_SIGNATORY = import.meta.env.VITE_API_TOKEN_SIGNATORY as
-  | string
-  | undefined
-const API_TOKEN_ADMIN = import.meta.env.VITE_API_TOKEN_ADMIN as string | undefined
+  string | undefined
+const API_TOKEN_ADMIN = import.meta.env.VITE_API_TOKEN_ADMIN as
+  string | undefined
 
 const ADMIN_GROUPS = new Set(["admin", "osaar", "Admin", "OSAAR"])
 const SIGNATORY_GROUPS = new Set([
@@ -68,7 +73,10 @@ function isEndpoint(endpoint: string, prefix: string): boolean {
  * Pick the role API key from Cognito groups, falling back to the request path.
  * Admin tokens may also be used on student and signatory routes.
  */
-export function getApiKeyForRequest(endpoint: string, token: string | null): string | undefined {
+export function getApiKeyForRequest(
+  endpoint: string,
+  token: string | null
+): string | undefined {
   const groups = getCognitoGroups(token)
 
   if (groupsOverlap(groups, ADMIN_GROUPS)) return API_TOKEN_ADMIN
@@ -89,7 +97,8 @@ export function getCognitoIdToken(): string | null {
   try {
     const authority = import.meta.env.VITE_COGNITO_AUTHORITY
     const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID
-    const storageKey = authority && clientId ? `oidc.user:${authority}:${clientId}` : null
+    const storageKey =
+      authority && clientId ? `oidc.user:${authority}:${clientId}` : null
 
     const storages = [sessionStorage, localStorage]
 
@@ -129,7 +138,85 @@ interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>
 }
 
-async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+function readStoredSessionId(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    const id = localStorage.getItem(SESSION_STORAGE_KEY)
+    return id && id.trim() !== "" ? id : null
+  } catch {
+    return null
+  }
+}
+
+function requestPath(endpoint: string): string {
+  return endpoint.replace(/^\//, "")
+}
+
+/**
+ * Business routes return 428 until `X-Session-ID` is present. Session routes
+ * create that id, and public routes are anonymous, so neither waits.
+ */
+function requiresActiveSession(
+  endpoint: string,
+  token: string | null
+): boolean {
+  if (!token || typeof window === "undefined") return false
+  const path = requestPath(endpoint)
+  if (path.startsWith("public/")) return false
+  if (path === "sessions" || path.startsWith("sessions/")) return false
+  return true
+}
+
+let sessionWait: Promise<string | null> | null = null
+
+function waitForSessionId(): Promise<string | null> {
+  const existing = readStoredSessionId()
+  if (existing) return Promise.resolve(existing)
+  if (sessionWait) return sessionWait
+
+  sessionWait = new Promise((resolve) => {
+    let settled = false
+    let timer = 0
+    let onReady = () => {}
+    let onFailed = () => {}
+    const finish = (id: string | null) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      window.removeEventListener(SESSION_READY_EVENT, onReady)
+      window.removeEventListener(SESSION_FAILED_EVENT, onFailed)
+      sessionWait = null
+      resolve(id)
+    }
+    onReady = () => finish(readStoredSessionId())
+    onFailed = () => finish(readStoredSessionId())
+    timer = window.setTimeout(
+      () => finish(readStoredSessionId()),
+      SESSION_WAIT_MS
+    )
+    window.addEventListener(SESSION_READY_EVENT, onReady)
+    window.addEventListener(SESSION_FAILED_EVENT, onFailed)
+  })
+
+  return sessionWait
+}
+
+/** Tells in-flight business requests that `apex_session_id` is now stored. */
+export function notifySessionReady(): void {
+  if (typeof window === "undefined") return
+  window.dispatchEvent(new Event(SESSION_READY_EVENT))
+}
+
+/** Releases business requests that are waiting on a session start that failed. */
+export function notifySessionFailed(): void {
+  if (typeof window === "undefined") return
+  window.dispatchEvent(new Event(SESSION_FAILED_EVENT))
+}
+
+async function request<T>(
+  endpoint: string,
+  options: RequestOptions = {}
+): Promise<T> {
   const { params, headers = {}, ...customConfig } = options
 
   let url = `${API_BASE_URL.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`
@@ -165,20 +252,37 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     reqHeaders["X-Api-Key"] = apiKey
   }
 
-  const sessionId = typeof window !== "undefined" ? localStorage.getItem("apex_session_id") : null
+  let sessionId = readStoredSessionId()
+  if (!sessionId && requiresActiveSession(endpoint, token)) {
+    sessionId = await waitForSessionId()
+  }
   if (sessionId) {
     reqHeaders["X-Session-ID"] = sessionId
   }
 
-  const deviceId = typeof window !== "undefined" ? localStorage.getItem("apex_device_id") : null
+  const deviceId =
+    typeof window !== "undefined"
+      ? localStorage.getItem("apex_device_id")
+      : null
   if (deviceId) {
     reqHeaders["X-Device-ID"] = deviceId
   }
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     ...customConfig,
     headers: reqHeaders,
   })
+
+  if (response.status === 428) {
+    const lateSessionId = readStoredSessionId()
+    if (lateSessionId && reqHeaders["X-Session-ID"] !== lateSessionId) {
+      reqHeaders["X-Session-ID"] = lateSessionId
+      response = await fetch(url, {
+        ...customConfig,
+        headers: reqHeaders,
+      })
+    }
+  }
 
   if (!response.ok) {
     let errorData: unknown
@@ -189,7 +293,11 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     }
 
     // Intercept displacement or revocation immediately
-    if (response.status === 409 && typeof errorData === "object" && errorData !== null) {
+    if (
+      response.status === 409 &&
+      typeof errorData === "object" &&
+      errorData !== null
+    ) {
       const code = (errorData as { code?: string }).code
       if (code === "CONCURRENT_LOGIN_DISPLACED") {
         if (typeof window !== "undefined") {
@@ -203,7 +311,9 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     }
 
     const message =
-      typeof errorData === "object" && errorData !== null && "message" in errorData
+      typeof errorData === "object" &&
+      errorData !== null &&
+      "message" in errorData
         ? String((errorData as { message: unknown }).message)
         : `Request failed with status ${response.status}`
 
@@ -223,7 +333,11 @@ export const apiClient = {
     return request<T>(endpoint, { ...options, method: "GET" })
   },
 
-  post<T>(endpoint: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  post<T>(
+    endpoint: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<T> {
     return request<T>(endpoint, {
       ...options,
       method: "POST",
@@ -231,7 +345,11 @@ export const apiClient = {
     })
   },
 
-  put<T>(endpoint: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  put<T>(
+    endpoint: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<T> {
     return request<T>(endpoint, {
       ...options,
       method: "PUT",
@@ -239,7 +357,11 @@ export const apiClient = {
     })
   },
 
-  patch<T>(endpoint: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  patch<T>(
+    endpoint: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<T> {
     return request<T>(endpoint, {
       ...options,
       method: "PATCH",
