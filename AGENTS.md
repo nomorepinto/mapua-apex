@@ -12,6 +12,13 @@ These rules apply across the entire repository (both `mapua-apex-frontend` and `
 - **Check for an existing implementation first.** Before writing a feature, always search the codebase for anything already implementing it — even partially. Look for existing routes, controllers, components, hooks, helpers, data-model fields, and backend endpoints that cover (or nearly cover) the requested behavior.
 - **Partial implementations count.** If a partial implementation exists, surface it, describe what it already does and what it is missing, and extend or wire it up rather than starting a fresh full implementation. Do not silently duplicate working code.
 
+## Todo List
+
+- **A finished task that matches `todo.md` must be recorded there in the same change.** After you complete work, check `todo.md` at the repository root. If an item is what you just finished, update it before you stop.
+- Strike through the heading (`## ~~N. Title~~`) and set **Status** to **Closed**, with one line on what was done. Leave the original goal and notes in place.
+- If the work only finishes part of an item, leave the heading as it is. Update **Status** to say what is done and what is still open.
+- Do not add, renumber, or close items the current task did not accomplish.
+
 ## Documentation Sync
 
 - **API routes edited → update the API contract docs.** Whenever you change an API route, controller, request/response shape, status code, or backend data model, update both `API_ROUTES.md` and `DynamoDB Schema.txt` (at the repository root) in the same change. Do not leave them describing the pre-change behavior.

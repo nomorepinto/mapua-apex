@@ -5,14 +5,9 @@ tracked here so they are not lost, but are **not** part of the current change.
 
 ## ~~1. Merge the three apps' data sources into one unified schema~~
 
-**Status:** ~~Deferred — too risky right now.~~ **Partially resolved** — the
-org **member roster** is now unified under apex: mapua-apex owns the
-`ORGANIZATION#{org}` + `MEMBER#{student_number}` items (managed via
-`/api/v1/students/members`), and `arcus-attendance-system` reads that roster for
-its "Allow members only" scanner toggle instead of writing its own parallel
-`ORGANIZATION` + `MEMBER` join rows. The arcus STUDENT profile
-(`PK=SK=STUDENT#{student_number}`) stays arcus-owned and is a separate concern.
-Full org / event unification (the broader goal below) remains **deferred**.
+**Status:** ~~Deferred — too risky right now.~~ ~~**Closed.**~~ The org member
+roster is unified under apex. Broader org / event unification is out of this
+list.
 
 **Goal:** Have the two arcus companion apps (`arcus-attendance-system`,
 `arcus-evaluation-system`) read mapua-apex's authoritative
@@ -65,3 +60,58 @@ submitted post-eval, automatically set the linked SUBMISSION
   absent, patches the submission to `cancelled`.
 - The window length is `services.arcus.post_evaluation_window_days` (default 3);
   the stateless window logic lives in `app/Support/Arcus/EventWindow.php`.
+
+## 3. Organization filter for reports
+
+**Status:** Not started.
+
+**Goal:** Add an organization filter on reports so a report can be limited to
+one organization.
+
+## 4. Organization department
+
+**Status:** Not started.
+
+**Goal:** Give each organization its own department. Reports and organization
+views must show that department, not the proponent's department.
+
+## 5. Visit logs
+
+**Status:** Not started.
+
+**Goal:** Add visit logs.
+
+## 6. Room suggestion by participant count
+
+**Status:** Not started.
+
+**Goal:** Suggest a room from the number of participants.
+
+## 7. Proponent position spelling
+
+**Status:** Not started.
+
+**Goal:** Stop free-typed position text from being saved with the wrong
+spelling. The same check applies to every field that should be a known value,
+not only position.
+
+## 8. OSAAR edit button
+
+**Status:** Not started.
+
+**Goal:** Let OSAAR edit submission details themselves, from an edit button on
+their review screen.
+
+## 9. Three OSAAR review stages
+
+**Status:** Not started.
+
+**Goal:** Split the OSAAR desk into three stages, in order: Sir Kyle, then
+Ma'am Grace, then back to OSAAR.
+
+## 10. Validation feedback while typing
+
+**Status:** Not started.
+
+**Goal:** Show field errors while the user is still filling in the form, not
+only after they submit or leave the page.
