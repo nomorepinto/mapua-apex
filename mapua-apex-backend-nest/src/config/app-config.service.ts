@@ -202,7 +202,11 @@ export class AppConfigService implements OnModuleInit {
   }
 
   /**
-   * Shared client options. Static keys are optional: Lambda uses the execution role.
+   * Shared client options. Long-lived local keys are passed through.
+   * Lambda injects temporary `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+   * plus `AWS_SESSION_TOKEN`. Copying the key pair without that token makes
+   * every AWS call fail with `UnrecognizedClientException`. Leave credentials
+   * unset in that case so the SDK default chain sends the full temporary set.
    */
   clientOptions(
     region: string,
@@ -214,9 +218,10 @@ export class AppConfigService implements OnModuleInit {
   } {
     const key = this.accessKeyId();
     const secret = this.secretAccessKey();
+    const sessionToken = this.optional('AWS_SESSION_TOKEN');
     return {
       region,
-      ...(key && secret
+      ...(key && secret && !sessionToken
         ? { credentials: { accessKeyId: key, secretAccessKey: secret } }
         : {}),
       ...(endpoint ? { endpoint } : {}),
