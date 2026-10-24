@@ -1,0 +1,156 @@
+# Deploys mapua-apex-backend-nest to an existing Lambda function.
+#
+# Push to master (when this app or this workflow changes) runs lint and tests,
+# bundles src/lambda.ts, and updates the function code. workflow_dispatch does
+# the same for whatever ref you run it from.
+#
+# This does not create the function, Function URL, CloudFront, WAF, or
+# environment variables. Those stay on the function. The zip never includes .env.
+#
+# Repository configuration:
+#   secrets.AWS_DEPLOY_ROLE_ARN   IAM role GitHub OIDC may assume
+#   vars.AWS_REGION               region the function lives in
+#   vars.LAMBDA_FUNCTION_NAME     function name
+#
+# The role trust policy must allow sts:AssumeRoleWithWebIdentity from
+# token.actions.githubusercontent.com, with:
+#   aud = sts.amazonaws.com
+#   sub = repo:nomorepinto/mapua-apex:ref:refs/heads/master
+# Repositories that opted into immutable subject claims include the org and
+# repo ids in that sub value. The role also needs lambda:UpdateFunctionCode,
+# lambda:UpdateFunctionConfiguration, and lambda:GetFunctionConfiguration
+# on this function.
+#
+# The function itself must already be Node.js 22 on x86_64, handler
+# lambda.handler, Function URL auth NONE with payload format 2.0. This
+# workflow sets the runtime and handler after each code update. It does not
+# change memory, timeout, architecture, or environment.
+
+name: Deploy Nest API
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'mapua-apex-backend-nest/**'
+      - '.github/workflows/deploy-nest-lambda.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-nest-lambda
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mapua-apex-backend-nest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mapua-apex-backend-nest/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:e2e
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: mapua-apex-backend-nest
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      LAMBDA_FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mapua-apex-backend-nest/package-lock.json
+
+      - name: Require deploy settings
+        run: |
+          if [ -z "$AWS_REGION" ] || [ -z "$LAMBDA_FUNCTION_NAME" ]; then
+            echo "Set repository variables AWS_REGION and LAMBDA_FUNCTION_NAME, and secret AWS_DEPLOY_ROLE_ARN." >&2
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run build:lambda
+
+      - name: Package the Lambda zip
+        run: |
+          printf '%s\n' '{ "type": "module" }' > dist/package.json
+          zip -q -j lambda.zip dist/lambda.js dist/lambda.js.map dist/package.json
+          bytes=$(stat -c%s lambda.zip)
+          echo "lambda.zip is ${bytes} bytes"
+          if [ "$bytes" -gt 50000000 ]; then
+            echo "Zip exceeds the 50 MB direct-upload limit. Use a container image or an S3 upload." >&2
+            exit 1
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: mapua-apex-nest-${{ github.run_id }}
+
+      - name: Publish the function code
+        run: |
+          set -euo pipefail
+
+          wait_until_ready() {
+            local status
+            for _ in $(seq 1 60); do
+              status=$(aws lambda get-function-configuration \
+                --function-name "$LAMBDA_FUNCTION_NAME" \
+                --query 'LastUpdateStatus' \
+                --output text)
+              case "$status" in
+                Successful) return 0 ;;
+                Failed)
+                  aws lambda get-function-configuration \
+                    --function-name "$LAMBDA_FUNCTION_NAME" \
+                    --query 'LastUpdateStatusReason' \
+                    --output text >&2
+                  return 1
+                  ;;
+              esac
+              sleep 3
+            done
+            echo "Timed out waiting for $LAMBDA_FUNCTION_NAME" >&2
+            return 1
+          }
+
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://lambda.zip \
+            --output text \
+            --query 'CodeSha256'
+
+          wait_until_ready
+
+          aws lambda update-function-configuration \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --runtime nodejs22.x \
+            --handler lambda.handler \
+            --output text \
+            --query 'FunctionArn'
+
+          wait_until_ready
