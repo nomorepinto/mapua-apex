@@ -1,9 +1,10 @@
 # Deploys mapua-apex-backend-nest to an existing Lambda Web Function.
 #
 # Push to master (when this app or this workflow changes) runs lint and tests,
-# bundles src/main.ts, uploads the zip to the versioned S3 bucket the current
-# revision already uses, and creates a new revision. workflow_dispatch does
-# the same for whatever ref you run it from.
+# compiles the Nest server with tsc, uploads that build and its production
+# dependencies to the versioned S3 bucket the current revision already uses,
+# and creates a new revision. workflow_dispatch does the same for whatever ref
+# you run it from.
 #
 # This does not create the Web Function, its endpoint, CloudFront, or WAF.
 # The endpoint must use auto-deployment mode LatestRevision so the new
@@ -109,15 +110,17 @@ jobs:
 
       - run: npm ci
       - run: npm run build:web
+      - run: npm prune --omit=dev
 
       - name: Package the Web Function zip
         run: |
-          printf '%s\n' '{ "type": "module" }' > dist/package.json
-          zip -q -j web.zip dist/index.js dist/index.js.map dist/package.json
-          bytes=$(stat -c%s web.zip)
-          echo "web.zip is ${bytes} bytes"
-          if [ "$bytes" -gt 262144000 ]; then
-            echo "Zip exceeds 250 MB. The unzipped Web Function limit is 512 MB." >&2
+          printf '%s\n' "import './dist/main.js';" > index.js
+          zip -qr web.zip index.js dist node_modules package.json
+          rm -f index.js
+          bytes=$(unzip -l web.zip | awk 'END {print $1}')
+          echo "web.zip unpacks to ${bytes} bytes"
+          if [ "$bytes" -gt 512000000 ]; then
+            echo "Unpacked zip exceeds the 512 MB Web Function limit." >&2
             exit 1
           fi
 

@@ -14,7 +14,7 @@ await build({
   outfile: web ? 'dist/index.js' : 'dist/lambda.js',
   sourcemap: true,
   banner: {
-    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+    js: "import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);",
   },
   external: [
     '@nestjs/microservices',
