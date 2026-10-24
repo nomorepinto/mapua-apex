@@ -9,6 +9,7 @@
   "scripts": {
     "build": "nest build",
     "build:lambda": "node scripts/build-lambda.mjs",
+    "build:web": "node scripts/build-lambda.mjs web",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

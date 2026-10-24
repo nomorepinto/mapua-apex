@@ -1,30 +1,36 @@
-# Deploys mapua-apex-backend-nest to an existing Lambda function.
+# Deploys mapua-apex-backend-nest to an existing Lambda Web Function.
 #
 # Push to master (when this app or this workflow changes) runs lint and tests,
-# bundles src/lambda.ts, and updates the function code. workflow_dispatch does
+# bundles src/main.ts, uploads the zip to the versioned S3 bucket the current
+# revision already uses, and creates a new revision. workflow_dispatch does
 # the same for whatever ref you run it from.
 #
-# This does not create the function, Function URL, CloudFront, WAF, or
-# environment variables. Those stay on the function. The zip never includes .env.
+# This does not create the Web Function, its endpoint, CloudFront, or WAF.
+# The endpoint must use auto-deployment mode LatestRevision so the new
+# revision receives traffic when it becomes Active. The new revision copies
+# the current revision's service configuration, including environment
+# variables. The zip never includes .env.
 #
 # Repository configuration:
 #   secrets.AWS_DEPLOY_ROLE_ARN   IAM role GitHub OIDC may assume
 #   vars.AWS_REGION               region the function lives in
-#   vars.LAMBDA_FUNCTION_NAME     function name
+#   vars.LAMBDA_FUNCTION_NAME     Web Function name
 #
 # The role trust policy must allow sts:AssumeRoleWithWebIdentity from
 # token.actions.githubusercontent.com, with:
 #   aud = sts.amazonaws.com
-#   sub = repo:nomorepinto/mapua-apex:ref:refs/heads/master
-# Repositories that opted into immutable subject claims include the org and
-# repo ids in that sub value. The role also needs lambda:UpdateFunctionCode,
-# lambda:UpdateFunctionConfiguration, and lambda:GetFunctionConfiguration
-# on this function.
+#   sub = repo:nomorepinto@179000892/mapua-apex@1360915587:ref:refs/heads/master
+# This repo was created after 15 July 2026, so the subject includes the
+# owner id and the repository id. The name-only form is rejected.
+# workflow_dispatch from any ref other than master uses that ref instead.
 #
-# The function itself must already be Node.js 22 on x86_64, handler
-# lambda.handler, Function URL auth NONE with payload format 2.0. This
-# workflow sets the runtime and handler after each code update. It does not
-# change memory, timeout, architecture, or environment.
+# AWSLambda_FullAccess covers the Lambda and iam:PassRole calls. It does not
+# cover the S3 upload. The role also needs s3:PutObject, s3:GetObject, and
+# s3:GetObjectVersion on the code bucket. The bucket policy must already
+# allow lambda.amazonaws.com those GetObject actions, which the bucket Lambda
+# created for this function does.
+#
+# The revision runs nodejs24.x. The server binds to AWS_LAMBDA_HTTP_ENDPOINT.
 #
 # package-lock.json is written by npm 11. Node 22's bundled npm 10 treats
 # that lockfile as out of sync (Missing: typescript@5.9.3) and fails npm ci.
@@ -102,16 +108,16 @@ jobs:
           fi
 
       - run: npm ci
-      - run: npm run build:lambda
+      - run: npm run build:web
 
-      - name: Package the Lambda zip
+      - name: Package the Web Function zip
         run: |
           printf '%s\n' '{ "type": "module" }' > dist/package.json
-          zip -q -j lambda.zip dist/lambda.js dist/lambda.js.map dist/package.json
-          bytes=$(stat -c%s lambda.zip)
-          echo "lambda.zip is ${bytes} bytes"
-          if [ "$bytes" -gt 50000000 ]; then
-            echo "Zip exceeds the 50 MB direct-upload limit. Use a container image or an S3 upload." >&2
+          zip -q -j web.zip dist/index.js dist/index.js.map dist/package.json
+          bytes=$(stat -c%s web.zip)
+          echo "web.zip is ${bytes} bytes"
+          if [ "$bytes" -gt 262144000 ]; then
+            echo "Zip exceeds 250 MB. The unzipped Web Function limit is 512 MB." >&2
             exit 1
           fi
 
@@ -121,46 +127,86 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-session-name: mapua-apex-nest-${{ github.run_id }}
 
-      - name: Publish the function code
+      - name: Ensure the AWS CLI supports Lambda Web Functions
+        run: |
+          if aws lambda-web help >/dev/null 2>&1; then
+            exit 0
+          fi
+          curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+          unzip -q /tmp/awscliv2.zip -d /tmp
+          sudo /tmp/aws/install --update
+
+      - name: Publish a Web Function revision
         run: |
           set -euo pipefail
 
-          wait_until_ready() {
-            local status
-            for _ in $(seq 1 60); do
-              status=$(aws lambda get-function-configuration \
-                --function-name "$LAMBDA_FUNCTION_NAME" \
-                --query 'LastUpdateStatus' \
-                --output text)
-              case "$status" in
-                Successful) return 0 ;;
-                Failed)
-                  aws lambda get-function-configuration \
-                    --function-name "$LAMBDA_FUNCTION_NAME" \
-                    --query 'LastUpdateStatusReason' \
-                    --output text >&2
-                  return 1
-                  ;;
-              esac
-              sleep 3
-            done
-            echo "Timed out waiting for $LAMBDA_FUNCTION_NAME" >&2
-            return 1
-          }
-
-          aws lambda update-function-code \
+          revision_id=$(aws lambda-web list-web-function-endpoints \
             --function-name "$LAMBDA_FUNCTION_NAME" \
-            --zip-file fileb://lambda.zip \
-            --output text \
-            --query 'CodeSha256'
+            --query 'endpoints[0].revisionWeights[0].revisionId' \
+            --output text)
+          if [ -z "$revision_id" ] || [ "$revision_id" = "None" ]; then
+            echo "No endpoint revision to copy service configuration from." >&2
+            exit 1
+          fi
 
-          wait_until_ready
-
-          aws lambda update-function-configuration \
+          current=$(aws lambda-web get-web-function-revision \
             --function-name "$LAMBDA_FUNCTION_NAME" \
-            --runtime nodejs22.x \
-            --handler lambda.handler \
-            --output text \
-            --query 'FunctionArn'
+            --revision-id "$revision_id" \
+            --output json)
+          bucket=$(echo "$current" | jq -r '.buildConfig.codeConfig.s3Object.bucket')
+          service_config=$(echo "$current" | jq -c '.serviceConfig | walk(if type == "object" then with_entries(select(.value != null)) else . end)')
+          if [ -z "$bucket" ] || [ "$bucket" = "null" ]; then
+            echo "The current revision has no S3 code bucket." >&2
+            exit 1
+          fi
 
-          wait_until_ready
+          key="mapua-apex-backend/revisions/${GITHUB_SHA}-${GITHUB_RUN_ID}.zip"
+          version_id=$(aws s3api put-object \
+            --bucket "$bucket" \
+            --key "$key" \
+            --body web.zip \
+            --query VersionId \
+            --output text)
+          if [ -z "$version_id" ] || [ "$version_id" = "None" ] || [ "$version_id" = "null" ]; then
+            echo "Bucket $bucket did not return an object version. Enable versioning." >&2
+            exit 1
+          fi
+
+          build_config=$(jq -nc \
+            --arg bucket "$bucket" \
+            --arg key "$key" \
+            --arg versionId "$version_id" \
+            '{codeConfig:{s3Object:{bucket:$bucket,key:$key,versionId:$versionId}},runtimeConfig:{runtime:"nodejs24.x"}}')
+
+          new_id=$(aws lambda-web create-web-function-revision \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --build-config "$build_config" \
+            --service-config "$service_config" \
+            --query revisionId \
+            --output text)
+          echo "Created revision $new_id"
+
+          for _ in $(seq 1 60); do
+            state=$(aws lambda-web get-web-function-revision \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --revision-id "$new_id" \
+              --query state \
+              --output text)
+            case "$state" in
+              Active)
+                echo "Revision $new_id is Active"
+                exit 0
+                ;;
+              Failed)
+                aws lambda-web get-web-function-revision \
+                  --function-name "$LAMBDA_FUNCTION_NAME" \
+                  --revision-id "$new_id" \
+                  --query '{stateReason:stateReason,errors:errors}' \
+                  --output json >&2
+                exit 1
+                ;;
+            esac
+            sleep 3
+          done
+          echo "Timed out waiting for revision $new_id" >&2
+          exit 1
