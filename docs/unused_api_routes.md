@@ -1,75 +1,54 @@
 # Unused / orphaned API routes
 
-This is an **informational** audit of backend routes that the `mapua-apex-frontend`
-SPA does not call. It complements the canonical contract in the root
-[`API_ROUTES.md`](../API_ROUTES.md).
+This audit records routes the `mapua-apex-frontend` SPA does not call. The
+canonical contract is [`API_ROUTES.md`](../API_ROUTES.md).
 
-**Scope note.** Per the current work item, these backend routes were **left
-untouched** — nothing here has been deleted or changed in `mapua-apex-backend`.
-This file only records the findings so a future, backend-scoped change can decide
-what to keep, wire up, or remove.
+The Nest server in `mapua-apex-backend-nest` does **not** implement the
+Section A routes. The Laravel server in `mapua-apex-backend` still exposes
+them under `/api/v1` until cutover. Do not point `VITE_API_BASE_URL` at Nest
+as part of this port.
 
 **How this was determined.** Every route in
 [`mapua-apex-backend/routes/api.php`](../mapua-apex-backend/routes/api.php)
-(plus the framework health route registered in `bootstrap/app.php`) was
-cross-referenced against every `apiClient.{get,post,put,patch,delete}(...)` call
-in `mapua-apex-frontend/src`. A route is listed as *orphaned* only when no SPA
-call targets it. The canonical route list and request/response shapes live in
-`API_ROUTES.md`; this file does not redefine them.
+was cross-referenced against every `apiClient.{get,post,put,patch,delete}(...)`
+call in `mapua-apex-frontend/src`. A route is listed as *orphaned* only when
+no SPA call targets it.
 
 ---
 
-## A. Orphaned routes (no SPA consumer)
+## A. Dropped from the Nest server
 
-These exist and work, but nothing in the frontend calls them. They are candidates
-for either (a) wiring into the UI, or (b) removal in a future backend cleanup.
-Left in place for now.
+These existed on Laravel and had no SPA caller. Nest does not register them.
 
-| # | Method | Endpoint | Handler | Why it appears unused |
-| :-- | :-- | :-- | :-- | :-- |
-| 1 | **GET** | `/api/v1/admins/monitor/bottlenecks` | `LogMonitorController@getBottlenecks` | The monitor UI (`hooks/use-monitor.ts`) calls `monitor/stats`, `monitor/sessions` (list + detail), and `monitor/activity` (list + detail), but never `bottlenecks`. Idle-session surfacing is not wired into the admin monitor pages. |
-| 2 | **GET** | `/api/v1/sessions/{sessionId}/validate` | `SessionController@validateSession` | `validateSession` simply delegates to `heartbeat`. The SPA's `hooks/use-session-logger.ts` calls the `PATCH .../heartbeat` route directly, so the separate `GET .../validate` is redundant for the frontend. |
-| 3 | **POST** | `/api/v1/admins/monitor/sessions/{id}/revoke` | `LogMonitorController@revokeSession` | `routes/admin/monitor-sessions.tsx` *displays* a `revoked` status, but there is no UI action that POSTs a revocation. The admin "revoke session" control is not implemented in the SPA. |
-| 4 | **POST** | `/api/v1/students/events/{event}/submissions/{submission}/notifications` | `Student\NotificationController@store` | The SPA **reads** the student timeline (`GET .../notifications` in `hooks/use-submissions.ts`) but never creates a row manually — timeline entries are written server-side by the approve/return/deny flows. |
-| 5 | **PUT** | `/api/v1/students/events/{event}/submissions/{submission}/notifications/{notification}` | `Student\NotificationController@update` | Same as #4 — no manual timeline-row editing exists in the SPA. |
-| 6 | **POST** | `/api/v1/signatories/events/{event}/submissions/{submission}/notifications` | `Signatory\NotificationController@store` | Signatory decisions go through `.../approve`, `.../return`, `.../deny`, and `.../classification` (all consumed). The standalone notification-create endpoint is not called by the SPA. |
-| 7 | **PUT** | `/api/v1/signatories/events/{event}/submissions/{submission}/notifications/{notification}` | `Signatory\NotificationController@update` | Same as #6 — no manual timeline-row editing exists in the SPA. |
-
-> Note: the **GET** notification routes are *not* orphaned. `GET
-> /api/v1/students/events/{event}/submissions/{submission}/notifications` is
-> consumed by `hooks/use-submissions.ts`, and admin submission detail
-> (`GET /api/v1/admins/events/{event}/submissions/{submission}`) returns the
-> timeline inline. Only the **POST/PUT** notification writers above are unused.
-
----
-
-## B. Intentionally not consumed by the SPA (keep)
-
-These have **no frontend caller by design** — they serve other systems or infra.
-They are **not** dead code and must not be treated as orphaned.
-
-| Method | Endpoint | Real consumer | Notes |
+| # | Method | Endpoint | Why it was unused |
 | :-- | :-- | :-- | :-- |
-| **GET** | `/api/v1/ping` | External health/liveness probes (`curl`, uptime monitors) | Returns `{ "ok": true }`; throttled with the student limiter. No SPA caller. |
-| **GET** | `/api/v1/arcus/events` | arcus companion apps (server-to-server) | Guarded by `arcus.service` (`X-Arcus-Service-Token`). The SPA's `lib/arcus-links.ts` only builds **deep links** to the arcus app UIs; it never calls this route. |
-| **GET** | `/api/v1/arcus/students/{studentId}/events` | Arcus Evaluation student landing/form | Service-authenticated; in-window events filtered by the verified student's check-ins. |
-| **GET** | `/api/v1/arcus/events/{eventId}/post-eval` | Arcus Evaluation officer workspace | Service-authenticated and organization-scoped; live participants plus Apex POSTEVAL status. |
-| **GET** | `/up` | Container / infra healthchecks | Laravel framework health route registered at the app root in `bootstrap/app.php` (`health: '/up'`), **not** under `/api/v1`. |
+| 1 | **GET** | `/api/v1/admins/monitor/bottlenecks` | The monitor UI calls `monitor/stats`, `monitor/sessions`, and `monitor/activity`, never `bottlenecks`. |
+| 2 | **GET** | `/api/v1/sessions/{sessionId}/validate` | The SPA calls `PATCH .../heartbeat` directly. |
+| 3 | **POST** | `/api/v1/admins/monitor/sessions/{id}/revoke` | The monitor page can display a `revoked` status, but no control POSTs a revocation. |
+| 4 | **GET** | `/api/v1/admins/announcements/{announcement}` | The announcement list already returns each row. |
+| 5 | **POST** | `/api/v1/students/events/{event}/submissions/{submission}/notifications` | The SPA reads the timeline. Approve, return, and deny write the rows. |
+| 6 | **PUT** | `/api/v1/students/events/{event}/submissions/{submission}/notifications/{notification}` | No manual timeline edit exists in the SPA. |
+| 7 | **POST** | `/api/v1/signatories/events/{event}/submissions/{submission}/notifications` | Signatory decisions use approve, return, deny, and classification. |
+| 8 | **PUT** | `/api/v1/signatories/events/{event}/submissions/{submission}/notifications/{notification}` | No manual timeline edit exists in the SPA. |
 
-> **Retired since the post-evaluation overhaul:** the former
-> `POST /api/v1/arcus/events/{event}/submissions/{submission}/finish` route has
-> been **deleted** from the backend. A submission now reaches `finished` only
-> when OSAAR approves its post-evaluation (a `POSTEVAL` going `submitted →
-> approved` transitions the linked `SUBMISSION` `approved → finished`). The three
-> Arcus GET routes above remain active. Attendance uses `window=attendance`;
-> evaluation uses `window=evaluation` for the configured post-event period.
+`GET /api/v2/students/events/{event}/submissions/{submission}/notifications`
+remains. Admin submission detail still returns the timeline inline.
 
 ---
 
-## C. Recommended follow-up (out of current scope)
+## B. Kept, and not called by the SPA
 
-Any decision to remove the Section A routes should be a **backend-scoped** change
-and, per the repository `AGENTS.md`, must update `API_ROUTES.md` and
-`DynamoDB Schema.txt` in the same change. Before deleting, confirm each route is
-also unused by any **non-SPA** caller (scripts, arcus apps, external monitors) —
-this audit only covered the frontend.
+These stay on the Nest server under `/api/v2` (health `GET /up` stays at the
+root). The Arcus companion apps are outside this repo and still call
+`/api/v1/arcus/...` until they are updated.
+
+| Method | Endpoint | Real consumer |
+| :-- | :-- | :-- |
+| **GET** | `/api/v2/ping` | Health probes. Body `{ "ok": true }`. |
+| **GET** | `/up` | Infra health checks. Body `{ "status": "ok" }`. |
+| **GET** | `/api/v2/arcus/events` | Arcus apps, `X-Arcus-Service-Token`. |
+| **GET** | `/api/v2/arcus/students/{studentId}/events` | Arcus Evaluation, filtered by the student's check-ins. |
+| **GET** | `/api/v2/arcus/events/{eventId}/post-eval` | Arcus Evaluation officer view. No `data` wrapper. |
+
+A submission reaches `finished` only when an admin approves its post-evaluation.
+The retired Arcus finish route stays retired.
