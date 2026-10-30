@@ -1,10 +1,8 @@
-import {
-  CognitoIdentityProviderClient,
-  ListUsersCommand,
-} from '@aws-sdk/client-cognito-identity-provider';
 import { SendEmailCommand, SESClient } from '@aws-sdk/client-ses';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { COGNITO_IDP, SES_CLIENT } from '../aws/dynamo.port.js';
+import { SIGNATORY_ATTRIBUTE } from '../accounts/account-groups.js';
+import { CognitoAccountsRepository } from '../accounts/cognito-accounts.repository.js';
+import { SES_CLIENT } from '../aws/dynamo.port.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import { stripPrefix } from '../common/dynamo-keys.js';
 import { str, type Item } from '../common/records.js';
@@ -22,8 +20,7 @@ export class MailService {
 
   constructor(
     @Inject(SES_CLIENT) private readonly ses: SESClient,
-    @Inject(COGNITO_IDP)
-    private readonly cognito: CognitoIdentityProviderClient,
+    private readonly accounts: CognitoAccountsRepository,
     private readonly config: AppConfigService,
     private readonly signatories: SignatoryRepository,
     private readonly organizations: OrganizationRepository,
@@ -142,18 +139,11 @@ export class MailService {
       return null;
     }
     try {
-      const result = await this.cognito.send(
-        new ListUsersCommand({
-          UserPoolId: poolId,
-          Filter: `custom:signatory_id = "${signatoryId}"`,
-          Limit: 1,
-        }),
+      const holders = await this.accounts.listByAttribute(
+        SIGNATORY_ATTRIBUTE,
+        signatoryId,
       );
-      const attributes = result.Users?.[0]?.Attributes ?? [];
-      return (
-        attributes.find((attribute) => attribute.Name === 'email')?.Value ??
-        null
-      );
+      return holders[0]?.email ?? null;
     } catch (error) {
       this.logger.warn(
         `Signatory email lookup failed: ${error instanceof Error ? error.message : 'unknown'}`,

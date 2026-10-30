@@ -63,6 +63,41 @@ describe('CognitoAccountsRepository', () => {
     ]);
   });
 
+  it('matches custom attributes in memory without a ListUsers filter', async () => {
+    const repo = repository('pool-1', async (command) => {
+      expect(command).toBeInstanceOf(ListUsersCommand);
+      expect((command as ListUsersCommand).input.Filter).toBeUndefined();
+      return {
+        Users: [
+          {
+            Username: 'ada@mapua.edu.ph',
+            UserStatus: 'CONFIRMED',
+            Enabled: true,
+            Attributes: [
+              { Name: 'sub', Value: 'ada-sub' },
+              { Name: 'email', Value: 'ada@mapua.edu.ph' },
+              { Name: SIGNATORY_ATTRIBUTE, Value: 'sig-1' },
+            ],
+          },
+          {
+            Username: 'other@mapua.edu.ph',
+            UserStatus: 'CONFIRMED',
+            Enabled: true,
+            Attributes: [
+              { Name: 'sub', Value: 'other-sub' },
+              { Name: SIGNATORY_ATTRIBUTE, Value: 'sig-2' },
+            ],
+          },
+        ],
+      };
+    });
+
+    const matches = await repo.listByAttribute(SIGNATORY_ATTRIBUTE, 'sig-1');
+    expect(matches.map((account) => account.username)).toEqual([
+      'ada@mapua.edu.ph',
+    ]);
+  });
+
   it('returns null when AdminGetUser cannot find the username', async () => {
     const repo = repository('pool-1', async (command) => {
       expect(command).toBeInstanceOf(AdminGetUserCommand);
