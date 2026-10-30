@@ -36,7 +36,6 @@ import {
   sanitizeIntegerInput,
 } from "@/lib/numeric-input"
 import { cn } from "@/lib/utils"
-import { useOrgStore } from "@/stores/org-store"
 
 type DetailsFields = Pick<
   SaafDraft,
@@ -69,6 +68,7 @@ export function ActivityDetailsSection({
   lockSchedule = false,
   titleEditable = false,
   venueNames,
+  fallbackTitle = "",
 }: {
   values: DetailsFields
   onChange: (key: any, value: any) => void
@@ -78,9 +78,10 @@ export function ActivityDetailsSection({
   titleEditable?: boolean
   /** Campus names for the venue list. Skips the student campus query. */
   venueNames?: string[]
+  /** Used when the title has not been copied onto the draft yet. */
+  fallbackTitle?: string
 }) {
-  const storedEventName = useOrgStore((state) => state.eventName)
-  const displayTitle = values.activityTitle || storedEventName || ""
+  const displayTitle = values.activityTitle || fallbackTitle || ""
   const descriptionGibberish = useGibberishField(values.activityDescription || "")
   const objectivesGibberish = useGibberishField(values.activityObjectives || "")
 
