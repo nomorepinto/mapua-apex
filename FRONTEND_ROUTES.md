@@ -5,7 +5,7 @@ Client-side route map for `mapua-apex-frontend`. The single source of truth is t
 ## Routing model
 
 - **React Router (data mode).** Built with `createBrowserRouter` in `src/router.tsx` and mounted by `src/main.tsx` under the OIDC `AuthProvider`.
-- **Role sections.** Each signed-in role owns a top-level prefix (`/students`, `/cdm-reviewer`, `/dean`, `/org-adviser`, `/osaar`, `/admin`) wrapped by a layout in `src/routes/layouts/`.
+- **Role sections.** Each signed-in role owns a top-level prefix (`/students`, `/cdm`, `/dean`, `/adviser`, `/osaar`, `/admin`) wrapped by a layout in `src/routes/layouts/`.
 - **Lazy pages.** Every leaf page is code-split via a `lazy` async `import()` returning `{ Component }`, with `HydrateFallback: RouteFallback`. Add a co-located `action` (via `Promise.all`) only when the route mutates (e.g. the SAAF submit route).
 - **Nested shells.** Sections that group sub-pages use a parent route with children: `PassThroughLayout` (renders `<Outlet />` only, e.g. `/students/submissions`, `/osaar/review`, `/admin/monitor`) or a dedicated shell component (e.g. `OsaarSetupLayout` for `/osaar/setup`).
 - **Index + wildcard.** Each section's `index: true` redirects to its landing page and a `path: "*"` catch-all redirects back to it. The global `path: "*"` renders `NotFoundPage`.
@@ -19,11 +19,11 @@ Sign-in is Amazon Cognito (OIDC). Unauthenticated hits on a guarded layout redir
 | `StudentsLayout` | `admin`, `org_adviser`, `org_submitter`, `student` | `/students/dashboard` |
 | `CdmReviewerLayout` | `admin`, `cdm_reviewer`, `cdm` | `/cdm/dashboard` |
 | `DeanLayout` | `admin`, `dean` | `/dean/dashboard` |
-| `OrgAdviserLayout` | `admin`, `org_adviser` | `/org-adviser/dashboard` |
+| `OrgAdviserLayout` | `admin`, `org_adviser` | `/adviser/dashboard` |
 | `OsaarLayout` | `admin`, `osaar` | `/osaar/dashboard` |
 | `AdminLayout` | `admin` | `/admin/sessions` |
 
-**Post-login hand-off** (`RoleRedirect`, first match wins): `admin` → `/admin/sessions`; `osaar` → `/osaar/dashboard`; `cdm_reviewer` → `/cdm/dashboard`; `dean` → `/dean/dashboard`; `org_adviser` → `/org-adviser/dashboard`; `org_submitter` → `/students/dashboard`; unknown group → `/students/dashboard`.
+**Post-login hand-off** (`RoleRedirect`, first match wins): `admin` → `/admin/sessions`; `osaar` → `/osaar/dashboard`; `cdm_reviewer` → `/cdm/dashboard`; `dean` → `/dean/dashboard`; `org_adviser` → `/adviser/dashboard`; `org_submitter` → `/students/dashboard`. A signed-in user with none of those groups stays on `/` and sees `PendingAssignment` until OSAAR links the account.
 
 **Log monitor gating.** Two page groups are wrapped in an extra `AuthGuard` at the route level (constants in `src/constants/auth.ts`):
 
@@ -84,16 +84,16 @@ Layout: `DeanLayout` (`src/routes/layouts/dean-layout.tsx`). Sidebar: Dashboard.
 
 ---
 
-## Org Adviser routes (`/org-adviser`)
+## Org Adviser routes (`/adviser`)
 
 Layout: `OrgAdviserLayout` (`src/routes/layouts/org-adviser-layout.tsx`). Sidebar: Dashboard.
 
 | Path | Component | Source file | Notes |
 | :---- | :---- | :---- | :---- |
-| `/org-adviser` | redirect | — | → `dashboard` |
-| `/org-adviser/dashboard` | `OrgAdviserDashboard` | `src/routes/org-adviser/dashboard.tsx` | Adviser review queue. |
-| `/org-adviser/about` | `About` | `src/routes/about.tsx` | Shared. |
-| `/org-adviser/*` | redirect | — | → `dashboard` |
+| `/adviser` | redirect | — | → `dashboard` |
+| `/adviser/dashboard` | `OrgAdviserDashboard` | `src/routes/org-adviser/dashboard.tsx` | Adviser review queue. |
+| `/adviser/about` | `About` | `src/routes/about.tsx` | Shared. |
+| `/adviser/*` | redirect | — | → `dashboard` |
 
 ---
 

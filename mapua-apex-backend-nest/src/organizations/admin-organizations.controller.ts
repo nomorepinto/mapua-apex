@@ -8,7 +8,10 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import { Roles } from '../common/decorators.js';
+import { AssignAccountDto } from '../accounts/dto/assign-account.dto.js';
+import type { AccountView } from '../accounts/cognito-account.js';
+import type { AuthenticatedCaller } from '../common/caller.js';
+import { CurrentCaller, Roles } from '../common/decorators.js';
 import {
   OrganizationDto,
   UpdateOrganizationDto,
@@ -35,6 +38,19 @@ export class AdminOrganizationsController {
       body.name,
       body.is_higher_council,
       body.signatories,
+    );
+  }
+
+  @Put(':organization/account')
+  assignAccount(
+    @Param('organization') organization: string,
+    @Body() body: AssignAccountDto,
+    @CurrentCaller() caller: AuthenticatedCaller,
+  ): Promise<AccountView | null> {
+    return this.organizations.assignAccount(
+      organization,
+      body.username,
+      caller.sub,
     );
   }
 

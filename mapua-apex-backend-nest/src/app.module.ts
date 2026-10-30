@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AccountsModule } from './accounts/accounts.module.js';
 import { ActivityModule } from './activity/activity.module.js';
 import { ApprovalSettingsModule } from './approval-settings/approval-settings.module.js';
 import { AnnouncementsModule } from './announcements/announcements.module.js';
@@ -36,6 +37,7 @@ const envFile = existingRootEnv();
     AuthModule,
     HealthModule,
     AnnouncementsModule,
+    AccountsModule,
     OrganizationsModule,
     SignatoriesModule,
     ApprovalSettingsModule,

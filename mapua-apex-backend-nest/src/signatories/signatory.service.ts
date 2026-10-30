@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { AccountsService } from '../accounts/accounts.service.js';
+import type { AccountView } from '../accounts/cognito-account.js';
 import { abort } from '../common/http.js';
 import { stripPrefix } from '../common/dynamo-keys.js';
 import { list, str, type Item } from '../common/records.js';
@@ -14,7 +16,12 @@ export interface SignatoryView {
 
 @Injectable()
 export class SignatoryService {
-  constructor(private readonly signatories: SignatoryRepository) {}
+  private readonly logger = new Logger(SignatoryService.name);
+
+  constructor(
+    private readonly signatories: SignatoryRepository,
+    private readonly accounts: AccountsService,
+  ) {}
 
   async list(): Promise<SignatoryView[]> {
     return (await this.signatories.list()).map((item) => this.toView(item));
@@ -46,8 +53,32 @@ export class SignatoryService {
     if (!existing) {
       throw new NotFoundException('Not Found');
     }
-    return this.toView(
-      await this.signatories.update(id, name, role, department),
+    const previousRole = str(existing, 'role') ?? '';
+    const updated = await this.signatories.update(id, name, role, department);
+    const bare = stripPrefix(id, 'SIGNATORY#') ?? id;
+    if (previousRole.toLowerCase() !== role.toLowerCase()) {
+      await this.bestEffort(`signatory role ${bare}`, () =>
+        this.accounts.syncSignatoryRole(bare, role),
+      );
+    }
+    return this.toView(updated);
+  }
+
+  async assignAccount(
+    id: string,
+    username: string | null,
+    callerSub: string,
+  ): Promise<AccountView | null> {
+    const existing = await this.signatories.get(id);
+    if (!existing) {
+      throw new NotFoundException('Not Found');
+    }
+    const bare = stripPrefix(id, 'SIGNATORY#') ?? id;
+    return this.accounts.assignSignatory(
+      bare,
+      str(existing, 'role') ?? '',
+      username,
+      callerSub,
     );
   }
 
@@ -76,7 +107,23 @@ export class SignatoryService {
         'This signatory still has submissions awaiting review and cannot be deleted.',
       );
     }
+    await this.bestEffort(`signatory release ${bare}`, () =>
+      this.accounts.releaseSignatory(bare, str(existing, 'role') ?? ''),
+    );
     await this.signatories.delete(bare);
+  }
+
+  private async bestEffort(
+    label: string,
+    work: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await work();
+    } catch (error) {
+      this.logger.warn(
+        `${label} failed: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+    }
   }
 
   async requireExisting(id: string): Promise<void> {

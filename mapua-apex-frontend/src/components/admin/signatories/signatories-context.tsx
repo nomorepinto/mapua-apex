@@ -21,12 +21,17 @@ import {
   type DepartmentOption,
   type RoleOption,
 } from "@/components/admin/signatories/signatory-options"
+import {
+  accountSearchText,
+  EMPTY_ACCOUNTS,
+} from "@/components/admin/accounts/account-assignment"
 import { signatoryNameError } from "@/components/admin/signatories/signatory-name"
 import { toastManager } from "@/components/ui/toast"
 import {
   useBulkCreateSignatoriesMutation,
   useCreateSignatoryMutation,
   useDeleteSignatoryMutation,
+  useCognitoAccountsQuery,
   useSignatoriesQuery,
   useUpdateSignatoryMutation,
 } from "@/hooks/use-admin"
@@ -116,6 +121,7 @@ export function useSignatoriesPage() {
 
 export function SignatoriesProvider({ children }: { children: ReactNode }) {
   const signatoriesQuery = useSignatoriesQuery()
+  const accountsQuery = useCognitoAccountsQuery()
   const createSignatory = useCreateSignatoryMutation()
   const updateSignatory = useUpdateSignatoryMutation()
   const deleteSignatory = useDeleteSignatoryMutation()
@@ -141,6 +147,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
   const [deleteError, setDeleteError] = useState("")
 
   const signatories = signatoriesQuery.data ?? EMPTY_SIGNATORIES
+  const accounts = accountsQuery.data ?? EMPTY_ACCOUNTS
   const takenRoles = takenSingletonRoles(signatories)
 
   const roleItems = useMemo(
@@ -195,12 +202,13 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
         signatoryRoleLabel(person.role),
         person.department ?? "",
         person.department ? departmentLabel(person.department) : "",
+        accountSearchText(accounts, "signatory", person.signatory_id),
       ]
         .join(" ")
         .toLowerCase()
       return haystack.includes(query)
     })
-  }, [search, sortedSignatories])
+  }, [accounts, search, sortedSignatories])
 
   const csvPayloads = useMemo(() => {
     const payloads = []

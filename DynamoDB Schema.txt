@@ -22,15 +22,19 @@ back to the single SIGNATORY whose role is osaar. Rename those people
 in place (PUT /admins/signatories on the same id).
 admin may occupy a desk but is not in the approval sequence.
 GET /public/organizations scans these base items without authentication and
-returns only the bare organization_id and name for the account signup picker.
+returns only the bare organization_id and name. Signup does not write
+custom:organization_id; OSAAR assigns it with
+PUT /admins/organizations/{id}/account.
 GET /students/organization also resolves the assigned dean's SIGNATORY item and
 returns its uppercase department as a derived response field (null when no dean
 or dean department is configured). The department is not copied onto this item.
 DELETE /admins/organizations/{id} is guarded: it removes the ORGANIZATION item
 only when the org owns no EVENT/SUBMISSION rows (GSI1PK = ORGANIZATION#id) and
 no COLLABORATION POINTER rows (PK = ORGANIZATION#id, SK begins COLLAB#);
-otherwise it returns 409 and leaves the item untouched. Delete does not rewrite
-student Cognito custom:organization_id.
+otherwise it returns 409 and leaves the item untouched. A successful delete
+clears Cognito custom:organization_id on every holder and removes them from
+org_submitter. That Cognito step is best-effort and does not roll back the
+DynamoDB delete. The attribute is not stored on this item.
 
 ORGANIZATION MEMBER (apex-owned roster)
 PK: ORGANIZATION#uuid
@@ -386,7 +390,10 @@ person occupies no ORGANIZATION.signatories desk and has no in-flight GSI2
 inbox item; otherwise it returns 409 (leaving the item untouched). Delete does
 not rewrite the copies above, so prefer replacing a person in place by keeping
 the same uuid (PUT name / role / department). A new uuid leaves in-flight
-papers, org desks, and Cognito custom:signatory_id pointing at the old id.
+papers and org desks pointing at the old id. Cognito custom:signatory_id is
+not stored on this item. PUT /admins/signatories/{id}/account sets it, and a
+successful delete clears it on every holder. A role change moves those holders
+into the new role's Cognito group. Both Cognito steps are best-effort.
 CDM stays one person. Several OSAAR people are allowed; new proposals
 read their order from APPROVAL SETTINGS, not from "the" OSAAR row.
 

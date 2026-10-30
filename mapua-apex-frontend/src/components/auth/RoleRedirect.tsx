@@ -1,6 +1,7 @@
 import { useAuth } from "react-oidc-context"
 import { Navigate } from "react-router"
 
+import { PendingAssignment } from "@/components/auth/pending-assignment"
 import { layout } from "@/config"
 
 /** Case-insensitive check for whether a user belongs to a Cognito group. */
@@ -59,6 +60,5 @@ export function RoleRedirect() {
     return <Navigate to="/students/dashboard" replace />
   }
 
-  // Fallback for unknown groups
-  return <Navigate to="/students/dashboard" replace />
+  return <PendingAssignment />
 }

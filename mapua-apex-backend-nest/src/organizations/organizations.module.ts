@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AccountsModule } from '../accounts/accounts.module.js';
 import { SignatoriesModule } from '../signatories/signatories.module.js';
 import { AdminOrganizationsController } from './admin-organizations.controller.js';
 import { OrganizationRepository } from './organization.repository.js';
@@ -7,7 +8,7 @@ import { PublicOrganizationsController } from './public-organizations.controller
 import { StudentOrganizationsController } from './student-organizations.controller.js';
 
 @Module({
-  imports: [SignatoriesModule],
+  imports: [AccountsModule, SignatoriesModule],
   controllers: [
     PublicOrganizationsController,
     StudentOrganizationsController,

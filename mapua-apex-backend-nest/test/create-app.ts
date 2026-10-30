@@ -47,11 +47,14 @@ const verifier: JwtVerifier = {
   },
 };
 
-export async function createTestApp(): Promise<{
+export async function createTestApp(options?: {
+  cognitoSend?: (command: unknown) => Promise<unknown>;
+}): Promise<{
   app: INestApplication;
   dynamo: MemoryDynamo;
 }> {
   process.env.AWS_DYNAMODB_TABLE ??= 'apex-test';
+  process.env.AWS_COGNITO_USER_POOL_ID ??= 'pool-test';
   process.env.APP_ENV ??= 'testing';
   process.env.NODE_ENV ??= 'test';
   process.env.GIBBERISH_CHECK_ENABLED ??= 'false';
@@ -64,7 +67,9 @@ export async function createTestApp(): Promise<{
     .overrideProvider(SES_CLIENT)
     .useValue({ send: async () => ({}) })
     .overrideProvider(COGNITO_IDP)
-    .useValue({ send: async () => ({ Users: [] }) })
+    .useValue({
+      send: options?.cognitoSend ?? (async () => ({ Users: [] })),
+    })
     .compile();
   const app = moduleRef.createNestApplication();
   configureApp(app);

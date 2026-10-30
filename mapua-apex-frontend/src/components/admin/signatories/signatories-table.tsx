@@ -1,6 +1,14 @@
 import { PencilIcon, StampIcon } from "lucide-react"
 
 import { signatoryRoleLabel } from "@/components/admin-osa/signatory-roles"
+import {
+  EMPTY_ACCOUNTS,
+  useAssignmentSettling,
+} from "@/components/admin/accounts/account-assignment"
+import {
+  AccountAssignmentCombobox,
+  AccountAssignmentSkeleton,
+} from "@/components/admin/accounts/account-assignment-combobox"
 import { useSignatoriesPage } from "@/components/admin/signatories/signatories-context"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,6 +27,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
+import { toastManager } from "@/components/ui/toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -29,11 +38,25 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { layout } from "@/config"
+import {
+  mutationErrorMessage,
+  useAssignSignatoryAccountMutation,
+  useCognitoAccountsQuery,
+} from "@/hooks/use-admin"
 import { formatDocumentId } from "@/lib/dynamodb-adapters"
 import { cn } from "@/lib/utils"
 
 export function SignatoriesTableCard() {
   const { state, actions } = useSignatoriesPage()
+  const accountsQuery = useCognitoAccountsQuery()
+  const assignAccount = useAssignSignatoryAccountMutation()
+  const settling = useAssignmentSettling(
+    assignAccount.isPending,
+    accountsQuery.isFetching
+  )
+  const accountsBusy =
+    accountsQuery.isLoading || settling || assignAccount.isPending
+  const accounts = accountsQuery.data ?? EMPTY_ACCOUNTS
 
   return (
     <Card className={cn(layout.card, "min-w-0")}>
@@ -44,7 +67,7 @@ export function SignatoriesTableCard() {
             ? "Loading…"
             : `${state.signatories.length} signator${
                 state.signatories.length === 1 ? "y" : "ies"
-              } · sorted by role · use Edit to update a row`}
+              } · sorted by role · a new account applies the next time that person signs in`}
         </CardDescription>
       </CardHeader>
       <CardPanel className="p-0">
@@ -85,6 +108,7 @@ export function SignatoriesTableCard() {
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Department</TableHead>
+                  <TableHead>Account</TableHead>
                   <TableHead className="w-28 text-right">
                     <span className="sr-only">Actions</span>
                   </TableHead>
@@ -93,7 +117,7 @@ export function SignatoriesTableCard() {
               <TableBody>
                 {state.filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell className="text-muted-foreground" colSpan={5}>
+                    <TableCell className="text-muted-foreground" colSpan={6}>
                       No signatories match “{state.search}”.
                     </TableCell>
                   </TableRow>
@@ -128,6 +152,47 @@ export function SignatoriesTableCard() {
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell
+                        onContextMenu={(event) => event.stopPropagation()}
+                      >
+                        {accountsQuery.isLoading ||
+                        settling ||
+                        (assignAccount.isPending &&
+                          assignAccount.variables?.signatoryId ===
+                            person.signatory_id) ? (
+                          <AccountAssignmentSkeleton />
+                        ) : accountsQuery.isError ? (
+                          <span className="text-sm text-muted-foreground">
+                            Accounts unavailable
+                          </span>
+                        ) : (
+                          <AccountAssignmentCombobox
+                            accounts={accounts}
+                            busy={accountsBusy}
+                            onAssign={(username) =>
+                              assignAccount.mutate(
+                                {
+                                  signatoryId: person.signatory_id,
+                                  username,
+                                },
+                                {
+                                  onError: (error) =>
+                                    toastManager.add({
+                                      title: "Could not assign account",
+                                      description: mutationErrorMessage(
+                                        error,
+                                        "Request failed."
+                                      ),
+                                      type: "error",
+                                    }),
+                                }
+                              )
+                            }
+                            target="signatory"
+                            targetId={person.signatory_id}
+                          />
                         )}
                       </TableCell>
                       <TableCell className="text-right">

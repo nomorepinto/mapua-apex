@@ -1,8 +1,11 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { AccountsService } from '../accounts/accounts.service.js';
+import type { AccountView } from '../accounts/cognito-account.js';
 import { abort } from '../common/http.js';
 import { organizationKey, stripPrefix } from '../common/dynamo-keys.js';
 import { str, type Item } from '../common/records.js';
@@ -29,9 +32,12 @@ export interface OrganizationDirectoryEntry {
 
 @Injectable()
 export class OrganizationService {
+  private readonly logger = new Logger(OrganizationService.name);
+
   constructor(
     private readonly organizations: OrganizationRepository,
     private readonly signatories: SignatoryRepository,
+    private readonly accounts: AccountsService,
   ) {}
 
   async directory(): Promise<OrganizationDirectoryEntry[]> {
@@ -116,7 +122,36 @@ export class OrganizationService {
         'This organization still has member rosters in the attendance system.',
       );
     }
+    await this.bestEffort(`organization release ${bare}`, () =>
+      this.accounts.releaseOrganization(bare),
+    );
     await this.organizations.delete(bare);
+  }
+
+  async assignAccount(
+    id: string,
+    username: string | null,
+    callerSub: string,
+  ): Promise<AccountView | null> {
+    const existing = await this.organizations.get(id);
+    if (!existing) {
+      throw new NotFoundException('Not Found');
+    }
+    const bare = stripPrefix(id, 'ORGANIZATION#') ?? id;
+    return this.accounts.assignOrganization(bare, username, callerSub);
+  }
+
+  private async bestEffort(
+    label: string,
+    work: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await work();
+    } catch (error) {
+      this.logger.warn(
+        `${label} failed: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+    }
   }
 
   async require(id: string): Promise<Item> {

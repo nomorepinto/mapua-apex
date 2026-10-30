@@ -5,6 +5,14 @@ import {
   ORGANIZATION_ASSIGNABLE_DESK_ITEMS,
   deskAssignment,
 } from "@/components/admin-osa/signatory-roles"
+import {
+  EMPTY_ACCOUNTS,
+  useAssignmentSettling,
+} from "@/components/admin/accounts/account-assignment"
+import {
+  AccountAssignmentCombobox,
+  AccountAssignmentSkeleton,
+} from "@/components/admin/accounts/account-assignment-combobox"
 import { DeskName } from "@/components/admin/organizations/organization-fields"
 import { useOrganizationsPage } from "@/components/admin/organizations/organizations-context"
 import { Button } from "@/components/ui/button"
@@ -25,6 +33,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
+import { toastManager } from "@/components/ui/toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -35,10 +44,24 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { layout } from "@/config"
+import {
+  mutationErrorMessage,
+  useAssignOrganizationAccountMutation,
+  useCognitoAccountsQuery,
+} from "@/hooks/use-admin"
 import { cn } from "@/lib/utils"
 
 export function OrganizationsTableCard() {
   const { state, actions } = useOrganizationsPage()
+  const accountsQuery = useCognitoAccountsQuery()
+  const assignAccount = useAssignOrganizationAccountMutation()
+  const settling = useAssignmentSettling(
+    assignAccount.isPending,
+    accountsQuery.isFetching
+  )
+  const accountsBusy =
+    accountsQuery.isLoading || settling || assignAccount.isPending
+  const accounts = accountsQuery.data ?? EMPTY_ACCOUNTS
 
   return (
     <Card className={cn(layout.card, "min-w-0")}>
@@ -49,7 +72,7 @@ export function OrganizationsTableCard() {
             ? "Loading…"
             : `${state.organizations.length} organization${
                 state.organizations.length === 1 ? "" : "s"
-              } · use Edit to update a row`}
+              } · a new account applies the next time that person signs in`}
         </CardDescription>
         <CardAction>
           <Input
@@ -91,7 +114,7 @@ export function OrganizationsTableCard() {
           </Empty>
         ) : (
           <>
-            <div className="text-muted-foreground border-b px-6 py-3 text-sm">
+            <div className="border-b px-6 py-3 text-sm text-muted-foreground">
               Shared desk: CDM {state.sharedCdmName}
             </div>
             <div className="px-4 pb-4 sm:px-6 sm:pb-6 md:px-7 md:pb-7">
@@ -102,6 +125,7 @@ export function OrganizationsTableCard() {
                     <TableHead>Dean</TableHead>
                     <TableHead>Adviser</TableHead>
                     <TableHead>Higher council</TableHead>
+                    <TableHead>Account</TableHead>
                     <TableHead className="w-28 text-right">
                       <span className="sr-only">Actions</span>
                     </TableHead>
@@ -110,7 +134,7 @@ export function OrganizationsTableCard() {
                 <TableBody>
                   {state.filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell className="text-muted-foreground" colSpan={5}>
+                      <TableCell className="text-muted-foreground" colSpan={6}>
                         No organizations match “{state.search}”.
                       </TableCell>
                     </TableRow>
@@ -144,6 +168,47 @@ export function OrganizationsTableCard() {
                         })}
                         <TableCell>
                           {org.is_higher_council ? "Yes" : "—"}
+                        </TableCell>
+                        <TableCell
+                          onContextMenu={(event) => event.stopPropagation()}
+                        >
+                          {accountsQuery.isLoading ||
+                          settling ||
+                          (assignAccount.isPending &&
+                            assignAccount.variables?.organizationId ===
+                              org.organization_id) ? (
+                            <AccountAssignmentSkeleton />
+                          ) : accountsQuery.isError ? (
+                            <span className="text-sm text-muted-foreground">
+                              Accounts unavailable
+                            </span>
+                          ) : (
+                            <AccountAssignmentCombobox
+                              accounts={accounts}
+                              busy={accountsBusy}
+                              onAssign={(username) =>
+                                assignAccount.mutate(
+                                  {
+                                    organizationId: org.organization_id,
+                                    username,
+                                  },
+                                  {
+                                    onError: (error) =>
+                                      toastManager.add({
+                                        title: "Could not assign account",
+                                        description: mutationErrorMessage(
+                                          error,
+                                          "Request failed."
+                                        ),
+                                        type: "error",
+                                      }),
+                                  }
+                                )
+                              }
+                              target="organization"
+                              targetId={org.organization_id}
+                            />
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button

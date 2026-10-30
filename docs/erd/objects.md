@@ -171,7 +171,10 @@ replaces `notif_type` / `comment` in place and does **not** change the SK.
 ## SIGNATORY
 
 A person (the signatory identity). Has **no** `organization_id`; desk
-assignment lives on `ORGANIZATION.signatories`.
+assignment lives on `ORGANIZATION.signatories`. Which Cognito user acts as
+this person is `custom:signatory_id` on the user pool, not a field on this
+item. `PUT /admins/signatories/{id}/account` maintains it. An organization
+account uses `custom:organization_id` the same way.
 
 | Property | Type | Notes |
 |---|---|---|

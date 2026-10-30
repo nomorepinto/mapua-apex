@@ -1,5 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useMemo, useState, type FormEvent, type ReactNode } from "react"
+import {
+  createContext,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react"
 import { use } from "react"
 
 import {
@@ -18,12 +24,17 @@ import {
   withSharedDesks,
   type AssignableDesks,
 } from "@/components/admin/organizations/organization-desks"
+import {
+  accountSearchText,
+  EMPTY_ACCOUNTS,
+} from "@/components/admin/accounts/account-assignment"
 import { organizationNameError } from "@/components/admin/organizations/organization-name"
 import { toastManager } from "@/components/ui/toast"
 import {
   useBulkCreateOrganizationsMutation,
   useCreateOrganizationMutation,
   useDeleteOrganizationMutation,
+  useCognitoAccountsQuery,
   useOrganizationsQuery,
   useSignatoriesQuery,
   useUpdateOrganizationMutation,
@@ -34,10 +45,7 @@ import type {
   CreateOrganizationPayload,
   OrganizationAssignableDeskRole,
 } from "@/lib/dynamodb-adapters"
-import {
-  parseOrganizationCsv,
-  type OrganizationCsvRow,
-} from "@/lib/parse-csv"
+import { parseOrganizationCsv, type OrganizationCsvRow } from "@/lib/parse-csv"
 
 const EMPTY_ORGANIZATIONS: ApiOrganization[] = []
 const EMPTY_SIGNATORIES: ApiSignatory[] = []
@@ -63,7 +71,7 @@ interface OrganizationsState {
   deskOptions: Record<OrganizationAssignableDeskRole, SignatoryOption[]>
   missingShared: ReturnType<typeof missingSharedRoles>
   sharedAccountsReady: boolean
-  missingAssignable: typeof ORGANIZATION_ASSIGNABLE_DESK_ITEMS[number][]
+  missingAssignable: (typeof ORGANIZATION_ASSIGNABLE_DESK_ITEMS)[number][]
   canAddOrganization: boolean
   sharedCdmName: string
   peopleById: Map<string, ApiSignatory>
@@ -111,12 +119,16 @@ interface OrganizationsContextValue {
   actions: OrganizationsActions
 }
 
-const OrganizationsContext = createContext<OrganizationsContextValue | null>(null)
+const OrganizationsContext = createContext<OrganizationsContextValue | null>(
+  null
+)
 
 export function useOrganizationsPage() {
   const value = use(OrganizationsContext)
   if (!value) {
-    throw new Error("useOrganizationsPage must be used within OrganizationsProvider")
+    throw new Error(
+      "useOrganizationsPage must be used within OrganizationsProvider"
+    )
   }
   return value
 }
@@ -124,6 +136,7 @@ export function useOrganizationsPage() {
 export function OrganizationsProvider({ children }: { children: ReactNode }) {
   const orgsQuery = useOrganizationsQuery()
   const signatoriesQuery = useSignatoriesQuery()
+  const accountsQuery = useCognitoAccountsQuery()
   const createOrg = useCreateOrganizationMutation()
   const updateOrg = useUpdateOrganizationMutation()
   const deleteOrg = useDeleteOrganizationMutation()
@@ -148,6 +161,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
 
   const organizations = orgsQuery.data ?? EMPTY_ORGANIZATIONS
   const signatories = signatoriesQuery.data ?? EMPTY_SIGNATORIES
+  const accounts = accountsQuery.data ?? EMPTY_ACCOUNTS
   const peopleById = useMemo(
     () =>
       new Map(
@@ -261,12 +275,13 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
           const id = deskAssignment(org, item.value)
           return id ? (peopleById.get(id)?.name ?? id) : ""
         }),
+        accountSearchText(accounts, "organization", org.organization_id),
       ]
         .join(" ")
         .toLowerCase()
       return haystack.includes(query)
     })
-  }, [organizations, peopleById, search])
+  }, [accounts, organizations, peopleById, search])
 
   function openEdit(org: ApiOrganization) {
     setEditing(org)
@@ -450,7 +465,9 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setDeleteOpen(false)
       setDeleteError(
-        error instanceof Error ? error.message : "Could not delete this organization."
+        error instanceof Error
+          ? error.message
+          : "Could not delete this organization."
       )
     }
   }

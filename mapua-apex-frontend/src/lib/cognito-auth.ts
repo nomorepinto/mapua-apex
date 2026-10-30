@@ -30,7 +30,9 @@ export interface NewPasswordChallenge {
   requiredAttributes: string[]
 }
 
-export function isNewPasswordChallenge(err: unknown): err is NewPasswordChallenge {
+export function isNewPasswordChallenge(
+  err: unknown
+): err is NewPasswordChallenge {
   if (!err || typeof err !== "object") return false
   const candidate = err as Partial<NewPasswordChallenge>
   return (
@@ -109,11 +111,14 @@ export function storeCognitoSession(tokens: {
   }
 
   // Fallback storage item
-  sessionStorage.setItem("apex_current_user", JSON.stringify({
-    email: profile.email || profile["cognito:username"],
-    name: profile.name,
-    groups: profile["cognito:groups"] || [],
-  }))
+  sessionStorage.setItem(
+    "apex_current_user",
+    JSON.stringify({
+      email: profile.email || profile["cognito:username"],
+      name: profile.name,
+      groups: profile["cognito:groups"] || [],
+    })
+  )
 
   // Fresh sign-in: reset idle tracking timestamp to now and clear old session ID
   try {
@@ -129,7 +134,10 @@ export function storeCognitoSession(tokens: {
 /**
  * Maps raw AWS error types to friendly, actionable messages
  */
-export function mapCognitoError(errorType: string, rawMessage: string): CognitoAuthError {
+export function mapCognitoError(
+  errorType: string,
+  rawMessage: string
+): CognitoAuthError {
   const type = errorType.split("#").pop() || errorType
 
   switch (type) {
@@ -137,75 +145,91 @@ export function mapCognitoError(errorType: string, rawMessage: string): CognitoA
       if (rawMessage.toLowerCase().includes("signup is not permitted")) {
         return {
           code: type,
-          message: "Self-service sign-up is currently disabled in your AWS Cognito User Pool. Please enable 'Allow self-service sign-up' in the AWS Console.",
+          message:
+            "Self-service sign-up is currently disabled in your AWS Cognito User Pool. Please enable 'Allow self-service sign-up' in the AWS Console.",
         }
       }
       if (rawMessage.toLowerCase().includes("session")) {
         return {
           code: type,
-          message: "This sign-in step expired. Sign in again with your temporary password.",
+          message:
+            "This sign-in step expired. Sign in again with your temporary password.",
         }
       }
       return {
         code: type,
-        message: rawMessage || "Incorrect email or password. Please verify your credentials.",
+        message:
+          rawMessage ||
+          "Incorrect email or password. Please verify your credentials.",
       }
     case "UserNotFoundException":
       return {
         code: type,
-        message: "No account found with this email. Please check your spelling or create an account.",
+        message:
+          "No account found with this email. Please check your spelling or create an account.",
       }
     case "UserNotConfirmedException":
       return {
         code: type,
-        message: "Your email address is not yet verified. Please enter the verification code sent to your inbox.",
+        message:
+          "Your email address is not yet verified. Please enter the verification code sent to your inbox.",
       }
     case "UsernameExistsException":
       return {
         code: type,
-        message: "An account with this email address already exists. Please sign in instead.",
+        message:
+          "An account with this email address already exists. Please sign in instead.",
       }
     case "InvalidPasswordException":
       if (/previous|history/i.test(rawMessage)) {
         return {
           code: type,
-          message: "Choose a password that is different from your temporary password.",
+          message:
+            "Choose a password that is different from your temporary password.",
         }
       }
       return {
         code: type,
-        message: "Password does not meet requirements: must be at least 8 characters with numbers, lowercase, and uppercase letters.",
+        message:
+          "Password does not meet requirements: must be at least 8 characters with numbers, lowercase, and uppercase letters.",
       }
     case "PasswordHistoryPolicyViolationException":
       return {
         code: type,
-        message: "Choose a password that is different from your temporary password.",
+        message:
+          "Choose a password that is different from your temporary password.",
       }
     case "CodeMismatchException":
       return {
         code: type,
-        message: "Invalid verification code. Please check your email and try again.",
+        message:
+          "Invalid verification code. Please check your email and try again.",
       }
     case "ExpiredCodeException":
       return {
         code: type,
-        message: "This verification code has expired. Please request a new code.",
+        message:
+          "This verification code has expired. Please request a new code.",
       }
     case "LimitExceededException":
     case "TooManyRequestsException":
       return {
         code: type,
-        message: "Too many attempts. For your security, please wait a moment before trying again.",
+        message:
+          "Too many attempts. For your security, please wait a moment before trying again.",
       }
     case "InvalidParameterException":
       return {
         code: type,
-        message: rawMessage || "Invalid information provided. Please check all fields.",
+        message:
+          rawMessage ||
+          "Invalid information provided. Please check all fields.",
       }
     default:
       return {
         code: type,
-        message: rawMessage || "An authentication error occurred. Please try again.",
+        message:
+          rawMessage || "An authentication error occurred. Please try again.",
       }
   }
 }
@@ -225,7 +249,8 @@ async function callCognitoApi(target: string, body: Record<string, unknown>) {
   const data = await response.json()
 
   if (!response.ok) {
-    const errorType = data.__type || response.headers.get("x-amzn-errortype") || "Error"
+    const errorType =
+      data.__type || response.headers.get("x-amzn-errortype") || "Error"
     const error = mapCognitoError(errorType, data.message || "")
     throw error
   }
@@ -255,7 +280,10 @@ function parseRequiredAttributes(raw: unknown): string[] {
 function readNewPasswordChallenge(
   data: {
     Session?: string
-    ChallengeParameters?: { USER_ID_FOR_SRP?: string; requiredAttributes?: unknown }
+    ChallengeParameters?: {
+      USER_ID_FOR_SRP?: string
+      requiredAttributes?: unknown
+    }
   },
   fallbackUsername: string
 ): NewPasswordChallenge {
@@ -264,23 +292,30 @@ function readNewPasswordChallenge(
   if (!session || !username) {
     throw {
       code: "NEW_PASSWORD_REQUIRED",
-      message: "Password change is required, but Cognito did not return a session. Sign in again.",
+      message:
+        "Password change is required, but Cognito did not return a session. Sign in again.",
     }
   }
 
   return {
     code: "NEW_PASSWORD_REQUIRED",
-    message: "This account is using a temporary password. Set a new password to continue.",
+    message:
+      "This account is using a temporary password. Set a new password to continue.",
     session,
     username,
-    requiredAttributes: parseRequiredAttributes(data.ChallengeParameters?.requiredAttributes),
+    requiredAttributes: parseRequiredAttributes(
+      data.ChallengeParameters?.requiredAttributes
+    ),
   }
 }
 
 /**
  * 1. Sign In via USER_PASSWORD_AUTH
  */
-export async function cognitoSignIn(username: string, password: string): Promise<CognitoSessionData> {
+export async function cognitoSignIn(
+  username: string,
+  password: string
+): Promise<CognitoSessionData> {
   const { clientId } = getCognitoConfig()
   const cleanUsername = username.trim()
 
@@ -327,7 +362,9 @@ export async function cognitoCompleteNewPassword(
   for (const [key, value] of Object.entries(attributes)) {
     const trimmed = value.trim()
     if (!trimmed) continue
-    const name = key.startsWith("userAttributes.") ? key : `userAttributes.${key}`
+    const name = key.startsWith("userAttributes.")
+      ? key
+      : `userAttributes.${key}`
     challengeResponses[name] = trimmed
   }
 
@@ -360,12 +397,10 @@ export async function cognitoCompleteNewPassword(
 export async function cognitoSignUp(
   fullName: string,
   email: string,
-  password: string,
-  organizationId: string
+  password: string
 ) {
   const { clientId } = getCognitoConfig()
   const cleanEmail = email.trim()
-  const cleanOrganizationId = organizationId.trim()
 
   const data = await callCognitoApi("SignUp", {
     ClientId: clientId,
@@ -374,7 +409,6 @@ export async function cognitoSignUp(
     UserAttributes: [
       { Name: "email", Value: cleanEmail },
       { Name: "name", Value: fullName.trim() },
-      { Name: "custom:organization_id", Value: cleanOrganizationId },
     ],
   })
 
@@ -387,7 +421,10 @@ export async function cognitoSignUp(
 /**
  * 3. Confirm Sign Up with Email Verification Code
  */
-export async function cognitoConfirmSignUp(email: string, confirmationCode: string) {
+export async function cognitoConfirmSignUp(
+  email: string,
+  confirmationCode: string
+) {
   const { clientId } = getCognitoConfig()
   const cleanEmail = email.trim()
   const cleanCode = confirmationCode.trim()
@@ -434,7 +471,11 @@ export async function cognitoForgotPassword(email: string) {
 /**
  * 6. Confirm Forgot Password
  */
-export async function cognitoConfirmForgotPassword(email: string, code: string, newPassword: string) {
+export async function cognitoConfirmForgotPassword(
+  email: string,
+  code: string,
+  newPassword: string
+) {
   const { clientId } = getCognitoConfig()
   const cleanEmail = email.trim()
 

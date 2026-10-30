@@ -4,6 +4,7 @@ import {
   announcementPath,
   type ApiAnnouncement,
   type ApiNotification,
+  type ApiCognitoAccount,
   type ApiOrganization,
   type ApiSignatory,
   type ApiApprovalSettings,
@@ -29,6 +30,7 @@ export const ADMIN_KEYS = {
     ["admin-submission-detail", eventId, submissionId] as const,
   organizations: ["admin-organizations"] as const,
   signatories: ["admin-signatories"] as const,
+  accounts: ["admin-accounts"] as const,
   approvalSettings: ["admin-approval-settings"] as const,
   announcements: ["admin-announcements"] as const,
 }
@@ -44,9 +46,12 @@ export function useAdminSubmissionsQuery(params?: {
   return useQuery({
     queryKey: ADMIN_KEYS.submissions(params),
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiSubmission[] }>("/admins/submissions", {
-        params,
-      })
+      const res = await apiClient.get<{ data: ApiSubmission[] }>(
+        "/admins/submissions",
+        {
+          params,
+        }
+      )
       return res.data || []
     },
   })
@@ -55,11 +60,15 @@ export function useAdminSubmissionsQuery(params?: {
 /**
  * Fetch full submission document + notifications for admin
  */
-export function useAdminSubmissionDetailQuery(eventId?: string, submissionId?: string) {
+export function useAdminSubmissionDetailQuery(
+  eventId?: string,
+  submissionId?: string
+) {
   return useQuery({
     queryKey: ADMIN_KEYS.submissionDetail(eventId || "", submissionId || ""),
     queryFn: async () => {
-      if (!eventId || !submissionId) throw new Error("Event ID and Submission ID required")
+      if (!eventId || !submissionId)
+        throw new Error("Event ID and Submission ID required")
       const res = await apiClient.get<{
         data: ApiSubmission & {
           notifications: ApiNotification[]
@@ -75,7 +84,9 @@ export function useAdminAnnouncementsQuery() {
   return useQuery({
     queryKey: ADMIN_KEYS.announcements,
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiAnnouncement[] }>("/admins/announcements")
+      const res = await apiClient.get<{ data: ApiAnnouncement[] }>(
+        "/admins/announcements"
+      )
       return res.data || []
     },
   })
@@ -86,9 +97,12 @@ export function useCreateAnnouncementMutation() {
 
   return useMutation({
     mutationFn: async (content: string) => {
-      const res = await apiClient.post<{ data: ApiAnnouncement }>("/admins/announcements", {
-        content,
-      })
+      const res = await apiClient.post<{ data: ApiAnnouncement }>(
+        "/admins/announcements",
+        {
+          content,
+        }
+      )
       return res.data
     },
     onSuccess: () => {
@@ -101,7 +115,13 @@ export function useUpdateAnnouncementMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ sentAt, content }: { sentAt: string; content: string }) => {
+    mutationFn: async ({
+      sentAt,
+      content,
+    }: {
+      sentAt: string
+      content: string
+    }) => {
       const res = await apiClient.put<{ data: ApiAnnouncement }>(
         announcementPath(sentAt),
         { content }
@@ -134,7 +154,9 @@ export function useOrganizationsQuery() {
   return useQuery({
     queryKey: ADMIN_KEYS.organizations,
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiOrganization[] }>("/admins/organizations")
+      const res = await apiClient.get<{ data: ApiOrganization[] }>(
+        "/admins/organizations"
+      )
       return res.data || []
     },
   })
@@ -226,7 +248,10 @@ export function useBulkCreateOrganizationsMutation() {
         } catch (error) {
           failed.push({
             name: payload.name,
-            error: mutationErrorMessage(error, "Could not create organization."),
+            error: mutationErrorMessage(
+              error,
+              "Could not create organization."
+            ),
           })
         }
       }
@@ -275,7 +300,9 @@ export function useSignatoriesQuery() {
   return useQuery({
     queryKey: ADMIN_KEYS.signatories,
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiSignatory[] }>("/admins/signatories")
+      const res = await apiClient.get<{ data: ApiSignatory[] }>(
+        "/admins/signatories"
+      )
       return res.data || []
     },
   })
@@ -378,6 +405,64 @@ export function useBulkCreateSignatoriesMutation() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.signatories })
+    },
+  })
+}
+
+export function useCognitoAccountsQuery() {
+  return useQuery({
+    queryKey: ADMIN_KEYS.accounts,
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: ApiCognitoAccount[] }>(
+        "/admins/accounts"
+      )
+      return res.data || []
+    },
+  })
+}
+
+export function useAssignSignatoryAccountMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      signatoryId,
+      username,
+    }: {
+      signatoryId: string
+      username: string | null
+    }) => {
+      const res = await apiClient.put<{ data: ApiCognitoAccount | null }>(
+        `/admins/signatories/${signatoryId}/account`,
+        { username }
+      )
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.accounts })
+    },
+  })
+}
+
+export function useAssignOrganizationAccountMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      organizationId,
+      username,
+    }: {
+      organizationId: string
+      username: string | null
+    }) => {
+      const res = await apiClient.put<{ data: ApiCognitoAccount | null }>(
+        `/admins/organizations/${organizationId}/account`,
+        { username }
+      )
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.accounts })
     },
   })
 }

@@ -226,7 +226,8 @@ export interface ApiAnnouncement {
 
 export type ApiSignatoryRole = "adviser" | "admin" | "cdm" | "dean" | "osaar"
 
-export type OrganizationDeskRole = "adviser" | "admin" | "cdm" | "dean" | "osaar"
+export type OrganizationDeskRole =
+  "adviser" | "admin" | "cdm" | "dean" | "osaar"
 export type OrganizationAssignableDeskRole = "dean" | "adviser"
 export type SharedSignatoryRole = "cdm"
 
@@ -241,6 +242,16 @@ export interface ApiSignatory {
   role: ApiSignatoryRole
   department?: string
   organization_id?: string
+}
+
+export interface ApiCognitoAccount {
+  username: string
+  sub: string
+  email: string | null
+  name: string | null
+  signatory_id: string | null
+  organization_id: string | null
+  status: string | null
 }
 
 export interface ApiOrganization {

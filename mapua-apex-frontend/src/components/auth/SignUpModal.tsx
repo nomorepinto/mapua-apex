@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from "react"
-import { X, AlertCircle, AlertTriangle, Check, Circle, Eye, EyeOff, Info, Loader2 } from "lucide-react"
+import {
+  X,
+  AlertCircle,
+  AlertTriangle,
+  Check,
+  Circle,
+  Eye,
+  EyeOff,
+  Info,
+  Loader2,
+} from "lucide-react"
 import apexBrandLogo from "@/assets/apex-brand.svg"
-import { OrganizationSelect } from "@/components/auth/OrganizationSelect"
 import { cognitoSignUp } from "@/lib/cognito-auth"
 import { useEmailExistence } from "@/hooks/use-email-existence"
 import {
@@ -15,7 +24,8 @@ const configuredInactivitySeconds = Number(
   import.meta.env.VITE_SIGNUP_INACTIVITY_TIMEOUT_SECONDS
 )
 const SIGNUP_INACTIVITY_TIMEOUT_MS =
-  Number.isFinite(configuredInactivitySeconds) && configuredInactivitySeconds > 0
+  Number.isFinite(configuredInactivitySeconds) &&
+  configuredInactivitySeconds > 0
     ? configuredInactivitySeconds * 1000
     : 3000
 
@@ -39,7 +49,6 @@ export function SignUpModal({
 
   const [email, setEmail] = useState("")
   const [emailTouched, setEmailTouched] = useState(false)
-  const [organizationId, setOrganizationId] = useState("")
 
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -63,7 +72,6 @@ export function SignUpModal({
         setFullNameTouched(false)
         setEmail("")
         setEmailTouched(false)
-        setOrganizationId("")
         setPassword("")
         setShowPassword(false)
         setCapsLockActive(false)
@@ -74,7 +82,12 @@ export function SignUpModal({
         onInactivityTimeout?.()
       }, SIGNUP_INACTIVITY_TIMEOUT_MS)
     }
-    const activityEvents = ["pointerdown", "keydown", "input", "focusin"] as const
+    const activityEvents = [
+      "pointerdown",
+      "keydown",
+      "input",
+      "focusin",
+    ] as const
 
     activityEvents.forEach((eventName) =>
       window.addEventListener(eventName, resetTimer)
@@ -87,25 +100,22 @@ export function SignUpModal({
         window.removeEventListener(eventName, resetTimer)
       )
     }
-  }, [
-    isLoading,
-    isOpen,
-    onClose,
-    onInactivityTimeout,
-    resetEmailExistence,
-  ])
+  }, [isLoading, isOpen, onClose, onInactivityTimeout, resetEmailExistence])
 
   if (!isOpen) return null
 
   // Live validation calculations
-  const nameError = (fullNameTouched || fullName.length > 0) ? validateFullName(fullName) : null
-  const liveEmailError = (emailTouched || email.length > 0)
-    ? validateEmailLive(email) ?? validateEmailDomain(email)
-    : null
+  const nameError =
+    fullNameTouched || fullName.length > 0 ? validateFullName(fullName) : null
+  const liveEmailError =
+    emailTouched || email.length > 0
+      ? (validateEmailLive(email) ?? validateEmailDomain(email))
+      : null
   const pwdReqs = checkPasswordRequirements(password)
 
   const handlePasswordKeyEvent = (
-    e: React.KeyboardEvent<HTMLInputElement> | React.FocusEvent<HTMLInputElement>
+    e:
+      React.KeyboardEvent<HTMLInputElement> | React.FocusEvent<HTMLInputElement>
   ) => {
     const nativeEvent = e.nativeEvent as KeyboardEvent
     if (typeof nativeEvent.getModifierState === "function") {
@@ -131,11 +141,15 @@ export function SignUpModal({
       return
     }
     if (cleanName.length < 8) {
-      setErrorMessage(`Full name must be at least 8 characters long (currently ${cleanName.length}).`)
+      setErrorMessage(
+        `Full name must be at least 8 characters long (currently ${cleanName.length}).`
+      )
       return
     }
     if (cleanName.length > 35) {
-      setErrorMessage(`Full name cannot exceed 35 characters (currently ${cleanName.length}).`)
+      setErrorMessage(
+        `Full name cannot exceed 35 characters (currently ${cleanName.length}).`
+      )
       return
     }
 
@@ -155,23 +169,21 @@ export function SignUpModal({
       return
     }
 
-    // 3. Organization selection
-    if (!organizationId) {
-      setErrorMessage("Please select your organization.")
-      return
-    }
-
-    // 4. Password requirements check
+    // 3. Password requirements check
     if (!pwdReqs.allValid) {
-      setErrorMessage("Please ensure your password satisfies all security requirements.")
+      setErrorMessage(
+        "Please ensure your password satisfies all security requirements."
+      )
       return
     }
 
-    // 5. Mailbox-existence gate: block only on a conclusive "invalid" answer
+    // 4. Mailbox-existence gate: block only on a conclusive "invalid" answer
     // (checker outages resolve to "unavailable" and fail open).
     const existence = await emailExistence.check(cleanEmail)
     if (existence === "invalid") {
-      setErrorMessage("No mailbox exists for this address. Please double-check it.")
+      setErrorMessage(
+        "No mailbox exists for this address. Please double-check it."
+      )
       return
     }
 
@@ -179,13 +191,16 @@ export function SignUpModal({
 
     try {
       // Direct AWS Cognito Sign Up
-      await cognitoSignUp(cleanName, cleanEmail, password, organizationId)
+      await cognitoSignUp(cleanName, cleanEmail, password)
 
       // Move to email verification modal
       onRequireVerification(cleanEmail)
     } catch (err: unknown) {
       const authErr = err as { code?: string; message?: string }
-      setErrorMessage(authErr.message || "Failed to create account. Please check your details.")
+      setErrorMessage(
+        authErr.message ||
+          "Failed to create account. Please check your details."
+      )
     } finally {
       setIsLoading(false)
     }
@@ -196,25 +211,25 @@ export function SignUpModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="sign-up-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+      className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm duration-200"
     >
       {/* Click outside backdrop */}
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Modal Dialog Card */}
-      <div className="relative z-10 w-full max-w-[440px] max-h-[92vh] overflow-y-auto rounded-[24px] bg-white p-7 sm:p-9 shadow-2xl transition-all border border-neutral-100 flex flex-col items-center">
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-[440px] flex-col items-center overflow-y-auto rounded-[24px] border border-neutral-100 bg-white p-7 shadow-2xl transition-all sm:p-9">
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 rounded-full p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+          className="absolute top-5 right-5 rounded-full p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
           aria-label="Close dialog"
         >
           <X className="h-5 w-5" />
         </button>
 
         {/* Brand Illustration */}
-        <div className="flex justify-center mb-3">
+        <div className="mb-3 flex justify-center">
           <img
             src={apexBrandLogo}
             alt="Mapua APEX"
@@ -223,8 +238,11 @@ export function SignUpModal({
         </div>
 
         {/* Heading & Subtitle */}
-        <div className="w-full text-left mb-5">
-          <h2 id="sign-up-title" className="text-xl font-bold tracking-tight text-neutral-900">
+        <div className="mb-5 w-full text-left">
+          <h2
+            id="sign-up-title"
+            className="text-xl font-bold tracking-tight text-neutral-900"
+          >
             Create your account
           </h2>
           <p className="mt-1 text-sm text-neutral-500">
@@ -234,8 +252,8 @@ export function SignUpModal({
 
         {/* Error Banner */}
         {errorMessage && (
-          <div className="w-full mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-red-800 text-xs flex items-start gap-2 animate-in fade-in">
-            <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+          <div className="animate-in fade-in mb-4 flex w-full items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
             <span className="flex-1">{errorMessage}</span>
           </div>
         )}
@@ -248,7 +266,9 @@ export function SignUpModal({
               <label className="block text-xs font-semibold text-neutral-800">
                 Full name
               </label>
-              <span className={`text-[11px] ${fullName.length > 35 || (fullName.length > 0 && fullName.trim().length < 8) ? "text-amber-600 font-medium" : "text-neutral-400"}`}>
+              <span
+                className={`text-[11px] ${fullName.length > 35 || (fullName.length > 0 && fullName.trim().length < 8) ? "font-medium text-amber-600" : "text-neutral-400"}`}
+              >
                 {fullName.length}/35 characters (min 8)
               </span>
             </div>
@@ -265,15 +285,15 @@ export function SignUpModal({
               maxLength={35}
               required
               disabled={isLoading}
-              className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 transition-all ${
+              className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-neutral-900 transition-all placeholder:text-neutral-400 focus:ring-2 focus:outline-none ${
                 nameError && fullNameTouched
                   ? "border-red-400 focus:border-red-500 focus:ring-red-500/20"
                   : "border-neutral-200 focus:border-[#b91c1c] focus:ring-[#b91c1c]/15"
               }`}
             />
             {nameError && (fullNameTouched || fullName.length > 0) && (
-              <p className="flex items-start gap-1 text-[11px] text-red-600 mt-1 animate-in fade-in">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <p className="animate-in fade-in mt-1 flex items-start gap-1 text-[11px] text-red-600">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>{nameError}</span>
               </p>
             )}
@@ -299,43 +319,34 @@ export function SignUpModal({
               placeholder="you@example.com"
               required
               disabled={isLoading}
-              className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 transition-all ${
-                (liveEmailError || (emailTouched && emailExistence.state === "invalid"))
+              className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-neutral-900 transition-all placeholder:text-neutral-400 focus:ring-2 focus:outline-none ${
+                liveEmailError ||
+                (emailTouched && emailExistence.state === "invalid")
                   ? "border-red-400 focus:border-red-500 focus:ring-red-500/20"
                   : "border-neutral-200 focus:border-[#b91c1c] focus:ring-[#b91c1c]/15"
               }`}
             />
             {liveEmailError && (emailTouched || email.length > 0) && (
-              <p className="flex items-start gap-1 text-[11px] text-red-600 mt-1 animate-in fade-in">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <p className="animate-in fade-in mt-1 flex items-start gap-1 text-[11px] text-red-600">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>{liveEmailError}</span>
               </p>
             )}
             {!liveEmailError && emailExistence.state === "checking" && (
-              <p className="flex items-center gap-1 text-[11px] text-neutral-500 mt-1">
+              <p className="mt-1 flex items-center gap-1 text-[11px] text-neutral-500">
                 <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
                 <span>Verifying email...</span>
               </p>
             )}
             {!liveEmailError && emailExistence.state === "invalid" && (
-              <p className="flex items-start gap-1 text-[11px] text-red-600 mt-1 animate-in fade-in">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span>No mailbox exists for this address. Please double-check it.</span>
+              <p className="animate-in fade-in mt-1 flex items-start gap-1 text-[11px] text-red-600">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  No mailbox exists for this address. Please double-check it.
+                </span>
               </p>
             )}
           </div>
-
-          <OrganizationSelect
-            disabled={isLoading}
-            invalid={errorMessage === "Please select your organization."}
-            onValueChange={(nextOrganizationId) => {
-              setOrganizationId(nextOrganizationId)
-              if (errorMessage === "Please select your organization.") {
-                setErrorMessage(null)
-              }
-            }}
-            value={organizationId}
-          />
 
           {/* Password field */}
           <div className="space-y-1.5 text-left">
@@ -356,13 +367,13 @@ export function SignUpModal({
                 placeholder="Create a strong password"
                 required
                 disabled={isLoading}
-                className="w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 pr-14 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[#b91c1c] focus:outline-none focus:ring-2 focus:ring-[#b91c1c]/15 transition-all"
+                className="w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 pr-14 text-sm text-neutral-900 transition-all placeholder:text-neutral-400 focus:border-[#b91c1c] focus:ring-2 focus:ring-[#b91c1c]/15 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-medium text-neutral-500 hover:text-neutral-800 transition-colors flex items-center gap-1 select-none"
+                className="absolute top-1/2 right-3.5 flex -translate-y-1/2 items-center gap-1 text-xs font-medium text-neutral-500 transition-colors select-none hover:text-neutral-800"
               >
                 {showPassword ? (
                   <>
@@ -380,16 +391,16 @@ export function SignUpModal({
 
             {/* CapsLock & NumLock live warnings */}
             {(capsLockActive || numLockActive) && (
-              <div className="flex flex-wrap items-center gap-2 pt-1 animate-in fade-in">
+              <div className="animate-in fade-in flex flex-wrap items-center gap-2 pt-1">
                 {capsLockActive && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                    <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
+                  <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                    <AlertTriangle className="h-3 w-3 shrink-0 text-amber-600" />
                     Caps Lock is ON
                   </span>
                 )}
                 {numLockActive && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
-                    <Info className="h-3 w-3 text-blue-500 shrink-0" />
+                  <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-800">
+                    <Info className="h-3 w-3 shrink-0 text-blue-500" />
                     Num Lock is ON
                   </span>
                 )}
@@ -397,23 +408,25 @@ export function SignUpModal({
             )}
 
             {/* Dynamic Interactive Password Requirements Checklist */}
-            <div className="mt-2.5 rounded-xl border border-neutral-100 bg-neutral-50/80 p-3 space-y-1.5">
-              <p className="text-[11px] font-semibold text-neutral-700 mb-1">
+            <div className="mt-2.5 space-y-1.5 rounded-xl border border-neutral-100 bg-neutral-50/80 p-3">
+              <p className="mb-1 text-[11px] font-semibold text-neutral-700">
                 Password must include:
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+              <div className="grid grid-cols-1 gap-1.5 text-[11px] sm:grid-cols-2">
                 {/* Rule 1: Min 8 chars */}
                 <div
                   className={`flex items-center gap-1.5 transition-colors ${
-                    pwdReqs.minLength ? "text-emerald-700 font-medium" : "text-neutral-500"
+                    pwdReqs.minLength
+                      ? "font-medium text-emerald-700"
+                      : "text-neutral-500"
                   }`}
                 >
                   {pwdReqs.minLength ? (
-                    <span className="h-4 w-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                       <Check className="h-2.5 w-2.5 stroke-[3]" />
                     </span>
                   ) : (
-                    <Circle className="h-3.5 w-3.5 text-neutral-300 shrink-0" />
+                    <Circle className="h-3.5 w-3.5 shrink-0 text-neutral-300" />
                   )}
                   <span>At least 8 characters</span>
                 </div>
@@ -421,15 +434,17 @@ export function SignUpModal({
                 {/* Rule 2: 1 Uppercase */}
                 <div
                   className={`flex items-center gap-1.5 transition-colors ${
-                    pwdReqs.hasUppercase ? "text-emerald-700 font-medium" : "text-neutral-500"
+                    pwdReqs.hasUppercase
+                      ? "font-medium text-emerald-700"
+                      : "text-neutral-500"
                   }`}
                 >
                   {pwdReqs.hasUppercase ? (
-                    <span className="h-4 w-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                       <Check className="h-2.5 w-2.5 stroke-[3]" />
                     </span>
                   ) : (
-                    <Circle className="h-3.5 w-3.5 text-neutral-300 shrink-0" />
+                    <Circle className="h-3.5 w-3.5 shrink-0 text-neutral-300" />
                   )}
                   <span>1 uppercase letter (A-Z)</span>
                 </div>
@@ -437,15 +452,17 @@ export function SignUpModal({
                 {/* Rule 3: 1 Number */}
                 <div
                   className={`flex items-center gap-1.5 transition-colors ${
-                    pwdReqs.hasNumber ? "text-emerald-700 font-medium" : "text-neutral-500"
+                    pwdReqs.hasNumber
+                      ? "font-medium text-emerald-700"
+                      : "text-neutral-500"
                   }`}
                 >
                   {pwdReqs.hasNumber ? (
-                    <span className="h-4 w-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                       <Check className="h-2.5 w-2.5 stroke-[3]" />
                     </span>
                   ) : (
-                    <Circle className="h-3.5 w-3.5 text-neutral-300 shrink-0" />
+                    <Circle className="h-3.5 w-3.5 shrink-0 text-neutral-300" />
                   )}
                   <span>1 number (0-9)</span>
                 </div>
@@ -453,15 +470,17 @@ export function SignUpModal({
                 {/* Rule 4: 1 Special Character */}
                 <div
                   className={`flex items-center gap-1.5 transition-colors ${
-                    pwdReqs.hasSpecialChar ? "text-emerald-700 font-medium" : "text-neutral-500"
+                    pwdReqs.hasSpecialChar
+                      ? "font-medium text-emerald-700"
+                      : "text-neutral-500"
                   }`}
                 >
                   {pwdReqs.hasSpecialChar ? (
-                    <span className="h-4 w-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                       <Check className="h-2.5 w-2.5 stroke-[3]" />
                     </span>
                   ) : (
-                    <Circle className="h-3.5 w-3.5 text-neutral-300 shrink-0" />
+                    <Circle className="h-3.5 w-3.5 shrink-0 text-neutral-300" />
                   )}
                   <span>1 special character (!@#$...)</span>
                 </div>
@@ -473,7 +492,7 @@ export function SignUpModal({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full rounded-xl bg-[#c01525] hover:bg-[#a8101f] active:bg-[#8B0000] text-white font-medium py-2.5 text-sm transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 mt-2"
+            className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#c01525] py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-[#a8101f] hover:shadow-md active:bg-[#8B0000] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? (
               <>
@@ -486,22 +505,27 @@ export function SignUpModal({
           </button>
 
           {/* Terms & Privacy */}
-          <p className="text-[11px] text-neutral-500 text-center leading-relaxed pt-1">
+          <p className="pt-1 text-center text-[11px] leading-relaxed text-neutral-500">
             By creating an account, you agree to our{" "}
-            <span className="text-[#b91c1c] cursor-pointer hover:underline font-medium">Terms of Service</span>
-            {" "}and{" "}
-            <span className="text-[#b91c1c] cursor-pointer hover:underline font-medium">Privacy Policy</span>.
+            <span className="cursor-pointer font-medium text-[#b91c1c] hover:underline">
+              Terms of Service
+            </span>{" "}
+            and{" "}
+            <span className="cursor-pointer font-medium text-[#b91c1c] hover:underline">
+              Privacy Policy
+            </span>
+            .
           </p>
         </form>
 
         {/* Footer switch */}
-        <div className="w-full border-t border-neutral-100 mt-5 pt-4 text-center">
+        <div className="mt-5 w-full border-t border-neutral-100 pt-4 text-center">
           <p className="text-xs text-neutral-600">
             Already have an account?{" "}
             <button
               type="button"
               onClick={onSwitchToSignIn}
-              className="font-semibold text-[#b91c1c] hover:text-[#991b1b] hover:underline transition-colors ml-1"
+              className="ml-1 font-semibold text-[#b91c1c] transition-colors hover:text-[#991b1b] hover:underline"
             >
               Sign in
             </button>
