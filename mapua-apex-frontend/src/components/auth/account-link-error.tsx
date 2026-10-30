@@ -1,11 +1,10 @@
-import { useAuth } from "react-oidc-context"
-
 import { Button } from "@/components/ui/button"
 import { layout } from "@/config"
+import { useSignOut } from "@/hooks/use-sign-out"
 import { cn } from "@/lib/utils"
 
 export function AccountLinkError() {
-  const auth = useAuth()
+  const signOut = useSignOut()
 
   return (
     <div className={cn(layout.center, "flex-col p-4 text-center")}>
@@ -18,7 +17,7 @@ export function AccountLinkError() {
         type="button"
         className="mt-6"
         onClick={() => {
-          void auth.signoutRedirect()
+          void signOut({ localOnly: true })
         }}
       >
         Sign out

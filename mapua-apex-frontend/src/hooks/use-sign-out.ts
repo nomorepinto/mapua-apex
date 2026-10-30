@@ -3,7 +3,11 @@ import { apiClient } from "@/lib/api-client";
 import { clearStoredLastActive } from "@/hooks/use-session-logger";
 
 export function useSignOut() {
-  return useCallback(async (options?: { skipSessionEnd?: boolean }) => {
+  return useCallback(async (options?: {
+    skipSessionEnd?: boolean
+    /** Stay in the app. Used when Cognito hosted logout is not a session this user has. */
+    localOnly?: boolean
+  }) => {
     // End session in backend logger before Cognito redirect
     const sessionId = localStorage.getItem("apex_session_id");
     if (sessionId && !options?.skipSessionEnd) {
@@ -28,13 +32,21 @@ export function useSignOut() {
       const storageKey = `oidc.user:${authority}:${clientId}`;
       sessionStorage.removeItem(storageKey);
     }
+    sessionStorage.removeItem("apex_current_user");
+
+    // Unassigned accounts sign in through the in-app form, so Cognito's hosted
+    // logout page has nothing to end and shows an error. Return to the landing page.
+    if (options?.localOnly || !domain || !clientId || !logoutUri) {
+      if (window.location.pathname === "/") {
+        window.location.reload();
+      } else {
+        window.location.replace("/");
+      }
+      return;
+    }
 
     // Redirect to Cognito's logout endpoint with correct params
-    if (domain && clientId && logoutUri) {
-      window.location.href = `${domain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
-    } else {
-      window.location.href = "/";
-    }
+    window.location.href = `${domain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
   }, []);
 }
 
