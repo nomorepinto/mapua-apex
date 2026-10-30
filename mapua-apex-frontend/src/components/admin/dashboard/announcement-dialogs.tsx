@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Check, CheckCircle2, CircleAlertIcon, DownloadIcon, FileText, Loader2 } from "lucide-react"
+import { Check, CheckCircle2, CircleAlertIcon, DownloadIcon, FileText, Loader2, Pencil } from "lucide-react"
 
 import {
   ANNOUNCEMENT_MAX,
@@ -440,6 +440,17 @@ export function SubmissionDetailDialog() {
         </DialogPanel>
 
         <div className="flex shrink-0 justify-end gap-3 rounded-b-2xl border-t border-neutral-200 bg-white px-4 py-4 sm:px-8">
+          {(state.selectedSubmission?.status === "pending" ||
+            state.selectedSubmission?.status === "returned") ? (
+            <Button
+              type="button"
+              onClick={actions.openSubmissionEdit}
+              className="mr-auto gap-2"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit submission
+            </Button>
+          ) : null}
           <Button
             type="button"
             disabled={isSavingPdf || !selectedActivity}

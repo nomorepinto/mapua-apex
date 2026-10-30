@@ -97,10 +97,14 @@ not only position.
 
 ## 8. OSAAR edit button
 
-**Status:** Not started.
+**Status:** Done.
 
 **Goal:** Let OSAAR edit submission details themselves, from an edit button on
 their review screen.
+
+**Done:** The OSAAR dashboard submission record has an Edit button for pending
+and returned papers. Saving updates the SAAF in place and leaves the approval
+desk, status, and room reservation as they are.
 
 ## 9. Three OSAAR review stages
 

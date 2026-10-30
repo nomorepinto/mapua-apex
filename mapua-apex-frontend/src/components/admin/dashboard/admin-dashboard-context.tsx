@@ -26,6 +26,7 @@ import {
   apiSubmissionToDashboardRow,
   formatDisplayDateTime,
   type ApiAnnouncement,
+  type ApiSubmission,
   type DashboardSubmissionRow,
 } from "@/lib/dynamodb-adapters"
 
@@ -87,6 +88,7 @@ interface AdminDashboardState {
   announcementsLoading: boolean
   announcementsError: boolean
   selectedKeys: { eventId: string; submissionId: string } | null
+  selectedSubmission: ApiSubmission | null
   selectedRow: DashboardSubmissionRow | null
   selectedActivity: Activity | null
   stepper: ReturnType<typeof apiNotificationsToStepper>
@@ -103,6 +105,7 @@ interface AdminDashboardState {
   deleteOpen: boolean
   deleteError: string
   deletePending: boolean
+  submissionEdit: ApiSubmission | null
 }
 
 interface AdminDashboardActions {
@@ -112,6 +115,8 @@ interface AdminDashboardActions {
   toggleDateSort: () => void
   selectSubmission: (eventId: string, submissionId: string) => void
   closeSubmission: () => void
+  openSubmissionEdit: () => void
+  closeSubmissionEdit: () => void
   openCreate: () => void
   setCreateOpen: (open: boolean) => void
   setCreateContent: (value: string) => void
@@ -164,6 +169,9 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
   const [editError, setEditError] = useState("")
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState("")
+  const [submissionEdit, setSubmissionEdit] = useState<ApiSubmission | null>(
+    null
+  )
 
   const signatoriesQuery = useSignatoriesQuery()
   const organizationsQuery = useOrganizationsQuery()
@@ -264,6 +272,25 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       signatoryChain: detailQuery.data?.signatory_chain,
     }
   )
+
+  function openSubmissionEdit() {
+    const submission = detailQuery.data
+    if (!submission) return
+    if (submission.status !== "pending" && submission.status !== "returned") {
+      return
+    }
+    const named = selectedRow?.organization_name
+    setSubmissionEdit({
+      ...submission,
+      organization_name:
+        submission.organization_name ||
+        (named && named !== "—" ? named : null),
+    })
+  }
+
+  function closeSubmissionEdit() {
+    setSubmissionEdit(null)
+  }
 
   function openCreate() {
     setCreateContent("")
@@ -368,6 +395,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       announcementsLoading: announcementsQuery.isLoading,
       announcementsError: announcementsQuery.isError,
       selectedKeys,
+      selectedSubmission: detailQuery.data ?? null,
       selectedRow,
       selectedActivity,
       stepper,
@@ -384,6 +412,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       deleteOpen,
       deleteError,
       deletePending: deleteAnnouncement.isPending,
+      submissionEdit,
     },
     actions: {
       setSearch,
@@ -404,6 +433,8 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       selectSubmission: (eventId, submissionId) =>
         setSelectedKeys({ eventId, submissionId }),
       closeSubmission: () => setSelectedKeys(null),
+      openSubmissionEdit,
+      closeSubmissionEdit,
       openCreate,
       setCreateOpen: (open) => {
         setCreateOpen(open)

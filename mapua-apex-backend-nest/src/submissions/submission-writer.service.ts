@@ -17,7 +17,7 @@ import {
   eventDateFloorKey,
 } from '../common/event-date.js';
 import { abort } from '../common/http.js';
-import { str, type Item } from '../common/records.js';
+import { record, str, type Item } from '../common/records.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import type { CreateSaafDto, SaafDto } from './dto/saaf.dto.js';
 import {
@@ -188,6 +188,119 @@ export class SubmissionWriterService {
     return { before: existing, after: item };
   }
 
+  /**
+   * OSAAR correction. Pending and returned papers can be rewritten in place.
+   * Status, the current desk, the stored signatory sequence, and room holds
+   * stay as filed. A paper that already reserves a room keeps its event date,
+   * time, and venue.
+   */
+  async adminUpdate(
+    eventId: string,
+    submissionId: string,
+    body: SaafDto,
+  ): Promise<Item> {
+    const existing = await this.submissions.getSubmission(
+      eventId,
+      submissionId,
+    );
+    if (!existing) {
+      throw new NotFoundException('Not Found');
+    }
+    const organizationId = stripPrefix(existing.GSI1PK, 'ORGANIZATION#');
+    if (!organizationId) {
+      throw new NotFoundException('Not Found');
+    }
+    const status = str(existing, 'status');
+    if (status !== 'pending' && status !== 'returned') {
+      abort(422, 'Only pending or returned submissions can be edited.');
+    }
+    const details = this.editedDetails(existing, body);
+    const reserved = hasVenueReservation(existing);
+    if (!reserved) {
+      this.assertDates({
+        ...body,
+        activity_details: details,
+        venue_reservation: { has_reservation: false },
+      });
+    }
+    const dependents = await this.resolveDependents(
+      organizationId,
+      body.collaboration?.dependent_organization_ids ?? [],
+    );
+    const sentAt = str(existing, 'sent_at') ?? nowIso();
+    const updated = await this.submissions.updateSubmission(
+      eventId,
+      submissionId,
+      {
+        collaboration: {
+          dependent_organization_ids: dependents.map((id) =>
+            organizationKey(id),
+          ),
+        },
+        activity_classification: this.editedClassification(existing, body),
+        proponents: body.proponents,
+        activity_details: details,
+        institutional_alignment: body.institutional_alignment,
+        detailed_budget_proposal: body.detailed_budget_proposal,
+      },
+    );
+    const previousDependents = dependentIds(existing);
+    for (const added of dependents.filter(
+      (id) => !previousDependents.includes(id),
+    )) {
+      await this.submissions.putCollaboration(
+        added,
+        eventId,
+        submissionId,
+        sentAt,
+      );
+    }
+    for (const removed of previousDependents.filter(
+      (id) => !dependents.includes(id),
+    )) {
+      await this.submissions.deleteCollaboration(
+        removed,
+        eventId,
+        submissionId,
+      );
+    }
+    return updated;
+  }
+
+  private editedClassification(existing: Item, body: SaafDto) {
+    const previous = record(existing.activity_classification);
+    const nature = previous ? str(previous, 'nature') : null;
+    return {
+      ...body.activity_classification,
+      ...(nature ? { nature } : {}),
+    };
+  }
+
+  /** Keep the filed schedule when the paper already holds a room. */
+  private editedDetails(existing: Item, body: SaafDto) {
+    const details = { ...body.activity_details };
+    if (!hasVenueReservation(existing)) {
+      return details;
+    }
+    const previous = record(existing.activity_details);
+    if (!previous) {
+      return details;
+    }
+    const venue = str(previous, 'venue');
+    const start = str(previous, 'date_of_event');
+    const end = str(previous, 'end_date_of_event');
+    const day = str(previous, 'day_of_event');
+    const time = str(previous, 'time_of_event');
+    return {
+      ...details,
+      ...(venue ? { venue } : {}),
+      ...(start ? { date_of_event: start } : {}),
+      ...(end ? { end_date_of_event: end } : {}),
+      ...(day ? { day_of_event: day } : {}),
+      ...(time ? { time_of_event: time } : {}),
+    };
+  }
+
   private async resolveDependents(
     organizationId: string,
     raw: string[],
@@ -287,6 +400,11 @@ export class SubmissionWriterService {
       ...(refs.length > 0 ? { booking_refs: refs } : {}),
     };
   }
+}
+
+function hasVenueReservation(item: Item): boolean {
+  const venue = record(item.venue_reservation);
+  return venue?.has_reservation === true;
 }
 
 export function refsOf(item: Item): { pk: string; sk: string }[] {

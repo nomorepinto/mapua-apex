@@ -11,6 +11,7 @@ import {
   EditAnnouncementDialog,
   SubmissionDetailDialog,
 } from "@/components/admin/dashboard/announcement-dialogs"
+import { EditSubmissionDialog } from "@/components/admin/dashboard/edit-submission-dialog"
 import { AdminSubmissionsSection } from "@/components/admin/dashboard/submissions-section"
 import { Button } from "@/components/ui/button"
 import { layout } from "@/config"
@@ -57,6 +58,7 @@ export function AdminOsaPanel() {
           </div>
         </div>
         <SubmissionDetailDialog />
+        <EditSubmissionDialog />
         <CreateAnnouncementDialog />
         <EditAnnouncementDialog />
         <DeleteAnnouncementDialog />

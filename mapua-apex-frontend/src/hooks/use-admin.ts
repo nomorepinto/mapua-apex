@@ -80,6 +80,39 @@ export function useAdminSubmissionDetailQuery(
   })
 }
 
+/**
+ * OSAAR correction of a pending or returned SAAF. Keeps the desk and the
+ * room reservation; see PUT /admins/events/:event/submissions/:submission.
+ */
+export function useUpdateAdminSubmissionMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      eventId,
+      submissionId,
+      payload,
+    }: {
+      eventId: string
+      submissionId: string
+      payload: unknown
+    }) => {
+      const res = await apiClient.put<{ data: ApiSubmission }>(
+        `/admins/events/${eventId}/submissions/${submissionId}`,
+        payload
+      )
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-submissions"] })
+      queryClient.invalidateQueries({ queryKey: ["admin-submission-detail"] })
+      queryClient.invalidateQueries({ queryKey: ["signatory-queue"] })
+      queryClient.invalidateQueries({ queryKey: ["signatory-history"] })
+      queryClient.invalidateQueries({ queryKey: ["signatory-submission-detail"] })
+    },
+  })
+}
+
 export function useAdminAnnouncementsQuery() {
   return useQuery({
     queryKey: ADMIN_KEYS.announcements,

@@ -66,10 +66,18 @@ export function ActivityDetailsSection({
   values,
   onChange,
   includeReservation = false,
+  lockSchedule = false,
+  titleEditable = false,
+  venueNames,
 }: {
   values: DetailsFields
   onChange: (key: any, value: any) => void
   includeReservation?: boolean
+  /** Date, time, and venue stay read-only. Participants stay editable. */
+  lockSchedule?: boolean
+  titleEditable?: boolean
+  /** Campus names for the venue list. Skips the student campus query. */
+  venueNames?: string[]
 }) {
   const storedEventName = useOrgStore((state) => state.eventName)
   const displayTitle = values.activityTitle || storedEventName || ""
@@ -142,8 +150,12 @@ export function ActivityDetailsSection({
   // in that flow: the venue is locked to the campus picked in the reservation
   // step and rendered read-only below. Without a reservation, "Online" stays an
   // option. See the matching guard in `useSaafForm` that clears a stale value.
-  const campusesQuery = useStudentCampusesQuery()
-  const campusNames = (campusesQuery.data ?? []).map((campus) => campus.name)
+  const scheduleLocked = includeReservation || lockSchedule
+  const campusesQuery = useStudentCampusesQuery({
+    enabled: venueNames === undefined,
+  })
+  const campusNames =
+    venueNames ?? (campusesQuery.data ?? []).map((campus) => campus.name)
   const venueOptions = includeReservation
     ? campusNames
     : [...campusNames, ONLINE_VENUE]
@@ -162,22 +174,38 @@ export function ActivityDetailsSection({
             Title of Activity applied for{" "}
             <span className="text-red-500">*</span>
           </label>
-          <Input
-            name="activityTitle"
-            value={displayTitle}
-            disabled
-            readOnly
-            tabIndex={-1}
-            placeholder="Initial name of activity"
-            style={{ color: "#171717" }}
-            className="h-10 cursor-not-allowed rounded-lg border-neutral-300 bg-neutral-100/70 text-sm !text-neutral-900 select-none placeholder:text-neutral-400"
-          />
-          <input
-            type="hidden"
-            name="activityTitle"
-            value={displayTitle}
-            required
-          />
+          {titleEditable ? (
+            <Input
+              name="activityTitle"
+              value={values.activityTitle}
+              onChange={(event) =>
+                onChange("activityTitle", event.target.value)
+              }
+              placeholder="Title of the activity"
+              required
+              style={{ color: "#171717" }}
+              className="h-10 rounded-lg border-neutral-300 bg-white text-sm !text-neutral-900 placeholder:text-neutral-400"
+            />
+          ) : (
+            <>
+              <Input
+                name="activityTitle"
+                value={displayTitle}
+                disabled
+                readOnly
+                tabIndex={-1}
+                placeholder="Initial name of activity"
+                style={{ color: "#171717" }}
+                className="h-10 cursor-not-allowed rounded-lg border-neutral-300 bg-neutral-100/70 text-sm !text-neutral-900 select-none placeholder:text-neutral-400"
+              />
+              <input
+                type="hidden"
+                name="activityTitle"
+                value={displayTitle}
+                required
+              />
+            </>
+          )}
           <FieldWarning name="activityTitle" />
         </div>
 
@@ -241,7 +269,7 @@ export function ActivityDetailsSection({
           <label className="block text-xs font-semibold text-neutral-800">
             Venue Campus <span className="text-red-500">*</span>
           </label>
-          {includeReservation ? (
+          {scheduleLocked ? (
             <Input
               name="activityVenue"
               value={values.activityVenue}
@@ -291,7 +319,7 @@ export function ActivityDetailsSection({
             <label className="block text-xs font-semibold text-neutral-800">
               Start Date of Event <span className="text-red-500">*</span>
             </label>
-            {includeReservation ? (
+            {scheduleLocked ? (
               <Input
                 name="dateOfEvent"
                 value={values.dateOfEvent}
@@ -313,7 +341,7 @@ export function ActivityDetailsSection({
                 required
               />
             )}
-            {!includeReservation && !ALLOW_ANY_EVENT_DATE && (
+            {!scheduleLocked && !ALLOW_ANY_EVENT_DATE && (
               <span className="block text-[10px] text-neutral-500">
                 At least 10 days from today
               </span>
@@ -331,7 +359,7 @@ export function ActivityDetailsSection({
             <label className="block text-xs font-semibold text-neutral-800">
               End Date of Event <span className="text-red-500">*</span>
             </label>
-            {includeReservation ? (
+            {scheduleLocked ? (
               <Input
                 name="endDateOfEvent"
                 value={values.endDateOfEvent || values.dateOfEvent || ""}
@@ -364,7 +392,7 @@ export function ActivityDetailsSection({
         </div>
 
         <div className="space-y-1.5">
-          {includeReservation ? (
+          {scheduleLocked ? (
             <>
               <label className="block text-xs font-semibold text-neutral-800">
                 Time of Event (Start to End) <span className="text-red-500">*</span>

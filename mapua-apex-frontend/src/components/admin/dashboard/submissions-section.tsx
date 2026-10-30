@@ -30,7 +30,8 @@ export function AdminSubmissionsSection() {
           <h2 className="text-lg font-extrabold text-neutral-900">Submissions</h2>
           <p className="text-xs text-neutral-500">
             Search every column or filter by a column header, then open a row
-            for the full SAAF record.
+            for the full SAAF record. Pending and returned papers can be
+            edited from there.
           </p>
         </div>
         <div className="w-full sm:max-w-xs sm:w-auto">

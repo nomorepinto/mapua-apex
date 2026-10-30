@@ -21,13 +21,14 @@ export function useAdminCampusesQuery() {
 /**
  * Fetch all campuses for the SAAF reservation step (read-only venue list).
  */
-export function useStudentCampusesQuery() {
+export function useStudentCampusesQuery(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: RESERVATION_KEYS.studentCampuses,
     queryFn: async () => {
       const res = await apiClient.get<{ data: ApiCampus[] }>("/students/campuses")
       return res.data || []
     },
+    enabled: options?.enabled ?? true,
   })
 }
 
