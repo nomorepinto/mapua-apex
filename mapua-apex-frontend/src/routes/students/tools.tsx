@@ -3,6 +3,7 @@ import { ClipboardListIcon, ExternalLinkIcon, QrCodeIcon } from "lucide-react"
 import { FormPageHeader } from "@/components/forms/form-page-header"
 import { Button } from "@/components/ui/button"
 import { layout } from "@/config"
+import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import { arcusAttendanceUrl, arcusEvaluationUrl } from "@/lib/arcus-links"
 import { cn } from "@/lib/utils"
 
@@ -19,6 +20,8 @@ type ToolCard = {
  * entry instead of linking nowhere.
  */
 export function Tools() {
+  const organizationQuery = useCurrentOrganizationQuery()
+  const filesPostEval = organizationQuery.data?.is_higher_council !== true
   const attendanceUrl = arcusAttendanceUrl()
   const evaluationUrl = arcusEvaluationUrl()
 
@@ -37,8 +40,9 @@ export function Tools() {
       href: evaluationUrl,
       icon: ClipboardListIcon,
       title: "Evaluation System",
-      description:
-        "Capture participant evaluations for events happening today. Responses feed your post-evaluation report.",
+      description: filesPostEval
+        ? "Capture participant evaluations for events happening today. Responses feed your post-evaluation report."
+        : "Capture participant evaluations for events happening today.",
     })
   }
 

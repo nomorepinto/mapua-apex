@@ -1,6 +1,7 @@
 import { useLocation } from "react-router"
 import { AlertTriangleIcon } from "lucide-react"
 
+import { MissingAccountLinkBadge } from "@/components/auth/missing-account-link-badge"
 import { layout } from "@/config"
 import { useReviewDashboardContext } from "@/components/signatories/dashboard/review-dashboard-context"
 
@@ -28,6 +29,7 @@ export function ReviewDashboardHeader() {
     <div className="space-y-1">
       <h1 className={layout.pageTitle}>
         {state.roleLabel} Dashboard
+        <MissingAccountLinkBadge />
         {roleMismatch && pageGroup && (
           <span
             className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 align-middle text-xs font-semibold text-amber-700"

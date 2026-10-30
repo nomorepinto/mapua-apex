@@ -99,22 +99,30 @@ export function EditOrganizationDialog() {
                 <p className="text-xs font-medium text-red-600">{nameError}</p>
               ) : null}
             </Field>
-            {ORGANIZATION_ASSIGNABLE_DESK_ITEMS.map((item) => (
-              <SignatoryDeskCombobox
-                emptyLabel={`No ${item.label} registered`}
-                items={state.deskOptions[item.value]}
-                key={item.value}
-                label={item.label}
-                onValueChange={(value) => actions.changeEditDesk(item.value, value)}
-                optionalLabel={
-                  item.value === "dean" && state.editIsHigherCouncil
-                    ? "Not required — higher councils skip the dean desk."
-                    : undefined
-                }
-                placeholder={`Search ${item.label.toLowerCase()}`}
-                value={state.editDesks[item.value]}
-              />
-            ))}
+            {ORGANIZATION_ASSIGNABLE_DESK_ITEMS.map((item) => {
+              const deanSkipped = item.value === "dean" && state.editIsHigherCouncil
+              return (
+                <SignatoryDeskCombobox
+                  disabled={deanSkipped}
+                  emptyLabel={`No ${item.label} registered`}
+                  items={state.deskOptions[item.value]}
+                  key={item.value}
+                  label={item.label}
+                  onValueChange={(value) =>
+                    actions.changeEditDesk(item.value, value)
+                  }
+                  optionalLabel={
+                    deanSkipped ? "Skipped for higher councils." : undefined
+                  }
+                  placeholder={
+                    deanSkipped
+                      ? "Skipped"
+                      : `Search ${item.label.toLowerCase()}`
+                  }
+                  value={deanSkipped ? null : state.editDesks[item.value]}
+                />
+              )
+            })}
             <HigherCouncilField
               checked={state.editIsHigherCouncil}
               id="edit-organization-higher-council"

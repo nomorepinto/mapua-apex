@@ -1,13 +1,17 @@
 import { Plus } from "lucide-react"
 import { Link } from "react-router"
 
+import { MissingAccountLinkBadge } from "@/components/auth/missing-account-link-badge"
 import { layout } from "@/config"
 
 export function StudentDashboardHeader() {
   return (
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
       <div>
-        <h1 className={layout.pageTitle}>Student Proposal Dashboard</h1>
+        <h1 className={layout.pageTitle}>
+          Student Proposal Dashboard
+          <MissingAccountLinkBadge />
+        </h1>
         <p className={layout.pageSubtitle}>
           Track your submitted proposals, approvals, and reminders
         </p>

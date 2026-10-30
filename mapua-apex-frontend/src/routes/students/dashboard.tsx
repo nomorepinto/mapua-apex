@@ -7,9 +7,15 @@ import { PostEvalsPanel } from "@/components/students/dashboard/postevals-panel"
 import { StudentDashboardProvider } from "@/components/students/dashboard/student-dashboard-context"
 import { SubmissionsPanel } from "@/components/students/dashboard/submissions-panel"
 import { layout } from "@/config"
+import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import { cn } from "@/lib/utils"
 
 export function OrgDashboard() {
+  const organizationQuery = useCurrentOrganizationQuery()
+  const showPostEvals =
+    !organizationQuery.isPending &&
+    organizationQuery.data?.is_higher_council !== true
+
   return (
     <StudentDashboardProvider>
       <div className={cn(layout.page, layout.stack, "!gap-6")}>
@@ -33,7 +39,7 @@ export function OrgDashboard() {
         </div>
 
         {/* 4. Full-width Card: Post-Evaluation Forms */}
-        <PostEvalsPanel />
+        {showPostEvals ? <PostEvalsPanel /> : null}
 
         {/* Modals & Dialogs (Submission tracker, review notices, etc.) */}
         <StudentDashboardDialogs />

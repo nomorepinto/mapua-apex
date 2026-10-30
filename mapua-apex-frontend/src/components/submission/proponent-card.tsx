@@ -3,6 +3,7 @@ import { AlertCircle, Loader2, Trash2Icon } from "lucide-react"
 
 import { FieldWarning } from "@/components/forms/field-warning"
 import {
+  ALL_DEPARTMENT_ITEMS,
   FIELD_INPUT_CLASS,
   getDepartmentItem,
   getDepartmentPrograms,
@@ -70,6 +71,8 @@ interface ProponentCardProps {
   proponent: Proponent
   index: number
   canRemove: boolean
+  /** Higher councils have no dean, so the proponent picks a department. */
+  departmentEditable?: boolean
   departmentValue: string
   /** Name of the applying organization; locks the "Name of Organization" field. */
   organizationName: string
@@ -81,6 +84,7 @@ export const ProponentCard = memo(function ProponentCard({
   proponent,
   index,
   canRemove,
+  departmentEditable = false,
   departmentValue,
   organizationName,
   onUpdate,
@@ -281,17 +285,58 @@ export const ProponentCard = memo(function ProponentCard({
           <label className="block text-xs font-medium text-neutral-700">
             Department <span className="text-red-500">*</span>
           </label>
-          <Input
-            value={selectedDeptCode}
-            placeholder="Assigned by organization dean"
-            readOnly
-            aria-readonly="true"
-            className={cn(
-              FIELD_INPUT_CLASS,
-              "cursor-not-allowed bg-neutral-100/70",
-              !selectedDeptCode && "saaf-glow-invalid"
-            )}
-          />
+          {departmentEditable ? (
+            <Select
+              value={selectedDeptCode}
+              onValueChange={(val) => {
+                if (typeof val !== "string") return
+                onUpdate(proponent.id, "department", val)
+                const stillValid = getDepartmentPrograms(val).some(
+                  (program) => program.code === selectedProgCode
+                )
+                if (!stillValid && proponent.programAndYear) {
+                  onUpdate(proponent.id, "programAndYear", "")
+                }
+              }}
+            >
+              <SelectTrigger
+                className={cn(
+                  "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
+                  !selectedDeptCode && "saaf-glow-invalid"
+                )}
+              >
+                <SelectValue placeholder="Select department">
+                  {selectedDeptCode || "Select department"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent
+                className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
+                style={SELECT_CONTENT_STYLE}
+              >
+                {ALL_DEPARTMENT_ITEMS.map((department) => (
+                  <SelectItem
+                    key={department.code}
+                    value={department.code}
+                    className={SELECT_ITEM_CLASS}
+                  >
+                    {department.name} ({department.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              value={selectedDeptCode}
+              placeholder="Assigned by organization dean"
+              readOnly
+              aria-readonly="true"
+              className={cn(
+                FIELD_INPUT_CLASS,
+                "cursor-not-allowed bg-neutral-100/70",
+                !selectedDeptCode && "saaf-glow-invalid"
+              )}
+            />
+          )}
           <input
             type="hidden"
             name={`proponent_${index}_department`}

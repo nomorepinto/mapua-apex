@@ -36,6 +36,9 @@ export class PostEvalService {
   ) {}
 
   async eligible(organizationId: string): Promise<Item[]> {
+    if (await this.skipsPostEval(organizationId)) {
+      return [];
+    }
     const blocked = new Set<string>();
     for (const row of await this.postevals.listOrg(organizationId)) {
       if (
@@ -121,6 +124,12 @@ export class PostEvalService {
     }
     if (stripPrefix(submission.GSI1PK, 'ORGANIZATION#') !== organizationId) {
       throw new NotFoundException('Not Found');
+    }
+    if (await this.skipsPostEval(organizationId)) {
+      abort(
+        422,
+        'Higher council organizations do not file a post-evaluation.',
+      );
     }
     const status = str(submission, 'status');
     if (status !== 'approved' && status !== 'finished') {
@@ -256,6 +265,11 @@ export class PostEvalService {
     ) {
       throw new NotFoundException('Not Found');
     }
+  }
+
+  private async skipsPostEval(organizationId: string): Promise<boolean> {
+    const org = await this.organizations.get(organizationId);
+    return org?.is_higher_council === true;
   }
 
   private windowOpen(date: string): boolean {

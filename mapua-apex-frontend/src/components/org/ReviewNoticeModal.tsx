@@ -98,7 +98,10 @@ const ReviewNoticeModal = memo(function ReviewNoticeModal({
     ? notice.comment
     : variant.fallback || notice?.comment
   const attendanceUrl = arcusAttendanceUrl()
-  const evaluationUrl = arcusEvaluationUrl()
+  const postEvalRequired =
+    notice?.notifType === "event scheduled" &&
+    !/post-evaluation is not required/i.test(notice.comment ?? "")
+  const evaluationUrl = postEvalRequired ? arcusEvaluationUrl() : ""
 
   return (
     <Dialog

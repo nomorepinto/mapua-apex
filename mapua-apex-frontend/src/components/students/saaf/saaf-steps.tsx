@@ -47,6 +47,7 @@ export function SaafPeopleStep() {
   return (
     <SaafStepPanel index={1}>
       <ProponentsSection
+        departmentValues={draft.departmentValues}
         proponents={draft.proponents}
         onUpdate={actions.handleUpdateProponent}
         onRemove={actions.handleRemoveProponent}

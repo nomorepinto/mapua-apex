@@ -5,6 +5,7 @@ import {
   PostEvalHeader,
   PostEvalStepperControl,
 } from "@/components/students/postevals/posteval-form"
+import { PostEvalOrganizationGate } from "@/components/students/postevals/posteval-organization-gate"
 import {
   PostEvalFinancialStep,
   PostEvalParticipationStep,
@@ -18,22 +19,24 @@ import { cn } from "@/lib/utils"
 
 export function PostEvalWizard() {
   return (
-    <PostEvalProvider>
-      <div className={cn("relative", layout.page)}>
-        <div className={layout.container}>
-          <PostEvalForm>
-            <PostEvalHeader />
-            <PostEvalStepperControl />
-            <PostEvalStepIssueSummary />
-            <PostEvalSummaryStep />
-            <PostEvalFinancialStep />
-            <PostEvalParticipationStep />
-            <PostEvalSubmitError />
-            <PostEvalStepActions />
-          </PostEvalForm>
+    <PostEvalOrganizationGate>
+      <PostEvalProvider>
+        <div className={cn("relative", layout.page)}>
+          <div className={layout.container}>
+            <PostEvalForm>
+              <PostEvalHeader />
+              <PostEvalStepperControl />
+              <PostEvalStepIssueSummary />
+              <PostEvalSummaryStep />
+              <PostEvalFinancialStep />
+              <PostEvalParticipationStep />
+              <PostEvalSubmitError />
+              <PostEvalStepActions />
+            </PostEvalForm>
+          </div>
+          <PostEvalDialogs />
         </div>
-        <PostEvalDialogs />
-      </div>
-    </PostEvalProvider>
+      </PostEvalProvider>
+    </PostEvalOrganizationGate>
   )
 }

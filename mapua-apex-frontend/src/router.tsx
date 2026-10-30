@@ -7,6 +7,8 @@ import { CdmReviewerLayout } from "@/routes/layouts/cdm-reviewer-layout"
 import { DeanLayout } from "@/routes/layouts/dean-layout"
 import { OrgAdviserLayout } from "@/routes/layouts/org-adviser-layout"
 import { OsaarLayout } from "@/routes/layouts/osaar-layout"
+import { ReservablesIndexRedirect, ReservablesLayout } from "@/routes/cdm-reviewer/reservables"
+import { OsaarDashboardLayout } from "@/routes/osaar/dashboard"
 import { OsaarSetupLayout } from "@/routes/osaar/setup"
 import { StudentsLayout } from "@/routes/layouts/students-layout"
 import { RootErrorBoundary, NotFoundPage } from "@/components/layout/error-boundary"
@@ -166,13 +168,43 @@ export const router = createBrowserRouter([
       },
       {
         path: "reservables",
-        HydrateFallback: RouteFallback,
-        lazy: async () => {
-          const { AdminReservablesPage } = await import(
-            "@/routes/cdm-reviewer/reservables"
-          )
-          return { Component: AdminReservablesPage }
-        },
+        Component: ReservablesLayout,
+        children: [
+          {
+            index: true,
+            Component: ReservablesIndexRedirect,
+          },
+          {
+            path: "add",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AddReservableSection } = await import(
+                "@/components/admin/reservables/add-reservable-section"
+              )
+              return { Component: AddReservableSection }
+            },
+          },
+          {
+            path: "view",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { ViewReservableSection } = await import(
+                "@/components/admin/reservables/view-reservable-section"
+              )
+              return { Component: ViewReservableSection }
+            },
+          },
+          {
+            path: "reserve",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { ReserveSection } = await import(
+                "@/components/admin/reservables/reserve-section"
+              )
+              return { Component: ReserveSection }
+            },
+          },
+        ],
       },
       {
         path: "reservations",
@@ -289,11 +321,53 @@ export const router = createBrowserRouter([
       },
       {
         path: "dashboard",
-        HydrateFallback: RouteFallback,
-        lazy: async () => {
-          const { AdminOsaPanel } = await import("@/routes/osaar/dashboard")
-          return { Component: AdminOsaPanel }
-        },
+        Component: OsaarDashboardLayout,
+        children: [
+          {
+            index: true,
+            Component: () => <Navigate to="/osaar/dashboard/review" replace />,
+          },
+          {
+            path: "review",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminDashboardReviewPage } = await import(
+                "@/routes/osaar/dashboard-review"
+              )
+              return { Component: AdminDashboardReviewPage }
+            },
+          },
+          {
+            path: "calendar",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminDashboardCalendarPage } = await import(
+                "@/routes/osaar/dashboard-calendar"
+              )
+              return { Component: AdminDashboardCalendarPage }
+            },
+          },
+          {
+            path: "submissions",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminDashboardSubmissionsPage } = await import(
+                "@/routes/osaar/dashboard-submissions"
+              )
+              return { Component: AdminDashboardSubmissionsPage }
+            },
+          },
+          {
+            path: "announcements",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminDashboardAnnouncementsPage } = await import(
+                "@/routes/osaar/dashboard-announcements"
+              )
+              return { Component: AdminDashboardAnnouncementsPage }
+            },
+          },
+        ],
       },
       {
         path: "setup",
@@ -349,17 +423,11 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            Component: () => <Navigate to="/osaar/review/dashboard" replace />,
+            Component: () => <Navigate to="/osaar/dashboard/review" replace />,
           },
           {
-            path: "dashboard",
-            HydrateFallback: RouteFallback,
-            lazy: async () => {
-              const { AdminReviewDashboard } = await import(
-                "@/routes/osaar/review-dashboard"
-              )
-              return { Component: AdminReviewDashboard }
-            },
+            path: "*",
+            Component: () => <Navigate to="/osaar/dashboard/review" replace />,
           },
         ],
       },

@@ -104,22 +104,26 @@ function AddOrganizationForm() {
             ) : null}
           </Field>
 
-          {ORGANIZATION_ASSIGNABLE_DESK_ITEMS.map((item) => (
-            <SignatoryDeskCombobox
-              emptyLabel={`No ${item.label} registered`}
-              items={state.deskOptions[item.value]}
-              key={item.value}
-              label={item.label}
-              onValueChange={(value) => actions.changeDesk(item.value, value)}
-              optionalLabel={
-                item.value === "dean" && state.isHigherCouncil
-                  ? "Not required — higher councils skip the dean desk."
-                  : undefined
-              }
-              placeholder={`Search ${item.label.toLowerCase()}`}
-              value={state.desks[item.value]}
-            />
-          ))}
+          {ORGANIZATION_ASSIGNABLE_DESK_ITEMS.map((item) => {
+            const deanSkipped = item.value === "dean" && state.isHigherCouncil
+            return (
+              <SignatoryDeskCombobox
+                disabled={deanSkipped}
+                emptyLabel={`No ${item.label} registered`}
+                items={state.deskOptions[item.value]}
+                key={item.value}
+                label={item.label}
+                onValueChange={(value) => actions.changeDesk(item.value, value)}
+                optionalLabel={
+                  deanSkipped ? "Skipped for higher councils." : undefined
+                }
+                placeholder={
+                  deanSkipped ? "Skipped" : `Search ${item.label.toLowerCase()}`
+                }
+                value={deanSkipped ? null : state.desks[item.value]}
+              />
+            )
+          })}
 
           <HigherCouncilField
             checked={state.isHigherCouncil}
@@ -190,9 +194,9 @@ function ImportOrganizationsCsv() {
       <CardHeader>
         <CardTitle>Import CSV</CardTitle>
         <CardDescription>
-          Four columns: organization name, dean, adviser, is_higher_council. The
-          dean may be left empty for higher councils. The shared CDM account is
-          attached automatically.
+          Four columns: organization name, dean, adviser, is_higher_council. A
+          higher-council row skips the dean, and any dean name in that row is
+          ignored. The shared CDM account is attached automatically.
         </CardDescription>
       </CardHeader>
       <CardPanel className="flex flex-col gap-4">

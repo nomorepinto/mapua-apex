@@ -206,8 +206,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       const selected: Partial<AssignableDesks> = {}
 
       for (const item of ORGANIZATION_ASSIGNABLE_DESK_ITEMS) {
-        // Higher-council rows skip the dean desk — an empty dean column is valid.
-        if (item.value === "dean" && row.is_higher_council && !row.desks.dean) {
+        // Higher-council rows skip the dean desk, even when a dean name is filled in.
+        if (item.value === "dean" && row.is_higher_council) {
           continue
         }
         const { match, ambiguous } = resolveSignatoryByRole(
@@ -287,7 +287,9 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
     setEditing(org)
     setEditName(org.name)
     setEditDesks({
-      dean: optionFromPerson(peopleById.get(deskAssignment(org, "dean") ?? "")),
+      dean: org.is_higher_council
+        ? null
+        : optionFromPerson(peopleById.get(deskAssignment(org, "dean") ?? "")),
       adviser: optionFromPerson(
         peopleById.get(deskAssignment(org, "adviser") ?? "")
       ),
@@ -321,7 +323,11 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const assignments = withSharedDesks(desks.dean, desks.adviser, signatories)
+    const assignments = withSharedDesks(
+      isHigherCouncil ? null : desks.dean,
+      desks.adviser,
+      signatories
+    )
     if (!assignments) {
       setFormError("Register a CDM account first.")
       return
@@ -414,7 +420,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
     }
 
     const assignments = withSharedDesks(
-      editDesks.dean,
+      editIsHigherCouncil ? null : editDesks.dean,
       editDesks.adviser,
       signatories
     )

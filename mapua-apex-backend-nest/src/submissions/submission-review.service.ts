@@ -8,6 +8,7 @@ import { nowIso, signatoryKey, stripPrefix } from '../common/dynamo-keys.js';
 import { abort } from '../common/http.js';
 import { num, record, str, type Item } from '../common/records.js';
 import { MailService } from '../mail/mail.service.js';
+import { OrganizationRepository } from '../organizations/organization.repository.js';
 import { refsOf } from './submission-writer.service.js';
 import {
   notificationItem,
@@ -23,6 +24,7 @@ export class SubmissionReviewService {
     private readonly mail: MailService,
     private readonly routing: RoutingService,
     private readonly config: AppConfigService,
+    private readonly organizations: OrganizationRepository,
   ) {}
 
   async approve(
@@ -115,8 +117,13 @@ export class SubmissionReviewService {
     const date =
       str(record(item.activity_details) ?? {}, 'date_of_event') ??
       'the scheduled date';
+    const orgId = stripPrefix(item.GSI1PK, 'ORGANIZATION#') ?? '';
+    const org = orgId ? await this.organizations.get(orgId) : undefined;
+    const skipsPostEval = org?.is_higher_council === true;
     const days = this.config.postEvaluationWindowDays();
-    const comment = `Your event will happen on ${date}. You have ${days} days to evaluate attendees after that date.`;
+    const comment = skipsPostEval
+      ? `Your event will happen on ${date}. A post-evaluation is not required for this organization.`
+      : `Your event will happen on ${date}. You have ${days} days to evaluate attendees after that date.`;
     await this.notify(
       submissionId,
       bareDesk,
@@ -126,7 +133,12 @@ export class SubmissionReviewService {
       updated,
     );
     await this.mail.decision(updated, 'fully approved', '', null);
-    await this.mail.decision(updated, 'event scheduled', comment, null);
+    await this.mail.decision(
+      updated,
+      skipsPostEval ? 'event scheduled no posteval' : 'event scheduled',
+      comment,
+      null,
+    );
     return updated;
   }
 

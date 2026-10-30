@@ -4,6 +4,7 @@ import { Outlet } from "react-router"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { AuthGuard } from "@/components/auth/AuthGuard"
 import { layout } from "@/config"
+import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 
 const STUDENT_NAV = [
   {
@@ -37,12 +38,24 @@ const STUDENT_NAV = [
 export function StudentsLayout() {
   return (
     <AuthGuard allowedGroups={["admin", "org_adviser", "org_submitter", "student"]}>
-      <div className={layout.frame}>
-        <AppSidebar homeTo="/students/dashboard" items={STUDENT_NAV} />
-        <main className={layout.main}>
-          <Outlet />
-        </main>
-      </div>
+      <StudentsFrame />
     </AuthGuard>
+  )
+}
+
+function StudentsFrame() {
+  const organizationQuery = useCurrentOrganizationQuery()
+  const items =
+    organizationQuery.data?.is_higher_council === true
+      ? STUDENT_NAV.filter((item) => item.to !== "/students/postevals")
+      : STUDENT_NAV
+
+  return (
+    <div className={layout.frame}>
+      <AppSidebar homeTo="/students/dashboard" items={items} />
+      <main className={layout.main}>
+        <Outlet />
+      </main>
+    </div>
   )
 }

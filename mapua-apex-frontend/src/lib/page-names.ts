@@ -4,34 +4,44 @@
 export function getPageName(path: string): string {
   const cleanPath = path.split("?")[0].replace(/\/$/, "") || "/";
 
-  if (cleanPath === "/" || cleanPath === "/login") return "Login Page";
-  if (cleanPath === "/dashboard") return "Dashboard";
+  if (cleanPath === "/") return "Login Page";
 
-  // Student routes
-  if (cleanPath === "/student/dashboard") return "Student Dashboard";
-  if (cleanPath === "/student/submissions") return "My Submissions";
-  if (cleanPath.startsWith("/student/submissions/new")) return "New Event Proposal";
-  if (cleanPath.startsWith("/student/submissions/")) return "Submission Details";
-  if (cleanPath === "/student/deadlines") return "Submissions & Deadlines";
-  if (cleanPath === "/student/announcements") return "Student Announcements";
-  if (cleanPath === "/student/organization") return "My Organization Profile";
-  if (cleanPath === "/student/organizations") return "Campus Organizations Directory";
+  if (cleanPath === "/students/submissions/saaf") return "Event proposal";
+  if (cleanPath === "/students/submissions") return "New proposal";
+  if (cleanPath === "/students/postevals/wizard") return "Post-eval wizard";
+  if (cleanPath === "/students/postevals") return "Post-evals";
+  if (cleanPath === "/students/dashboard") return "Student Dashboard";
+  if (cleanPath === "/students/members") return "Members";
+  if (cleanPath === "/students/tools") return "Tools";
 
-  // Signatory routes
-  if (cleanPath === "/signatory/dashboard") return "Signatory Dashboard";
-  if (cleanPath === "/signatory/submissions") return "Review Submissions Queue";
-  if (cleanPath.startsWith("/signatory/submissions/")) return "Review Event Proposal";
-  if (cleanPath === "/signatory/profile") return "Signatory Profile";
+  if (cleanPath === "/cdm/reservables/add") return "Reservables · Add";
+  if (cleanPath === "/cdm/reservables/view") return "Reservables · View";
+  if (cleanPath === "/cdm/reservables/reserve") return "Reservables · Reserve";
+  if (cleanPath === "/cdm/dashboard") return "CDM Dashboard";
+  if (cleanPath === "/cdm/reservations") return "Reservations";
+  if (cleanPath === "/cdm/activities") return "Activity Log";
 
-  // Admin routes
-  if (cleanPath === "/admin/submissions") return "All Submissions";
-  if (cleanPath.startsWith("/admin/submissions/")) return "Admin Submission View";
-  if (cleanPath === "/admin/announcements") return "Manage Announcements";
-  if (cleanPath === "/admin/organizations") return "Manage Organizations";
-  if (cleanPath === "/admin/signatories") return "Manage Signatories";
+  if (cleanPath === "/dean/dashboard") return "Dean Dashboard";
+  if (cleanPath === "/adviser/dashboard") return "Adviser Dashboard";
 
-  // Super Admin Monitor
-  if (cleanPath === "/admin/monitor") return "System Monitor";
+  if (cleanPath === "/osaar/dashboard/review") return "Review";
+  if (cleanPath === "/osaar/dashboard/calendar") return "All submissions calendar";
+  if (cleanPath === "/osaar/dashboard/submissions") return "All submissions";
+  if (cleanPath === "/osaar/dashboard/announcements") return "Announcements";
+  if (cleanPath === "/osaar/dashboard") return "OSAAR Dashboard";
+  if (cleanPath === "/osaar/setup/organizations") return "Organizations";
+  if (cleanPath === "/osaar/setup/signatories") return "Signatories";
+  if (cleanPath === "/osaar/setup/approval-stages") return "Approval stages";
+  if (cleanPath === "/osaar/setup/campuses") return "Campuses";
+  if (cleanPath === "/osaar/postevals") return "Post-Evaluations";
+  if (cleanPath === "/osaar/activities") return "Activity Log";
+
+  if (cleanPath === "/admin/sessions") return "Session Log";
+  if (cleanPath === "/admin/activities") return "Activity Log";
+
+  if (/^\/(students|cdm|dean|adviser|osaar|admin)\/about$/.test(cleanPath)) {
+    return "About APEX";
+  }
 
   return cleanPath.replace(/^\//, "").replace(/\//g, " > ") || "Home";
 }

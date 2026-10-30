@@ -7,7 +7,7 @@ Client-side route map for `mapua-apex-frontend`. The single source of truth is t
 - **React Router (data mode).** Built with `createBrowserRouter` in `src/router.tsx` and mounted by `src/main.tsx` under the OIDC `AuthProvider`.
 - **Role sections.** Each signed-in role owns a top-level prefix (`/students`, `/cdm`, `/dean`, `/adviser`, `/osaar`, `/admin`) wrapped by a layout in `src/routes/layouts/`.
 - **Lazy pages.** Every leaf page is code-split via a `lazy` async `import()` returning `{ Component }`, with `HydrateFallback: RouteFallback`. Add a co-located `action` (via `Promise.all`) only when the route mutates (e.g. the SAAF submit route).
-- **Nested shells.** Sections that group sub-pages use a parent route with children: `PassThroughLayout` (renders `<Outlet />` only, e.g. `/students/submissions`, `/osaar/review`, `/admin/monitor`) or a dedicated shell component (e.g. `OsaarSetupLayout` for `/osaar/setup`).
+- **Nested shells.** Sections that group sub-pages use a parent route with children: `PassThroughLayout` (renders `<Outlet />` only, e.g. `/students/submissions`, `/admin/monitor`) or a dedicated shell component (e.g. `OsaarSetupLayout` for `/osaar/setup`, `OsaarDashboardLayout` for `/osaar/dashboard`).
 - **Index + wildcard.** Each section's `index: true` redirects to its landing page and a `path: "*"` catch-all redirects back to it. The global `path: "*"` renders `NotFoundPage`.
 
 ## Auth & role gating
@@ -99,20 +99,24 @@ Layout: `OrgAdviserLayout` (`src/routes/layouts/org-adviser-layout.tsx`). Sideba
 
 ## OSAAR routes (`/osaar`)
 
-Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboard, Setup, Review, Activity Log.
+Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboard, Setup, Post-evals, Activity Log.
 
 | Path | Component | Source file | Notes |
 | :---- | :---- | :---- | :---- |
 | `/osaar` | redirect | — | → `dashboard` |
-| `/osaar/dashboard` | `AdminOsaPanel` | `src/routes/osaar/dashboard.tsx` | OSAAR home: calendar, submissions queue, announcements. |
+| `/osaar/dashboard` | `OsaarDashboardLayout` | `src/routes/osaar/dashboard.tsx` | Shell with a segmented tab bar over the dashboard sub-pages. |
+| `/osaar/dashboard/review` | `AdminDashboardReviewPage` | `src/routes/osaar/dashboard-review.tsx` | Review queue and submission history. First section. |
+| `/osaar/dashboard/calendar` | `AdminDashboardCalendarPage` | `src/routes/osaar/dashboard-calendar.tsx` | All submissions calendar. |
+| `/osaar/dashboard/submissions` | `AdminDashboardSubmissionsPage` | `src/routes/osaar/dashboard-submissions.tsx` | All submissions. |
+| `/osaar/dashboard/announcements` | `AdminDashboardAnnouncementsPage` | `src/routes/osaar/dashboard-announcements.tsx` | Announcements. |
+| `/osaar/dashboard` (index) | redirect | — | → `review`. |
 | `/osaar/setup` | `OsaarSetupLayout` | `src/routes/osaar/setup.tsx` | Shell with a segmented tab bar over the master-data sub-pages. |
 | `/osaar/setup/organizations` | `AdminOrganizationsPage` | `src/routes/osaar/organizations.tsx` | Manage orgs + their adviser/dean desks. CDM is stamped from the single CDM signatory. |
 | `/osaar/setup/signatories` | `AdminSignatoriesPage` | `src/routes/osaar/signatories.tsx` | Manage signatory people. CDM stays one account; OSAAR may be several. |
 | `/osaar/setup/approval-stages` | `AdminApprovalStagesPage` | `src/routes/osaar/approval-stages.tsx` | Ordered OSAAR stages for new proposals. |
 | `/osaar/setup/campuses` | `AdminCampusPage` | `src/routes/osaar/campus.tsx` | Manage campuses. |
 | `/osaar/setup` (index) | redirect | — | → `organizations`. |
-| `/osaar/review` | `PassThroughLayout` | — | Index → `dashboard`. |
-| `/osaar/review/dashboard` | `AdminReviewDashboard` | `src/routes/osaar/review-dashboard.tsx` | Reviewer queue. |
+| `/osaar/review` | `PassThroughLayout` | — | Index and every child redirect to `/osaar/dashboard/review`. |
 | `/osaar/activities` | `AdminMonitorActivitiesPage` | `src/routes/admin/monitor-activities.tsx` | Reused admin page, wrapped in `AuthGuard` `ACTIVITY_LOG_GROUPS`. |
 | `/osaar/about` | `About` | `src/routes/about.tsx` | Shared. |
 | `/osaar/*` | redirect | — | → `dashboard` |

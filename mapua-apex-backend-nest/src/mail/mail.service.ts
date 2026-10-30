@@ -78,16 +78,21 @@ export class MailService {
           `${title} was fully approved`,
           'Your submission was fully approved.',
         );
-      } else if (kind === 'event scheduled') {
+      } else if (
+        kind === 'event scheduled' ||
+        kind === 'event scheduled no posteval'
+      ) {
         const links = [
           this.config.arcusAttendanceUrl(),
-          this.config.arcusEvaluationUrl(),
+          kind === 'event scheduled' ? this.config.arcusEvaluationUrl() : '',
         ]
           .filter(Boolean)
           .join('\n');
         await this.send(
           student,
-          'Your event is approved — attendance & post-evaluation',
+          kind === 'event scheduled'
+            ? 'Your event is approved — attendance & post-evaluation'
+            : 'Your event is approved — attendance',
           `${comment}\n${links}`.trim(),
         );
       } else if (kind === 'denied' || kind === 'returned') {

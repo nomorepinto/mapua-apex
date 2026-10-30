@@ -1,61 +1,73 @@
-import { ArrowUp } from "lucide-react"
+import {
+  CalendarIcon,
+  ClipboardCheckIcon,
+  FileTextIcon,
+  MegaphoneIcon,
+} from "lucide-react"
+import { Outlet, useLocation, useNavigate } from "react-router"
 
-import { AdminAnnouncementsSection } from "@/components/admin/dashboard/announcements-section"
-import { AdminCalendarSection } from "@/components/admin/dashboard/calendar-section"
-import { AdminDashboardHeader } from "@/components/admin/dashboard/admin-dashboard-header"
-import { AdminDashboardProvider } from "@/components/admin/dashboard/admin-dashboard-context"
-import { AdminNavigationPanel } from "@/components/admin/dashboard/admin-navigation-panel"
 import {
   CreateAnnouncementDialog,
   DeleteAnnouncementDialog,
   EditAnnouncementDialog,
   SubmissionDetailDialog,
 } from "@/components/admin/dashboard/announcement-dialogs"
+import { AdminDashboardProvider } from "@/components/admin/dashboard/admin-dashboard-context"
 import { EditSubmissionDialog } from "@/components/admin/dashboard/edit-submission-dialog"
-import { AdminSubmissionsSection } from "@/components/admin/dashboard/submissions-section"
-import { Button } from "@/components/ui/button"
+import {
+  SegmentedControl,
+  type SegmentedItem,
+} from "@/components/admin/reservables/segmented-control"
+import { FormPageHeader } from "@/components/forms/form-page-header"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
-export function AdminOsaPanel() {
-  const scrollToTop = () => {
-    const topEl = document.getElementById("osaar-dashboard-top")
-    if (topEl) {
-      topEl.scrollIntoView({ behavior: "smooth", block: "start" })
-    }
-    const main = document.querySelector("main")
-    if (main) {
-      main.scrollTo({ top: 0, behavior: "smooth" })
-    }
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }
+type DashboardSection =
+  | "review"
+  | "calendar"
+  | "submissions"
+  | "announcements"
+
+const SECTION_ITEMS: SegmentedItem<DashboardSection>[] = [
+  { value: "review", label: "Review", icon: ClipboardCheckIcon },
+  {
+    value: "calendar",
+    label: "All submissions calendar",
+    icon: CalendarIcon,
+  },
+  { value: "submissions", label: "All submissions", icon: FileTextIcon },
+  { value: "announcements", label: "Announcements", icon: MegaphoneIcon },
+]
+
+function resolveSection(pathname: string): DashboardSection {
+  const segment = pathname.split("/").filter(Boolean).pop()
+  return SECTION_ITEMS.some((item) => item.value === segment)
+    ? (segment as DashboardSection)
+    : "review"
+}
+
+export function OsaarDashboardLayout() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const section = resolveSection(location.pathname)
 
   return (
     <AdminDashboardProvider>
       <div className={layout.page}>
-        <div id="osaar-dashboard-top" className={cn(layout.container, layout.stack, "scroll-mt-4")}>
-          <AdminDashboardHeader />
-          <AdminNavigationPanel />
-          <AdminCalendarSection />
-          <AdminSubmissionsSection />
-          <AdminAnnouncementsSection />
-
-          {/* Back to Top Navigation Action */}
-          <div className="flex flex-col items-center justify-center pt-2 pb-10 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={scrollToTop}
-              className="group inline-flex items-center gap-2 rounded-full border border-neutral-300 bg-white/90 px-5 py-2 text-xs font-bold text-neutral-700 shadow-2xs hover:border-[#8B0000]/40 hover:bg-neutral-50 hover:text-[#8B0000] transition-all cursor-pointer hover:shadow-xs active:scale-95"
-              aria-label="Back to top of page"
-            >
-              <ArrowUp className="h-3.5 w-3.5 text-[#8B0000] transition-transform group-hover:-translate-y-0.5" />
-              <span>Back to top</span>
-            </Button>
-            <p className="text-[11px] font-medium text-neutral-400">
-              Office of Student Affairs · Mapúa University
-            </p>
-          </div>
+        <div className={cn(layout.container, layout.stack)}>
+          <FormPageHeader
+            subtitle="Approve proposals waiting in the review queue, browse every submission on the calendar and in the full list, and post announcements across every organization."
+            title="Dashboard"
+          />
+          <SegmentedControl
+            ariaLabel="Dashboard section"
+            className="max-w-full flex-wrap"
+            items={SECTION_ITEMS}
+            mode="tablist"
+            onChange={(value) => navigate(`/osaar/dashboard/${value}`)}
+            value={section}
+          />
+          <Outlet />
         </div>
         <SubmissionDetailDialog />
         <EditSubmissionDialog />
