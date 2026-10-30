@@ -62,8 +62,9 @@ export function SignatoriesTableCard() {
               </EmptyMedia>
               <EmptyTitle>No signatories yet</EmptyTitle>
               <EmptyDescription>
-                Add a name and role on the left. Organizations need shared CDM
-                and OSAAR accounts before they can be registered.
+                Add a name and role on the left. Organizations need a CDM
+                account before they can be registered. OSAAR accounts are
+                assigned on Approval stages.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

@@ -56,8 +56,7 @@ export function withSharedDesks(
   people: ApiSignatory[]
 ): ApiOrganizationSignatory[] | null {
   const cdm = findByRole(people, "cdm")
-  const osaar = findByRole(people, "osaar")
-  if (!cdm || !osaar) {
+  if (!cdm) {
     return null
   }
 
@@ -66,7 +65,6 @@ export function withSharedDesks(
     // only attached when one was actually selected.
     ...(dean ? [{ role: "dean", signatory_id: dean.value } as const] : []),
     { role: "adviser", signatory_id: adviser.value },
-    { role: "osaar", signatory_id: osaar.signatory_id },
     { role: "cdm", signatory_id: cdm.signatory_id },
   ]
 }

@@ -22,17 +22,25 @@ export class SignatoryRepository {
   }
 
   async findIdByRole(role: string): Promise<string | null> {
+    const ids = await this.listIdsByRole(role, 2);
+    if (ids.length !== 1) {
+      return null;
+    }
+    return ids[0] ?? null;
+  }
+
+  /** Every signatory id with this role. Dean rows are keyed per department. */
+  async listIdsByRole(role: string, limit?: number): Promise<string[]> {
     const items = await this.table.query({
       index: 'GSI4',
       keyCondition: 'GSI4PK = :role',
       values: { ':role': roleIndex(role) },
-      limit: 2,
-      allPages: false,
+      ...(limit ? { limit, allPages: false } : {}),
     });
-    if (items.length !== 1) {
-      return null;
-    }
-    return stripPrefix(items[0]?.PK, 'SIGNATORY#');
+    return items.flatMap((item) => {
+      const id = stripPrefix(item.PK, 'SIGNATORY#');
+      return id ? [id] : [];
+    });
   }
 
   async create(

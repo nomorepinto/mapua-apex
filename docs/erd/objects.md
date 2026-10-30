@@ -25,9 +25,10 @@ person occupies each approval role for this org.
 
 Allowed desk roles are stored in the order `adviser → dean → osaar → cdm → admin`
 regardless of write order. `admin` may hold a desk but is **not** part of the
-approval sequence. `osaar` and `cdm` are campus-wide: routing uses the single
-SIGNATORY item whose role is `osaar` or `cdm` (`GSI4PK` `ROLE#OSAAR` /
-`ROLE#CDM`), not a per-org desk.
+approval sequence. `cdm` is campus-wide: routing uses the single SIGNATORY
+item whose role is `cdm` (`GSI4PK` `ROLE#CDM`), not a per-org desk. OSAAR
+stages are the ordered list on `SETTINGS#APPROVAL` (see below). A per-org
+`osaar` desk is not used to pick the hop.
 
 ---
 
@@ -90,6 +91,7 @@ submission, including any collaboration.
 | `status` | string | `pending / approved / denied / returned / finished`. `finished` is terminal and set only when OSAAR approves the event's POSTEVAL (see below). `cancelled` is **reserved** for the deferred EventBridge auto-cancel — not written by any code path yet |
 | `current_signatory` | string | `SIGNATORY#uuid` holding the paper now |
 | `signatory_sequence` | list | Ordered `SIGNATORY#uuid` routing snapshot, written at submit time |
+| `signatory_steps` | list | Same snapshot with `{ key, role, signatory_id, organization_id }`. Keys: `adviser:ORG#id`, `dean:ORG#id`, `osaar_1`..`n`, `cdm`. Absent on items sent before stages were stored; those items are not backfilled |
 | `collaboration.dependent_organization_ids` | list | `ORGANIZATION#uuid` dependents; empty/absent = no collaboration |
 | `GSI1PK` | string | `ORGANIZATION#uuid` (proponent org) |
 | `GSI1SK` | string | `SUBMISSION#uuid` |
@@ -184,7 +186,28 @@ assignment lives on `ORGANIZATION.signatories`.
 Other items copy the signatory id rather than join back to SIGNATORY:
 `ORGANIZATION.signatories[].signatory_id`, `SUBMISSION.current_signatory` /
 `GSI2PK`, and `NOTIFICATION.signatory`. Renaming keeps the same uuid; deleting
-a SIGNATORY does not rewrite those copies.
+a SIGNATORY does not rewrite those copies. CDM stays one person.
+Several OSAAR people are allowed; new proposals take their order from
+APPROVAL SETTINGS.
+
+---
+
+## APPROVAL SETTINGS
+
+One item. Its `osaar_stages` list is how many OSAAR approvals a **new**
+proposal needs, in that order. Proposals already sent keep the stages
+stored on their own `signatory_steps`.
+
+| Property | Type | Notes |
+|---|---|---|
+| `PK` | string | `SETTINGS#APPROVAL` |
+| `SK` | string | `SETTINGS#APPROVAL` |
+| `osaar_stages` | list | `{ key, signatory_id }`. Keys are `osaar_1`..`n`, rewritten on each save. Each `signatory_id` is `SIGNATORY#uuid` with role `osaar`, all distinct |
+| `updated_at` | timestamp | Last save |
+
+When the item is missing, routing uses the single `ROLE#OSAAR` signatory.
+Zero OSAAR signatories, or more than one with nothing saved, rejects a
+new proposal.
 
 ---
 

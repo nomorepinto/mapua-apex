@@ -105,9 +105,10 @@ Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboar
 | :---- | :---- | :---- | :---- |
 | `/osaar` | redirect | — | → `dashboard` |
 | `/osaar/dashboard` | `AdminOsaPanel` | `src/routes/osaar/dashboard.tsx` | OSAAR home: calendar, submissions queue, announcements. |
-| `/osaar/setup` | `OsaarSetupLayout` | `src/routes/osaar/setup.tsx` | Shell with a segmented tab bar over the three master-data sub-pages. |
-| `/osaar/setup/organizations` | `AdminOrganizationsPage` | `src/routes/osaar/organizations.tsx` | Manage orgs + their adviser/dean desks. |
-| `/osaar/setup/signatories` | `AdminSignatoriesPage` | `src/routes/osaar/signatories.tsx` | Manage signatory people. |
+| `/osaar/setup` | `OsaarSetupLayout` | `src/routes/osaar/setup.tsx` | Shell with a segmented tab bar over the master-data sub-pages. |
+| `/osaar/setup/organizations` | `AdminOrganizationsPage` | `src/routes/osaar/organizations.tsx` | Manage orgs + their adviser/dean desks. CDM is stamped from the single CDM signatory. |
+| `/osaar/setup/signatories` | `AdminSignatoriesPage` | `src/routes/osaar/signatories.tsx` | Manage signatory people. CDM stays one account; OSAAR may be several. |
+| `/osaar/setup/approval-stages` | `AdminApprovalStagesPage` | `src/routes/osaar/approval-stages.tsx` | Ordered OSAAR stages for new proposals. |
 | `/osaar/setup/campuses` | `AdminCampusPage` | `src/routes/osaar/campus.tsx` | Manage campuses. |
 | `/osaar/setup` (index) | redirect | — | → `organizations`. |
 | `/osaar/review` | `PassThroughLayout` | — | Index → `dashboard`. |

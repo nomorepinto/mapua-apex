@@ -21,13 +21,9 @@ export const ORGANIZATION_ASSIGNABLE_DESK_ITEMS = [
 
 export const SHARED_SIGNATORY_ROLE_ITEMS = [
   { label: "CDM", value: "cdm" },
-  { label: "OSAAR", value: "osaar" },
 ] as const
 
-export const SINGLETON_SIGNATORY_ROLES: readonly ApiSignatoryRole[] = [
-  "cdm",
-  "osaar",
-]
+export const SINGLETON_SIGNATORY_ROLES: readonly ApiSignatoryRole[] = ["cdm"]
 
 export type SignatoryRoleValue = ApiSignatory["role"]
 

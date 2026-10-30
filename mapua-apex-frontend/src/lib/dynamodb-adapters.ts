@@ -28,6 +28,12 @@ export interface ApiSubmission {
   /** Ordered snapshot of signatory IDs (plain, no `SIGNATORY#` prefix) resolved at submit time. */
   signatory_sequence?: string[]
   /**
+   * Ordered hops written when the proposal was sent. OSAAR stages are
+   * `osaar_1`, `osaar_2`, and so on. Absent on proposals sent before stages
+   * were stored.
+   */
+  signatory_steps?: ApiSignatoryStep[]
+  /**
    * Detail-only: `signatory_sequence` expanded at read time so each hop carries
    * its role plus the organization whose desk it is. Lets a collaboration label
    * steps "{Org}'s Adviser", "{Org}'s Dean", "{Org 2}'s Adviser", … instead of
@@ -179,11 +185,31 @@ export interface ApiNotification {
  * One hop of the derived approval chain. Campus desks (OSAAR, CDM) have a null
  * organization; adviser/dean hops carry the organization whose desk it is.
  */
+export interface ApiSignatoryStep {
+  key: string
+  role?: string | null
+  signatory_id: string
+  organization_id?: string | null
+}
+
 export interface ApiSignatoryChainLink {
   signatory_id: string
   role?: string | null
   organization_id?: string | null
   organization_name?: string | null
+  /** `osaar_1`, `adviser:ORG#…`, `cdm`, and so on. Null on older submissions. */
+  stage_key?: string | null
+}
+
+export interface ApiOsaarStage {
+  key: string
+  order: number
+  signatory_id: string
+  signatory_name: string
+}
+
+export interface ApiApprovalSettings {
+  osaar_stages: ApiOsaarStage[]
 }
 
 export interface ApiDeadline {
@@ -202,7 +228,7 @@ export type ApiSignatoryRole = "adviser" | "admin" | "cdm" | "dean" | "osaar"
 
 export type OrganizationDeskRole = "adviser" | "admin" | "cdm" | "dean" | "osaar"
 export type OrganizationAssignableDeskRole = "dean" | "adviser"
-export type SharedSignatoryRole = "cdm" | "osaar"
+export type SharedSignatoryRole = "cdm"
 
 export interface ApiOrganizationSignatory {
   role: OrganizationDeskRole
@@ -622,6 +648,8 @@ export function formatSignatoryRole(
   if (raw === "adviser" || raw.includes("adviser") || raw.startsWith("adv"))
     return "Adviser"
   if (raw === "dean" || raw.includes("dean")) return "Dean"
+  const osaarStage = /^osaar_(\d+)$/.exec(raw)
+  if (osaarStage) return `OSAAR ${osaarStage[1]}`
   if (raw === "osaar" || raw.includes("osaar") || raw === "osa") return "OSAAR"
   if (raw === "cdm" || raw.includes("cdm")) return "CDM"
   if (raw === "admin" || raw.includes("admin")) return "Admin"
@@ -690,9 +718,16 @@ export function formatSignatoryRole(
  */
 export function signatoryChainLabel(
   link: ApiSignatoryChainLink,
-  qualifyOrg = true
+  qualifyOrg = true,
+  osaarCount = 1
 ): string {
-  const role = formatSignatoryRole(link.role || link.signatory_id)
+  const numbered =
+    (link.role ?? "").toLowerCase() === "osaar" &&
+    osaarCount > 1 &&
+    link.stage_key
+      ? link.stage_key
+      : link.role || link.signatory_id
+  const role = formatSignatoryRole(numbered)
   const org = qualifyOrg ? link.organization_name?.trim() : ""
   return org ? `${org}'s ${role}` : role
 }
@@ -732,6 +767,45 @@ export function organizationNameFor(
   return match?.name || id
 }
 
+function currentDeskLabel(
+  submission: ApiSubmission,
+  orgSignatories?: Array<{
+    role?: string
+    signatory_id?: string
+    name?: string
+  }>
+): string {
+  const currentId = (submission.current_signatory ?? "").replace(
+    /^SIGNATORY#/i,
+    ""
+  )
+  const steps = submission.signatory_steps ?? []
+  const currentStep = steps.find(
+    (step) => step.signatory_id.replace(/^SIGNATORY#/i, "") === currentId
+  )
+  const osaarCount = steps.filter(
+    (step) => (step.role ?? "").toLowerCase() === "osaar"
+  ).length
+  if (
+    currentStep &&
+    (currentStep.role ?? "").toLowerCase() === "osaar" &&
+    osaarCount > 1 &&
+    currentStep.key
+  ) {
+    return formatSignatoryRole(currentStep.key)
+  }
+  if (currentStep?.role) {
+    return formatSignatoryRole(currentStep.role)
+  }
+  return formatSignatoryRole(
+    submission.current_signatory,
+    orgSignatories,
+    undefined,
+    submission.activity_classification?.activity_type,
+    Boolean(submission.venue_reservation?.has_reservation)
+  )
+}
+
 export function apiSubmissionToDashboardRow(
   submission: ApiSubmission,
   orgSignatories?: Array<{
@@ -752,13 +826,7 @@ export function apiSubmissionToDashboardRow(
   if (isApproved) {
     currentSignatoryLabel = "Completed"
   } else if (submission.current_signatory) {
-    currentSignatoryLabel = formatSignatoryRole(
-      submission.current_signatory,
-      orgSignatories,
-      undefined,
-      submission.activity_classification?.activity_type,
-      Boolean(submission.venue_reservation?.has_reservation)
-    )
+    currentSignatoryLabel = currentDeskLabel(submission, orgSignatories)
   }
 
   return {
@@ -1047,10 +1115,14 @@ export function apiNotificationsToStepper(
   // Only qualify steps with the organization name when more than one org is in
   // the chain; a single-org paper keeps the clean bare role labels.
   const qualifyOrg = distinctOrgs.size > 1
+  const osaarCount = useChain
+    ? chain!.filter((link) => (link.role ?? "").toLowerCase() === "osaar")
+        .length
+    : 0
   const steps: Array<{ key: string; label: string }> = useChain
     ? chain!.map((link) => ({
         key: stripId(link.signatory_id),
-        label: signatoryChainLabel(link, qualifyOrg),
+        label: signatoryChainLabel(link, qualifyOrg, osaarCount),
       }))
     : resolveExpectedRoles(options).map((role) => ({ key: role, label: role }))
 

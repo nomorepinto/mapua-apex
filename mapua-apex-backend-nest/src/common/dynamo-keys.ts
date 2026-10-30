@@ -74,6 +74,11 @@ export function announcementPk(): string {
   return 'ANNOUNCEMENT';
 }
 
+/** Singleton item that stores the ordered OSAAR approval stages. */
+export function approvalSettingsKey(): string {
+  return 'SETTINGS#APPROVAL';
+}
+
 export function sessionKey(sessionId: string): string {
   return `SESSION#${stripPrefix(sessionId, 'SESSION#')}`;
 }

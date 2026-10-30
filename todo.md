@@ -104,10 +104,16 @@ their review screen.
 
 ## 9. Three OSAAR review stages
 
-**Status:** Not started.
+**Status:** Partial — the stage count is adjustable. Confirming the live
+order (Sir Kyle, then Ma'am Grace, then OSAAR) is still open.
 
 **Goal:** Split the OSAAR desk into three stages, in order: Sir Kyle, then
 Ma'am Grace, then back to OSAAR.
+
+**Done:** Setup → Approval stages stores an ordered list of OSAAR
+signatories. New proposals walk that list. Proposals already sent keep
+the stages they were filed with. Assigning the three named people is a
+data step, not more code.
 
 ## 10. Validation feedback while typing
 

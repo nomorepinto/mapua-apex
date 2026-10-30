@@ -207,7 +207,6 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
     const errors: string[] = [...csvParseErrors]
     const singletonCounts: Record<string, number> = {
       cdm: takenRoles.has("cdm") ? 1 : 0,
-      osaar: takenRoles.has("osaar") ? 1 : 0,
     }
 
     for (const record of csvRecords) {

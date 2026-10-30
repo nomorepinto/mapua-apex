@@ -12,7 +12,8 @@ graph TD
 
     EVENT["<b>EVENT</b><br/>PK = EVENT#uuid<br/>SK = EVENT#uuid<br/>------------------<br/>sent_at<br/>GSI1PK = ORGANIZATION#uuid<br/>GSI1SK = sent_at"]
 
-    SUBMISSION["<b>SUBMISSION</b><br/>PK = EVENT#uuid<br/>SK = SUBMISSION#uuid<br/>------------------<br/>submission_type / status<br/>current_signatory<br/>signatory_sequence[]<br/>collaboration.dependent_organization_ids[]<br/>activity_classification<br/>activity_details / proponents[]<br/>detailed_budget_proposal<br/>venue_reservation : reservations[]<br/>booking_refs[]<br/>GSI1PK = ORGANIZATION#uuid<br/>GSI2PK = SIGNATORY#uuid (sparse inbox)"]
+    SUBMISSION["<b>SUBMISSION</b><br/>PK = EVENT#uuid<br/>SK = SUBMISSION#uuid<br/>------------------<br/>submission_type / status<br/>current_signatory<br/>signatory_sequence[]<br/>signatory_steps[]<br/>collaboration.dependent_organization_ids[]<br/>activity_classification<br/>activity_details / proponents[]<br/>detailed_budget_proposal<br/>venue_reservation : reservations[]<br/>booking_refs[]<br/>GSI1PK = ORGANIZATION#uuid<br/>GSI2PK = SIGNATORY#uuid (sparse inbox)"]
+    SETTINGS["<b>APPROVAL SETTINGS</b><br/>PK = SETTINGS#APPROVAL<br/>SK = SETTINGS#APPROVAL<br/>------------------<br/>osaar_stages[]<br/>updated_at"]
 
     NOTIFICATION["<b>NOTIFICATION</b><br/>PK = SUBMISSION#uuid<br/>SK = NOTIFICATION#timestamp<br/>------------------<br/>signatory<br/>notif_type<br/>comment"]
 
@@ -40,6 +41,7 @@ graph TD
     SUBMISSION -->|"1 : N &nbsp;(PK = SUBMISSION#id)"| NOTIFICATION
     ORGANIZATION -->|"M : N &nbsp;desk assignment (signatories[])"| SIGNATORY
     SUBMISSION -->|"M : N &nbsp;approval chain (signatory_sequence)"| SIGNATORY
+    SETTINGS -->|"1 : N &nbsp;OSAAR stages for new proposals"| SIGNATORY
     ORGANIZATION -->|"1 : N &nbsp;dependent copies"| COLLAB
     COLLAB -.->|"resolves to master"| SUBMISSION
     CAMPUS -->|"1 : N &nbsp;(RESERVABLE.PK = CAMPUS#id)"| RESERVABLE

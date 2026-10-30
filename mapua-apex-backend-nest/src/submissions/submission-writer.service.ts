@@ -17,7 +17,11 @@ import {
 import { abort } from '../common/http.js';
 import { str, type Item } from '../common/records.js';
 import type { CreateSaafDto, SaafDto } from './dto/saaf.dto.js';
-import { dependentIds, RoutingService } from './routing.service.js';
+import {
+  dependentIds,
+  RoutingService,
+  type SignatoryStep,
+} from './routing.service.js';
 import { SubmissionRepository } from './submission.repository.js';
 
 @Injectable()
@@ -35,12 +39,13 @@ export class SubmissionWriterService {
       organizationId,
       body.collaboration?.dependent_organization_ids ?? [],
     );
-    const sequence = await this.routing.sequenceFor(
+    const steps = await this.routing.sequenceFor(
       organizationId,
       dependents,
       body.activity_classification.activity_type,
       body.venue_reservation.has_reservation,
     );
+    const sequence = steps.map((step) => step.signatory_id);
     await this.ensureEvent(body.event_id, organizationId);
     const submissionId = randomUUID();
     const sentAt = nowIso();
@@ -59,7 +64,7 @@ export class SubmissionWriterService {
       organizationId,
       body,
       dependents,
-      sequence,
+      steps,
       sequence[0] ?? '',
       'pending',
       sentAt,
@@ -116,12 +121,18 @@ export class SubmissionWriterService {
       organizationId,
       body.collaboration?.dependent_organization_ids ?? [],
     );
-    const sequence = await this.routing.sequenceFor(
+    const frozenOsaar = await this.routing.frozenOsaarStageIds(existing);
+    if (frozenOsaar.length === 0) {
+      abort(422, 'This submission has no OSAAR stage to keep.');
+    }
+    const steps = await this.routing.sequenceFor(
       organizationId,
       dependents,
       body.activity_classification.activity_type,
       body.venue_reservation.has_reservation,
+      frozenOsaar,
     );
+    const sequence = steps.map((step) => step.signatory_id);
     const current = stripPrefix(existing.current_signatory, 'SIGNATORY#') ?? '';
     const keepDesk = status === 'returned' && sequence.includes(current);
     const desk = keepDesk ? current : (sequence[0] ?? '');
@@ -142,7 +153,7 @@ export class SubmissionWriterService {
       organizationId,
       body,
       dependents,
-      sequence,
+      steps,
       desk,
       'pending',
       sentAt,
@@ -227,13 +238,14 @@ export class SubmissionWriterService {
     organizationId: string,
     body: SaafDto,
     dependents: string[],
-    sequence: string[],
+    steps: SignatoryStep[],
     desk: string,
     status: string,
     sentAt: string,
     planned: PlannedBooking[],
   ): Item {
     const refs = planned.map((row) => row.ref);
+    const sequence = steps.map((step) => step.signatory_id);
     return {
       PK: eventKey(eventId),
       SK: submissionKey(submissionId),
@@ -246,6 +258,14 @@ export class SubmissionWriterService {
       status,
       current_signatory: signatoryKey(desk),
       signatory_sequence: sequence.map((id) => signatoryKey(id)),
+      signatory_steps: steps.map((step) => ({
+        key: step.key,
+        role: step.role,
+        signatory_id: signatoryKey(step.signatory_id),
+        organization_id: step.organization_id
+          ? organizationKey(step.organization_id)
+          : null,
+      })),
       collaboration: {
         dependent_organization_ids: dependents.map((id) => organizationKey(id)),
       },

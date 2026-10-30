@@ -6,6 +6,7 @@ import {
   type ApiNotification,
   type ApiOrganization,
   type ApiSignatory,
+  type ApiApprovalSettings,
   type ApiSubmission,
   type CreateOrganizationPayload,
   type CreateSignatoryPayload,
@@ -28,6 +29,7 @@ export const ADMIN_KEYS = {
     ["admin-submission-detail", eventId, submissionId] as const,
   organizations: ["admin-organizations"] as const,
   signatories: ["admin-signatories"] as const,
+  approvalSettings: ["admin-approval-settings"] as const,
   announcements: ["admin-announcements"] as const,
 }
 
@@ -233,6 +235,35 @@ export function useBulkCreateOrganizationsMutation() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.organizations })
+    },
+  })
+}
+
+export function useApprovalSettingsQuery() {
+  return useQuery({
+    queryKey: ADMIN_KEYS.approvalSettings,
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: ApiApprovalSettings }>(
+        "/admins/approval-settings"
+      )
+      return res.data
+    },
+  })
+}
+
+export function useUpdateApprovalSettingsMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (signatoryIds: string[]) => {
+      const res = await apiClient.put<{ data: ApiApprovalSettings }>(
+        "/admins/approval-settings",
+        { osaar_stage_signatory_ids: signatoryIds }
+      )
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.approvalSettings })
     },
   })
 }

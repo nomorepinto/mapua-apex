@@ -1,4 +1,4 @@
-import { Building2Icon, MapPinIcon, StampIcon } from "lucide-react"
+import { Building2Icon, ListOrderedIcon, MapPinIcon, StampIcon } from "lucide-react"
 import { Outlet, useLocation, useNavigate } from "react-router"
 
 import {
@@ -9,11 +9,20 @@ import { FormPageHeader } from "@/components/forms/form-page-header"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
-type SetupSection = "organizations" | "signatories" | "campuses"
+type SetupSection =
+  | "organizations"
+  | "signatories"
+  | "approval-stages"
+  | "campuses"
 
 const SECTION_ITEMS: SegmentedItem<SetupSection>[] = [
   { value: "organizations", label: "Organizations", icon: Building2Icon },
   { value: "signatories", label: "Signatories", icon: StampIcon },
+  {
+    value: "approval-stages",
+    label: "Approval stages",
+    icon: ListOrderedIcon,
+  },
   { value: "campuses", label: "Campuses", icon: MapPinIcon },
 ]
 
@@ -33,7 +42,7 @@ export function OsaarSetupLayout() {
     <div className={layout.page}>
       <div className={cn(layout.container, layout.stack)}>
         <FormPageHeader
-          subtitle="Maintain the system's foundational records: student organizations and their desks, the signatories who approve proposals, and the campuses CDM attaches reservable rooms and equipment to."
+          subtitle="Maintain the system's foundational records: student organizations and their desks, the signatories who approve proposals, how many OSAAR approvals a new proposal needs, and the campuses CDM attaches reservable rooms and equipment to."
           title="Setup"
         />
         <SegmentedControl

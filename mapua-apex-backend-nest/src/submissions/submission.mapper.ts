@@ -37,6 +37,9 @@ export function toSubmission(item: Item, extras: Item = {}): Item {
   view.signatory_sequence = sequence.map(
     (id) => stripPrefix(id, 'SIGNATORY#') ?? String(id),
   );
+  if (Array.isArray(item.signatory_steps)) {
+    view.signatory_steps = publicSteps(item.signatory_steps);
+  }
   const collaboration = record(item.collaboration);
   if (collaboration) {
     const ids = Array.isArray(collaboration.dependent_organization_ids)
@@ -61,6 +64,32 @@ export function toSubmission(item: Item, extras: Item = {}): Item {
     view.notifications = extras.notifications;
   }
   return view;
+}
+
+function publicSteps(value: unknown[]): Item[] {
+  return value.flatMap((entry) => {
+    const step = record(entry);
+    if (!step) {
+      return [];
+    }
+    const key = str(step, 'key');
+    const signatoryId = stripPrefix(step.signatory_id, 'SIGNATORY#');
+    if (!key || !signatoryId) {
+      return [];
+    }
+    const organizationId = step.organization_id;
+    return [
+      {
+        key,
+        role: str(step, 'role'),
+        signatory_id: signatoryId,
+        organization_id:
+          typeof organizationId === 'string'
+            ? stripPrefix(organizationId, 'ORGANIZATION#')
+            : null,
+      },
+    ];
+  });
 }
 
 export function toNotification(item: Item): Item {

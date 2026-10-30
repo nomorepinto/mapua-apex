@@ -15,9 +15,11 @@ Stored in that role order even if the write sent a different order.
 Not stored on SIGNATORY. Approval routing uses org desks for adviser
 and dean. If is_higher_council is true, Dean is skipped; Adviser still
 reviews first.
-OSAAR and CDM are campus-wide: OSAAR_SIGNATORY_ID and
-CDM_SIGNATORY_ID in the API env (plain uuid or SIGNATORY#uuid).
-Rename those people in place (PUT /signatories on the same id).
+CDM is campus-wide: the single SIGNATORY whose role is cdm (GSI4
+ROLE#CDM). OSAAR stages are the ordered list on SETTINGS#APPROVAL,
+not an environment variable. When that item is missing, routing falls
+back to the single SIGNATORY whose role is osaar. Rename those people
+in place (PUT /admins/signatories on the same id).
 admin may occupy a desk but is not in the approval sequence.
 GET /public/organizations scans these base items without authentication and
 returns only the bare organization_id and name for the account signup picker.
@@ -109,7 +111,16 @@ status: "pending" | "approved" | "denied" | "returned" | "finished" | "cancelled
   submission becomes "cancelled" (+ cancelled_at). No code path writes it yet;
   see mapua-apex/todo.md item 2.)
 current_signatory: SIGNATORY#uuid
-signatory_sequence: [ SIGNATORY#uuid ]   (ordered routing snapshot, written at submit time; the ONLY stored form of the chain — signatory_chain is derived at read time, never persisted)
+signatory_sequence: [ SIGNATORY#uuid ]   (ordered routing snapshot, written at submit time)
+signatory_steps: [                         (same snapshot, with stable keys; absent on items sent before stages were stored — those items are not backfilled)
+  {
+    key: "adviser:ORG#uuid" | "dean:ORG#uuid" | "osaar_1" | "osaar_2" | "cdm",
+    role: "adviser" | "dean" | "osaar" | "cdm",
+    signatory_id: SIGNATORY#uuid,
+    organization_id: ORGANIZATION#uuid | null
+  }
+]
+signatory_chain is derived at read time, never persisted.
 collaboration: {
   dependent_organization_ids: [ ORGANIZATION#uuid ]   (index-only collaboration dependents; empty/absent = no collaboration)
 }
@@ -376,6 +387,21 @@ inbox item; otherwise it returns 409 (leaving the item untouched). Delete does
 not rewrite the copies above, so prefer replacing a person in place by keeping
 the same uuid (PUT name / role / department). A new uuid leaves in-flight
 papers, org desks, and Cognito custom:signatory_id pointing at the old id.
+CDM stays one person. Several OSAAR people are allowed; new proposals
+read their order from APPROVAL SETTINGS, not from "the" OSAAR row.
+
+APPROVAL SETTINGS
+PK: SETTINGS#APPROVAL
+SK: SETTINGS#APPROVAL
+osaar_stages: [
+  { key: "osaar_1", signatory_id: SIGNATORY#uuid },
+  { key: "osaar_2", signatory_id: SIGNATORY#uuid }
+]
+updated_at: timestamp
+One item. The list length is how many OSAAR approvals a new proposal
+needs, in that order. Keys are rewritten osaar_1..n on each PUT.
+Missing item: routing uses the single ROLE#OSAAR signatory. The item
+is not consulted for proposals already sent.
 
 ANNOUNCEMENT
 PK: ANNOUNCEMENT
@@ -623,7 +649,13 @@ json
   "sent_at": "2026-09-10T14:00:00Z",
   "status": "pending",
   "current_signatory": "SIGNATORY#adv001",
-  "signatory_sequence": ["SIGNATORY#adv001", "SIGNATORY#osaar", "SIGNATORY#cdm"],
+  "signatory_sequence": ["SIGNATORY#adv001", "SIGNATORY#osaar", "SIGNATORY#osaar2", "SIGNATORY#cdm"],
+  "signatory_steps": [
+    { "key": "adviser:ORG#a1b2", "role": "adviser", "signatory_id": "SIGNATORY#adv001", "organization_id": "ORGANIZATION#a1b2" },
+    { "key": "osaar_1", "role": "osaar", "signatory_id": "SIGNATORY#osaar", "organization_id": null },
+    { "key": "osaar_2", "role": "osaar", "signatory_id": "SIGNATORY#osaar2", "organization_id": null },
+    { "key": "cdm", "role": "cdm", "signatory_id": "SIGNATORY#cdm", "organization_id": null }
+  ],
   "collaboration": { "dependent_organization_ids": [] },
   "GSI1PK": "ORGANIZATION#a1b2",
   "GSI1SK": "SUBMISSION#s001",
@@ -707,16 +739,23 @@ Adviser, then Dean when activity_type is co-curricular, then OSAAR, then CDM
 when has_reservation is true. If the submitting organization's
 is_higher_council is true, Dean is skipped (even for co-curricular);
 Adviser still reviews first, then OSAAR, then CDM when there is a
-reservation. Adviser and Dean come from ORGANIZATION.signatories. OSAAR and
-CDM come from OSAAR_SIGNATORY_ID and CDM_SIGNATORY_ID. admin is a valid desk
-role but is not in this sequence. current_signatory / GSI2PK hold whoever has
-the paper now; on a fresh submit current_signatory is signatory_sequence[0].
-On approve, ApproveSubmission reads the stored signatory_sequence, finds the
-current desk, and advances current_signatory / GSI2 to the next id (or drops
-GSI2 when the sequence is done) — it no longer re-reads the org desks or
-campus env ids. Items written before this field existed have no
-signatory_sequence; the first approve lazily resolves it (via the org desks
-and campus env ids) and persists it on the same write.
+reservation. Adviser and Dean come from ORGANIZATION.signatories. OSAAR
+stages come from SETTINGS#APPROVAL (fallback: the single ROLE#OSAAR
+signatory when that item is missing). CDM is the single ROLE#CDM
+signatory. There is no OSAAR_SIGNATORY_ID or CDM_SIGNATORY_ID env var.
+admin is a valid desk role but is not in this sequence. The same write
+stores signatory_steps, one object per hop, with keys adviser:ORG#id,
+dean:ORG#id, osaar_1..n, and cdm. current_signatory / GSI2PK hold whoever
+has the paper now; on a fresh submit current_signatory is
+signatory_sequence[0]. On approve, ApproveSubmission reads the stored
+signatory_sequence, finds the current desk, and advances
+current_signatory / GSI2 to the next id (or drops GSI2 when the sequence
+is done) — it no longer re-reads the org desks or the settings item.
+Items written before signatory_sequence existed have an empty list; the
+first approve lazily resolves the current stages and persists them.
+A student PUT keeps the OSAAR ids already on that item (from
+signatory_steps, or from sequence entries whose SIGNATORY role is osaar)
+and only rebuilds adviser, dean, and CDM.
 Return keeps the paper on the current desk (status "returned"). A student PUT
 on a returned paper keeps that desk only if it is still in the recomputed
 sequence; otherwise routing restarts at signatory_sequence[0]. Deny
@@ -727,8 +766,8 @@ across every organization. The chain is built over [proponent, ...dependents]
 in submitted order: first the Adviser of each organization, then the Dean of
 each organization (a Dean step for an org exists only when
 activity_classification.activity_type is co-curricular AND that org's
-is_higher_council is not true), then the campus desks (OSAAR, then CDM when
-venue_reservation.has_reservation is true). Signatory ids are de-duplicated
+is_higher_council is not true), then each OSAAR stage, then CDM when
+venue_reservation.has_reservation is true. Signatory ids are de-duplicated
 across the whole chain preserving first occurrence, so a person who is adviser
 and dean (same or across orgs) signs once. Missing adviser / required dean /
 unconfigured campus desk throws UnresolvableSignatoryRoute (422). The rest of
@@ -738,18 +777,17 @@ proponent edits and resubmits; the sequence is recomputed, and if the desk the
 paper was returned to is no longer in the new chain, routing restarts at
 signatory_sequence[0].
 
-signatory_sequence stores bare SIGNATORY#uuid ids in order, which is enough to
-route approvals but not to label each hop for a collaboration (two orgs can both
-contribute an "adviser"). Detail reads therefore project the stored sequence
-into a derived signatory_chain: an ordered array of
-{ signatory_id, role, organization_id, organization_name }. SignatoryChainResolver
-walks [proponent, ...dependents] org desks to map each id to the role and
-organization whose desk it is (first desk wins on a de-duplicated shared
-signatory); the campus desks (OSAAR, CDM, matched against the env ids) resolve
-to a null organization. signatory_chain is computed on read for the single-record
-GET endpoints (student / signatory / admin detail) and is NOT written to the item
-and NOT returned by list endpoints — the persisted source of truth stays
-signatory_sequence plus the ORGANIZATION.signatories desks.
+signatory_sequence stores SIGNATORY#uuid ids in order, which is enough to
+route approvals but not to label each hop. signatory_steps stores the same
+order with a key, role, and organization. Detail reads project a derived
+signatory_chain: an ordered array of
+{ signatory_id, role, organization_id, organization_name, stage_key }.
+When signatory_steps is present, the chain is those steps (OSAAR and CDM
+have a null organization). Older items still map ids through org desks
+(first desk wins) and leave stage_key null. signatory_chain is computed
+on read for the single-record GET endpoints (student / signatory / admin
+detail) and is NOT written to the item and NOT returned by list endpoints.
+signatory_steps is stored and is returned wherever the submission item is.
 
 NOTIFICATION
 json

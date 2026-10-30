@@ -34,13 +34,13 @@ export class SubmissionReviewService {
     let sequence = prefixedSequence(item);
     if (sequence.length === 0) {
       const orgId = stripPrefix(item.GSI1PK, 'ORGANIZATION#') ?? '';
-      const bare = await this.routing.sequenceFor(
+      const steps = await this.routing.sequenceFor(
         orgId,
         dependentIds(item),
         activityType(item),
         hasReservation(item),
       );
-      sequence = bare.map((id) => signatoryKey(id));
+      sequence = steps.map((step) => signatoryKey(step.signatory_id));
     }
     const bareDesk = stripPrefix(signatoryId, 'SIGNATORY#') ?? signatoryId;
     const index = sequence.findIndex(

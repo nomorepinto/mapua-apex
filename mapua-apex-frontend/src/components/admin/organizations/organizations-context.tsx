@@ -66,7 +66,6 @@ interface OrganizationsState {
   missingAssignable: typeof ORGANIZATION_ASSIGNABLE_DESK_ITEMS[number][]
   canAddOrganization: boolean
   sharedCdmName: string
-  sharedOsaarName: string
   peopleById: Map<string, ApiSignatory>
   createPending: boolean
   bulkPending: boolean
@@ -177,7 +176,6 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
   )
 
   const sharedCdm = findByRole(signatories, "cdm")
-  const sharedOsaar = findByRole(signatories, "osaar")
 
   const csvResolved = useMemo(() => {
     const payloads: CreateOrganizationPayload[] = []
@@ -234,7 +232,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       )
       if (!assignments) {
         errors.push(
-          `${row.name}: CDM and OSAAR accounts must exist before importing organizations.`
+          `${row.name}: a CDM account must exist before importing organizations.`
         )
         continue
       }
@@ -296,7 +294,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       return
     }
     if (!sharedAccountsReady) {
-      setFormError("Register shared CDM and OSAAR accounts first.")
+      setFormError("Register a CDM account first.")
       return
     }
     if (!desks.adviser) {
@@ -310,7 +308,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
 
     const assignments = withSharedDesks(desks.dean, desks.adviser, signatories)
     if (!assignments) {
-      setFormError("Register shared CDM and OSAAR accounts first.")
+      setFormError("Register a CDM account first.")
       return
     }
 
@@ -340,7 +338,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
 
   async function handleCsvImport() {
     if (!sharedAccountsReady) {
-      setCsvError("Register shared CDM and OSAAR accounts first.")
+      setCsvError("Register a CDM account first.")
       return
     }
 
@@ -406,7 +404,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       signatories
     )
     if (!assignments) {
-      setEditError("Register shared CDM and OSAAR accounts first.")
+      setEditError("Register a CDM account first.")
       return
     }
 
@@ -493,7 +491,6 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         Boolean(desks.adviser) &&
         (isHigherCouncil || Boolean(desks.dean)),
       sharedCdmName: sharedCdm?.name ?? "—",
-      sharedOsaarName: sharedOsaar?.name ?? "—",
       peopleById,
       createPending: createOrg.isPending,
       bulkPending: bulkCreate.isPending,

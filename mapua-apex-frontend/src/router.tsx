@@ -324,6 +324,16 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: "approval-stages",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { AdminApprovalStagesPage } = await import(
+                "@/routes/osaar/approval-stages"
+              )
+              return { Component: AdminApprovalStagesPage }
+            },
+          },
+          {
             path: "campuses",
             HydrateFallback: RouteFallback,
             lazy: async () => {
