@@ -122,7 +122,10 @@ export class AppConfigService implements OnModuleInit {
     return ['local', 'testing', 'dev', 'test'].includes(this.appEnv());
   }
 
-  /** Local-only override shared with the SPA. Deployed builds leave it off. */
+  /**
+   * Local-only override shared with the SPA (`VITE_ALLOW_ANY_EVENT_DATE=true`).
+   * Deployed builds leave it off because Lambda does not run with APP_ENV=local.
+   */
   allowAnyEventDate(): boolean {
     return this.appEnv() === 'local' && this.flag('VITE_ALLOW_ANY_EVENT_DATE');
   }

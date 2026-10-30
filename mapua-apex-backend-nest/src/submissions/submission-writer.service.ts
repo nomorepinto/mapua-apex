@@ -4,8 +4,6 @@ import {
   BookingService,
   type PlannedBooking,
 } from '../bookings/booking.service.js';
-import { AppConfigService } from '../config/app-config.service.js';
-import { addDays, utcToday } from '../common/availability-window.js';
 import {
   eventKey,
   nowIso,
@@ -14,8 +12,13 @@ import {
   stripPrefix,
   submissionKey,
 } from '../common/dynamo-keys.js';
+import {
+  assertEventDateAllowed,
+  eventDateFloorKey,
+} from '../common/event-date.js';
 import { abort } from '../common/http.js';
 import { str, type Item } from '../common/records.js';
+import { AppConfigService } from '../config/app-config.service.js';
 import type { CreateSaafDto, SaafDto } from './dto/saaf.dto.js';
 import {
   dependentIds,
@@ -203,8 +206,14 @@ export class SubmissionWriterService {
   private assertDates(body: SaafDto): void {
     const start = body.activity_details.date_of_event;
     const end = body.activity_details.end_date_of_event;
-    if (!this.config.allowAnyEventDate() && start < addDays(utcToday(), 10)) {
-      abort(422, 'The date of event must be at least 10 days from today.');
+    const floor = eventDateFloorKey(this.config.allowAnyEventDate());
+    assertEventDateAllowed(start, floor);
+    if (body.venue_reservation.has_reservation) {
+      for (const reservation of body.venue_reservation.reservations ?? []) {
+        for (const selection of reservation.selections ?? []) {
+          assertEventDateAllowed(selection.date, floor);
+        }
+      }
     }
     if (end && end < start) {
       abort(422, 'The end date of event must be on or after the start date.');
