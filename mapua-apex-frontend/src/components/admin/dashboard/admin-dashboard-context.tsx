@@ -26,6 +26,7 @@ import {
   apiSubmissionToDashboardRow,
   formatDisplayDateTime,
   type ApiAnnouncement,
+  type ApiSubmission,
   type DashboardSubmissionRow,
 } from "@/lib/dynamodb-adapters"
 
@@ -33,10 +34,7 @@ export const ANNOUNCEMENT_MAX = 5000
 
 /** Columns of the admin submissions table that expose a value-filter dropdown. */
 export type AdminFilterColumn =
-  | "organization"
-  | "department"
-  | "type"
-  | "status"
+  "organization" | "department" | "type" | "status"
 
 /** Selected values per filterable column; an empty list means "no filter". */
 export type AdminColumnFilters = Record<AdminFilterColumn, string[]>
@@ -71,6 +69,7 @@ function columnValue(
 }
 
 interface AdminDashboardState {
+  rawSubmissions: ApiSubmission[]
   rows: DashboardSubmissionRow[]
   /** Rows after the search box, per-column filters, and date sort are applied. */
   filteredRows: DashboardSubmissionRow[]
@@ -137,7 +136,9 @@ const AdminDashboardContext = createContext<AdminDashboardContextValue | null>(
 export function useAdminDashboard() {
   const value = use(AdminDashboardContext)
   if (!value) {
-    throw new Error("useAdminDashboard must be used within AdminDashboardProvider")
+    throw new Error(
+      "useAdminDashboard must be used within AdminDashboardProvider"
+    )
   }
   return value
 }
@@ -306,7 +307,9 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       setCreateError("")
     } catch (error) {
       setCreateError(
-        error instanceof Error ? error.message : "Could not post this announcement."
+        error instanceof Error
+          ? error.message
+          : "Could not post this announcement."
       )
     }
   }
@@ -330,7 +333,9 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       closeEdit()
     } catch (error) {
       setEditError(
-        error instanceof Error ? error.message : "Could not save this announcement."
+        error instanceof Error
+          ? error.message
+          : "Could not save this announcement."
       )
     }
   }
@@ -349,13 +354,16 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setDeleteOpen(false)
       setDeleteError(
-        error instanceof Error ? error.message : "Could not delete this announcement."
+        error instanceof Error
+          ? error.message
+          : "Could not delete this announcement."
       )
     }
   }
 
   const value: AdminDashboardContextValue = {
     state: {
+      rawSubmissions: submissionsQuery.data ?? [],
       rows,
       filteredRows,
       search,

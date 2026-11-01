@@ -22,6 +22,7 @@ import {
 } from "@/lib/dynamodb-adapters"
 
 interface StudentDashboardState {
+  rawSubmissions: ApiSubmission[]
   organizationName: string
   submissions: DashboardSubmissionRow[]
   /** Submissions filtered by the table search box across all visible columns. */
@@ -85,11 +86,7 @@ const StudentDashboardContext =
 
 /** Columns of the submissions table that expose a value-filter dropdown. */
 export type FilterColumn =
-  | "collab"
-  | "venue"
-  | "classification"
-  | "signatory"
-  | "status"
+  "collab" | "venue" | "classification" | "signatory" | "status"
 
 /** Selected values per filterable column; an empty list means "no filter". */
 export type ColumnFilters = Record<FilterColumn, string[]>
@@ -143,7 +140,11 @@ export function useStudentDashboard() {
   return value
 }
 
-export function StudentDashboardProvider({ children }: { children: ReactNode }) {
+export function StudentDashboardProvider({
+  children,
+}: {
+  children: ReactNode
+}) {
   const [trackerOpen, setTrackerOpen] = useState(false)
   const [selectedKeys, setSelectedKeys] = useState<{
     eventId: string
@@ -156,7 +157,9 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
   const [dateSortDirection, setDateSortDirection] =
     useState<DateSortDirection>("desc")
   const [dismissedReminderIds, setDismissedReminderIds] = useState<string[]>([])
-  const [selectedNotice, setSelectedNotice] = useState<ReviewNotice | null>(null)
+  const [selectedNotice, setSelectedNotice] = useState<ReviewNotice | null>(
+    null
+  )
   const [reservationChangeTarget, setReservationChangeTarget] = useState<{
     eventId: string
     submissionId: string
@@ -182,9 +185,9 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
 
   const filterOptions = useMemo(() => {
     const collect = (column: FilterColumn) =>
-      Array.from(new Set(submissions.map((row) => columnValue(row, column)))).sort(
-        (a, b) => a.localeCompare(b)
-      )
+      Array.from(
+        new Set(submissions.map((row) => columnValue(row, column)))
+      ).sort((a, b) => a.localeCompare(b))
     return {
       collab: COLLAB_OPTIONS,
       venue: collect("venue"),
@@ -274,6 +277,7 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
 
   const value: StudentDashboardContextValue = {
     state: {
+      rawSubmissions: submissionsQuery.data ?? [],
       organizationName: organizationQuery.data?.name || "Organization",
       submissions,
       filteredSubmissions,
@@ -287,15 +291,20 @@ export function StudentDashboardProvider({ children }: { children: ReactNode }) 
       announcementsLoading: announcementsQuery.isLoading,
       announcementsError: announcementsQuery.isError,
       reminders,
-      importantReminders: reminders.filter((item) => item.section === "Important"),
-      upcomingReminders: reminders.filter((item) => item.section === "Upcoming"),
+      importantReminders: reminders.filter(
+        (item) => item.section === "Important"
+      ),
+      upcomingReminders: reminders.filter(
+        (item) => item.section === "Upcoming"
+      ),
       reviewNotices,
       deniedNotices,
       returnedNotices,
       approvedNotices,
       scheduledNotices,
       reservationNotices,
-      remindersLoading: deadlinesQuery.isLoading || reviewNoticesQuery.isLoading,
+      remindersLoading:
+        deadlinesQuery.isLoading || reviewNoticesQuery.isLoading,
       remindersExpanded,
       trackerOpen,
       selectedKeys,

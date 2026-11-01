@@ -19,6 +19,7 @@ Setup (one time):
 Usage:
     python build_pdf.py                       # uses files in this folder
     python build_pdf.py --out model.pdf       # custom output path
+    python build_pdf.py --browser-channel msedge  # reuse installed Microsoft Edge
     python build_pdf.py --mermaid-js C:\\path\\to\\mermaid.min.js   # offline render
     python build_pdf.py erd.mmd objects.md access-patterns.md        # explicit order
 
@@ -237,7 +238,8 @@ def build_html(mmd_files: list[Path], md_files: list[Path], title: str,
 """
 
 
-def render_pdf(html_str: str, out_path: Path, timeout_ms: int, keep_html: bool) -> None:
+def render_pdf(html_str: str, out_path: Path, timeout_ms: int, keep_html: bool,
+               browser_channel: str | None = None) -> None:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
@@ -256,7 +258,7 @@ def render_pdf(html_str: str, out_path: Path, timeout_ms: int, keep_html: bool) 
 
     with sync_playwright() as p:
         try:
-            browser = p.chromium.launch()
+            browser = p.chromium.launch(channel=browser_channel)
         except Exception as exc:  # noqa: BLE001
             sys.exit(
                 f"[error] could not launch Chromium: {exc}\n"
@@ -270,11 +272,13 @@ def render_pdf(html_str: str, out_path: Path, timeout_ms: int, keep_html: bool) 
         )
         try:
             page.wait_for_function("window.__renderDone === true", timeout=timeout_ms)
-        except Exception:  # noqa: BLE001
-            print("[warn] timed out waiting for Mermaid to finish; rendering anyway.")
+        except Exception as exc:  # noqa: BLE001
+            browser.close()
+            sys.exit(f"[error] Mermaid did not finish; PDF was not replaced: {exc}")
         err = page.evaluate("window.__renderError")
         if err:
-            print(f"[warn] Mermaid reported an error: {err}")
+            browser.close()
+            sys.exit(f"[error] Mermaid failed; PDF was not replaced: {err}")
         page.emulate_media(media="print")
         page.pdf(
             path=str(out_path),
@@ -296,6 +300,8 @@ def main() -> None:
     ap.add_argument("--mermaid-cdn", default=DEFAULT_CDN, help="Mermaid CDN URL (used if --mermaid-js absent).")
     ap.add_argument("--timeout", type=int, default=60000, help="Mermaid render timeout in ms (default 60000).")
     ap.add_argument("--keep-html", action="store_true", help="Also write the intermediate .html next to the PDF.")
+    ap.add_argument("--browser-channel", choices=["chrome", "msedge"], default=None,
+                    help="Use an installed browser instead of Playwright's bundled Chromium.")
     args = ap.parse_args()
 
     directory = Path(args.dir).resolve()
@@ -317,7 +323,7 @@ def main() -> None:
     print("[info] Mermaid source:", mermaid_src)
 
     html_str = build_html(mmd_files, md_files, args.title, mermaid_src)
-    render_pdf(html_str, out_path, args.timeout, args.keep_html)
+    render_pdf(html_str, out_path, args.timeout, args.keep_html, args.browser_channel)
     print(f"[done] wrote {out_path}")
 
 

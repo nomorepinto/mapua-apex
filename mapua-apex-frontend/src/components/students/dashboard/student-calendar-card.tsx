@@ -43,7 +43,7 @@ export function mapProposalStatus(
   apiStatus?: string | null
 ): ProposalDashboardStatus {
   const s = (apiStatus || status || "").toLowerCase()
-  if (s === "approved" || s === "completed") {
+  if (s === "approved" || s === "completed" || s === "finished") {
     return "Approved"
   }
   if (s === "denied" || s === "rejected" || s === "cancelled") {
@@ -119,7 +119,8 @@ export function StudentCalendarCard() {
 
     submissions.forEach((row) => {
       // Use the proposal's actual submission date/timestamp field
-      const sentKey = toLocalDateKey(row.sent_at) || getDateKey(new Date(row.sent_at))
+      const sentKey =
+        toLocalDateKey(row.sent_at) || getDateKey(new Date(row.sent_at))
       if (sentKey) {
         const list = map.get(sentKey) || []
         list.push(row)
@@ -208,11 +209,15 @@ export function StudentCalendarCard() {
   }, [selectedDateKey])
 
   const goToPreviousMonth = () => {
-    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+    setCurrentMonth(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+    )
   }
 
   const goToNextMonth = () => {
-    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+    setCurrentMonth(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+    )
   }
 
   const goToToday = () => {
@@ -221,7 +226,11 @@ export function StudentCalendarCard() {
     setSelectedDateKey(todayKey)
   }
 
-  const handleCellClick = (cellDateKey: string, cellDate: Date, isCurrentMonth: boolean) => {
+  const handleCellClick = (
+    cellDateKey: string,
+    cellDate: Date,
+    isCurrentMonth: boolean
+  ) => {
     setSelectedDateKey(cellDateKey)
     if (!isCurrentMonth) {
       setCurrentMonth(new Date(cellDate.getFullYear(), cellDate.getMonth(), 1))
@@ -232,14 +241,13 @@ export function StudentCalendarCard() {
   return (
     <div className={cn(layout.section, "overflow-hidden")}>
       {/* Calendar Card Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-neutral-200 pb-4">
+      <div className="flex flex-col gap-3 border-b border-neutral-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-base font-extrabold text-neutral-900 sm:text-lg">
-            Calendar · {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+            Calendar · {MONTH_NAMES[currentMonth.getMonth()]}{" "}
+            {currentMonth.getFullYear()}
           </h3>
-          <p className="text-xs text-neutral-500">
-            My submissions only
-          </p>
+          <p className="text-xs text-neutral-500">My submissions only</p>
 
           {/* Status Legend under the title */}
           <div className="mt-2.5 flex items-center gap-3.5 text-xs">
@@ -267,7 +275,7 @@ export function StudentCalendarCard() {
             className="h-8 px-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
             aria-label="Previous Month"
           >
-            <ChevronLeft className="h-4 w-4 mr-1" />
+            <ChevronLeft className="mr-1 h-4 w-4" />
             Previous
           </Button>
 
@@ -288,7 +296,7 @@ export function StudentCalendarCard() {
             aria-label="Next Month"
           >
             Next
-            <ChevronRight className="h-4 w-4 ml-1" />
+            <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -302,7 +310,9 @@ export function StudentCalendarCard() {
               key={name}
               className={cn(
                 "py-2 text-[11px] font-bold tracking-wider uppercase",
-                index === 0 || index === 6 ? "text-neutral-500" : "text-neutral-700"
+                index === 0 || index === 6
+                  ? "text-neutral-500"
+                  : "text-neutral-700"
               )}
             >
               {name}
@@ -311,7 +321,7 @@ export function StudentCalendarCard() {
         </div>
 
         {/* Day Cells Grid */}
-        <div className="grid grid-cols-7 bg-neutral-200 gap-px">
+        <div className="grid grid-cols-7 gap-px bg-neutral-200">
           {calendarCells.map((cell) => {
             const hasProposals = cell.proposals.length > 0
 
@@ -319,12 +329,16 @@ export function StudentCalendarCard() {
               <button
                 key={cell.dateKey}
                 type="button"
-                onClick={() => handleCellClick(cell.dateKey, cell.date, cell.isCurrentMonth)}
+                onClick={() =>
+                  handleCellClick(cell.dateKey, cell.date, cell.isCurrentMonth)
+                }
                 className={cn(
-                  "group relative flex min-h-[68px] flex-col justify-between p-1.5 text-left transition-colors sm:min-h-[76px] sm:p-2 cursor-pointer outline-none",
-                  cell.isCurrentMonth ? "bg-white" : "bg-neutral-50/60 text-neutral-400",
+                  "group relative flex min-h-[68px] cursor-pointer flex-col justify-between p-1.5 text-left transition-colors outline-none sm:min-h-[76px] sm:p-2",
+                  cell.isCurrentMonth
+                    ? "bg-white"
+                    : "bg-neutral-50/60 text-neutral-400",
                   cell.isSelected
-                    ? "ring-2 ring-[#8B0000] ring-inset bg-red-50/20 z-10 font-bold"
+                    ? "z-10 bg-red-50/20 font-bold ring-2 ring-[#8B0000] ring-inset"
                     : "hover:bg-neutral-50/90",
                   cell.isToday && !cell.isSelected && "bg-red-50/30"
                 )}
@@ -336,9 +350,9 @@ export function StudentCalendarCard() {
                     className={cn(
                       "inline-flex size-6 items-center justify-center rounded-full text-xs font-semibold transition-colors",
                       cell.isToday
-                        ? "bg-[#8B0000] text-white font-extrabold shadow-2xs"
+                        ? "bg-[#8B0000] font-extrabold text-white shadow-2xs"
                         : cell.isSelected
-                          ? "text-[#8B0000] font-extrabold"
+                          ? "font-extrabold text-[#8B0000]"
                           : cell.isCurrentMonth
                             ? "text-neutral-800"
                             : "text-neutral-400"
@@ -393,9 +407,11 @@ export function StudentCalendarCard() {
           <button
             type="button"
             onClick={() => setDialogOpen(true)}
-            className="font-bold text-[#8B0000] hover:underline cursor-pointer"
+            className="cursor-pointer font-bold text-[#8B0000] hover:underline"
           >
-            View {selectedDateProposals.length} proposal{selectedDateProposals.length > 1 ? "s" : ""} on {selectedDateDisplay}
+            View {selectedDateProposals.length} proposal
+            {selectedDateProposals.length > 1 ? "s" : ""} on{" "}
+            {selectedDateDisplay}
           </button>
         )}
       </div>
@@ -403,7 +419,7 @@ export function StudentCalendarCard() {
       {/* Date Proposals Modal Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogPopup className="max-w-xl">
-          <DialogHeader className="border-b border-neutral-200 pb-3 pr-8">
+          <DialogHeader className="border-b border-neutral-200 pr-8 pb-3">
             <DialogTitle className="text-base font-bold text-neutral-900">
               Proposals on {selectedDateDisplay}
             </DialogTitle>
@@ -414,7 +430,7 @@ export function StudentCalendarCard() {
             </DialogDescription>
           </DialogHeader>
 
-          <DialogPanel className="max-h-[60vh] overflow-y-auto p-4 space-y-3">
+          <DialogPanel className="max-h-[60vh] space-y-3 overflow-y-auto p-4">
             {selectedDateProposals.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 p-8 text-center">
                 <CalendarIcon className="mb-2 h-7 w-7 text-neutral-300" />
@@ -422,17 +438,21 @@ export function StudentCalendarCard() {
                   No proposals submitted on this date
                 </p>
                 <p className="mt-1 text-[11px] text-neutral-500">
-                  Select a date marked with status dots (green, orange, or red) to view its proposals.
+                  Select a date marked with status dots (green, orange, or red)
+                  to view its proposals.
                 </p>
               </div>
             ) : (
               selectedDateProposals.map((sub) => {
-                const mappedStatus = mapProposalStatus(sub.status, sub.api_status)
+                const mappedStatus = mapProposalStatus(
+                  sub.status,
+                  sub.api_status
+                )
 
                 return (
                   <div
                     key={`${sub.event_id}-${sub.submission_id}`}
-                    className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-3.5 shadow-2xs hover:border-neutral-300 transition-all"
+                    className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-3.5 shadow-2xs transition-all hover:border-neutral-300"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-mono text-xs font-bold text-neutral-500">
@@ -441,24 +461,26 @@ export function StudentCalendarCard() {
                       <ProposalStatusBadge status={mappedStatus} />
                     </div>
 
-                    <h4 className="text-sm font-bold text-neutral-900 leading-snug">
+                    <h4 className="text-sm leading-snug font-bold text-neutral-900">
                       {sub.activity_details.title}
                     </h4>
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
-                      <span>Submitted: {formatDisplayDateTime(sub.sent_at)}</span>
+                      <span>
+                        Submitted: {formatDisplayDateTime(sub.sent_at)}
+                      </span>
                       {sub.current_signatory && (
                         <span>Reviewer: {sub.current_signatory}</span>
                       )}
                     </div>
 
                     {sub.activity_details.description && (
-                      <p className="line-clamp-2 text-xs text-neutral-600 bg-neutral-50 rounded-lg p-2 mt-1">
+                      <p className="mt-1 line-clamp-2 rounded-lg bg-neutral-50 p-2 text-xs text-neutral-600">
                         {sub.activity_details.description}
                       </p>
                     )}
 
-                    <div className="mt-2 pt-2 border-t border-neutral-100 flex justify-end">
+                    <div className="mt-2 flex justify-end border-t border-neutral-100 pt-2">
                       <Button
                         size="sm"
                         variant="outline"
@@ -466,7 +488,7 @@ export function StudentCalendarCard() {
                           setDialogOpen(false)
                           actions.openTracker(sub.event_id, sub.submission_id)
                         }}
-                        className="text-xs font-semibold gap-1.5 cursor-pointer text-neutral-800 hover:text-neutral-900"
+                        className="cursor-pointer gap-1.5 text-xs font-semibold text-neutral-800 hover:text-neutral-900"
                       >
                         <Eye className="h-3.5 w-3.5" />
                         <span>View Proposal Tracker</span>

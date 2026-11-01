@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiClient } from "@/lib/api-client"
+import { useReportScope } from "./use-reporting"
 import type {
   ApiReservationChange,
   ResolveReservationChangePayload,
@@ -36,9 +37,15 @@ function adminChangesPath(campusId: string): string {
  * "pending CDM" badge: when any row is `pending`, the Request-change button is
  * replaced until CDM resolves it.
  */
-export function useReservationChangesQuery(eventId?: string | null, submissionId?: string | null) {
+export function useReservationChangesQuery(
+  eventId?: string | null,
+  submissionId?: string | null
+) {
   return useQuery({
-    queryKey: RESERVATION_KEYS.studentChanges(eventId ?? "", submissionId ?? ""),
+    queryKey: [
+      ...RESERVATION_KEYS.studentChanges(eventId ?? "", submissionId ?? ""),
+      useReportScope(),
+    ],
     queryFn: async () => {
       const res = await apiClient.get<{ data: ApiReservationChange[] }>(
         studentChangesPath(eventId!, submissionId!)
@@ -63,7 +70,10 @@ export function useStoreReservationChangeMutation() {
       eventId,
       submissionId,
       ...payload
-    }: { eventId: string; submissionId: string } & StoreReservationChangePayload) => {
+    }: {
+      eventId: string
+      submissionId: string
+    } & StoreReservationChangePayload) => {
       const res = await apiClient.post<{ data: ApiReservationChange }>(
         studentChangePath(eventId, submissionId),
         payload
@@ -72,11 +82,17 @@ export function useStoreReservationChangeMutation() {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
-        queryKey: RESERVATION_KEYS.studentChanges(variables.eventId, variables.submissionId),
+        queryKey: RESERVATION_KEYS.studentChanges(
+          variables.eventId,
+          variables.submissionId
+        ),
       })
       // A system notification lands in the paper's timeline.
       queryClient.invalidateQueries({
-        queryKey: SUBMISSION_KEYS.notifications(variables.eventId, variables.submissionId),
+        queryKey: SUBMISSION_KEYS.notifications(
+          variables.eventId,
+          variables.submissionId
+        ),
       })
       queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
     },
@@ -95,7 +111,10 @@ export function useAdminReservationChangesQuery(
   status: ReservationChangeFilter = "pending"
 ) {
   return useQuery({
-    queryKey: RESERVATION_KEYS.adminChanges(campusId ?? "", status),
+    queryKey: [
+      ...RESERVATION_KEYS.adminChanges(campusId ?? "", status),
+      useReportScope(),
+    ],
     queryFn: async () => {
       const res = await apiClient.get<{ data: ApiReservationChange[] }>(
         adminChangesPath(campusId!),
@@ -110,9 +129,15 @@ export function useAdminReservationChangesQuery(
 /**
  * A single request + its submission snapshot for the detail panel.
  */
-export function useAdminReservationChangeQuery(campusId?: string | null, changeId?: string | null) {
+export function useAdminReservationChangeQuery(
+  campusId?: string | null,
+  changeId?: string | null
+) {
   return useQuery({
-    queryKey: RESERVATION_KEYS.adminChange(campusId ?? "", changeId ?? ""),
+    queryKey: [
+      ...RESERVATION_KEYS.adminChange(campusId ?? "", changeId ?? ""),
+      useReportScope(),
+    ],
     queryFn: async () => {
       const res = await apiClient.get<{ data: ApiReservationChange }>(
         `${adminChangesPath(campusId!)}/${changeId}`
@@ -138,7 +163,10 @@ export function useResolveReservationChangeMutation() {
       campusId,
       changeId,
       ...payload
-    }: { campusId: string; changeId: string } & ResolveReservationChangePayload) => {
+    }: {
+      campusId: string
+      changeId: string
+    } & ResolveReservationChangePayload) => {
       const res = await apiClient.post<{ data: ApiReservationChange }>(
         `${adminChangesPath(campusId)}/${changeId}/resolve`,
         payload

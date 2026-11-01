@@ -8,13 +8,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ActivityFilterHeader } from "@/components/signatories/dashboard/activity-filter-header"
+import { useLocalReport } from "@/hooks/use-reporting"
+import { useSignatoryHistoryQuery } from "@/hooks/use-signatory"
+import { apiSubmissionToActivity } from "@/lib/dynamodb-adapters"
+import { ReportToolbar } from "@/components/reports/report-toolbar"
 import { ActivitySortHeader } from "@/components/signatories/dashboard/activity-sort-header"
-import { ActivityTableSearch } from "@/components/signatories/dashboard/activity-table-search"
-import {
-  useActivityTableFilters,
-  type ActivityTableFilters,
-} from "@/hooks/use-activity-table-filters"
+import type { ActivityTableFilters } from "@/hooks/use-activity-table-filters"
 import { useReviewDashboardContext } from "@/components/signatories/dashboard/review-dashboard-context"
 import { LoadingBlock } from "@/components/ui/loading-block"
 import { layout } from "@/config"
@@ -51,14 +50,23 @@ function StatusBadge({ status }: { status: Activity["status"] }) {
 // ── History table ─────────────────────────────────────────────────────────────
 
 interface HistoryTableProps {
-  filters: ActivityTableFilters
+  filters: Pick<
+    ActivityTableFilters,
+    "rows" | "search" | "sortDirection" | "toggleSort"
+  >
   loading: boolean
   onSelect: (activity: Activity) => void
   emptyLabel: string
   hasRows: boolean
 }
 
-function HistoryTable({ filters, loading, onSelect, emptyLabel, hasRows }: HistoryTableProps) {
+function HistoryTable({
+  filters,
+  loading,
+  onSelect,
+  emptyLabel,
+  hasRows,
+}: HistoryTableProps) {
   return (
     <div className={layout.sectionFlush}>
       <Table
@@ -66,107 +74,81 @@ function HistoryTable({ filters, loading, onSelect, emptyLabel, hasRows }: Histo
         containerClassName="max-h-[36rem] overflow-auto"
       >
         <TableHeader className="sticky top-0 z-10 bg-white shadow-xs [&_th]:bg-white">
-            <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-500 uppercase hover:bg-transparent!">
-              <ActivityFilterHeader
-                column="organization"
-                label="Organization"
-                onClear={filters.clearColumnFilter}
-                onToggle={filters.toggleColumnFilter}
-                options={filters.filterOptions.organization}
-                selected={filters.columnFilters.organization}
-              />
-              <ActivityFilterHeader
-                column="department"
-                label="Department"
-                onClear={filters.clearColumnFilter}
-                onToggle={filters.toggleColumnFilter}
-                options={filters.filterOptions.department}
-                selected={filters.columnFilters.department}
-              />
-              <TableHead className="px-6 py-4 font-bold text-neutral-500">
-                ACTIVITY NAME
-              </TableHead>
-              <ActivitySortHeader
-                direction={filters.sortDirection}
-                label="Date"
-                onSort={filters.toggleSort}
-              />
-              <ActivityFilterHeader
-                capitalize
-                column="type"
-                label="Type"
-                onClear={filters.clearColumnFilter}
-                onToggle={filters.toggleColumnFilter}
-                options={filters.filterOptions.type}
-                selected={filters.columnFilters.type}
-              />
-              <ActivityFilterHeader
-                align="right"
-                className="text-right"
-                column="status"
-                label="Outcome"
-                onClear={filters.clearColumnFilter}
-                onToggle={filters.toggleColumnFilter}
-                options={filters.filterOptions.status}
-                selected={filters.columnFilters.status}
-              />
+          <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-500 uppercase hover:bg-transparent!">
+            <TableHead className="px-6 py-4">Organization</TableHead>
+            <TableHead className="px-6 py-4">Proponent department</TableHead>
+            <TableHead className="px-6 py-4 font-bold text-neutral-500">
+              ACTIVITY NAME
+            </TableHead>
+            <ActivitySortHeader
+              direction={filters.sortDirection}
+              label="Latest submitted"
+              onSort={filters.toggleSort}
+            />
+            <TableHead className="px-6 py-4">Type</TableHead>
+            <TableHead className="px-6 py-4 text-right">
+              Current outcome
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading ? (
+            <TableRow>
+              <TableCell colSpan={6} className="py-4">
+                <LoadingBlock label="Loading history" />
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-4">
-                  <LoadingBlock label="Loading history" />
+          ) : filters.rows.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={6}
+                className="py-14 text-center text-sm text-neutral-400"
+              >
+                {hasRows
+                  ? filters.search.trim()
+                    ? `No processed submissions match "${filters.search.trim()}".`
+                    : "No processed submissions match the selected filters."
+                  : emptyLabel}
+              </TableCell>
+            </TableRow>
+          ) : (
+            filters.rows.map((activity) => (
+              <TableRow
+                key={activity.id}
+                className="cursor-pointer hover:bg-neutral-50"
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelect(activity)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    onSelect(activity)
+                  }
+                }}
+              >
+                <TableCell className="px-6 py-4 text-sm text-neutral-700">
+                  {activity.org}
+                </TableCell>
+                <TableCell className="px-6 py-4 text-sm whitespace-nowrap text-neutral-700">
+                  {activity.departmentCode}
+                </TableCell>
+                <TableCell className="px-6 py-4 text-sm font-semibold text-neutral-900">
+                  {activity.title}
+                </TableCell>
+                <TableCell className="px-6 py-4 text-sm text-neutral-500">
+                  {activity.submittedDate}
+                </TableCell>
+                <TableCell className="px-6 py-4 text-xs text-neutral-500 capitalize">
+                  {activity.type}
+                </TableCell>
+                <TableCell className="px-6 py-4 text-right">
+                  <StatusBadge status={activity.status} />
                 </TableCell>
               </TableRow>
-            ) : filters.rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-14 text-center text-sm text-neutral-400">
-                  {hasRows
-                    ? filters.search.trim()
-                      ? `No processed submissions match "${filters.search.trim()}".`
-                      : "No processed submissions match the selected filters."
-                    : emptyLabel}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filters.rows.map((activity) => (
-                <TableRow
-                  key={activity.id}
-                  className="cursor-pointer hover:bg-neutral-50"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onSelect(activity)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault()
-                      onSelect(activity)
-                    }
-                  }}
-                >
-                  <TableCell className="px-6 py-4 text-sm text-neutral-700">
-                    {activity.org}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-sm whitespace-nowrap text-neutral-700">
-                    {activity.departmentCode}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-sm font-semibold text-neutral-900">
-                    {activity.title}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-sm text-neutral-500">
-                    {activity.submittedDate}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-xs capitalize text-neutral-500">
-                    {activity.type}
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-right">
-                    <StatusBadge status={activity.status} />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+            ))
+          )}
+        </TableBody>
+      </Table>
     </div>
   )
 }
@@ -186,7 +168,26 @@ function HistoryTable({ filters, loading, onSelect, emptyLabel, hasRows }: Histo
  */
 export function SubmissionHistorySection() {
   const { state, actions } = useReviewDashboardContext()
-  const filters = useActivityTableFilters(state.historyActivities, "status")
+  const historyQuery = useSignatoryHistoryQuery()
+  const report = useLocalReport(
+    "proposals",
+    "signatory-history",
+    historyQuery.data
+  )
+  const filters = {
+    rows: report.rows.map(apiSubmissionToActivity),
+    search: report.filters.search ?? "",
+    sortDirection:
+      report.filters.date_basis === "latest_submitted_at"
+        ? (report.filters.sort ?? "desc")
+        : null,
+    toggleSort: () =>
+      report.setFilters({
+        ...report.filters,
+        date_basis: "latest_submitted_at",
+        sort: report.filters.sort === "asc" ? "desc" : "asc",
+      }),
+  }
 
   function historyTitle() {
     if (state.isCampusDesk) return "Submission History"
@@ -219,23 +220,38 @@ export function SubmissionHistorySection() {
     <section className={layout.section}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex shrink-0 flex-col gap-1">
-          <h2 className="text-lg font-extrabold text-neutral-900">{historyTitle()}</h2>
+          <h2 className="text-lg font-extrabold text-neutral-900">
+            {historyTitle()}
+          </h2>
           <p className="text-xs text-neutral-500">{historySubtitle()}</p>
         </div>
-        <ActivityTableSearch
-          ariaLabel="Search submission history"
-          onChange={filters.setSearch}
-          value={filters.search}
-        />
       </div>
 
-      <HistoryTable
-        filters={filters}
-        loading={state.isHistoryLoading}
-        onSelect={actions.handleActivitySelect}
-        emptyLabel={emptyLabel()}
-        hasRows={state.historyActivities.length > 0}
-      />
+      <div className="mb-4">
+        <ReportToolbar
+          kind="proposals"
+          endpoint="/signatories/submissions/history"
+          filters={report.filters}
+          onChange={report.setFilters}
+          onReset={report.reset}
+          options={report.options}
+          count={report.rows.length}
+          ready={historyQuery.isSuccess}
+        />
+      </div>
+      {historyQuery.isError ? (
+        <p role="alert" className="text-sm text-red-700">
+          Could not load submission history. Refresh to retry.
+        </p>
+      ) : (
+        <HistoryTable
+          filters={filters}
+          loading={state.isHistoryLoading}
+          onSelect={actions.handleActivitySelect}
+          emptyLabel={emptyLabel()}
+          hasRows={state.historyActivities.length > 0}
+        />
+      )}
     </section>
   )
 }

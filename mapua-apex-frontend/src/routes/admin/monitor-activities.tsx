@@ -1,210 +1,95 @@
-import { useState, useMemo } from "react";
-import { DownloadIcon, RefreshCw } from "lucide-react";
-import { FormPageHeader } from "@/components/forms/form-page-header";
-import { layout } from "@/config";
-import { cn } from "@/lib/utils";
-import {
-  useActivitiesQuery,
-  useActivityAnalyticsQuery,
-  formatActivityId,
-  formatEventId,
-  resolveUserDisplayName,
-} from "@/hooks/use-monitor";
-import type { LogQueryParams, ActivityNotification } from "@/types/logs";
-import { IS_MOCK_MODE } from "@/lib/mock-monitor-data";
-import { exportToCsv } from "@/lib/export-csv";
-import { formatManila, getTodayManila, getYesterdayManila } from "@/lib/monitor-formatters";
-import { ActivityStatCards } from "@/components/admin/activities/activity-stat-cards";
-import { ActivitiesFilterBar } from "@/components/admin/activities/activities-filter-bar";
-import { ActivitiesTable } from "@/components/admin/activities/activities-table";
-import { ActivityDetailModal } from "@/components/admin/activities/activity-detail-modal";
-import type { ActivitySortDirection } from "@/hooks/use-activity-table-filters";
+import { useState, useMemo } from "react"
+import { RefreshCw } from "lucide-react"
+import { FormPageHeader } from "@/components/forms/form-page-header"
+import { layout } from "@/config"
+import { cn } from "@/lib/utils"
+import { normalizeActivityItem } from "@/hooks/use-monitor"
+import type { ActivityNotification } from "@/types/logs"
+import { getTodayManila, getYesterdayManila } from "@/lib/monitor-formatters"
+import { useReportTable, useReportPagination } from "@/hooks/use-reporting"
+import { ReportToolbar } from "@/components/reports/report-toolbar"
+import { Button } from "@/components/ui/button"
+import { ActivitiesTable } from "@/components/admin/activities/activities-table"
+import { ActivityDetailModal } from "@/components/admin/activities/activity-detail-modal"
 
 export function AdminMonitorActivitiesPage() {
-  // Filter State (Default range = yesterday to today Manila)
-  const [startDate, setStartDate] = useState<string>(getYesterdayManila());
-  const [endDate, setEndDate] = useState<string>(getTodayManila());
-  const [notifTypeFilter, setNotifTypeFilter] = useState<string>("");
-  const [activitySearch, setActivitySearch] = useState<string>("");
-  const [signatorySearch, setSignatorySearch] = useState<string>("");
-
-  // Pagination State
-  const [pageSize, setPageSize] = useState<number>(25);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [sortDirection, setSortDirection] = useState<ActivitySortDirection>("desc");
+  const report = useReportTable(
+    "activity",
+    "/admins/monitor/activity",
+    "activity",
+    { start_date: getYesterdayManila(), end_date: getTodayManila() }
+  )
+  const { filters, setFilters } = report
+  const startDate = filters.start_date ?? ""
+  const endDate = filters.end_date ?? ""
+  const sortDirection = filters.sort ?? "desc"
+  const sortedNotifications = useMemo(
+    () => report.rows.map(normalizeActivityItem),
+    [report.rows]
+  )
+  const { pageSize, currentPage, totalPages, setCurrentPage, setPageSize } =
+    useReportPagination(filters, sortedNotifications.length)
 
   // Modal Detail State
-  const [selectedNotification, setSelectedNotification] = useState<ActivityNotification | null>(null);
+  const [selectedNotification, setSelectedNotification] =
+    useState<ActivityNotification | null>(null)
 
-  const queryParams: LogQueryParams = useMemo(
-    () => ({
-      startDate,
-      endDate,
-      notifType: notifTypeFilter || undefined,
-      activityId: activitySearch || undefined,
-      signatoryId: signatorySearch || undefined,
-    }),
-    [startDate, endDate, notifTypeFilter, activitySearch, signatorySearch]
-  );
-
-  const activitiesQuery = useActivitiesQuery(queryParams);
-  const activityAnalyticsQuery = useActivityAnalyticsQuery(queryParams);
-
-  const isActivitiesLoading = activitiesQuery.isLoading || activitiesQuery.isFetching;
-  const isRefreshing = isActivitiesLoading || activityAnalyticsQuery.isLoading || activityAnalyticsQuery.isFetching;
-
+  const activitiesQuery = report.query
+  const isActivitiesLoading =
+    activitiesQuery.isPending || activitiesQuery.isFetching
+  const isRefreshing = isActivitiesLoading
   const handleRefresh = () => {
-    activitiesQuery.refetch();
-    activityAnalyticsQuery.refetch();
-  };
-  const rawNotifications = activitiesQuery.data?.data ?? [];
-  const activityStats = activityAnalyticsQuery.data;
-
-  // Instant Client-side Filter
-  const filteredNotifications = useMemo(() => {
-    return rawNotifications.filter((n) => {
-      if (notifTypeFilter) {
-        const norm = (n.notif_type || "").toLowerCase();
-        const f = notifTypeFilter.toLowerCase();
-        if (f === "approved" && !norm.includes("approve")) return false;
-        if (f === "returned" && !norm.includes("return") && !norm.includes("revision")) return false;
-        if (f === "denied" && !norm.includes("deny")) return false;
-        if (f === "submitted" && norm !== "submitted") return false;
-        if (f === "created" && norm !== "created") return false;
-        if (f === "updated" && norm !== "updated") return false;
-        if (f === "deleted" && norm !== "deleted") return false;
-      }
-
-      if (activitySearch) {
-        const query = activitySearch.toLowerCase();
-        const actId = (n.activity_id || formatActivityId(undefined, n.sent_at)).toLowerCase();
-        const subId = (n.submission_id || "").toLowerCase();
-        if (!actId.includes(query) && !subId.includes(query)) return false;
-      }
-
-      if (signatorySearch) {
-        const query = signatorySearch.toLowerCase();
-        const userName = (resolveUserDisplayName(n) || "").toLowerCase();
-        const email = (n.userEmail || "").toLowerCase();
-        const signatory = (n.signatory || "").toLowerCase();
-        if (!userName.includes(query) && !email.includes(query) && !signatory.includes(query)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [rawNotifications, notifTypeFilter, activitySearch, signatorySearch]);
-
-  const sortedNotifications = useMemo(() => {
-    const sorted = [...filteredNotifications].sort(
-      (a, b) => (Date.parse(a.sent_at) || 0) - (Date.parse(b.sent_at) || 0)
-    );
-    return sortDirection === "desc" ? sorted.reverse() : sorted;
-  }, [filteredNotifications, sortDirection]);
-
-  const totalPages = Math.ceil(sortedNotifications.length / pageSize) || 1;
+    void activitiesQuery.refetch()
+  }
 
   const paginatedNotifications = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return sortedNotifications.slice(start, start + pageSize);
-  }, [sortedNotifications, currentPage, pageSize]);
+    const start = (currentPage - 1) * pageSize
+    return sortedNotifications.slice(start, start + pageSize)
+  }, [sortedNotifications, currentPage, pageSize])
 
-  const toggleSort = () => {
-    setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-    setCurrentPage(1);
-  };
-
-  // CSV Export handler
-  const handleExportCsv = () => {
-    const headers = [
-      "Sent At (Manila)",
-      "Activity ID",
-      "Event ID",
-      "User",
-      "Type",
-      "Remarks / Comment",
-    ];
-    const rows = sortedNotifications.map((n) => [
-      formatManila(n.sent_at),
-      n.activity_id || formatActivityId(undefined, n.sent_at),
-      formatEventId(n.submission_id),
-      resolveUserDisplayName(n),
-      n.notif_type,
-      n.comment || "",
-    ]);
-
-    exportToCsv(`apex_activity_log_${getTodayManila()}.csv`, headers, rows);
-  };
+  const toggleSort = () =>
+    setFilters({ ...filters, sort: sortDirection === "asc" ? "desc" : "asc" })
 
   return (
     <div className={layout.page}>
       <div className="w-full space-y-6 px-4 py-4 md:px-8">
         {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-200 pb-5">
+        <div className="flex flex-col gap-4 border-b border-neutral-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
           <FormPageHeader
-            subtitle="Audit paper approval workflow notifications, signatory remarks, and status timeline records across SAAF submissions."
+            subtitle="Recorded actions across proposals and administrative modules. Proposal statistics are available as a separate report template."
             title="Activity Log"
           />
 
           <div className="flex items-center gap-3 self-start sm:self-auto">
-            {IS_MOCK_MODE && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 border border-amber-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                Mock Preview Mode
-              </span>
-            )}
-            <button
+            <Button
               type="button"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3.5 py-2 text-xs font-semibold text-neutral-700 shadow-xs hover:bg-neutral-50 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex cursor-pointer items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3.5 py-2 text-xs font-semibold text-neutral-700 shadow-xs transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
               title="Refresh activity logs"
             >
-              <RefreshCw className={cn("h-3.5 w-3.5 text-neutral-600", isRefreshing && "animate-spin text-[#8B0000]")} />
+              <RefreshCw
+                className={cn(
+                  "h-3.5 w-3.5 text-neutral-600",
+                  isRefreshing && "animate-spin text-[#8B0000]"
+                )}
+              />
               {isRefreshing ? "Refreshing..." : "Refresh"}
-            </button>
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="flex items-center gap-2 rounded-xl bg-[#8B0000] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#6b0000] transition-colors cursor-pointer"
-            >
-              <DownloadIcon className="h-3.5 w-3.5" />
-              Export CSV
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* STAT CARDS SECTION */}
-        <ActivityStatCards stats={activityStats} />
-
-        {/* Filters Bar */}
-        <ActivitiesFilterBar
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={(val) => {
-            setStartDate(val);
-            setCurrentPage(1);
-          }}
-          onEndDateChange={(val) => {
-            setEndDate(val);
-            setCurrentPage(1);
-          }}
-          notifTypeFilter={notifTypeFilter}
-          onNotifTypeFilterChange={(val) => {
-            setNotifTypeFilter(val);
-            setCurrentPage(1);
-          }}
-          activitySearch={activitySearch}
-          onActivitySearchChange={(val) => {
-            setActivitySearch(val);
-            setCurrentPage(1);
-          }}
-          signatorySearch={signatorySearch}
-          onSignatorySearchChange={(val) => {
-            setSignatorySearch(val);
-            setCurrentPage(1);
-          }}
+        <ReportToolbar
+          kind="activity"
+          endpoint={report.endpoint}
+          filters={filters}
+          onChange={setFilters}
+          onReset={report.reset}
+          options={report.options}
+          count={report.rows.length}
+          ready={activitiesQuery.isSuccess && !isRefreshing}
+          showSummary
         />
 
         {/* DATA TABLE */}
@@ -222,8 +107,8 @@ export function AdminMonitorActivitiesPage() {
           totalPages={totalPages}
           onPageChange={setCurrentPage}
           onPageSizeChange={(size) => {
-            setPageSize(size);
-            setCurrentPage(1);
+            setPageSize(size)
+            setCurrentPage(1)
           }}
           startDate={startDate}
           endDate={endDate}
@@ -236,6 +121,6 @@ export function AdminMonitorActivitiesPage() {
         onClose={() => setSelectedNotification(null)}
       />
     </div>
-  );
+  )
 }
-export default AdminMonitorActivitiesPage;
+export default AdminMonitorActivitiesPage

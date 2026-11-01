@@ -19,6 +19,14 @@ export class PostEvalRepository {
     });
   }
 
+  iterateOrg(organizationId: string): AsyncGenerator<Item> {
+    return this.table.queryItems({
+      index: 'GSI1',
+      keyCondition: 'GSI1PK = :pk AND begins_with(GSI1SK, :sk)',
+      values: { ':pk': organizationKey(organizationId), ':sk': 'POSTEVAL#' },
+    });
+  }
+
   listOrg(organizationId: string): Promise<Item[]> {
     return this.table.query({
       index: 'GSI1',

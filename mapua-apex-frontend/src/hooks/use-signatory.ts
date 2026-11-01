@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api-client"
+import { useReportScope } from "./use-reporting"
 import type { ApiSubmission, ApiSignatory } from "@/lib/dynamodb-adapters"
 import { SUBMISSION_KEYS } from "@/hooks/use-submissions"
 import type { BookingConflict } from "@/lib/types"
@@ -23,7 +24,10 @@ export function useSubmissionBookingConflictsQuery(
   enabled = true
 ) {
   return useQuery({
-    queryKey: SIGNATORY_KEYS.bookingConflicts(eventId || "", submissionId || ""),
+    queryKey: [
+      ...SIGNATORY_KEYS.bookingConflicts(eventId || "", submissionId || ""),
+      useReportScope(),
+    ],
     queryFn: async () => {
       const res = await apiClient.get<{ data: BookingConflict[] }>(
         `/signatories/events/${eventId}/submissions/${submissionId}/booking-conflicts`
@@ -39,7 +43,7 @@ export function useSubmissionBookingConflictsQuery(
  */
 export function useCurrentSignatoryQuery() {
   return useQuery({
-    queryKey: SIGNATORY_KEYS.me,
+    queryKey: [...SIGNATORY_KEYS.me, useReportScope()],
     queryFn: async () => {
       const res = await apiClient.get<{ data: ApiSignatory }>("/signatories/me")
       return res.data
@@ -52,9 +56,11 @@ export function useCurrentSignatoryQuery() {
  */
 export function useSignatoryQueueQuery() {
   return useQuery({
-    queryKey: SIGNATORY_KEYS.queue,
+    queryKey: [...SIGNATORY_KEYS.queue, useReportScope()],
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiSubmission[] }>("/signatories/submissions")
+      const res = await apiClient.get<{ data: ApiSubmission[] }>(
+        "/signatories/submissions"
+      )
       return res.data || []
     },
   })
@@ -66,7 +72,7 @@ export function useSignatoryQueueQuery() {
  */
 export function useSignatoryHistoryQuery() {
   return useQuery({
-    queryKey: SIGNATORY_KEYS.history,
+    queryKey: [...SIGNATORY_KEYS.history, useReportScope()],
     queryFn: async () => {
       const res = await apiClient.get<{ data: ApiSubmission[] }>(
         "/signatories/submissions/history"
@@ -79,11 +85,18 @@ export function useSignatoryHistoryQuery() {
 /**
  * Fetch one full SAAF on this signatory's desk
  */
-export function useSignatorySubmissionDetailQuery(eventId?: string, submissionId?: string) {
+export function useSignatorySubmissionDetailQuery(
+  eventId?: string,
+  submissionId?: string
+) {
   return useQuery({
-    queryKey: SIGNATORY_KEYS.detail(eventId || "", submissionId || ""),
+    queryKey: [
+      ...SIGNATORY_KEYS.detail(eventId || "", submissionId || ""),
+      useReportScope(),
+    ],
     queryFn: async () => {
-      if (!eventId || !submissionId) throw new Error("Event ID and Submission ID required")
+      if (!eventId || !submissionId)
+        throw new Error("Event ID and Submission ID required")
       const res = await apiClient.get<{ data: ApiSubmission }>(
         `/signatories/events/${eventId}/submissions/${submissionId}`
       )
@@ -107,9 +120,9 @@ export function useApproveSubmissionMutation() {
       eventId: string
       submissionId: string
     }) => {
-      const res = await apiClient.post<{ data: { event_id: string; submission_id: string; status: string } }>(
-        `/signatories/events/${eventId}/submissions/${submissionId}/approve`
-      )
+      const res = await apiClient.post<{
+        data: { event_id: string; submission_id: string; status: string }
+      }>(`/signatories/events/${eventId}/submissions/${submissionId}/approve`)
       return res.data
     },
     onSuccess: () => {
@@ -120,7 +133,10 @@ export function useApproveSubmissionMutation() {
     },
     onError: (_error, variables) => {
       queryClient.invalidateQueries({
-        queryKey: SIGNATORY_KEYS.bookingConflicts(variables.eventId, variables.submissionId),
+        queryKey: SIGNATORY_KEYS.bookingConflicts(
+          variables.eventId,
+          variables.submissionId
+        ),
       })
     },
   })
@@ -209,7 +225,10 @@ export function useUpdateEventClassificationMutation() {
       }
       queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.queue })
       queryClient.invalidateQueries({
-        queryKey: SIGNATORY_KEYS.detail(variables.eventId, variables.submissionId),
+        queryKey: SIGNATORY_KEYS.detail(
+          variables.eventId,
+          variables.submissionId
+        ),
       })
       queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
     },

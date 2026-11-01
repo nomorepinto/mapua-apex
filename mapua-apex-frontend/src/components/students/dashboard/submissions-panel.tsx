@@ -1,13 +1,11 @@
-import { Search } from "lucide-react"
+import { useMemo } from "react"
+import { useLocalReport } from "@/hooks/use-reporting"
+import { ReportToolbar } from "@/components/reports/report-toolbar"
 import { Link } from "react-router"
 
 import { CollabBadge } from "@/components/students/dashboard/collab-badge"
-import {
-  mapProposalStatus,
-  ProposalStatusBadge,
-} from "@/components/students/dashboard/student-calendar-card"
+import { Badge } from "@/components/ui/badge"
 import { useStudentDashboard } from "@/components/students/dashboard/student-dashboard-context"
-import { Input } from "@/components/ui/input"
 import { LoadingBlock } from "@/components/ui/loading-block"
 import {
   Table,
@@ -21,11 +19,29 @@ import { layout } from "@/config"
 import {
   formatDisplayDate,
   formatDocumentId,
+  getSubmissionStatusMeta,
 } from "@/lib/dynamodb-adapters"
 import { cn } from "@/lib/utils"
 
 export function SubmissionsPanel() {
   const { state, actions } = useStudentDashboard()
+  const report = useLocalReport(
+    "proposals",
+    "student-proposals",
+    state.rawSubmissions
+  )
+  const filteredSubmissions = useMemo(() => {
+    const mapped = new Map(
+      state.submissions.map((row) => [
+        `${row.event_id}:${row.submission_id}`,
+        row,
+      ])
+    )
+    return report.rows.flatMap((item) => {
+      const row = mapped.get(`${item.event_id}:${item.submission_id}`)
+      return row ? [row] : []
+    })
+  }, [report.rows, state.submissions])
 
   return (
     <div className={cn(layout.section, "overflow-hidden")}>
@@ -43,36 +59,51 @@ export function SubmissionsPanel() {
             )}
           </div>
           <p className="text-xs text-neutral-500">
-            Only shows proposals submitted by you
+            Your organization's proposals and authorized collaborations
           </p>
         </div>
 
         {/* Search Box */}
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
-          <Input
-            aria-label="Search proposals"
-            className="h-9 pl-8 text-xs"
-            onChange={(event) => actions.setSearch(event.currentTarget.value)}
-            placeholder="Search proposals…"
-            type="search"
-            value={state.search}
-          />
-        </div>
       </div>
 
+      <div className="mb-4">
+        <ReportToolbar
+          kind="proposals"
+          endpoint="/students/submissions"
+          filters={report.filters}
+          onChange={report.setFilters}
+          onReset={report.reset}
+          options={report.options}
+          count={filteredSubmissions.length}
+          ready={!state.submissionsLoading && !state.submissionsError}
+        />
+      </div>
       {/* Submissions Table with Horizontal & Vertical Scroll */}
-      <div className="w-full min-w-0 overflow-x-auto overflow-y-auto max-h-[400px] rounded-xl border border-neutral-200 scrollbar-thin [scrollbar-width:thin] [scrollbar-color:#CBD5E1_transparent] shadow-2xs">
-        <Table className="w-full min-w-[44rem] text-left border-collapse">
+      <div className="max-h-[400px] w-full min-w-0 [scrollbar-width:thin] scrollbar-thin [scrollbar-color:#CBD5E1_transparent] overflow-x-auto overflow-y-auto rounded-xl border border-neutral-200 shadow-2xs">
+        <Table className="w-full min-w-[44rem] border-collapse text-left">
           <TableHeader className="sticky top-0 z-10 bg-neutral-50 shadow-2xs">
-            <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-600 uppercase bg-neutral-50">
-              <TableHead className="py-3 pr-4 font-bold bg-neutral-50">Proposal ID</TableHead>
-              <TableHead className="py-3 pr-4 font-bold bg-neutral-50">Proposal Title</TableHead>
-              <TableHead className="py-3 pr-4 font-bold bg-neutral-50">Type</TableHead>
-              <TableHead className="py-3 pr-4 font-bold bg-neutral-50">Category</TableHead>
-              <TableHead className="py-3 pr-4 font-bold bg-neutral-50">Submitted</TableHead>
-              <TableHead className="py-3 pr-4 font-bold bg-neutral-50">Last Reviewer</TableHead>
-              <TableHead className="py-3 pl-2 text-right font-bold bg-neutral-50">Status</TableHead>
+            <TableRow className="border-b border-neutral-200 bg-neutral-50 text-xs font-bold tracking-wider text-neutral-600 uppercase">
+              <TableHead className="bg-neutral-50 py-3 pr-4 font-bold">
+                Proposal ID
+              </TableHead>
+              <TableHead className="bg-neutral-50 py-3 pr-4 font-bold">
+                Proposal Title
+              </TableHead>
+              <TableHead className="bg-neutral-50 py-3 pr-4 font-bold">
+                Type
+              </TableHead>
+              <TableHead className="bg-neutral-50 py-3 pr-4 font-bold">
+                Category
+              </TableHead>
+              <TableHead className="bg-neutral-50 py-3 pr-4 font-bold">
+                Latest submitted
+              </TableHead>
+              <TableHead className="bg-neutral-50 py-3 pr-4 font-bold">
+                Last Reviewer
+              </TableHead>
+              <TableHead className="bg-neutral-50 py-3 pl-2 text-right font-bold">
+                Status
+              </TableHead>
             </TableRow>
           </TableHeader>
 
@@ -100,7 +131,8 @@ export function SubmissionsPanel() {
                       No proposals submitted yet
                     </p>
                     <p className="mb-2 text-xs text-neutral-500">
-                      Create your first activity proposal to start tracking approvals and reminders.
+                      Create your first activity proposal to start tracking
+                      approvals and reminders.
                     </p>
                     <Link
                       to="/students/submissions"
@@ -111,26 +143,27 @@ export function SubmissionsPanel() {
                   </div>
                 </TableCell>
               </TableRow>
-            ) : state.filteredSubmissions.length === 0 ? (
+            ) : filteredSubmissions.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={7}
                   className="py-12 text-center text-sm font-semibold text-neutral-500"
                 >
-                  {state.search.trim()
-                    ? `No proposals match “${state.search.trim()}”.`
+                  {report.filters.search?.trim()
+                    ? `No proposals match “${report.filters.search.trim()}”.`
                     : "No proposals match the filter."}
                 </TableCell>
               </TableRow>
             ) : (
-              state.filteredSubmissions.map((sub) => {
-                const mappedStatus = mapProposalStatus(sub.status, sub.api_status)
+              filteredSubmissions.map((sub) => {
+                const mappedStatus = getSubmissionStatusMeta(sub.api_status)
                 const submissionType = "SAAF"
                 const category = sub.activity_classification
                   ? sub.activity_classification.charAt(0).toUpperCase() +
                     sub.activity_classification.slice(1)
                   : "Co-curricular"
-                const submittedDate = sub.submitted_date || formatDisplayDate(sub.sent_at)
+                const submittedDate =
+                  sub.submitted_date || formatDisplayDate(sub.sent_at)
                 const lastReviewer = sub.current_signatory || "—"
 
                 return (
@@ -151,14 +184,14 @@ export function SubmissionsPanel() {
                   >
                     {/* Proposal ID */}
                     <TableCell
-                      className="py-3.5 pr-4 font-mono text-xs font-bold whitespace-nowrap text-neutral-900 group-hover:text-[#8B0000] transition-colors"
+                      className="py-3.5 pr-4 font-mono text-xs font-bold whitespace-nowrap text-neutral-900 transition-colors group-hover:text-[#8B0000]"
                       title={sub.submission_id}
                     >
                       {formatDocumentId(sub.submission_id)}
                     </TableCell>
 
                     {/* Proposal Title */}
-                    <TableCell className="py-3.5 pr-4 text-xs font-bold text-neutral-900 group-hover:text-[#8B0000] transition-colors">
+                    <TableCell className="py-3.5 pr-4 text-xs font-bold text-neutral-900 transition-colors group-hover:text-[#8B0000]">
                       <div className="flex items-center gap-2">
                         <span>{sub.activity_details.title}</span>
                         {sub.is_collaboration ? (
@@ -168,28 +201,30 @@ export function SubmissionsPanel() {
                     </TableCell>
 
                     {/* Type */}
-                    <TableCell className="py-3.5 pr-4 text-xs font-semibold text-neutral-700 whitespace-nowrap">
+                    <TableCell className="py-3.5 pr-4 text-xs font-semibold whitespace-nowrap text-neutral-700">
                       {submissionType}
                     </TableCell>
 
                     {/* Category */}
-                    <TableCell className="py-3.5 pr-4 text-xs font-medium text-neutral-600 whitespace-nowrap">
+                    <TableCell className="py-3.5 pr-4 text-xs font-medium whitespace-nowrap text-neutral-600">
                       {category}
                     </TableCell>
 
                     {/* Submitted Date */}
-                    <TableCell className="py-3.5 pr-4 text-xs font-medium text-neutral-600 whitespace-nowrap">
+                    <TableCell className="py-3.5 pr-4 text-xs font-medium whitespace-nowrap text-neutral-600">
                       {submittedDate}
                     </TableCell>
 
                     {/* Last Reviewer */}
-                    <TableCell className="py-3.5 pr-4 text-xs font-semibold text-neutral-800 whitespace-nowrap">
+                    <TableCell className="py-3.5 pr-4 text-xs font-semibold whitespace-nowrap text-neutral-800">
                       {lastReviewer}
                     </TableCell>
 
                     {/* Status Badge */}
                     <TableCell className="py-3.5 pl-2 text-right whitespace-nowrap">
-                      <ProposalStatusBadge status={mappedStatus} />
+                      <Badge className={mappedStatus.color}>
+                        {mappedStatus.label}
+                      </Badge>
                     </TableCell>
                   </TableRow>
                 )
@@ -200,9 +235,10 @@ export function SubmissionsPanel() {
       </div>
 
       {/* Helper text if scrollable */}
-      {state.filteredSubmissions.length > 5 && (
+      {filteredSubmissions.length > 5 && (
         <div className="mt-2 text-right text-[11px] text-neutral-400">
-          Showing {state.filteredSubmissions.length} proposals · Scroll table to view all
+          Showing {filteredSubmissions.length} proposals · Scroll table to view
+          all
         </div>
       )}
     </div>

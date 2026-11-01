@@ -108,7 +108,10 @@ SUBMISSION
 PK: EVENT#uuid
 SK: SUBMISSION#uuid
 submission_type: string
-sent_at: timestamp
+sent_at: timestamp (latest submission/resubmission, not original filing time)
+first_submitted_at: timestamp (optional legacy; server-owned immutable first filing)
+first_submitted_at_source: "recorded" | "linked_creation_evidence" (optional legacy)
+fully_approved_at: timestamp (optional; server-owned first final approval)
 status: "pending" | "approved" | "denied" | "returned" | "finished" | "cancelled"
   ("cancelled" is RESERVED for the deferred EventBridge auto-cancel — when an
   event's 3-day post-evaluation window lapses with no filed post-eval the linked
@@ -1013,12 +1016,63 @@ read endpoint still exists in code but returns nothing in production.
 
 ________________
 
-SESSION LOG (implemented — session monitoring)
-Table: MAPUA_APEX_TABLE (single-table, no separate log table)
-Written by: App\Logging\SessionLogWriter
-Read by:    App\Logging\LogTableItems::querySessions(), getSessionItem()
+REPORTING (NestJS /api/v2)
+No new table, GSI, report-storage item, or visit-log collection is introduced.
+POST report handlers under existing session/activity/submission/post-evaluation/
+campus reservation-change collections return HTTP 200 public JSON and no-store.
+See API_ROUTES.md for the complete request/response and column allowlists.
 
-Key structure (plan §2.1):
+Dates: inclusive Manila calendar dates become UTC [start, next-day end).
+Submissions are NOT date-indexed: all authorized organization GSI1 SUBMISSION#
+queries and collaboration pointers are traversed before date filtering. The
+organization directory scan is fully paginated, including empty filtered pages;
+there is no first-100-organizations shortcut. Post-evaluations use organization
+GSI1 POSTEVAL# queries; reservation changes use the existing campus GSI6 index.
+Related records use deduplicated batches of <=100, strongly consistent reads,
+and bounded retries of unprocessed keys; missing required records fail retrieval.
+Report detail rows are compound-identity deduplicated and timestamp/ID sorted.
+
+Creation stores first_submitted_at with source recorded. Editable updates use
+conditional UpdateItem (status/sent_at/current_signatory optimistic check), never
+replace immutable reporting fields from a stale full-item read. Final approval
+uses if_not_exists(fully_approved_at); later completion/cancellation preserves it.
+Unknown legacy first dates remain unknown through edits. The offline-testable
+frontend/scripts/backfill_report_timestamps.py defaults to dry-run and accepts
+only reliably linked SUBMISSION_CREATE activity timestamps and explicit fully
+approved notifications; ambiguous/absent evidence is skipped. Conditional writes
+protect existing/concurrently populated fields. Cloud execution needs approval.
+
+Report limits: <=366 days, <=10,000 matching details, <=4 MiB JSON, <=20 seconds.
+Incomplete retrieval is a 503 error, never a partial successful report. Public
+report errors retain message/code; timeouts and exhausted batch retries also
+retain retryable=true. Size-limit errors return 422 REPORT_TOO_LARGE. Historical
+coverage is separate: retained/deleted history, unknown first dates, unlinked
+actions, or selected capped page visits produce coverage notes. Summary-only
+reports still aggregate the full authorized cohort. No historical snapshot or
+facility utilization is inferred from current state/bookings.
+
+SESSION LOG (implemented — session monitoring)
+Table (NestJS): AWS_DYNAMODB_SESSION_LOG_TABLE, falling back to AWS_DYNAMODB_TABLE.
+Written by: NestJS SessionService (legacy Laravel SessionLogWriter also exists).
+Read by: NestJS MonitorRepository/MonitorService; admin/super_admin only.
+Monthly GSI1 traversal has real opaque continuation keys, filter/caller binding,
+sort direction and retrieval cutoff; it consumes every page across UTC buckets.
+Retention is LOG_RETENTION_DAYS (default 90); policy is unchanged.
+
+ACTIVITY LOG (NestJS)
+Table: AWS_DYNAMODB_ACTIVITY_LOG_TABLE, falling back to AWS_DYNAMODB_TABLE.
+PK = SK = ACTIVITY#{activityId}; GSI1 = SESSION#{sessionId}/timestamp;
+GSI2 = USER#{userId}/timestamp; GSI3 = DATE#{UTC YYYY-MM-DD}/timestamp.
+Writer: ActivityLogService; reader: MonitorRepository. Fields include activityId,
+sessionId, timestamp, actionType, module, entityId, entityName, userId/userName/
+userEmail/userRole, optional eventId and organizationId/organizationName, and
+description. New submission audit writes preserve compound event/proposal linkage;
+legacy unlinked actions are excluded from distinct-proposal counts and disclosed.
+Arbitrary snapshots and Dynamo keys are excluded from public monitor/report rows.
+Activity access retains the broad administrative role alias; session permission
+is separate. No silent 62-day activity range cap remains.
+
+Session key structure:
   PK:     SESSION#{session_id}
   SK:     METADATA
   GSI1PK: LOG#SESSION#{YYYY-MM}   GSI1SK: {login_time}   ← monthly query bucket

@@ -61,9 +61,9 @@ submitted post-eval, automatically set the linked SUBMISSION
 - The window length is `services.arcus.post_evaluation_window_days` (default 3);
   the stateless window logic lives in `app/Support/Arcus/EventWindow.php`.
 
-## 3. Organization filter for reports
+## ~~3. Organization filter for reports~~
 
-**Status:** Not started.
+**Status:** **Closed.** Added authorization-scoped organization filters shared by applicable log/history tables and PDF/CSV reports, with complete retrieval, coverage warnings, and regression tests.
 
 **Goal:** Add an organization filter on reports so a report can be limited to
 one organization.

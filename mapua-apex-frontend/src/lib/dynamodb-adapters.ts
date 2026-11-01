@@ -23,7 +23,11 @@ export interface ApiSubmission {
   organization_name?: string | null
   submission_type: string
   sent_at: string
-  status: "pending" | "approved" | "denied" | "returned" | "cancelled"
+  first_submitted_at?: string
+  first_submitted_at_source?: "recorded" | "linked_creation_evidence"
+  fully_approved_at?: string
+  status:
+    "pending" | "approved" | "denied" | "returned" | "cancelled" | "finished"
   current_signatory?: string
   /** Ordered snapshot of signatory IDs (plain, no `SIGNATORY#` prefix) resolved at submit time. */
   signatory_sequence?: string[]
@@ -411,6 +415,11 @@ export function buildSaafApiPayload(
  */
 export function getSubmissionStatusMeta(status: string) {
   switch (status.toLowerCase()) {
+    case "finished":
+      return {
+        label: "Finished",
+        color: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+      }
     case "approved":
       return {
         label: "Approved",
@@ -441,7 +450,7 @@ export function getSubmissionStatusMeta(status: string) {
 }
 
 export type DashboardSubmissionStatus =
-  "Under Review" | "Approved" | "Returned" | "Denied" | "Cancelled"
+  "Under Review" | "Approved" | "Returned" | "Denied" | "Cancelled" | "Finished"
 
 export interface DashboardSubmissionRow {
   event_id: string
@@ -461,7 +470,7 @@ export interface DashboardSubmissionRow {
   submitted_date: string
   /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
   sent_at: string
-  api_status: "pending" | "approved" | "denied" | "returned" | "cancelled"
+  api_status: ApiSubmission["status"]
   activity_details: {
     title: string
     description: string
@@ -831,7 +840,8 @@ export function apiSubmissionToDashboardRow(
   const title =
     submission.activity_details?.title_and_nature || "Untitled activity"
   const budget = submission.activity_details?.proposed_budget
-  const isApproved = submission.status === "approved"
+  const isApproved =
+    submission.status === "approved" || submission.status === "finished"
 
   let currentSignatoryLabel = "—"
   if (isApproved) {
@@ -921,15 +931,17 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
         : "Review"
 
   const status: Activity["status"] =
-    submission.status === "approved"
-      ? "Accepted"
-      : submission.status === "denied"
-        ? "Rejected"
-        : submission.status === "returned"
-          ? "Returned"
-          : submission.status === "cancelled"
-            ? "Cancelled"
-            : "Review"
+    submission.status === "finished"
+      ? "Finished"
+      : submission.status === "approved"
+        ? "Accepted"
+        : submission.status === "denied"
+          ? "Rejected"
+          : submission.status === "returned"
+            ? "Returned"
+            : submission.status === "cancelled"
+              ? "Cancelled"
+              : "Review"
 
   // Derive the display arrays from the new reservable-based `reservations`
   // shape when present; fall back to the legacy free-text shape for stored

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { generateReport } from '../common/reporting.js';
 import { randomUUID } from 'node:crypto';
 import { BookingService } from '../bookings/booking.service.js';
 import {
@@ -123,28 +128,65 @@ export class ReservationChangeService {
     return rows.map((row) => this.view(row));
   }
 
+  report(campusId: string, input: unknown): Promise<Item> {
+    return generateReport(
+      'reservation_changes',
+      input,
+      `Campus: ${campusId}`,
+      () => this.iterateCampus(campusId),
+    );
+  }
+
   async listForCampus(campusId: string, status?: string): Promise<Item[]> {
-    const rows = await this.table.query({
-      index: 'GSI6',
-      keyCondition: 'GSI6PK = :pk',
-      values: { ':pk': campusKey(campusId) },
-    });
-    const filtered = rows.filter(
-      (row) => !status || status === 'all' || str(row, 'status') === status,
+    const rows: Item[] = [];
+    for await (const row of this.iterateCampus(campusId, status))
+      rows.push(row);
+    return rows.sort(
+      (left, right) =>
+        String(right.requested_at).localeCompare(String(left.requested_at)) ||
+        String(right.change_id).localeCompare(String(left.change_id)),
     );
-    filtered.sort((left, right) =>
-      String(right.requested_at).localeCompare(String(left.requested_at)),
-    );
-    const views: Item[] = [];
-    for (const row of filtered) {
-      const eventId = stripPrefix(row.PK, 'EVENT#') ?? '';
-      const submissionId = str(row, 'submission_id') ?? '';
-      const submission = submissionId
-        ? await this.submissions.getSubmission(eventId, submissionId)
-        : undefined;
-      views.push(this.view(row, submission));
-    }
-    return views;
+  }
+
+  private async *iterateCampus(
+    campusId: string,
+    status?: string,
+  ): AsyncGenerator<Item> {
+    let startKey: Item | undefined;
+    do {
+      const page = await this.table.queryPage({
+        index: 'GSI6',
+        keyCondition: 'GSI6PK = :pk',
+        values: { ':pk': campusKey(campusId) },
+        startKey,
+      });
+      const filtered = page.items.filter(
+        (row) => !status || status === 'all' || str(row, 'status') === status,
+      );
+      const keys = filtered.map((row) => ({
+        eventId: stripPrefix(row.PK, 'EVENT#') ?? '',
+        submissionId: str(row, 'submission_id') ?? '',
+      }));
+      const submissions = keys.length
+        ? await this.submissions.batchSubmissions(keys)
+        : [];
+      const byKey = new Map(
+        submissions.map((item) => [`${item.PK}|${item.SK}`, item]),
+      );
+      for (const row of filtered) {
+        const submission = byKey.get(
+          `${row.PK}|SUBMISSION#${row.submission_id}`,
+        );
+        if (!submission)
+          throw new ServiceUnavailableException({
+            code: 'RETRIEVAL_INCOMPLETE',
+            message:
+              'A reservation request references an unavailable proposal. Retry after records are repaired.',
+          });
+        yield this.view(row, submission);
+      }
+      startKey = page.lastKey;
+    } while (startKey);
   }
 
   async showForCampus(campusId: string, changeId: string): Promise<Item> {
@@ -383,7 +425,9 @@ export class ReservationChangeService {
     }
     const timing = deriveTiming(selections);
     const previousDetails = record(submission.activity_details);
-    const details = previousDetails ? { ...previousDetails, ...timing } : { ...timing };
+    const details = previousDetails
+      ? { ...previousDetails, ...timing }
+      : { ...timing };
     const previousVenue = record(submission.venue_reservation);
     const venue = previousVenue
       ? { ...previousVenue, has_reservation: true, reservations }

@@ -1,6 +1,6 @@
 # Data Objects & Properties
 
-All objects live in a **single DynamoDB table**. Each item is identified by a
+Business objects live in a **single DynamoDB table**. NestJS session/activity logs use the same table by default, with existing optional log-table configuration overrides. Each item is identified by a
 partition key (`PK`) and a sort key (`SK`); several item types share one
 partition so related records are read together in a single query. There are
 **no foreign keys and no cascade**: related IDs are *copied* onto items and
@@ -87,7 +87,10 @@ submission, including any collaboration.
 | `PK` | string | `EVENT#uuid` (parent event partition) |
 | `SK` | string | `SUBMISSION#uuid` |
 | `submission_type` | string | e.g. `saaf` |
-| `sent_at` | timestamp | Submit time (UTC) |
+| `sent_at` | timestamp | Latest submit/resubmission time (UTC) |
+| `first_submitted_at` | timestamp, optional | Server-owned immutable first filing; absent legacy values remain unknown |
+| `first_submitted_at_source` | string, optional | `recorded` on new submissions or `linked_creation_evidence` from conservative backfill |
+| `fully_approved_at` | timestamp, optional | First successful final approval, set once and preserved through completion/cancellation |
 | `status` | string | `pending / approved / denied / returned / finished`. `finished` is terminal and set only when OSAAR approves the event's POSTEVAL (see below). `cancelled` is **reserved** for the deferred EventBridge auto-cancel — not written by any code path yet |
 | `current_signatory` | string | `SIGNATORY#uuid` holding the paper now |
 | `signatory_sequence` | list | Ordered `SIGNATORY#uuid` routing snapshot, written at submit time |
@@ -97,6 +100,8 @@ submission, including any collaboration.
 | `GSI1SK` | string | `SUBMISSION#uuid` |
 | `GSI2PK` | string | `SIGNATORY#uuid` — sparse signatory inbox (present while `pending`/`returned`) |
 | `GSI2SK` | timestamp | Desk queue time |
+
+The NestJS `/api/v2` report API enumerates the authorized organization/desk/collaboration scope before applying dates; GSI1 is organization/ID-based, not date-based. Editable updates condition on status/latest date/current desk and do not overwrite reporting timestamps from stale reads. Final approval uses `if_not_exists`. Historical recovery is dry-run-first, accepts only reliable linked creation/final-approval evidence, and conditionally avoids replacing concurrent values. Unknown dates and log retention produce explicit coverage notes, never fabricated cohort dates. Reports do not create persistent data objects.
 
 ### activity_classification
 

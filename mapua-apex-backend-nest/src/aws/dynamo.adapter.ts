@@ -12,10 +12,18 @@ import {
   UpdateCommand,
   type TransactWriteCommandInput,
 } from '@aws-sdk/lib-dynamodb';
-import { Injectable, type OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  ServiceUnavailableException,
+  type OnModuleDestroy,
+} from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service.js';
+import { reportRequestOptions } from '../common/report-budget.js';
 import type {
   DynamoPort,
+  DynamoPage,
+  QueryPageArgs,
+  ScanPageArgs,
   QueryArgs,
   ScanArgs,
   TransactOp,
@@ -42,6 +50,7 @@ export class DynamoAdapter implements DynamoPort, OnModuleDestroy {
   ): Promise<Record<string, unknown> | undefined> {
     const result = await this.doc.send(
       new GetCommand({ TableName: table, Key: key }),
+      reportRequestOptions(),
     );
     return result.Item;
   }
@@ -64,6 +73,42 @@ export class DynamoAdapter implements DynamoPort, OnModuleDestroy {
     await this.doc.send(new DeleteCommand({ TableName: table, Key: key }));
   }
 
+  async queryPage(args: QueryPageArgs): Promise<DynamoPage> {
+    const result = await this.doc.send(
+      new QueryCommand({
+        TableName: args.table,
+        IndexName: args.index,
+        KeyConditionExpression: args.keyCondition,
+        FilterExpression: args.filter,
+        ExpressionAttributeNames: args.names,
+        ExpressionAttributeValues: args.values,
+        ProjectionExpression: args.projection,
+        ExclusiveStartKey: args.startKey,
+        Limit: args.limit ?? 200,
+        ScanIndexForward: args.scanForward,
+        ConsistentRead: args.index ? undefined : args.consistent,
+      }),
+      reportRequestOptions(),
+    );
+    return { items: result.Items ?? [], lastKey: result.LastEvaluatedKey };
+  }
+
+  async scanPage(args: ScanPageArgs): Promise<DynamoPage> {
+    const result = await this.doc.send(
+      new ScanCommand({
+        TableName: args.table,
+        FilterExpression: args.filter,
+        ExpressionAttributeNames: args.names,
+        ExpressionAttributeValues: args.values,
+        ProjectionExpression: args.projection,
+        ExclusiveStartKey: args.startKey,
+        Limit: args.maxItems ?? 200,
+      }),
+      reportRequestOptions(),
+    );
+    return { items: result.Items ?? [], lastKey: result.LastEvaluatedKey };
+  }
+
   async query(args: QueryArgs): Promise<Record<string, unknown>[]> {
     const items: Record<string, unknown>[] = [];
     let startKey: Record<string, unknown> | undefined;
@@ -82,6 +127,7 @@ export class DynamoAdapter implements DynamoPort, OnModuleDestroy {
           ExclusiveStartKey: startKey,
           ConsistentRead: args.index ? undefined : args.consistent,
         }),
+        reportRequestOptions(),
       );
       items.push(...(result.Items ?? []));
       startKey = result.LastEvaluatedKey;
@@ -109,6 +155,7 @@ export class DynamoAdapter implements DynamoPort, OnModuleDestroy {
           ExclusiveStartKey: startKey,
           Limit: max - items.length,
         }),
+        reportRequestOptions(),
       );
       items.push(...(result.Items ?? []));
       startKey = result.LastEvaluatedKey;
@@ -117,12 +164,24 @@ export class DynamoAdapter implements DynamoPort, OnModuleDestroy {
   }
 
   async update(args: UpdateArgs): Promise<Record<string, unknown>> {
-    const built = buildUpdate(args.set, args.remove);
+    const built = buildUpdate(args.set, args.remove, args.setIfAbsent);
     const result = await this.doc.send(
       new UpdateCommand({
         TableName: args.table,
         Key: args.key,
         ...built,
+        ExpressionAttributeNames: {
+          ...built.ExpressionAttributeNames,
+          ...args.names,
+        },
+        ...(built.ExpressionAttributeValues || args.values
+          ? {
+              ExpressionAttributeValues: {
+                ...built.ExpressionAttributeValues,
+                ...args.values,
+              },
+            }
+          : {}),
         ConditionExpression: args.condition,
         ReturnValues: 'ALL_NEW',
       }),
@@ -204,14 +263,33 @@ export class DynamoAdapter implements DynamoPort, OnModuleDestroy {
     keys: Record<string, unknown>[],
   ): Promise<Record<string, unknown>[]> {
     const found: Record<string, unknown>[] = [];
-    for (let index = 0; index < keys.length; index += 100) {
-      const chunk = keys.slice(index, index + 100);
-      const result = await this.doc.send(
-        new BatchGetCommand({
-          RequestItems: { [table]: { Keys: chunk, ConsistentRead: true } },
-        }),
-      );
-      found.push(...(result.Responses?.[table] ?? []));
+    const unique = [
+      ...new Map(
+        keys.map((key) => [`${String(key.PK)}\0${String(key.SK)}`, key]),
+      ).values(),
+    ];
+    for (let index = 0; index < unique.length; index += 100) {
+      let pending: Record<string, unknown>[] = unique.slice(index, index + 100);
+      for (let attempt = 0; pending.length > 0; attempt++) {
+        if (attempt >= 5)
+          throw new ServiceUnavailableException({
+            code: 'RETRIEVAL_INCOMPLETE',
+            message: 'Batch retrieval is incomplete; retry the request.',
+            retryable: true,
+          });
+        if (attempt > 0)
+          await new Promise((resolve) =>
+            setTimeout(resolve, 50 * 2 ** attempt),
+          );
+        const result = await this.doc.send(
+          new BatchGetCommand({
+            RequestItems: { [table]: { Keys: pending, ConsistentRead: true } },
+          }),
+          reportRequestOptions(),
+        );
+        found.push(...(result.Responses?.[table] ?? []));
+        pending = result.UnprocessedKeys?.[table]?.Keys ?? [];
+      }
     }
     return found;
   }
@@ -225,6 +303,7 @@ export class DynamoAdapter implements DynamoPort, OnModuleDestroy {
 function buildUpdate(
   set: Record<string, unknown> | undefined,
   remove: string[] | undefined,
+  setIfAbsent?: Record<string, unknown>,
 ): {
   UpdateExpression: string;
   ExpressionAttributeNames?: Record<string, string>;
@@ -242,6 +321,13 @@ function buildUpdate(
     names[name] = key;
     values[placeholder] = value;
     sets.push(`${name} = ${placeholder}`);
+  });
+  Object.entries(setIfAbsent ?? {}).forEach(([key, value], index) => {
+    const name = `#a${index}`;
+    const placeholder = `:a${index}`;
+    names[name] = key;
+    values[placeholder] = value;
+    sets.push(`${name} = if_not_exists(${name}, ${placeholder})`);
   });
   const removals = (remove ?? []).map((key, index) => {
     const name = `#r${index}`;

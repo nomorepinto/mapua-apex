@@ -10,7 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Input } from "@/components/ui/input"
+import { useLocalReport } from "@/hooks/use-reporting"
+import { ReportToolbar } from "@/components/reports/report-toolbar"
 import { LoadingBlock } from "@/components/ui/loading-block"
 import { useOrgPostEvalsQuery } from "@/hooks/use-postevals"
 import {
@@ -20,15 +21,6 @@ import {
 } from "@/lib/dynamodb-adapters"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
-
-type StatusFilter = "all" | "submitted" | "approved" | "denied"
-
-const STATUS_CHIPS: Array<{ value: StatusFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "submitted", label: "Submitted" },
-  { value: "approved", label: "Approved" },
-  { value: "denied", label: "Denied" },
-]
 
 function StatusBadge({ status }: { status: string }) {
   const meta = getPostEvalStatusMeta(status)
@@ -52,9 +44,11 @@ function StatusBadge({ status }: { status: string }) {
  */
 export function PostEvalsPanel() {
   const { data, isPending, isError } = useOrgPostEvalsQuery()
-  const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
-  const [sortDesc, setSortDesc] = useState(true)
+  const report = useLocalReport("postevals", "student-postevals", data)
+  const search = report.filters.search ?? ""
+  const sortDesc = report.filters.sort !== "asc"
+  const setSortDesc = () =>
+    report.setFilters({ ...report.filters, sort: sortDesc ? "asc" : "desc" })
   const [selected, setSelected] = useState<{
     eventId: string
     postevalId: string
@@ -65,23 +59,10 @@ export function PostEvalsPanel() {
     [data]
   )
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return rows
-      .filter((row) => statusFilter === "all" || row.api_status === statusFilter)
-      .filter(
-        (row) =>
-          !query ||
-          row.id.toLowerCase().includes(query) ||
-          row.event_title.toLowerCase().includes(query) ||
-          row.status.toLowerCase().includes(query)
-      )
-      .sort((a, b) => {
-        const left = new Date(a.submitted_at || 0).getTime()
-        const right = new Date(b.submitted_at || 0).getTime()
-        return sortDesc ? right - left : left - right
-      })
-  }, [rows, search, statusFilter, sortDesc])
+  const filtered = useMemo(
+    () => report.rows.map(apiPostEvalToDashboardRow),
+    [report.rows]
+  )
 
   return (
     <div className={cn(layout.section, "overflow-hidden")}>
@@ -94,58 +75,49 @@ export function PostEvalsPanel() {
             Reports filed after each event · OSAAR approval marks it finished
           </p>
         </div>
-        <Input
-          aria-label="Search post-evaluations"
-          className="w-full min-w-0 sm:w-64"
-          onChange={(event) => setSearch(event.currentTarget.value)}
-          placeholder="Search all columns"
-          type="search"
-          value={search}
-        />
       </div>
 
       {/* Status filter chips */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {STATUS_CHIPS.map((chip) => (
-          <button
-            key={chip.value}
-            type="button"
-            onClick={() => setStatusFilter(chip.value)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-              statusFilter === chip.value
-                ? "border-[#8B0000] bg-[#8B0000] text-white"
-                : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50"
-            )}
-          >
-            {chip.label}
-          </button>
-        ))}
+      <div className="mb-4">
+        <ReportToolbar
+          kind="postevals"
+          endpoint="/students/postevals"
+          filters={report.filters}
+          onChange={report.setFilters}
+          onReset={report.reset}
+          options={report.options}
+          count={filtered.length}
+          ready={!isPending && !isError}
+        />
       </div>
 
       <div className={layout.tableWrap}>
-        <Table className={cn(layout.table, "min-w-0 text-left sm:min-w-[36rem]")}>
+        <Table
+          className={cn(layout.table, "min-w-0 text-left sm:min-w-[36rem]")}
+        >
           <TableHeader>
-            <TableRow className="border-b border-neutral-200 text-xs font-bold uppercase tracking-wider text-neutral-600">
-              <TableHead className="pb-3 pr-4 font-bold">Document ID</TableHead>
-              <TableHead className="pb-3 pr-4 font-bold">Event Title</TableHead>
-              <TableHead className="hidden pb-3 pr-4 font-bold sm:table-cell">
+            <TableRow className="border-b border-neutral-200 text-xs font-bold tracking-wider text-neutral-600 uppercase">
+              <TableHead className="pr-4 pb-3 font-bold">Document ID</TableHead>
+              <TableHead className="pr-4 pb-3 font-bold">Event Title</TableHead>
+              <TableHead className="hidden pr-4 pb-3 font-bold sm:table-cell">
                 Attendees
               </TableHead>
-              <TableHead className="hidden pb-3 pr-4 font-bold sm:table-cell">
+              <TableHead className="hidden pr-4 pb-3 font-bold sm:table-cell">
                 Evaluations
               </TableHead>
-              <TableHead className="hidden pb-3 pr-4 font-bold sm:table-cell">
+              <TableHead className="hidden pr-4 pb-3 font-bold sm:table-cell">
                 <button
                   type="button"
-                  onClick={() => setSortDesc((prev) => !prev)}
-                  className="inline-flex items-center gap-1 font-bold uppercase tracking-wider text-neutral-600 hover:text-[#8B0000]"
+                  onClick={setSortDesc}
+                  className="inline-flex items-center gap-1 font-bold tracking-wider text-neutral-600 uppercase hover:text-[#8B0000]"
                 >
                   Date Filed
                   <span aria-hidden>{sortDesc ? "↓" : "↑"}</span>
                 </button>
               </TableHead>
-              <TableHead className="pb-3 text-right font-bold">Status</TableHead>
+              <TableHead className="pb-3 text-right font-bold">
+                Status
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="divide-y divide-neutral-50">
@@ -191,7 +163,7 @@ export function PostEvalsPanel() {
                 >
                   {search.trim()
                     ? `No post-evaluations match “${search.trim()}”.`
-                    : "No post-evaluations match the selected status."}
+                    : "No post-evaluations match the selected filters."}
                 </TableCell>
               </TableRow>
             ) : (

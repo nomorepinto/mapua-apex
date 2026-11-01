@@ -15,12 +15,20 @@ export interface Desk {
 export class OrganizationRepository {
   constructor(private readonly table: DynamoTable) {}
 
-  list(): Promise<Item[]> {
-    return this.table.scan({
-      filter: 'begins_with(PK, :pk) AND PK = SK',
-      values: { ':pk': 'ORGANIZATION#' },
-      maxItems: 100,
-    });
+  async list(): Promise<Item[]> {
+    const items: Item[] = [];
+    let startKey: Item | undefined;
+    do {
+      const page = await this.table.scanPage({
+        filter: 'begins_with(PK, :pk) AND PK = SK',
+        values: { ':pk': 'ORGANIZATION#' },
+        maxItems: 200,
+        startKey,
+      });
+      items.push(...page.items);
+      startKey = page.lastKey;
+    } while (startKey);
+    return items;
   }
 
   get(id: string): Promise<Item | undefined> {

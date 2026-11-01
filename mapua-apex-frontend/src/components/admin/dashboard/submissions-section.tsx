@@ -1,9 +1,9 @@
-import { SearchIcon } from "lucide-react"
+import { useMemo } from "react"
+import { useLocalReport } from "@/hooks/use-reporting"
+import { ReportToolbar } from "@/components/reports/report-toolbar"
 
 import { useAdminDashboard } from "@/components/admin/dashboard/admin-dashboard-context"
-import { SubmissionsFilterHeader } from "@/components/admin/dashboard/submissions-filter-header"
 import { SubmissionsSortHeader } from "@/components/admin/dashboard/submissions-sort-header"
-import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -18,6 +18,20 @@ import { cn } from "@/lib/utils"
 
 export function AdminSubmissionsSection() {
   const { state, actions } = useAdminDashboard()
+  const report = useLocalReport(
+    "proposals",
+    "admin-proposals",
+    state.rawSubmissions
+  )
+  const filteredRows = useMemo(() => {
+    const mapped = new Map(
+      state.rows.map((row) => [`${row.event_id}:${row.submission_id}`, row])
+    )
+    return report.rows.flatMap((item) => {
+      const row = mapped.get(`${item.event_id}:${item.submission_id}`)
+      return row ? [row] : []
+    })
+  }, [report.rows, state.rows])
 
   return (
     <section
@@ -27,75 +41,55 @@ export function AdminSubmissionsSection() {
     >
       <div className="mb-5 flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 sm:max-w-sm">
-          <h2 className="text-lg font-extrabold text-neutral-900">Submissions</h2>
+          <h2 className="text-lg font-extrabold text-neutral-900">
+            Submissions
+          </h2>
           <p className="text-xs text-neutral-500">
-            Search every column or filter by a column header, then open a row
-            for the full SAAF record.
+            Filter the proposal cohort, then open a row for the full SAAF
+            record.
           </p>
-        </div>
-        <div className="w-full sm:max-w-xs sm:w-auto">
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
-            <Input
-              aria-label="Search submissions"
-              className="pl-9"
-              onChange={(event) => actions.setSearch(event.currentTarget.value)}
-              placeholder="Search all columns"
-              type="search"
-              value={state.search}
-            />
-          </div>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1">
+      <ReportToolbar
+        kind="proposals"
+        endpoint="/admins/submissions"
+        filters={report.filters}
+        onChange={report.setFilters}
+        onReset={report.reset}
+        options={report.options}
+        count={filteredRows.length}
+        ready={!state.submissionsLoading && !state.submissionsError}
+      />
+      <div className="mt-4 min-h-0 flex-1">
         <Table
           className={layout.table}
           containerClassName="max-h-[36rem] overflow-auto rounded-xl border border-neutral-200/80 shadow-2xs"
         >
           <TableHeader className="sticky top-0 z-10 bg-white shadow-xs [&_th]:bg-white">
             <TableRow className="border-b border-neutral-200 text-neutral-500">
-              <TableHead className="text-xs font-bold uppercase">Event</TableHead>
-              <SubmissionsFilterHeader
-                label="Organization"
-                column="organization"
-                options={state.filterOptions.organization}
-                selected={state.columnFilters.organization}
-                onToggle={actions.toggleColumnFilter}
-                onClear={actions.clearColumnFilter}
-              />
-              <SubmissionsFilterHeader
-                label="Department"
-                column="department"
-                options={state.filterOptions.department}
-                selected={state.columnFilters.department}
-                onToggle={actions.toggleColumnFilter}
-                onClear={actions.clearColumnFilter}
-              />
-              <SubmissionsFilterHeader
-                label="Type"
-                column="type"
-                capitalize
-                options={state.filterOptions.type}
-                selected={state.columnFilters.type}
-                onToggle={actions.toggleColumnFilter}
-                onClear={actions.clearColumnFilter}
-              />
+              <TableHead className="text-xs font-bold uppercase">
+                Event
+              </TableHead>
+              <TableHead>Organization</TableHead>
+              <TableHead>Proponent department</TableHead>
+              <TableHead>Type</TableHead>
               <SubmissionsSortHeader
-                label="Submitted"
-                direction={state.dateSortDirection}
-                onSort={actions.toggleDateSort}
+                label="Latest submitted"
+                direction={
+                  report.filters.date_basis === "latest_submitted_at"
+                    ? (report.filters.sort ?? "desc")
+                    : null
+                }
+                onSort={() =>
+                  report.setFilters({
+                    ...report.filters,
+                    date_basis: "latest_submitted_at",
+                    sort: report.filters.sort === "asc" ? "desc" : "asc",
+                  })
+                }
               />
-              <SubmissionsFilterHeader
-                label="Status"
-                column="status"
-                align="right"
-                className="text-right"
-                options={state.filterOptions.status}
-                selected={state.columnFilters.status}
-                onToggle={actions.toggleColumnFilter}
-                onClear={actions.clearColumnFilter}
-              />
+              <TableHead className="text-right">Current status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -114,7 +108,7 @@ export function AdminSubmissionsSection() {
                   Could not load submissions.
                 </TableCell>
               </TableRow>
-            ) : state.filteredRows.length === 0 ? (
+            ) : filteredRows.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={6}
@@ -122,13 +116,13 @@ export function AdminSubmissionsSection() {
                 >
                   {state.rows.length === 0
                     ? "No submissions to review yet."
-                    : state.search.trim()
-                      ? `No submissions match “${state.search.trim()}”.`
+                    : report.filters.search?.trim()
+                      ? `No submissions match “${report.filters.search?.trim()}”.`
                       : "No submissions match the selected filters."}
                 </TableCell>
               </TableRow>
             ) : (
-              state.filteredRows.map((row) => (
+              filteredRows.map((row) => (
                 <TableRow
                   key={`${row.event_id}:${row.submission_id}`}
                   className="cursor-pointer hover:bg-neutral-50"

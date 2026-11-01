@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { generateReport } from '../common/reporting.js';
 import { stripPrefix } from '../common/dynamo-keys.js';
 import { str, type Item } from '../common/records.js';
 import { OrganizationRepository } from '../organizations/organization.repository.js';
@@ -17,32 +22,75 @@ export class SubmissionQueryService {
     private readonly routing: RoutingService,
   ) {}
 
-  async studentList(organizationId: string): Promise<Item[]> {
-    const own = await this.submissions.listOrgSubmissions(organizationId);
-    const collab = await this.submissions.listCollaborations(organizationId);
-    const seen = new Set(own.map((item) => `${item.PK}|${item.SK}`));
-    const merged: Item[] = own.map((item) =>
-      toSubmission(item, { role: 'proponent' }),
+  report(
+    input: unknown,
+    scope: 'admin' | 'student' | 'history',
+    id = '',
+  ): Promise<Item> {
+    return generateReport(
+      'proposals',
+      input,
+      scope === 'admin'
+        ? 'All administratively visible proposals'
+        : `${scope}: ${id}`,
+      () =>
+        scope === 'admin'
+          ? this.iterateAdmin()
+          : scope === 'student'
+            ? this.iterateStudent(id)
+            : this.iterateHistory(id),
     );
-    for (const pointer of collab) {
-      const eventId = str(pointer, 'event_id');
-      const submissionId = str(pointer, 'submission_id');
-      if (!eventId || !submissionId) {
-        continue;
-      }
-      const master = await this.submissions.getSubmission(
-        eventId,
-        submissionId,
-      );
-      if (!master || seen.has(`${master.PK}|${master.SK}`)) {
-        continue;
-      }
-      seen.add(`${master.PK}|${master.SK}`);
-      merged.push(toSubmission(master, { role: 'dependent' }));
-    }
-    return merged.sort((left, right) =>
+  }
+
+  async studentList(organizationId: string): Promise<Item[]> {
+    const rows: Item[] = [];
+    for await (const row of this.iterateStudent(organizationId)) rows.push(row);
+    return rows.sort((left, right) =>
       String(right.sent_at).localeCompare(String(left.sent_at)),
     );
+  }
+
+  private async *iterateStudent(organizationId: string): AsyncGenerator<Item> {
+    const seen = new Set<string>();
+    for await (const item of this.submissions.iterateOrgSubmissions(
+      organizationId,
+    )) {
+      seen.add(`${item.PK}|${item.SK}`);
+      yield toSubmission(item, { role: 'proponent' });
+    }
+    const collab = await this.submissions.listCollaborations(organizationId);
+    const keys = collab.map((pointer) => ({
+      eventId: str(pointer, 'event_id') ?? '',
+      submissionId: str(pointer, 'submission_id') ?? '',
+    }));
+    if (keys.some((key) => !key.eventId || !key.submissionId))
+      throw new ServiceUnavailableException({
+        code: 'RETRIEVAL_INCOMPLETE',
+        message:
+          'Collaboration references are incomplete. Retry after records are repaired.',
+      });
+    for (let offset = 0; offset < keys.length; offset += 100) {
+      const batch = keys.slice(offset, offset + 100);
+      const masters = await this.submissions.batchSubmissions(batch);
+      if (
+        masters.length !==
+        new Set(batch.map((key) => `${key.eventId}|${key.submissionId}`)).size
+      )
+        throw new ServiceUnavailableException({
+          code: 'RETRIEVAL_INCOMPLETE',
+          message:
+            'A linked proposal could not be retrieved. Retry after records are repaired.',
+        });
+      for (const master of masters) {
+        if (
+          seen.has(`${master.PK}|${master.SK}`) ||
+          !dependentIds(master).includes(organizationId)
+        )
+          continue;
+        seen.add(`${master.PK}|${master.SK}`);
+        yield toSubmission(master, { role: 'dependent' });
+      }
+    }
   }
 
   async studentShow(
@@ -82,6 +130,12 @@ export class SubmissionQueryService {
   }
 
   async history(signatoryId: string): Promise<Item[]> {
+    const rows: Item[] = [];
+    for await (const row of this.iterateHistory(signatoryId)) rows.push(row);
+    return rows;
+  }
+
+  private async *iterateHistory(signatoryId: string): AsyncGenerator<Item> {
     const person = await this.signatories.get(signatoryId);
     const role = person ? (str(person, 'role') ?? '') : '';
     const department = person
@@ -89,14 +143,12 @@ export class SubmissionQueryService {
       : '';
     const bare = stripPrefix(signatoryId, 'SIGNATORY#') ?? signatoryId;
     const organizations = await this.organizations.list();
-    const rows: Item[] = [];
     for (const org of organizations) {
       const orgId = stripPrefix(org.PK, 'ORGANIZATION#') ?? '';
       const adviser = desksOf(org).some(
         (desk) => desk.role === 'adviser' && desk.signatory_id === bare,
       );
-      const submissions = await this.submissions.listOrgSubmissions(orgId);
-      for (const item of submissions) {
+      for await (const item of this.submissions.iterateOrgSubmissions(orgId)) {
         const status = str(item, 'status');
         const onDesk =
           (status === 'pending' || status === 'returned') &&
@@ -118,13 +170,10 @@ export class SubmissionQueryService {
           deanMatch ||
           inSequence
         ) {
-          rows.push(
-            toSubmission(item, { organization_name: str(org, 'name') }),
-          );
+          yield toSubmission(item, { organization_name: str(org, 'name') });
         }
       }
     }
-    return rows;
   }
 
   async adminList(
@@ -132,16 +181,29 @@ export class SubmissionQueryService {
     activityType?: string,
     organizationId?: string,
   ): Promise<Item[]> {
+    const rows: Item[] = [];
+    for await (const row of this.iterateAdmin(
+      status,
+      activityType,
+      organizationId,
+    ))
+      rows.push(row);
+    return rows;
+  }
+
+  private async *iterateAdmin(
+    status?: string,
+    activityType?: string,
+    organizationId?: string,
+  ): AsyncGenerator<Item> {
     const orgs = organizationId
       ? [await this.organizations.get(organizationId)].filter(
           (org): org is Item => Boolean(org),
         )
       : await this.organizations.list();
-    const rows: Item[] = [];
     for (const org of orgs) {
       const orgId = stripPrefix(org.PK, 'ORGANIZATION#') ?? '';
-      const submissions = await this.submissions.listOrgSubmissions(orgId);
-      for (const item of submissions) {
+      for await (const item of this.submissions.iterateOrgSubmissions(orgId)) {
         if (status && str(item, 'status') !== status) {
           continue;
         }
@@ -152,10 +214,9 @@ export class SubmissionQueryService {
         if (activityType && type !== activityType) {
           continue;
         }
-        rows.push(toSubmission(item, { organization_name: str(org, 'name') }));
+        yield toSubmission(item, { organization_name: str(org, 'name') });
       }
     }
-    return rows;
   }
 
   async adminShow(eventId: string, submissionId: string): Promise<Item> {

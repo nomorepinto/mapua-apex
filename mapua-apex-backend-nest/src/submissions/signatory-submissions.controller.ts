@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { filterCollection } from '../common/reporting.js';
 import { Roles, SignatoryId } from '../common/decorators.js';
 import type { Item } from '../common/records.js';
 import { ClassificationPatchDto, CommentDto } from './dto/saaf.dto.js';
@@ -23,8 +34,25 @@ export class SignatorySubmissionsController {
   }
 
   @Get('submissions/history')
-  history(@SignatoryId() signatoryId: string): Promise<Item[]> {
-    return this.query.history(signatoryId);
+  async history(
+    @SignatoryId() signatoryId: string,
+    @Query('filters') filters?: string,
+  ): Promise<Item[]> {
+    return filterCollection(
+      'proposals',
+      await this.query.history(signatoryId),
+      filters,
+    );
+  }
+
+  @Post('submissions/history/report')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  report(
+    @SignatoryId() signatoryId: string,
+    @Body() body: unknown,
+  ): Promise<Item> {
+    return this.query.report(body, 'history', signatoryId);
   }
 
   @Get('events/:event/submissions/:submission')

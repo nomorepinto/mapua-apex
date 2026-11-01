@@ -70,6 +70,8 @@ export class SubmissionWriterService {
       sentAt,
       planned,
     );
+    item.first_submitted_at = sentAt;
+    item.first_submitted_at_source = 'recorded';
     await this.submissions.putSubmission(item, 'attribute_not_exists(SK)');
     await this.bookings.commit(planned);
     for (const dependent of dependents) {
@@ -159,7 +161,7 @@ export class SubmissionWriterService {
       sentAt,
       planned,
     );
-    await this.submissions.putSubmission(item);
+    const updated = await this.submissions.replaceEditable(existing, item);
     await this.bookings.releaseRefs(previousRefs);
     await this.bookings.commit(planned);
     const previousDependents = dependentIds(existing);
@@ -182,7 +184,7 @@ export class SubmissionWriterService {
         submissionId,
       );
     }
-    return { before: existing, after: item };
+    return { before: existing, after: updated };
   }
 
   private async resolveDependents(

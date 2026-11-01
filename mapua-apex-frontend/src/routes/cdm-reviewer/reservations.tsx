@@ -7,6 +7,7 @@ import {
 } from "@/components/cdm/reservations/reservations-context"
 import { FormPageHeader } from "@/components/forms/form-page-header"
 import { Card, CardPanel } from "@/components/ui/card"
+import { ReportToolbar } from "@/components/reports/report-toolbar"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -19,7 +20,7 @@ export function CdmReservationsPage() {
 }
 
 function ReservationsBody() {
-  const { state, actions } = useReservationsPage()
+  const { state, actions, report } = useReservationsPage()
 
   return (
     <div className={layout.page}>
@@ -40,6 +41,19 @@ function ReservationsBody() {
             />
           </CardPanel>
         </Card>
+
+        {state.campusId && (
+          <ReportToolbar
+            kind="reservation_changes"
+            endpoint={`/admins/campuses/${encodeURIComponent(state.campusId)}/reservation-changes`}
+            filters={report.filters}
+            onChange={report.setFilters}
+            onReset={report.reset}
+            options={report.options}
+            count={report.rows.length}
+            ready={!state.changesLoading && !state.changesError}
+          />
+        )}
 
         <div
           className={cn(

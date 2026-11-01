@@ -28,6 +28,8 @@ export class ActivityLogService {
     entityName: string;
     description: string;
     organizationName: string;
+    organizationId?: string;
+    eventId?: string;
     after: unknown;
   }): Promise<void> {
     try {
@@ -51,6 +53,10 @@ export class ActivityLogService {
         entityId: input.entityId,
         entityName: input.entityName,
         organizationName: input.organizationName,
+        ...(input.organizationId
+          ? { organizationId: input.organizationId }
+          : {}),
+        ...(input.eventId ? { eventId: input.eventId } : {}),
         description: input.description,
         TTL:
           Math.floor(Date.now() / 1000) +

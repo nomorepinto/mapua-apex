@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Header,
+  Query,
   HttpCode,
   Param,
   Post,
@@ -15,6 +17,7 @@ import { SubmissionQueryService } from './submission-query.service.js';
 import { SubmissionWriterService } from './submission-writer.service.js';
 import { RoutingService } from './routing.service.js';
 import type { Item } from '../common/records.js';
+import { filterCollection } from '../common/reporting.js';
 
 @Controller('students')
 @Roles('student')
@@ -27,8 +30,25 @@ export class StudentSubmissionsController {
   ) {}
 
   @Get('submissions')
-  list(@OrganizationId() organizationId: string): Promise<Item[]> {
-    return this.query.studentList(organizationId);
+  async list(
+    @OrganizationId() organizationId: string,
+    @Query('filters') filters?: string,
+  ): Promise<Item[]> {
+    return filterCollection(
+      'proposals',
+      await this.query.studentList(organizationId),
+      filters,
+    );
+  }
+
+  @Post('submissions/report')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  report(
+    @OrganizationId() organizationId: string,
+    @Body() body: unknown,
+  ): Promise<Item> {
+    return this.query.report(body, 'student', organizationId);
   }
 
   @Post('submissions')

@@ -1,4 +1,14 @@
-import { Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { filterCollection } from '../common/reporting.js';
 import { Roles } from '../common/decorators.js';
 import type { Item } from '../common/records.js';
 import { PostEvalService } from './posteval.service.js';
@@ -9,11 +19,23 @@ export class AdminPostEvalsController {
   constructor(private readonly postevals: PostEvalService) {}
 
   @Get('postevals')
-  list(
+  async list(
     @Query('status') status?: string,
     @Query('organization_id') organizationId?: string,
+    @Query('filters') filters?: string,
   ): Promise<Item[]> {
-    return this.postevals.adminList(status, organizationId);
+    return filterCollection(
+      'postevals',
+      await this.postevals.adminList(status, organizationId),
+      filters,
+    );
+  }
+
+  @Post('postevals/report')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  report(@Body() body: unknown): Promise<Item> {
+    return this.postevals.report(body);
   }
 
   @Get('postevals/:event/:posteval')

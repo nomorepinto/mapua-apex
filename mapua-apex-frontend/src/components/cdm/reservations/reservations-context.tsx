@@ -2,6 +2,7 @@
 import { createContext, useState, type ReactNode } from "react"
 import { use } from "react"
 import { useSearchParams } from "react-router"
+import { useLocalReport } from "@/hooks/use-reporting"
 
 import { useAdminCampusesQuery } from "@/hooks/use-campuses"
 import { useAdminReservablesQuery } from "@/hooks/use-reservables"
@@ -49,6 +50,7 @@ interface ReservationsActions {
 }
 
 interface ReservationsContextValue {
+  report: ReturnType<typeof useLocalReport<ApiReservationChange>>
   state: ReservationsState
   actions: ReservationsActions
 }
@@ -73,36 +75,60 @@ export function useReservationsPage() {
  */
 export function ReservationsProvider({ children }: { children: ReactNode }) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const status = parseStatus(searchParams.get("status"))
+  const legacyStatus = parseStatus(searchParams.get("status"))
 
   const campusesQuery = useAdminCampusesQuery()
   const campuses = campusesQuery.data ?? EMPTY_CAMPUSES
 
   // Default to the first campus; the override is set only when CDM picks one.
-  const [campusOverride, setCampusOverride] = useState<string | null>(null)
+  const campusOverride = searchParams.get("reservation-campus")
   const activeCampus =
     campuses.find((campus) => campus.campus_id === campusOverride) ??
     campuses[0] ??
     null
   const campusId = activeCampus?.campus_id ?? null
 
-  const changesQuery = useAdminReservationChangesQuery(campusId, status)
-  const changes = changesQuery.data ?? EMPTY_CHANGES
+  const changesQuery = useAdminReservationChangesQuery(campusId, "all")
+  const report = useLocalReport(
+    "reservation_changes",
+    `reservation-history-${campusId ?? "none"}`,
+    changesQuery.isError ? EMPTY_CHANGES : (changesQuery.data ?? EMPTY_CHANGES),
+    { values: { status: legacyStatus === "pending" ? ["pending"] : [] } }
+  )
+  const changes = report.rows
+  const status =
+    report.filters.values?.status?.length === 1 &&
+    report.filters.values.status[0] === "pending"
+      ? "pending"
+      : "all"
   const reservablesQuery = useAdminReservablesQuery(campusId)
   const reservables = reservablesQuery.data ?? EMPTY_RESERVABLES
 
   const [selectedChangeId, setSelectedChangeId] = useState<string | null>(null)
+  const [previousCampus, setPreviousCampus] = useState(campusId)
+  if (previousCampus !== campusId) {
+    setPreviousCampus(campusId)
+    setSelectedChangeId(null)
+  }
   const detailQuery = useAdminReservationChangeQuery(campusId, selectedChangeId)
   const resolve = useResolveReservationChangeMutation()
 
   function setStatus(next: ReservationChangeFilter) {
-    const params = new URLSearchParams(searchParams)
-    params.set("status", next)
-    setSearchParams(params, { replace: true })
+    report.setFilters({
+      ...report.filters,
+      values: {
+        ...report.filters.values,
+        status: next === "pending" ? ["pending"] : [],
+      },
+    })
   }
 
   function setCampusId(next: string) {
-    setCampusOverride(next)
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current)
+      params.set("reservation-campus", next)
+      return params
+    })
     // A request belongs to one campus, so switching clears the pick.
     setSelectedChangeId(null)
   }
@@ -113,13 +139,14 @@ export function ReservationsProvider({ children }: { children: ReactNode }) {
     : null
 
   const value: ReservationsContextValue = {
+    report,
     state: {
       campuses,
       campusId,
       campusesLoading: campusesQuery.isLoading,
       status,
       changes,
-      changesLoading: changesQuery.isLoading,
+      changesLoading: changesQuery.isPending || changesQuery.isFetching,
       changesError,
       reservables,
       selectedChangeId,
@@ -134,7 +161,5 @@ export function ReservationsProvider({ children }: { children: ReactNode }) {
     },
   }
 
-  return (
-    <ReservationsContext value={value}>{children}</ReservationsContext>
-  )
+  return <ReservationsContext value={value}>{children}</ReservationsContext>
 }

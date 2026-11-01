@@ -60,11 +60,19 @@ export class ApiExceptionFilter implements ExceptionFilter {
           }
           return { status, body };
         }
-        const record = raw as { message?: string | string[]; errors?: unknown };
+        const record = raw as {
+          message?: string | string[];
+          errors?: unknown;
+          code?: unknown;
+          retryable?: unknown;
+        };
         const message = Array.isArray(record.message)
           ? record.message[0]
           : (record.message ?? exception.message);
         const body: Record<string, unknown> = { message };
+        if (typeof record.code === 'string') body.code = record.code;
+        if (typeof record.retryable === 'boolean')
+          body.retryable = record.retryable;
         if (record.errors) {
           body.errors = record.errors;
         }

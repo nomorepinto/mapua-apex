@@ -14,6 +14,7 @@ import {
   useCurrentOrganizationQuery,
   useSubmissionDetailQuery,
   useSubmissionNotificationsQuery,
+  fetchSubmissionNotifications,
 } from "@/hooks/use-submissions"
 import {
   apiNotificationsToStepper,
@@ -38,6 +39,8 @@ import {
 import { ActivityBudgetTable } from "@/components/ui/activity-budget-table"
 import { ActivityReservationDetails } from "@/components/ui/activity-reservation-details"
 import { saveActivityAsPdf, saveSubmissionAsPdf } from "@/lib/save-proposal-pdf"
+import { RecordTimeline } from "@/components/reports/record-timeline"
+import { proposalTimeline } from "@/lib/timeline-reporting"
 
 interface SubmissionTrackerModalProps {
   isOpen: boolean
@@ -89,7 +92,8 @@ export function SubmissionTrackerModal({
   const isDenied = detailQuery.data?.status === "denied"
 
   const returnNotifications = useMemo(() => {
-    if (!notificationsQuery.data || notificationsQuery.data.length === 0) return []
+    if (!notificationsQuery.data || notificationsQuery.data.length === 0)
+      return []
     return notificationsQuery.data
       .filter((item) => item.notif_type === "returned")
       .sort((a, b) => (b.sent_at || "").localeCompare(a.sent_at || ""))
@@ -101,12 +105,17 @@ export function SubmissionTrackerModal({
     if (!latestReturnNotification) return null
     const chain = detailQuery.data?.signatory_chain
     if (Array.isArray(chain) && chain.length > 0) {
-      const stripId = (val?: string | null) => (val || "").replace(/^SIGNATORY#/i, "").trim()
+      const stripId = (val?: string | null) =>
+        (val || "").replace(/^SIGNATORY#/i, "").trim()
       const link = chain.find(
-        (c) => stripId(c.signatory_id) === stripId(latestReturnNotification.signatory)
+        (c) =>
+          stripId(c.signatory_id) ===
+          stripId(latestReturnNotification.signatory)
       )
       if (link) {
-        const distinctOrgs = new Set(chain.map((c) => c.organization_id).filter(Boolean))
+        const distinctOrgs = new Set(
+          chain.map((c) => c.organization_id).filter(Boolean)
+        )
         return signatoryChainLabel(link, distinctOrgs.size > 1)
       }
     }
@@ -114,14 +123,20 @@ export function SubmissionTrackerModal({
       latestReturnNotification.signatory,
       orgQuery.data?.signatories
     )
-  }, [latestReturnNotification, detailQuery.data?.signatory_chain, orgQuery.data?.signatories])
+  }, [
+    latestReturnNotification,
+    detailQuery.data?.signatory_chain,
+    orgQuery.data?.signatories,
+  ])
 
   const latestDeniedNotification = useMemo(() => {
-    if (!notificationsQuery.data || notificationsQuery.data.length === 0) return null
+    if (!notificationsQuery.data || notificationsQuery.data.length === 0)
+      return null
     return (
       notificationsQuery.data
         .filter((n) => n.notif_type === "denied")
-        .sort((a, b) => (b.sent_at || "").localeCompare(a.sent_at || ""))[0] || null
+        .sort((a, b) => (b.sent_at || "").localeCompare(a.sent_at || ""))[0] ||
+      null
     )
   }, [notificationsQuery.data])
 
@@ -182,7 +197,7 @@ export function SubmissionTrackerModal({
               ) : null}
             </div>
 
-            <DialogTitle className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight text-white">
+            <DialogTitle className="text-2xl leading-tight font-extrabold tracking-tight text-white sm:text-3xl">
               {detailQuery.isLoading
                 ? "Loading submission…"
                 : `${activity?.title || "Submission"} Proposal`}
@@ -194,15 +209,15 @@ export function SubmissionTrackerModal({
             </p>
 
             <div className="mt-4 flex items-center">
-              <div className="inline-flex items-center rounded-xl bg-black/20 p-1 border border-white/10 backdrop-blur-xs">
+              <div className="inline-flex items-center rounded-xl border border-white/10 bg-black/20 p-1 backdrop-blur-xs">
                 <button
                   type="button"
                   onClick={() => setActiveTab("details")}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer",
+                    "flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all",
                     activeTab === "details"
                       ? "bg-white text-[#8B0000] shadow-xs"
-                      : "text-white/80 hover:text-white hover:bg-white/10"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
                   )}
                 >
                   <FileText className="h-3.5 w-3.5" />
@@ -212,10 +227,10 @@ export function SubmissionTrackerModal({
                   type="button"
                   onClick={() => setActiveTab("progress")}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer",
+                    "flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all",
                     activeTab === "progress"
                       ? "bg-white text-[#8B0000] shadow-xs"
-                      : "text-white/80 hover:text-white hover:bg-white/10"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
                   )}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -239,28 +254,31 @@ export function SubmissionTrackerModal({
           ) : null}
 
           {canResubmit && !isDependent ? (
-            <div className="mb-6 rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50 to-amber-50/60 p-4 sm:p-5 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="mb-6 rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50 to-amber-50/60 p-4 shadow-xs sm:p-5">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                 <div className="flex items-start gap-3">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/20 text-amber-900">
                     <AlertCircle className="size-5 text-amber-800" />
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-base font-bold text-amber-950">Application Returned</span>
-                      <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-900">
+                      <span className="text-base font-bold text-amber-950">
+                        Application Returned
+                      </span>
+                      <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-extrabold tracking-wider text-amber-900 uppercase">
                         Action Required
                       </span>
                     </div>
-                    <p className="text-xs text-amber-800/90 mt-0.5">
-                      Update this application and resubmit it to the current signatory.
+                    <p className="mt-0.5 text-xs text-amber-800/90">
+                      Update this application and resubmit it to the current
+                      signatory.
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleResubmit}
-                  className="cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#8B0000] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#700000] transition-colors shrink-0"
+                  className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[#8B0000] px-4 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-[#700000]"
                 >
                   Edit and resubmit
                 </button>
@@ -270,16 +288,23 @@ export function SubmissionTrackerModal({
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 pb-2.5">
                   <div className="flex items-center gap-2">
                     <MessageSquare className="size-3.5 text-amber-700" />
-                    <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                    <span className="text-xs font-bold tracking-wider text-amber-950 uppercase">
                       Reason for Return
                     </span>
                   </div>
-                  {(returnSignatoryLabel || latestReturnNotification?.sent_at) && (
+                  {(returnSignatoryLabel ||
+                    latestReturnNotification?.sent_at) && (
                     <span className="text-xs font-medium text-neutral-500">
-                      {returnSignatoryLabel ? `Returned by ${returnSignatoryLabel}` : ""}
-                      {returnSignatoryLabel && latestReturnNotification?.sent_at ? " • " : ""}
+                      {returnSignatoryLabel
+                        ? `Returned by ${returnSignatoryLabel}`
+                        : ""}
+                      {returnSignatoryLabel && latestReturnNotification?.sent_at
+                        ? " • "
+                        : ""}
                       {latestReturnNotification?.sent_at
-                        ? formatDisplayDateTime(latestReturnNotification.sent_at)
+                        ? formatDisplayDateTime(
+                            latestReturnNotification.sent_at
+                          )
                         : ""}
                     </span>
                   )}
@@ -293,11 +318,11 @@ export function SubmissionTrackerModal({
                       rowClassName="h-4 w-full"
                     />
                   ) : latestReturnNotification?.comment ? (
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium text-neutral-800">
+                    <p className="text-sm leading-relaxed font-medium whitespace-pre-wrap text-neutral-800">
                       {latestReturnNotification.comment}
                     </p>
                   ) : (
-                    <p className="text-xs italic text-neutral-500">
+                    <p className="text-xs text-neutral-500 italic">
                       No specific remarks were provided by the reviewer.
                     </p>
                   )}
@@ -305,15 +330,19 @@ export function SubmissionTrackerModal({
 
                 {returnNotifications.length > 1 && (
                   <details className="mt-3 border-t border-amber-100/80 pt-2.5 text-xs">
-                    <summary className="cursor-pointer font-semibold text-amber-900 hover:text-amber-950 select-none">
-                      Previous Return Feedback ({returnNotifications.length - 1} earlier)
+                    <summary className="cursor-pointer font-semibold text-amber-900 select-none hover:text-amber-950">
+                      Previous Return Feedback ({returnNotifications.length - 1}{" "}
+                      earlier)
                     </summary>
-                    <div className="mt-2 space-y-2.5 pl-2 border-l-2 border-amber-200">
+                    <div className="mt-2 space-y-2.5 border-l-2 border-amber-200 pl-2">
                       {returnNotifications.slice(1).map((item, idx) => (
                         <div key={`${item.sent_at}-${idx}`} className="text-xs">
                           <div className="font-semibold text-neutral-600">
-                            {formatSignatoryRole(item.signatory, orgQuery.data?.signatories)} •{" "}
-                            {formatDisplayDateTime(item.sent_at)}
+                            {formatSignatoryRole(
+                              item.signatory,
+                              orgQuery.data?.signatories
+                            )}{" "}
+                            • {formatDisplayDateTime(item.sent_at)}
                           </div>
                           <p className="mt-0.5 whitespace-pre-wrap text-neutral-700">
                             {item.comment || "No comment"}
@@ -328,20 +357,24 @@ export function SubmissionTrackerModal({
           ) : null}
 
           {isDependent && canResubmit ? (
-            <div className="mb-6 rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50 to-amber-50/60 p-4 sm:p-5 shadow-xs">
+            <div className="mb-6 rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50 to-amber-50/60 p-4 shadow-xs sm:p-5">
               <div className="flex items-start gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-900 border border-amber-500/30">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/20 text-amber-900">
                   <AlertCircle className="size-5 text-amber-800" />
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-base font-bold text-amber-950">Application Returned</span>
-                    <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-900">
+                    <span className="text-base font-bold text-amber-950">
+                      Application Returned
+                    </span>
+                    <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-extrabold tracking-wider text-amber-900 uppercase">
                       Collaborator View
                     </span>
                   </div>
-                  <p className="text-xs text-amber-800/90 mt-0.5">
-                    This application was returned for revision. As a collaborating organization, this view is read-only — the proponent organization manages edits and resubmission.
+                  <p className="mt-0.5 text-xs text-amber-800/90">
+                    This application was returned for revision. As a
+                    collaborating organization, this view is read-only — the
+                    proponent organization manages edits and resubmission.
                   </p>
                 </div>
               </div>
@@ -350,16 +383,23 @@ export function SubmissionTrackerModal({
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 pb-2.5">
                   <div className="flex items-center gap-2">
                     <MessageSquare className="size-3.5 text-amber-700" />
-                    <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                    <span className="text-xs font-bold tracking-wider text-amber-950 uppercase">
                       Reason for Return
                     </span>
                   </div>
-                  {(returnSignatoryLabel || latestReturnNotification?.sent_at) && (
+                  {(returnSignatoryLabel ||
+                    latestReturnNotification?.sent_at) && (
                     <span className="text-xs font-medium text-neutral-500">
-                      {returnSignatoryLabel ? `Returned by ${returnSignatoryLabel}` : ""}
-                      {returnSignatoryLabel && latestReturnNotification?.sent_at ? " • " : ""}
+                      {returnSignatoryLabel
+                        ? `Returned by ${returnSignatoryLabel}`
+                        : ""}
+                      {returnSignatoryLabel && latestReturnNotification?.sent_at
+                        ? " • "
+                        : ""}
                       {latestReturnNotification?.sent_at
-                        ? formatDisplayDateTime(latestReturnNotification.sent_at)
+                        ? formatDisplayDateTime(
+                            latestReturnNotification.sent_at
+                          )
                         : ""}
                     </span>
                   )}
@@ -373,11 +413,11 @@ export function SubmissionTrackerModal({
                       rowClassName="h-4 w-full"
                     />
                   ) : latestReturnNotification?.comment ? (
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed font-medium text-neutral-800">
+                    <p className="text-sm leading-relaxed font-medium whitespace-pre-wrap text-neutral-800">
                       {latestReturnNotification.comment}
                     </p>
                   ) : (
-                    <p className="text-xs italic text-neutral-500">
+                    <p className="text-xs text-neutral-500 italic">
                       No specific remarks were provided by the reviewer.
                     </p>
                   )}
@@ -386,12 +426,14 @@ export function SubmissionTrackerModal({
             </div>
           ) : isDependent ? (
             <div className="mb-6 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-600">
-              You are a collaborating organization on this application. It is read-only — the proponent organization manages edits and resubmission.
+              You are a collaborating organization on this application. It is
+              read-only — the proponent organization manages edits and
+              resubmission.
             </div>
           ) : null}
 
           {isDenied ? (
-            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 sm:p-5 text-rose-900 shadow-2xs">
+            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900 shadow-2xs sm:p-5">
               <div className="flex items-center gap-2.5">
                 <AlertCircle className="size-4 shrink-0 text-rose-600" />
                 <p className="text-sm font-bold text-rose-900">
@@ -400,10 +442,10 @@ export function SubmissionTrackerModal({
               </div>
               {latestDeniedNotification?.comment ? (
                 <div className="mt-3 rounded-xl border border-rose-200/80 bg-white/90 p-3.5 shadow-2xs">
-                  <span className="text-[11px] font-bold text-rose-900 uppercase tracking-wider block mb-1">
+                  <span className="mb-1 block text-[11px] font-bold tracking-wider text-rose-900 uppercase">
                     Reason for Rejection
                   </span>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-800">
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-neutral-800">
                     {latestDeniedNotification.comment}
                   </p>
                 </div>
@@ -414,17 +456,21 @@ export function SubmissionTrackerModal({
           {activity && activeTab === "details" && (
             <div className="space-y-6">
               <div className="space-y-3">
-                <h3 className="text-center text-xs font-bold text-neutral-500 uppercase tracking-widest">
+                <h3 className="text-center text-xs font-bold tracking-widest text-neutral-500 uppercase">
                   Proponents
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   {activity.proponents.map((prop, idx) => (
                     <div
                       key={idx}
-                      className="bg-neutral-50 border border-neutral-200/80 rounded-xl p-3.5 text-center shadow-2xs hover:bg-neutral-100/50 transition-colors"
+                      className="rounded-xl border border-neutral-200/80 bg-neutral-50 p-3.5 text-center shadow-2xs transition-colors hover:bg-neutral-100/50"
                     >
-                      <p className="text-xs text-neutral-500 font-semibold">{prop.role}</p>
-                      <p className="text-sm font-bold text-neutral-900 mt-0.5">{prop.name}</p>
+                      <p className="text-xs font-semibold text-neutral-500">
+                        {prop.role}
+                      </p>
+                      <p className="mt-0.5 text-sm font-bold text-neutral-900">
+                        {prop.name}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -434,47 +480,64 @@ export function SubmissionTrackerModal({
 
               <div className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm md:grid-cols-2">
                 <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-bold text-neutral-900">Event Date & Time</span>
+                  <span className="font-bold text-neutral-900">
+                    Event Date & Time
+                  </span>
                   <span className="font-medium text-neutral-600 sm:text-right">
-                    {activity.time ? `${activity.time} ` : ""}{activity.date}
+                    {activity.time ? `${activity.time} ` : ""}
+                    {activity.date}
                   </span>
                 </div>
 
                 <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
                   <span className="font-bold text-neutral-900">Venue</span>
-                  <span className="font-medium text-neutral-600 sm:text-right">{activity.venue}</span>
+                  <span className="font-medium text-neutral-600 sm:text-right">
+                    {activity.venue}
+                  </span>
                 </div>
 
                 <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-bold text-neutral-900">Estimated Budget</span>
-                  <span className="font-medium text-neutral-600 sm:text-right">{activity.proposedBudget}</span>
+                  <span className="font-bold text-neutral-900">
+                    Estimated Budget
+                  </span>
+                  <span className="font-medium text-neutral-600 sm:text-right">
+                    {activity.proposedBudget}
+                  </span>
                 </div>
 
                 <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-bold text-neutral-900">Number of Participants</span>
-                  <span className="font-medium text-neutral-600 sm:text-right">{activity.expectedParticipants}</span>
+                  <span className="font-bold text-neutral-900">
+                    Number of Participants
+                  </span>
+                  <span className="font-medium text-neutral-600 sm:text-right">
+                    {activity.expectedParticipants}
+                  </span>
                 </div>
 
                 <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-bold text-neutral-900">Activity type</span>
-                  <span className="font-medium text-neutral-600 sm:text-right capitalize">
+                  <span className="font-bold text-neutral-900">
+                    Activity type
+                  </span>
+                  <span className="font-medium text-neutral-600 capitalize sm:text-right">
                     {activity.type}
                   </span>
                 </div>
 
                 <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-bold text-neutral-900">Event Nature</span>
+                  <span className="font-bold text-neutral-900">
+                    Event Nature
+                  </span>
                   <span className="font-medium sm:text-right">
                     {activity.nature?.toLowerCase() === "major" ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider bg-red-100 text-[#8B0000] border border-red-200">
+                      <span className="inline-flex items-center rounded-md border border-red-200 bg-red-100 px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-[#8B0000] uppercase">
                         Major Event
                       </span>
                     ) : activity.nature?.toLowerCase() === "minor" ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider bg-neutral-100 text-neutral-700 border border-neutral-200">
+                      <span className="inline-flex items-center rounded-md border border-neutral-200 bg-neutral-100 px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-neutral-700 uppercase">
                         Minor Event
                       </span>
                     ) : (
-                      <span className="text-neutral-400 text-xs italic">
+                      <span className="text-xs text-neutral-400 italic">
                         Pending classification
                       </span>
                     )}
@@ -486,7 +549,7 @@ export function SubmissionTrackerModal({
                 <h4 className="text-sm font-bold text-neutral-900">
                   Description of the Activity
                 </h4>
-                <p className="text-sm text-neutral-700 leading-relaxed">
+                <p className="text-sm leading-relaxed text-neutral-700">
                   {activity.description}
                 </p>
               </div>
@@ -498,10 +561,16 @@ export function SubmissionTrackerModal({
                 <ul className="space-y-2.5 text-sm text-neutral-700">
                   {activity.objectives.map((obj, idx) => (
                     <li key={idx} className="flex items-start gap-2.5">
-                      <span className="text-neutral-400 font-bold mt-1 text-xs">•</span>
+                      <span className="mt-1 text-xs font-bold text-neutral-400">
+                        •
+                      </span>
                       <div>
-                        <span className="font-bold text-neutral-900">{obj.title}: </span>
-                        <span className="leading-relaxed">{obj.description}</span>
+                        <span className="font-bold text-neutral-900">
+                          {obj.title}:{" "}
+                        </span>
+                        <span className="leading-relaxed">
+                          {obj.description}
+                        </span>
                       </div>
                     </li>
                   ))}
@@ -522,11 +591,46 @@ export function SubmissionTrackerModal({
           )}
 
           {activeTab === "progress" && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-2xs">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-base font-bold text-neutral-900">Progress Tracking</h3>
-                  <span className="text-xs text-neutral-500 font-medium">
+            <div className="animate-in fade-in space-y-6 duration-200">
+              {notificationsQuery.isError ? (
+                <div role="alert" className="space-y-2 text-sm text-red-700">
+                  Review history could not be retrieved.{" "}
+                  <Button
+                    variant="outline"
+                    onClick={() => notificationsQuery.refetch()}
+                  >
+                    Retry history
+                  </Button>
+                </div>
+              ) : (
+                notificationsQuery.isSuccess && (
+                  <RecordTimeline
+                    key={`${eventId}:${submissionId}`}
+                    kind="proposal_timeline"
+                    source={proposalTimeline(
+                      notificationsQuery.data,
+                      submissionId
+                    )}
+                    scope={`Opened proposal ${eventId}:${submissionId}`}
+                    loadSource={async (signal) =>
+                      proposalTimeline(
+                        await fetchSubmissionNotifications(
+                          eventId,
+                          submissionId,
+                          signal
+                        ),
+                        submissionId
+                      )
+                    }
+                  />
+                )
+              )}
+              <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs sm:p-6">
+                <div className="mb-1 flex items-center justify-between">
+                  <h3 className="text-base font-bold text-neutral-900">
+                    Progress Tracking
+                  </h3>
+                  <span className="text-xs font-medium text-neutral-500">
                     {notificationsQuery.isLoading ? (
                       <Skeleton
                         aria-label="Loading notifications"
@@ -541,13 +645,16 @@ export function SubmissionTrackerModal({
 
                 <div className="mb-6 flex flex-col gap-2 text-xs text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
                   <span className="min-w-0">
-                    {formatDocumentId(submissionId)} • Submitted {activity?.submittedDate || "—"} •{" "}
+                    {formatDocumentId(submissionId)} • Submitted{" "}
+                    {activity?.submittedDate || "—"} •{" "}
                     {stepper.isAllApproved
                       ? "All steps completed"
                       : `${stepper.remainingSteps} tasks remaining before final approval`}
                   </span>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-neutral-500">Overall progress</span>
+                    <span className="text-xs font-medium text-neutral-500">
+                      Overall progress
+                    </span>
                     <span className="text-base font-extrabold text-[#8B0000]">
                       {stepper.progressPercent}%
                     </span>
@@ -556,24 +663,32 @@ export function SubmissionTrackerModal({
 
                 <ol className="flex flex-col gap-3 md:hidden">
                   {stepper.fullSteps.map((stepName, idx) => {
-                    const isCompleted = stepper.isAllApproved || idx < stepper.currentStepIdx
-                    const isCurrent = !stepper.isAllApproved && idx === stepper.currentStepIdx
-                    let nodeBg = "bg-neutral-100 border-neutral-300 text-neutral-400"
+                    const isCompleted =
+                      stepper.isAllApproved || idx < stepper.currentStepIdx
+                    const isCurrent =
+                      !stepper.isAllApproved && idx === stepper.currentStepIdx
+                    let nodeBg =
+                      "bg-neutral-100 border-neutral-300 text-neutral-400"
                     if (isCompleted) {
-                      nodeBg = "bg-emerald-100 border-emerald-500 text-emerald-800"
+                      nodeBg =
+                        "bg-emerald-100 border-emerald-500 text-emerald-800"
                     } else if (isCurrent) {
-                      nodeBg = "bg-amber-100 border-amber-500 text-amber-900 ring-4 ring-amber-100"
+                      nodeBg =
+                        "bg-amber-100 border-amber-500 text-amber-900 ring-4 ring-amber-100"
                     }
 
                     return (
-                      <li key={`${stepName}-${idx}`} className="flex items-center gap-3">
+                      <li
+                        key={`${stepName}-${idx}`}
+                        className="flex items-center gap-3"
+                      >
                         <div
                           className={`flex size-10 shrink-0 items-center justify-center rounded-full border-2 font-bold shadow-xs ${nodeBg}`}
                         >
                           {isCompleted ? (
                             <Check className="h-5 w-5 stroke-[2.5] text-emerald-800" />
                           ) : isCurrent ? (
-                            <span className="h-3.5 w-3.5 rounded-full bg-amber-500 animate-pulse"></span>
+                            <span className="h-3.5 w-3.5 animate-pulse rounded-full bg-amber-500"></span>
                           ) : (
                             <span className="h-2.5 w-2.5 rounded-full bg-neutral-300"></span>
                           )}
@@ -595,14 +710,17 @@ export function SubmissionTrackerModal({
                   })}
                 </ol>
 
-                <div className="relative hidden select-none px-2 py-4 md:block">
-                  <div className="absolute top-9 left-8 right-8 -translate-y-1/2 h-1.5 bg-neutral-200 rounded-full z-0 overflow-hidden">
+                <div className="relative hidden px-2 py-4 select-none md:block">
+                  <div className="absolute top-9 right-8 left-8 z-0 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-neutral-200">
                     <div
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out"
+                      className="h-full rounded-full bg-emerald-500 transition-all duration-500 ease-out"
                       style={{
                         width: `${
                           stepper.fullSteps.length > 1
-                            ? (Math.min(stepper.currentStepIdx, stepper.fullSteps.length - 1) /
+                            ? (Math.min(
+                                stepper.currentStepIdx,
+                                stepper.fullSteps.length - 1
+                              ) /
                                 (stepper.fullSteps.length - 1)) *
                               100
                             : 0
@@ -611,48 +729,54 @@ export function SubmissionTrackerModal({
                     ></div>
                   </div>
 
-                  <div className="relative z-10 w-full min-h-[76px]">
+                  <div className="relative z-10 min-h-[76px] w-full">
                     {stepper.fullSteps.map((stepName, idx) => {
                       const totalSteps = stepper.fullSteps.length
-                      const isCompleted = stepper.isAllApproved || idx < stepper.currentStepIdx
-                      const isCurrent = !stepper.isAllApproved && idx === stepper.currentStepIdx
+                      const isCompleted =
+                        stepper.isAllApproved || idx < stepper.currentStepIdx
+                      const isCurrent =
+                        !stepper.isAllApproved && idx === stepper.currentStepIdx
 
-                      let nodeBg = "bg-neutral-100 border-neutral-300 text-neutral-400"
+                      let nodeBg =
+                        "bg-neutral-100 border-neutral-300 text-neutral-400"
                       if (isCompleted) {
-                        nodeBg = "bg-emerald-100 border-emerald-500 text-emerald-800"
+                        nodeBg =
+                          "bg-emerald-100 border-emerald-500 text-emerald-800"
                       } else if (isCurrent) {
-                        nodeBg = "bg-amber-100 border-amber-500 text-amber-900 ring-4 ring-amber-100"
+                        nodeBg =
+                          "bg-amber-100 border-amber-500 text-amber-900 ring-4 ring-amber-100"
                       }
 
                       return (
                         <div
                           key={`${stepName}-${idx}`}
-                          className="absolute top-4 -translate-x-1/2 flex flex-col items-center"
+                          className="absolute top-4 flex -translate-x-1/2 flex-col items-center"
                           style={{
-                            left: totalSteps > 1
-                              ? `calc(32px + (100% - 64px) * ${idx / (totalSteps - 1)})`
-                              : "50%",
+                            left:
+                              totalSteps > 1
+                                ? `calc(32px + (100% - 64px) * ${idx / (totalSteps - 1)})`
+                                : "50%",
                           }}
                         >
                           <div
-                            className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-bold transition-all duration-300 shadow-xs ${nodeBg}`}
+                            className={`flex h-10 w-10 items-center justify-center rounded-full border-2 font-bold shadow-xs transition-all duration-300 ${nodeBg}`}
                           >
                             {isCompleted ? (
-                              <Check className="w-5 h-5 stroke-[2.5] text-emerald-800" />
+                              <Check className="h-5 w-5 stroke-[2.5] text-emerald-800" />
                             ) : isCurrent ? (
-                              <span className="w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse"></span>
+                              <span className="h-3.5 w-3.5 animate-pulse rounded-full bg-amber-500"></span>
                             ) : (
-                              <span className="w-2.5 h-2.5 rounded-full bg-neutral-300"></span>
+                              <span className="h-2.5 w-2.5 rounded-full bg-neutral-300"></span>
                             )}
                           </div>
                           <span
                             className={cn(
-                              "text-xs font-bold mt-2 text-center whitespace-nowrap px-1 max-w-[120px] truncate",
+                              "mt-2 max-w-[120px] truncate px-1 text-center text-xs font-bold whitespace-nowrap",
                               isCompleted
                                 ? "text-neutral-900"
                                 : isCurrent
-                                ? "text-amber-900 font-extrabold"
-                                : "text-neutral-400"
+                                  ? "font-extrabold text-amber-900"
+                                  : "text-neutral-400"
                             )}
                             title={stepName}
                           >
@@ -665,31 +789,43 @@ export function SubmissionTrackerModal({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-2xs">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-base font-bold text-neutral-900">Signatory Approvals</h3>
+              <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs sm:p-6">
+                <div className="mb-1 flex items-center justify-between">
+                  <h3 className="text-base font-bold text-neutral-900">
+                    Signatory Approvals
+                  </h3>
                 </div>
-                <p className="text-xs font-semibold text-neutral-500 mb-4">Required Reviewers</p>
+                <p className="mb-4 text-xs font-semibold text-neutral-500">
+                  Required Reviewers
+                </p>
                 <div className="space-y-3.5">
                   {stepper.assigneesList.map((item, idx) => {
                     let iconBg = "bg-neutral-200 text-neutral-400"
-                    if (item.state === "completed") iconBg = "bg-emerald-500 text-white"
-                    else if (item.state === "current") iconBg = "bg-amber-500 text-white"
+                    if (item.state === "completed")
+                      iconBg = "bg-emerald-500 text-white"
+                    else if (item.state === "current")
+                      iconBg = "bg-amber-500 text-white"
 
                     return (
-                      <div key={`${item.role}-${idx}`} className="flex items-center gap-3">
+                      <div
+                        key={`${item.role}-${idx}`}
+                        className="flex items-center gap-3"
+                      >
                         <div
-                          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${iconBg}`}
                         >
                           {item.state === "completed" ? (
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <Check className="h-3.5 w-3.5 stroke-[3]" />
                           ) : (
-                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                            <div className="h-2 w-2 rounded-full bg-white"></div>
                           )}
                         </div>
-                        <div className="text-xs sm:text-sm font-medium text-neutral-900">
+                        <div className="text-xs font-medium text-neutral-900 sm:text-sm">
                           <span className="font-bold">{item.name}</span>
-                          <span className="text-neutral-500"> — {item.statusText}</span>
+                          <span className="text-neutral-500">
+                            {" "}
+                            — {item.statusText}
+                          </span>
                         </div>
                       </div>
                     )
@@ -698,7 +834,6 @@ export function SubmissionTrackerModal({
               </div>
             </div>
           )}
-
         </DialogPanel>
 
         <div className="flex shrink-0 justify-end gap-3 rounded-b-2xl border-t border-neutral-200 bg-white px-4 py-4 sm:px-8">
@@ -706,7 +841,7 @@ export function SubmissionTrackerModal({
             <Button
               type="button"
               onClick={handleResubmit}
-              className="bg-[#8B0000] text-white hover:bg-[#700000] font-bold shadow-xs cursor-pointer"
+              className="cursor-pointer bg-[#8B0000] font-bold text-white shadow-xs hover:bg-[#700000]"
             >
               Edit and resubmit
             </Button>
@@ -716,7 +851,7 @@ export function SubmissionTrackerModal({
             disabled={isSavingPdf || !activity}
             onClick={handleSavePdf}
             variant="outline"
-            className="gap-2 text-neutral-800 cursor-pointer"
+            className="cursor-pointer gap-2 text-neutral-800"
           >
             {isSavingPdf ? (
               <Loader2 className="h-4 w-4 animate-spin text-[#8B0000]" />
@@ -725,7 +860,12 @@ export function SubmissionTrackerModal({
             )}
             Save as PDF
           </Button>
-          <Button type="button" variant="outline" onClick={onClose} className="cursor-pointer">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="cursor-pointer"
+          >
             Close
           </Button>
         </div>

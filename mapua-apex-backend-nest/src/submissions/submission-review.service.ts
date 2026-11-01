@@ -96,6 +96,7 @@ export class SubmissionReviewService {
       submissionId,
       {
         status: 'approved',
+        fully_approved_at: str(item, 'fully_approved_at') ?? sentAt,
         current_signatory: signatoryKey(bareDesk),
         signatory_sequence: sequence,
       },

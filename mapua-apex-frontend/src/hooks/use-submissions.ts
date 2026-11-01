@@ -1,6 +1,12 @@
 import { useMemo } from "react"
-import { useMutation, useQuery, useQueryClient, useQueries } from "@tanstack/react-query"
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  useQueries,
+} from "@tanstack/react-query"
 import { apiClient } from "@/lib/api-client"
+import { useReportScope } from "./use-reporting"
 import {
   apiNotificationsToReviewNotices,
   type ApiSubmission,
@@ -26,10 +32,13 @@ export const SUBMISSION_KEYS = {
  * Fetch all submissions belonging to the logged-in student's organization
  */
 export function useOrgSubmissionsQuery(options?: { enabled?: boolean }) {
+  const scope = useReportScope()
   return useQuery({
-    queryKey: SUBMISSION_KEYS.all,
+    queryKey: [...SUBMISSION_KEYS.all, scope],
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiSubmission[] }>("/students/submissions")
+      const res = await apiClient.get<{ data: ApiSubmission[] }>(
+        "/students/submissions"
+      )
       return res.data || []
     },
     enabled: options?.enabled ?? true,
@@ -39,11 +48,19 @@ export function useOrgSubmissionsQuery(options?: { enabled?: boolean }) {
 /**
  * Fetch a single full SAAF submission
  */
-export function useSubmissionDetailQuery(eventId?: string, submissionId?: string) {
+export function useSubmissionDetailQuery(
+  eventId?: string,
+  submissionId?: string
+) {
+  const scope = useReportScope()
   return useQuery({
-    queryKey: SUBMISSION_KEYS.detail(eventId || "", submissionId || ""),
+    queryKey: [
+      ...SUBMISSION_KEYS.detail(eventId || "", submissionId || ""),
+      scope,
+    ],
     queryFn: async () => {
-      if (!eventId || !submissionId) throw new Error("Event ID and Submission ID required")
+      if (!eventId || !submissionId)
+        throw new Error("Event ID and Submission ID required")
       const res = await apiClient.get<{ data: ApiSubmission }>(
         `/students/events/${eventId}/submissions/${submissionId}`
       )
@@ -56,16 +73,36 @@ export function useSubmissionDetailQuery(eventId?: string, submissionId?: string
 /**
  * Fetch review stepper/notifications for a submission
  */
-export function useSubmissionNotificationsQuery(eventId?: string, submissionId?: string) {
+export async function fetchSubmissionNotifications(
+  eventId: string,
+  submissionId: string,
+  signal?: AbortSignal
+): Promise<ApiNotification[]> {
+  const res = await apiClient.get<{ data: ApiNotification[] }>(
+    `/students/events/${encodeURIComponent(eventId)}/submissions/${encodeURIComponent(submissionId)}/notifications`,
+    { signal, cache: "no-store" }
+  )
+  if (
+    !Array.isArray(res.data) ||
+    res.data.some((row) => row.submission_id !== submissionId)
+  )
+    throw new Error("The complete proposal timeline could not be retrieved.")
+  return res.data
+}
+export function useSubmissionNotificationsQuery(
+  eventId?: string,
+  submissionId?: string
+) {
+  const scope = useReportScope()
   return useQuery({
-    queryKey: SUBMISSION_KEYS.notifications(eventId || "", submissionId || ""),
-    queryFn: async () => {
-      if (!eventId || !submissionId) return []
-      const res = await apiClient.get<{ data: ApiNotification[] }>(
-        `/students/events/${eventId}/submissions/${submissionId}/notifications`
-      )
-      return res.data || []
-    },
+    queryKey: [
+      ...SUBMISSION_KEYS.notifications(eventId || "", submissionId || ""),
+      scope,
+    ],
+    queryFn: ({ signal }) =>
+      eventId && submissionId
+        ? fetchSubmissionNotifications(eventId, submissionId, signal)
+        : [],
     enabled: Boolean(eventId && submissionId),
   })
 }
@@ -77,26 +114,40 @@ export function useSubmissionNotificationsQuery(eventId?: string, submissionId?:
  */
 export function useOrgReviewNoticesQuery(
   submissions: ApiSubmission[],
-  orgSignatories?: Array<{ role?: string; signatory_id?: string; name?: string }>
+  orgSignatories?: Array<{
+    role?: string
+    signatory_id?: string
+    name?: string
+  }>
 ) {
+  const scope = useReportScope()
   const reviewPapers = submissions
 
   const queries = useQueries({
     queries: reviewPapers.map((submission) => ({
-      queryKey: SUBMISSION_KEYS.notifications(submission.event_id, submission.submission_id),
-      queryFn: async () => {
-        const res = await apiClient.get<{ data: ApiNotification[] }>(
-          `/students/events/${submission.event_id}/submissions/${submission.submission_id}/notifications`
-        )
-        return res.data || []
-      },
+      queryKey: [
+        ...SUBMISSION_KEYS.notifications(
+          submission.event_id,
+          submission.submission_id
+        ),
+        scope,
+      ],
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchSubmissionNotifications(
+          submission.event_id,
+          submission.submission_id,
+          signal
+        ),
     })),
   })
 
   const notices = useMemo(() => {
     const notificationsBySubmission = new Map<string, ApiNotification[]>()
     reviewPapers.forEach((submission, index) => {
-      notificationsBySubmission.set(submission.submission_id, queries[index]?.data || [])
+      notificationsBySubmission.set(
+        submission.submission_id,
+        queries[index]?.data || []
+      )
     })
     return apiNotificationsToReviewNotices(
       reviewPapers,
@@ -116,9 +167,11 @@ export function useOrgReviewNoticesQuery(
  */
 export function useCurrentOrganizationQuery() {
   return useQuery({
-    queryKey: SUBMISSION_KEYS.organization,
+    queryKey: [...SUBMISSION_KEYS.organization, useReportScope()],
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiOrganization }>("/students/organization")
+      const res = await apiClient.get<{ data: ApiOrganization }>(
+        "/students/organization"
+      )
       return res.data
     },
   })
@@ -128,9 +181,11 @@ export function useCurrentOrganizationQuery() {
  * Directory of all organizations (id + name) for selecting collaboration
  * dependents. The caller's own organization is filtered out by the consumer.
  */
-export function useAvailableOrganizationsQuery(options?: { enabled?: boolean }) {
+export function useAvailableOrganizationsQuery(options?: {
+  enabled?: boolean
+}) {
   return useQuery({
-    queryKey: SUBMISSION_KEYS.organizationDirectory,
+    queryKey: [...SUBMISSION_KEYS.organizationDirectory, useReportScope()],
     queryFn: async () => {
       const res = await apiClient.get<{
         data: Array<{ organization_id: string; name: string | null }>
@@ -146,9 +201,11 @@ export function useAvailableOrganizationsQuery(options?: { enabled?: boolean }) 
  */
 export function useOrgDeadlinesQuery() {
   return useQuery({
-    queryKey: SUBMISSION_KEYS.deadlines,
+    queryKey: [...SUBMISSION_KEYS.deadlines, useReportScope()],
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiDeadline[] }>("/students/deadlines")
+      const res = await apiClient.get<{ data: ApiDeadline[] }>(
+        "/students/deadlines"
+      )
       return res.data || []
     },
   })
@@ -161,7 +218,9 @@ export function useOrgAnnouncementsQuery() {
   return useQuery({
     queryKey: SUBMISSION_KEYS.announcements,
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiAnnouncement[] }>("/students/announcements")
+      const res = await apiClient.get<{ data: ApiAnnouncement[] }>(
+        "/students/announcements"
+      )
       return res.data || []
     },
   })
@@ -212,10 +271,16 @@ export function useUpdateSubmissionMutation() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
       queryClient.invalidateQueries({
-        queryKey: SUBMISSION_KEYS.detail(variables.eventId, variables.submissionId),
+        queryKey: SUBMISSION_KEYS.detail(
+          variables.eventId,
+          variables.submissionId
+        ),
       })
       queryClient.invalidateQueries({
-        queryKey: SUBMISSION_KEYS.notifications(variables.eventId, variables.submissionId),
+        queryKey: SUBMISSION_KEYS.notifications(
+          variables.eventId,
+          variables.submissionId
+        ),
       })
     },
   })

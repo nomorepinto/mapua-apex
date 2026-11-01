@@ -72,9 +72,8 @@ export function RequestList() {
               </EmptyMedia>
               <EmptyTitle>No requests</EmptyTitle>
               <EmptyDescription>
-                {status === "pending"
-                  ? "No pending reservation change requests for this campus."
-                  : "No reservation change requests for this campus yet."}
+                No reservation change requests match the selected campus and
+                filters.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

@@ -53,6 +53,8 @@ export class ActivityLogInterceptor implements NestInterceptor {
           entityName,
           description,
           organizationName: str(payload, 'organization_name') ?? 'N/A',
+          organizationId: str(payload, 'organization_id') ?? undefined,
+          eventId: str(payload, 'event_id') ?? undefined,
           after: request.body,
         });
       }),

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { generateReport } from '../common/reporting.js';
 import { randomUUID } from 'node:crypto';
 import { AppConfigService } from '../config/app-config.service.js';
 import {
@@ -34,6 +35,17 @@ export class PostEvalService {
     private readonly organizations: OrganizationRepository,
     private readonly config: AppConfigService,
   ) {}
+
+  report(input: unknown, organizationId?: string): Promise<Item> {
+    return generateReport(
+      'postevals',
+      input,
+      organizationId
+        ? `Organization: ${organizationId}`
+        : 'All administratively visible post-evaluations',
+      () => this.iterateList(undefined, organizationId),
+    );
+  }
 
   async eligible(organizationId: string): Promise<Item[]> {
     const blocked = new Set<string>();
@@ -81,34 +93,40 @@ export class PostEvalService {
   }
 
   async list(organizationId: string): Promise<Item[]> {
-    const rows = await this.postevals.listOrg(organizationId);
-    const org = await this.organizations.get(organizationId);
-    const name = org ? str(org, 'name') : null;
-    return rows
-      .map((row) => this.view(name ? { ...row, organization_name: name } : row))
-      .sort((left, right) =>
-        String(right.submitted_at).localeCompare(String(left.submitted_at)),
-      );
+    const rows: Item[] = [];
+    for await (const row of this.iterateList(undefined, organizationId))
+      rows.push(row);
+    return rows.sort((left, right) =>
+      String(right.submitted_at).localeCompare(String(left.submitted_at)),
+    );
   }
 
   async adminList(status?: string, organizationId?: string): Promise<Item[]> {
+    const rows: Item[] = [];
+    for await (const row of this.iterateList(status, organizationId))
+      rows.push(row);
+    return rows;
+  }
+
+  private async *iterateList(
+    status?: string,
+    organizationId?: string,
+  ): AsyncGenerator<Item> {
     const orgs = organizationId
       ? [await this.organizations.get(organizationId)].filter(
           (org): org is Item => Boolean(org),
         )
       : await this.organizations.list();
-    const rows: Item[] = [];
     for (const org of orgs) {
       const id = stripPrefix(org.PK, 'ORGANIZATION#') ?? '';
       const name = str(org, 'name');
-      for (const row of await this.postevals.listOrg(id)) {
+      for await (const row of this.postevals.iterateOrg(id)) {
         if (status && str(row, 'status') !== status) {
           continue;
         }
-        rows.push(this.view(name ? { ...row, organization_name: name } : row));
+        yield this.view(name ? { ...row, organization_name: name } : row);
       }
     }
-    return rows;
   }
 
   async create(organizationId: string, body: StorePostEval): Promise<Item> {

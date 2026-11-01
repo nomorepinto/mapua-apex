@@ -367,6 +367,8 @@ Allowed groups: `admin`, `osaar`, `cdm_reviewer`, `cdm`, and `super_admin`.
 
 ### Session Log Routes
 
+Session list/detail/report and `/stats` require `admin` or `super_admin` (dedicated `session_admin` permission). OSAAR/CDM retain Activity Log access but cannot read session data. Existing active-session checks still apply.
+
 | Method | Endpoint | Description |
 | :---- | :---- | :---- |
 | **GET** | `/api/v2/admins/monitor/sessions` | Query session logs. Monthly-bucketed via GSI1 (`LOG#SESSION#YYYY-MM`). |
@@ -379,7 +381,11 @@ Allowed groups: `admin`, `osaar`, `cdm_reviewer`, `cdm`, and `super_admin`.
 - `role` (`student` \| `signatory` \| `admin` etc., optional)
 - `status` (`active` \| `completed` \| `timed_out` \| `revoked`, optional)
 - `limit` (integer, max 200, default 50)
-- `nextToken` (when the result is longer than `limit`, the value is the literal `more`; otherwise `null`)
+- `nextToken` (opaque resumable cursor from the preceding response; `null` at the end). Never construct it or reuse it with a different filter, sort, or caller. The old literal `more` is no longer returned.
+- `filters` (optional JSON-encoded shared filter object described below; when present, replaces the legacy filters)
+- `sort` (`asc` or `desc`, default `desc`)
+
+Dates are inclusive Asia/Manila calendar days, not UTC days. Invalid/reversed ranges or ranges over 366 days return 422. Retrieval traverses every intersecting UTC month/day bucket and Dynamo page, including empty filtered pages. Activity supports the same pagination/date contract plus legacy `module` and `actionType` aliases (`SUBMITTED`, `APPROVED`, `RETURNED`, `DENIED`). No silent 62-day cap remains. Collection responses retain `data` arrays; log results also include `nextToken`. Public activity projections omit arbitrary request/response snapshots and Dynamo keys.
 
 **Response `200`:**
 ```json
@@ -415,6 +421,74 @@ Allowed groups: `admin`, `osaar`, `cdm_reviewer`, `cdm`, and `super_admin`.
 | :---- | :---- | :---- |
 | **GET** | `/api/v2/admins/monitor/activity` | Query activity logs for a date range. |
 | **GET** | `/api/v2/admins/monitor/activity/{activityId}` | Fetch a single activity log item. |
+
+### Read-only Report Routes
+
+All paths below accept **POST**, return **200** with `{ "data": ReportPayload }`, and set `Cache-Control: no-store`. No files are stored/uploaded by these endpoints.
+
+| Endpoint | Report type | Visibility |
+|---|---|---|
+| `/api/v2/admins/monitor/sessions/report` | `sessions` | Admin/super-admin only |
+| `/api/v2/admins/monitor/activity/report` | `activity` | Existing administrative monitor access |
+| `/api/v2/admins/submissions/report` | `proposals` | Existing administrative submission access |
+| `/api/v2/students/submissions/report` | `proposals` | Caller organization and authorized collaboration masters |
+| `/api/v2/signatories/submissions/history/report` | `proposals` | Existing signatory history/desk visibility |
+| `/api/v2/admins/postevals/report` | `postevals` | Existing administrative post-evaluation access |
+| `/api/v2/students/postevals/report` | `postevals` | Caller organization |
+| `/api/v2/admins/campuses/{campus}/reservation-changes/report` | `reservation_changes` | Existing administrative campus visibility |
+
+Request example:
+```json
+{
+  "filters": {
+    "start_date": "2026-10-01",
+    "end_date": "2026-10-31",
+    "date_basis": "first_submitted_at",
+    "search": "Forum",
+    "values": { "organization_id": ["org-1"], "status": ["approved", "finished"] },
+    "sort": "desc"
+  },
+  "sections": ["summary", "breakdowns", "details"],
+  "columns": ["id", "date", "title", "organization", "status"],
+  "compare_previous_period": true
+}
+```
+
+`filters` requires both dates for reports. Collection `filters` may omit both dates for proposal/post-evaluation/reservation history. Facet selections use OR within a field and AND between fields; empty arrays do not restrict. Search is limited to 200 characters; each facet permits at most 100 string values of at most 200 characters. Unsupported fields, values, bases, columns, or sections return **422 `INVALID_REPORT_FILTER`**. Filters never expand authorization. Missing/wrong groups or required claims return 401; inaccessible single-record resources retain 404. No new option-list endpoint: controls derive values only from the authorized collection.
+
+| Type | Date bases (first is default) | Allowed facet fields |
+|---|---|---|
+| sessions | `login_date` | `actor_id`, `role`, `status`, `end_reason`, `browser`, `device` |
+| activity | `action_date` | `action`, `module`, `organization_id`, `actor_id`, `role` |
+| proposals | `first_submitted_at`, `latest_submitted_at`, `event_date` (overlap) | `organization_id`, `status`, `type`, `department` (proponent), `has_reservation`, `collaboration_role` |
+| postevals | `filed_date` | `organization_id`, `status` |
+| reservation_changes | `requested_at`, `resolved_at` | `organization_id`, `campus_id`, `status`, `type`, `decision` |
+
+Enum facets: proposal statuses `pending/returned/approved/denied/finished/cancelled`, type `co-curricular/extra-curricular`, reservation `true/false`, collaboration role `proponent/dependent`; post-eval statuses `submitted/approved/denied`; reservation statuses `pending/resolved/denied`, types `cancel/reschedule`, decisions `cancel/reschedule/deny`. Session statuses include recorded `active/completed/expired/revoked/logged_out/timed_out/no_logout_recorded/unknown`; missing roles remain unknown.
+
+Sections default to all three shown above. Columns default to safe public identifiers/dates and domain labels. Allowlisted columns:
+- Sessions: `id,date,actor,role,status,end_reason,logout_at,duration_minutes,browser,device,email,ip_address,page_visits`.
+- Activity: `id,date,organization,action,module,actor,role,entity_id,title,email,remarks`.
+- Proposals: `id,date,organization,title,status,type,department,first_submitted_at,latest_submitted_at,event_date,has_reservation,collaboration_role,proposed_budget,planned_participants`.
+- Post-evaluations: `id,date,organization,title,status,resolved_at,duration_minutes`.
+- Reservation changes: `id,date,organization,title,campus_id,type,status,decision,requested_at,resolved_at,duration_minutes,remarks`.
+Email, IP, page visits, and remarks are excluded from defaults and require explicit selection within existing access. Exported paths strip query strings/fragments.
+
+`ReportPayload` fields:
+- `report_type`, normalized `filters`, `retrieved_from`/`retrieved_to` (UTC timestamps), descriptive `scope`, `total_count`.
+- `summary`: metric names to scalar values; unavailable superlatives are null. Proposal identity is `(event_id, submission_id)`; collaboration pointers do not inflate totals. Approval rate is `(approved + finished)/(approved + finished + denied)`, with numerator/denominator and organization ranking minimum of five decided proposals. Durations use verified immutable timestamp pairs and show sample counts. Budgets/participants are proposed/planned, never spending/unique attendees.
+- `breakdowns`: group name to `{ key, label, count }[]`, including ties/rankings; current cohort status, not historical end-date status.
+- `comparison`: null unless selected; otherwise `{ start_date, end_date, current_count, previous_count, difference, percent_change }`. The previous period has equal length and identical non-date filters. Zero baseline yields null percentage.
+- `columns`: `{ key, label }[]`; `rows`: only selected public scalar cells. No detail section means an empty rows array, not incomplete aggregation.
+- `coverage`: `{ retrieval_complete, historical_coverage_complete, unknown_date_candidates, retention_days }`; `warnings`: explanatory strings. Unknown first dates are excluded from dated cohorts, counted in the authorized non-date-filtered scope, and never replaced by latest submission/event dates. Retention gaps, missing activity linkage, and selected capped session timelines are disclosed. Limited historical coverage requires acknowledgment in the client; incomplete retrieval cannot be exported.
+
+Report error envelopes preserve `{ message, code }` and, for generation timeouts and exhausted unprocessed-batch retries, `retryable: true` through the global exception filter. No partial report `data` is returned on failure.
+
+Limits: 366 calendar days, 10,000 matching detail rows, 4 MiB JSON, 20-second generation budget. Limit excess returns **422 `REPORT_TOO_LARGE`**; time budget returns retryable **503 `REPORT_TIMEOUT`**; missing/throttled required related records return **503 `RETRIEVAL_INCOMPLETE`**. No successful payload silently truncates. Summary-only requests aggregate all records within the execution/response budgets. Reads are not a historical transaction snapshot.
+
+The frontend freezes previews and generates PDF/UTF-8 CSV locally. Embedded session/proposal timeline appendices re-fetch the opened record through the existing session-detail/notification endpoints; there are no additional timeline report routes. Personal searches and selected users/page paths remain out of URLs and persistent filter storage. The frontend `/api/v1` fallback remains unchanged; these features require explicit `/api/v2` configuration.
+
+Submission public responses add server-owned `first_submitted_at`, `first_submitted_at_source` (`recorded` or `linked_creation_evidence`), and `fully_approved_at` when known. Edits/resubmissions preserve the first date and still update `sent_at`; final approval sets its timestamp only once. The historical backfill script defaults to dry-run, uses reliable linked creation/final-approval evidence only, and conditionally avoids overwriting concurrently populated fields. Cloud execution requires separate approval.
 
 ### Analytics Routes
 

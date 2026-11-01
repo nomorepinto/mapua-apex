@@ -1,7 +1,15 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { DynamoTable } from '../aws/dynamo-table.js';
 import { AppConfigService } from '../config/app-config.service.js';
-import { sessionGsi1, sessionKey } from '../common/dynamo-keys.js';
+import { sessionKey } from '../common/dynamo-keys.js';
+import { MonitorRepository } from './monitor.repository.js';
+import {
+  generateReport,
+  invalidReport,
+  parseFilters,
+  type ReportFilters,
+} from '../common/reporting.js';
+import { withReportBudget } from '../common/report-budget.js';
 import { manilaDate } from '../common/manila.js';
 import { str, type Item } from '../common/records.js';
 
@@ -15,53 +23,54 @@ export class MonitorService {
   constructor(
     private readonly table: DynamoTable,
     private readonly config: AppConfigService,
+    private readonly repository: MonitorRepository,
   ) {}
 
-  async sessions(query: {
-    startDate?: string;
-    endDate?: string;
-    userId?: string;
-    role?: string;
-    status?: string;
-    limit?: string;
-  }): Promise<MonitorPage> {
-    const { start, end, limit } = range(
-      query.startDate,
-      query.endDate,
-      query.limit,
-    );
-    const buckets = monthsBetween(start, end);
-    const items: Item[] = [];
-    for (const bucket of buckets) {
-      const rows = await this.table.query({
-        table: this.config.sessionLogTable(),
-        index: 'GSI1',
-        keyCondition: 'GSI1PK = :pk AND GSI1SK BETWEEN :start AND :end',
-        values: {
-          ':pk': sessionGsi1(bucket),
-          ':start': `${start}T00:00:00Z`,
-          ':end': `${end}T23:59:59Z`,
-        },
-        scanForward: false,
+  async sessions(
+    query: Record<string, string | undefined>,
+    scope = '',
+  ): Promise<MonitorPage> {
+    return this.list('sessions', query, scope);
+  }
+
+  private async list(
+    kind: 'sessions' | 'activity',
+    query: Record<string, string | undefined>,
+    scope: string,
+  ): Promise<MonitorPage> {
+    const filters = monitorFilters(kind, query);
+    const limit = Number(query.limit ?? 50);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200)
+      invalidReport('limit must be between 1 and 200.');
+    return withReportBudget(async () => {
+      const page = await this.repository.page(
+        kind,
+        filters,
         limit,
-      });
-      for (const row of rows) {
-        if (query.userId && str(row, 'sub') !== query.userId) {
-          continue;
-        }
-        if (query.role && str(row, 'user_role') !== query.role) {
-          continue;
-        }
-        if (query.status && str(row, 'status') !== query.status) {
-          continue;
-        }
-        items.push(publicSession(row));
-      }
-    }
-    items.sort((left, right) =>
-      String(right.login_time).localeCompare(String(left.login_time)),
+        query.nextToken,
+        scope,
+      );
+      return {
+        ...page,
+        data: page.data.map(
+          kind === 'sessions' ? publicSession : publicActivity,
+        ),
+      };
+    });
+  }
+
+  report(
+    kind: 'sessions' | 'activity',
+    input: unknown,
+    scope: string,
+  ): Promise<Item> {
+    return generateReport(
+      kind,
+      input,
+      scope,
+      (filters) => this.repository.all(kind, filters),
+      this.config.logRetentionDays(),
     );
-    return page(items, limit);
   }
 
   async session(id: string): Promise<Item> {
@@ -76,53 +85,11 @@ export class MonitorService {
     return publicSession(item);
   }
 
-  async activity(query: {
-    startDate?: string;
-    endDate?: string;
-    userId?: string;
-    role?: string;
-    actionType?: string;
-    module?: string;
-    limit?: string;
-  }): Promise<MonitorPage> {
-    const { start, end, limit } = range(
-      query.startDate,
-      query.endDate,
-      query.limit,
-    );
-    const items: Item[] = [];
-    for (const date of datesBetween(start, end)) {
-      const rows = await this.table.query({
-        table: this.config.activityLogTable(),
-        index: 'GSI3',
-        keyCondition: 'GSI3PK = :pk',
-        values: { ':pk': `DATE#${date}` },
-        scanForward: false,
-        limit,
-      });
-      for (const row of rows) {
-        if (query.userId && str(row, 'userId') !== query.userId) {
-          continue;
-        }
-        if (query.role && str(row, 'userRole') !== query.role) {
-          continue;
-        }
-        if (query.module && str(row, 'module') !== query.module) {
-          continue;
-        }
-        if (
-          query.actionType &&
-          !actionMatches(str(row, 'actionType') ?? '', query.actionType)
-        ) {
-          continue;
-        }
-        items.push(row);
-      }
-    }
-    items.sort((left, right) =>
-      String(right.timestamp).localeCompare(String(left.timestamp)),
-    );
-    return page(items, limit);
+  async activity(
+    query: Record<string, string | undefined>,
+    scope = '',
+  ): Promise<MonitorPage> {
+    return this.list('activity', query, scope);
   }
 
   async activityItem(activityId: string): Promise<Item> {
@@ -133,36 +100,32 @@ export class MonitorService {
     if (!item) {
       throw new HttpException({ error: 'Activity log record not found' }, 404);
     }
-    return item;
+    return publicActivity(item);
   }
 
   async stats(): Promise<Item> {
     const today = manilaDate();
-    const sessions = await this.sessions({
-      startDate: today,
-      endDate: today,
-      limit: '1000',
-    });
-    const activity = await this.activity({
-      startDate: today,
-      endDate: today,
-      limit: '1000',
-    });
-    const roleDistribution: Record<string, number> = {};
-    let active = 0;
-    for (const row of sessions.data) {
-      const role = str(row, 'user_role') ?? 'unknown';
-      roleDistribution[role] = (roleDistribution[role] ?? 0) + 1;
-      if (str(row, 'status') === 'active') {
-        active += 1;
+    return withReportBudget(async () => {
+      const filters = { start_date: today, end_date: today };
+      const roleDistribution: Record<string, number> = {};
+      let active = 0;
+      let sessions = 0;
+      let activity = 0;
+      for await (const row of this.repository.all('sessions', filters)) {
+        sessions++;
+        const role = str(row, 'user_role') ?? 'unknown';
+        roleDistribution[role] = (roleDistribution[role] ?? 0) + 1;
+        if (str(row, 'status') === 'active') active++;
       }
-    }
-    return {
-      activeSessionsCount: active,
-      totalSessionsToday: sessions.data.length,
-      totalActivityToday: activity.data.length,
-      roleDistribution,
-    };
+      for await (const _row of this.repository.all('activity', filters))
+        activity++;
+      return {
+        activeSessionsCount: active,
+        totalSessionsToday: sessions,
+        totalActivityToday: activity,
+        roleDistribution,
+      };
+    });
   }
 }
 
@@ -183,79 +146,65 @@ function publicSession(item: Item): Item {
     pages_visited: item.pages_visited ?? [],
     events_count: item.events_count ?? 0,
     revocation_reason: str(item, 'revocation_reason'),
+    end_reason: str(item, 'end_reason'),
+    pages_visited_truncated: item.pages_visited_truncated === true,
   };
 }
 
-function page(items: Item[], limit: number): MonitorPage {
-  return {
-    data: items.slice(0, limit),
-    nextToken: items.length > limit ? 'more' : null,
-  };
-}
-
-function range(
-  startRaw: string | undefined,
-  endRaw: string | undefined,
-  limitRaw: string | undefined,
-): {
-  start: string;
-  end: string;
-  limit: number;
-} {
-  const today = manilaDate();
-  let start =
-    startRaw && /^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? startRaw : today;
-  let end = endRaw && /^\d{4}-\d{2}-\d{2}$/.test(endRaw) ? endRaw : today;
-  if (start > end) {
-    const swap = start;
-    start = end;
-    end = swap;
-  }
-  const parsed = Number.parseInt(limitRaw ?? '50', 10);
-  const limit = Number.isFinite(parsed)
-    ? Math.min(Math.max(parsed, 1), 200)
-    : 50;
-  return { start, end, limit };
-}
-
-function monthsBetween(start: string, end: string): string[] {
-  const months: string[] = [];
-  let cursor = start;
-  while (cursor <= end && months.length < 24) {
-    const month = cursor.slice(0, 7);
-    if (!months.includes(month)) {
-      months.push(month);
-    }
-    cursor = nextDate(cursor);
-  }
-  return months;
-}
-
-function datesBetween(start: string, end: string): string[] {
-  const dates: string[] = [];
-  let cursor = start;
-  while (cursor <= end && dates.length < 62) {
-    dates.push(cursor);
-    cursor = nextDate(cursor);
-  }
-  return dates;
-}
-
-function nextDate(date: string): string {
-  const parsed = new Date(`${date}T00:00:00Z`);
-  parsed.setUTCDate(parsed.getUTCDate() + 1);
-  return parsed.toISOString().slice(0, 10);
-}
-
-function actionMatches(actual: string, target: string): boolean {
-  const left = actual.toUpperCase();
-  const right = target.trim().toUpperCase();
-  return (
-    left === right ||
-    left.includes(right) ||
-    right.includes(left) ||
-    (right === 'APPROVED' && left.includes('APPROVE')) ||
-    (right === 'RETURNED' && left.includes('RETURN')) ||
-    (right === 'DENIED' && left.includes('DENY'))
+function publicActivity(item: Item): Item {
+  return Object.fromEntries(
+    [
+      'activityId',
+      'sessionId',
+      'userId',
+      'userName',
+      'userEmail',
+      'userRole',
+      'timestamp',
+      'actionType',
+      'module',
+      'entityId',
+      'eventId',
+      'entityName',
+      'organizationId',
+      'organizationName',
+      'description',
+    ].map((key) => [key, item[key] ?? null]),
   );
+}
+
+function monitorFilters(
+  kind: 'sessions' | 'activity',
+  query: Record<string, string | undefined>,
+): ReportFilters {
+  if (query.filters) {
+    try {
+      return parseFilters(kind, JSON.parse(query.filters) as unknown);
+    } catch (error) {
+      if (error instanceof SyntaxError) invalidReport('Invalid filters JSON.');
+      throw error;
+    }
+  }
+  const values: Record<string, string[]> = {};
+  if (query.userId) values.actor_id = [query.userId];
+  if (query.role) values.role = [query.role];
+  if (kind === 'sessions' && query.status) values.status = [query.status];
+  if (kind === 'activity' && query.module) values.module = [query.module];
+  if (kind === 'activity' && query.actionType) {
+    const aliases: Record<string, string> = {
+      APPROVED: 'SUBMISSION_APPROVE',
+      RETURNED: 'SUBMISSION_RETURN',
+      DENIED: 'SUBMISSION_DENY',
+      SUBMITTED: 'SUBMISSION_CREATE',
+    };
+    values.action = [
+      aliases[query.actionType.toUpperCase()] ?? query.actionType,
+    ];
+  }
+  return parseFilters(kind, {
+    start_date: query.startDate ?? manilaDate(),
+    end_date: query.endDate ?? manilaDate(),
+    values,
+    sort: query.sort ?? 'desc',
+  });
 }

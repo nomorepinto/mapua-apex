@@ -3,6 +3,9 @@ import { AppConfigService } from '../config/app-config.service.js';
 import {
   DYNAMO,
   type DynamoPort,
+  type DynamoPage,
+  type QueryPageArgs,
+  type ScanPageArgs,
   type QueryArgs,
   type ScanArgs,
   type TransactOp,
@@ -41,22 +44,45 @@ export class DynamoTable {
     return this.dynamo.delete(table, { PK: pk, SK: sk });
   }
 
+  queryPage(
+    args: Omit<QueryPageArgs, 'table'> & { table?: string },
+  ): Promise<DynamoPage> {
+    return this.dynamo.queryPage({ ...args, table: args.table ?? this.main() });
+  }
+
+  async *queryItems(
+    args: Omit<QueryPageArgs, 'table'> & { table?: string },
+  ): AsyncGenerator<Record<string, unknown>> {
+    let startKey = args.startKey;
+    do {
+      const page = await this.queryPage({ ...args, startKey });
+      yield* page.items;
+      startKey = page.lastKey;
+    } while (startKey);
+  }
+
+  scanPage(
+    args: Omit<ScanPageArgs, 'table'> & { table?: string },
+  ): Promise<DynamoPage> {
+    return this.dynamo.scanPage({ ...args, table: args.table ?? this.main() });
+  }
+
   query(
     args: Omit<QueryArgs, 'table'> & { table?: string },
   ): Promise<Record<string, unknown>[]> {
-    return this.dynamo.query({ table: args.table ?? this.main(), ...args });
+    return this.dynamo.query({ ...args, table: args.table ?? this.main() });
   }
 
   scan(
     args: Omit<ScanArgs, 'table'> & { table?: string } = {},
   ): Promise<Record<string, unknown>[]> {
-    return this.dynamo.scan({ table: args.table ?? this.main(), ...args });
+    return this.dynamo.scan({ ...args, table: args.table ?? this.main() });
   }
 
   update(
     args: Omit<UpdateArgs, 'table'> & { table?: string },
   ): Promise<Record<string, unknown>> {
-    return this.dynamo.update({ table: args.table ?? this.main(), ...args });
+    return this.dynamo.update({ ...args, table: args.table ?? this.main() });
   }
 
   transact(ops: TransactOp[], table = this.main()): Promise<void> {

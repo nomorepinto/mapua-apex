@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
+import { useLocalReport } from "@/hooks/use-reporting"
+import { ReportToolbar } from "@/components/reports/report-toolbar"
 
-import { ActivityFilterHeader } from "@/components/signatories/dashboard/activity-filter-header"
 import { ActivitySortHeader } from "@/components/signatories/dashboard/activity-sort-header"
-import { ActivityTableSearch } from "@/components/signatories/dashboard/activity-table-search"
 import {
   usePostEvalsReview,
   type PostEvalSelection,
@@ -16,10 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import type {
-  ActivityFilterColumn,
-  ActivitySortDirection,
-} from "@/hooks/use-activity-table-filters"
 import {
   apiPostEvalToDashboardRow,
   formatDocumentId,
@@ -29,13 +25,14 @@ import {
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
-type ColumnFilters = Partial<Record<ActivityFilterColumn, string[]>>
-
 function StatusBadge({ status }: { status: string }) {
   const meta = getPostEvalStatusMeta(status)
   return (
     <span
-      className={cn("rounded-md border px-2.5 py-1 text-xs font-bold", meta.color)}
+      className={cn(
+        "rounded-md border px-2.5 py-1 text-xs font-bold",
+        meta.color
+      )}
     >
       {meta.label}
     </span>
@@ -51,68 +48,24 @@ function StatusBadge({ status }: { status: string }) {
 export function PostEvalQueue() {
   const { postEvals, isLoading, isError, selectPostEval } = usePostEvalsReview()
 
-  const [search, setSearch] = useState("")
-  const [columnFilters, setColumnFilters] = useState<ColumnFilters>({})
-  const [sortDirection, setSortDirection] = useState<ActivitySortDirection>("desc")
+  const report = useLocalReport("postevals", "admin-postevals", postEvals)
+  const search = report.filters.search ?? ""
+  const sortDirection = report.filters.sort ?? "desc"
 
   const rows = useMemo<DashboardPostEvalRow[]>(
     () => postEvals.map(apiPostEvalToDashboardRow),
     [postEvals]
   )
 
-  const organizationOptions = useMemo(
-    () =>
-      Array.from(new Set(rows.map((row) => row.organization_name)))
-        .filter((value) => value && value !== "—")
-        .sort((a, b) => a.localeCompare(b)),
-    [rows]
-  )
-
-  const statusOptions = useMemo(
-    () => Array.from(new Set(rows.map((row) => row.status))).sort((a, b) => a.localeCompare(b)),
-    [rows]
-  )
-
-  const toggleColumnFilter = (column: ActivityFilterColumn, value: string) => {
-    setColumnFilters((prev) => {
-      const current = prev[column] ?? []
-      const next = current.includes(value)
-        ? current.filter((entry) => entry !== value)
-        : [...current, value]
-      return { ...prev, [column]: next }
+  const toggleSort = () =>
+    report.setFilters({
+      ...report.filters,
+      sort: sortDirection === "asc" ? "desc" : "asc",
     })
-  }
-
-  const clearColumnFilter = (column: ActivityFilterColumn) => {
-    setColumnFilters((prev) => ({ ...prev, [column]: [] }))
-  }
-
-  const toggleSort = () => {
-    setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
-  }
-
-  const filteredRows = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    const orgFilter = columnFilters.organization ?? []
-    const statusFilter = columnFilters.status ?? []
-
-    return rows
-      .filter((row) => {
-        if (query) {
-          const haystack = [row.id, row.organization_name, row.event_title, row.status]
-            .join(" ")
-            .toLowerCase()
-          if (!haystack.includes(query)) return false
-        }
-        if (orgFilter.length && !orgFilter.includes(row.organization_name)) return false
-        if (statusFilter.length && !statusFilter.includes(row.status)) return false
-        return true
-      })
-      .sort((a, b) => {
-        const diff = (Date.parse(a.submitted_at) || 0) - (Date.parse(b.submitted_at) || 0)
-        return sortDirection === "asc" ? diff : -diff
-      })
-  }, [rows, search, columnFilters, sortDirection])
+  const filteredRows = useMemo(
+    () => report.rows.map(apiPostEvalToDashboardRow),
+    [report.rows]
+  )
 
   const openRow = (row: DashboardPostEvalRow): PostEvalSelection => ({
     eventId: row.event_id,
@@ -123,19 +76,28 @@ export function PostEvalQueue() {
     <section className={layout.section}>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex shrink-0 flex-col gap-1">
-          <h2 className="text-lg font-extrabold text-neutral-900">Post-Evaluations</h2>
+          <h2 className="text-lg font-extrabold text-neutral-900">
+            Post-Evaluations
+          </h2>
           <p className="text-xs text-neutral-500">
             Filed by organizations after each event. Approving marks the linked
             submission finished.
           </p>
         </div>
-        <ActivityTableSearch
-          ariaLabel="Search post-evaluations"
-          onChange={setSearch}
-          value={search}
-        />
       </div>
 
+      <div className="mb-4">
+        <ReportToolbar
+          kind="postevals"
+          endpoint="/admins/postevals"
+          filters={report.filters}
+          onChange={report.setFilters}
+          onReset={report.reset}
+          options={report.options}
+          count={filteredRows.length}
+          ready={!isLoading && !isError}
+        />
+      </div>
       <div className={layout.sectionFlush}>
         <div className={layout.tableWrap}>
           <Table className={layout.table}>
@@ -144,14 +106,7 @@ export function PostEvalQueue() {
                 <TableHead className="px-6 py-4 font-bold text-neutral-500">
                   DOCUMENT ID
                 </TableHead>
-                <ActivityFilterHeader
-                  column="organization"
-                  label="Organization"
-                  onClear={clearColumnFilter}
-                  onToggle={toggleColumnFilter}
-                  options={organizationOptions}
-                  selected={columnFilters.organization ?? []}
-                />
+                <TableHead className="px-6 py-4">Organization</TableHead>
                 <TableHead className="px-6 py-4 font-bold text-neutral-500">
                   EVENT TITLE
                 </TableHead>
@@ -166,16 +121,9 @@ export function PostEvalQueue() {
                   label="Submitted"
                   onSort={toggleSort}
                 />
-                <ActivityFilterHeader
-                  align="right"
-                  className="text-right"
-                  column="status"
-                  label="Status"
-                  onClear={clearColumnFilter}
-                  onToggle={toggleColumnFilter}
-                  options={statusOptions}
-                  selected={columnFilters.status ?? []}
-                />
+                <TableHead className="px-6 py-4 text-right">
+                  Current status
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -196,7 +144,10 @@ export function PostEvalQueue() {
                 </TableRow>
               ) : filteredRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-14 text-center text-sm text-neutral-400">
+                  <TableCell
+                    colSpan={7}
+                    className="py-14 text-center text-sm text-neutral-400"
+                  >
                     {rows.length === 0
                       ? "No post-evaluations have been filed yet."
                       : search.trim()

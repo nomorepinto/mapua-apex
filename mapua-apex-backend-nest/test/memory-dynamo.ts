@@ -1,5 +1,8 @@
 import type {
   DynamoPort,
+  DynamoPage,
+  QueryPageArgs,
+  ScanPageArgs,
   QueryArgs,
   ScanArgs,
   TransactOp,
@@ -35,6 +38,70 @@ export class MemoryDynamo implements DynamoPort {
     this.rows(table).delete(this.id(key));
   }
 
+  async queryPage(args: QueryPageArgs): Promise<DynamoPage> {
+    const sortKey = args.index ? `${args.index}SK` : 'SK';
+    const candidates = [...this.rows(args.table).values()]
+      .filter((item) => matches(item, args.keyCondition, args.values))
+      .sort(
+        (a, b) =>
+          String(a[sortKey]).localeCompare(String(b[sortKey])) ||
+          this.id(a).localeCompare(this.id(b)),
+      );
+    if (args.scanForward === false) candidates.reverse();
+    return this.paginate(
+      candidates,
+      args.startKey,
+      args.limit ?? 200,
+      args.filter,
+      args.values,
+      args.index,
+    );
+  }
+
+  async scanPage(args: ScanPageArgs): Promise<DynamoPage> {
+    return this.paginate(
+      [...this.rows(args.table).values()],
+      args.startKey,
+      args.maxItems ?? 200,
+      args.filter,
+      args.values ?? {},
+    );
+  }
+
+  private paginate(
+    candidates: Item[],
+    startKey: Item | undefined,
+    limit: number,
+    filter: string | undefined,
+    values: Item,
+    index?: string,
+  ): DynamoPage {
+    const start = startKey
+      ? candidates.findIndex((row) => this.id(row) === this.id(startKey)) + 1
+      : 0;
+    const evaluated = candidates.slice(start, start + limit);
+    const last = evaluated.at(-1);
+    const lastKey =
+      last && start + limit < candidates.length
+        ? {
+            PK: last.PK,
+            SK: last.SK,
+            ...(index
+              ? {
+                  [`${index}PK`]: last[`${index}PK`],
+                  [`${index}SK`]: last[`${index}SK`],
+                }
+              : {}),
+          }
+        : undefined;
+    return {
+      items: evaluated
+        .filter((row) => !filter || matches(row, filter, values))
+        .map((row) => this.clone(row) ?? {}),
+      lastKey,
+    };
+  }
+
   async query(args: QueryArgs): Promise<Item[]> {
     const matched = [...this.rows(args.table).values()].filter((item) =>
       matches(item, args.keyCondition, args.values),
@@ -59,7 +126,10 @@ export class MemoryDynamo implements DynamoPort {
     const rows = this.rows(args.table);
     const key = this.id(args.key);
     const current = rows.get(key);
-    if (args.condition && !this.conditionHolds(current, args.condition)) {
+    if (
+      args.condition &&
+      !this.conditionHolds(current, args.condition, args.names, args.values)
+    ) {
       throw conditional();
     }
     const next: Item = current ? { ...current, ...args.key } : { ...args.key };
@@ -67,6 +137,9 @@ export class MemoryDynamo implements DynamoPort {
       if (value !== undefined) {
         next[name] = value;
       }
+    }
+    for (const [name, value] of Object.entries(args.setIfAbsent ?? {})) {
+      if (next[name] === undefined) next[name] = value;
     }
     for (const name of args.remove ?? []) {
       delete next[name];
@@ -101,7 +174,9 @@ export class MemoryDynamo implements DynamoPort {
     keys: Record<string, unknown>[],
   ): Promise<Item[]> {
     const found: Item[] = [];
-    for (const key of keys) {
+    for (const key of new Map(
+      keys.map((key) => [this.id(key), key]),
+    ).values()) {
       const item = await this.get(table, key);
       if (item) {
         found.push(item);
@@ -127,12 +202,22 @@ export class MemoryDynamo implements DynamoPort {
     return item ? (structuredClone(item) as Item) : undefined;
   }
 
-  private conditionHolds(item: Item | undefined, condition: string): boolean {
-    if (condition.startsWith('attribute_not_exists(')) {
-      const name = condition.slice('attribute_not_exists('.length, -1);
-      return item === undefined || item[name] === undefined;
-    }
-    return true;
+  private conditionHolds(
+    item: Item | undefined,
+    condition: string,
+    names: Record<string, string> = {},
+    values: Item = {},
+  ): boolean {
+    const resolved = condition.replace(/#\w+/g, (key) => names[key] ?? key);
+    return resolved.split(' AND ').every((part) => {
+      const absent = /^attribute_not_exists\((\w+)\)$/.exec(part);
+      if (absent) return item?.[absent[1]!] === undefined;
+      const present = /^attribute_exists\((\w+)\)$/.exec(part);
+      if (present) return item?.[present[1]!] !== undefined;
+      const equal = /^(\w+) = (:\w+)$/.exec(part);
+      if (equal) return item?.[equal[1]!] === values[equal[2]!];
+      return true;
+    });
   }
 }
 

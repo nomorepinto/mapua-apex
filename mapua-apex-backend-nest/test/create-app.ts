@@ -8,6 +8,19 @@ import { JWT_VERIFIER, type JwtVerifier } from '../src/auth/jwt-verifier.js';
 import { MemoryDynamo } from './memory-dynamo.js';
 
 export const TOKENS = {
+  osaar: {
+    sub: 'osaar-sub',
+    'cognito:groups': ['osaar'],
+    'custom:signatory_id': 'sig-osaar',
+  },
+  cdm: {
+    sub: 'cdm-sub',
+    'cognito:groups': ['cdm_reviewer'],
+    'custom:signatory_id': 'sig-cdm',
+  },
+  missingOrganization: { sub: 'missing-org', 'cognito:groups': ['student'] },
+  missingSignatory: { sub: 'missing-desk', 'cognito:groups': ['signatory'] },
+  missingRole: { sub: 'missing-role' },
   student: {
     sub: 'student-sub',
     email: 'student@mymail.mapua.edu.ph',

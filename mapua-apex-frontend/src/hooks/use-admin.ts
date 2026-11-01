@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ApiError, apiClient } from "@/lib/api-client"
+import { useReportScope } from "./use-reporting"
 import {
   announcementPath,
   type ApiAnnouncement,
@@ -44,7 +45,7 @@ export function useAdminSubmissionsQuery(params?: {
   organization_id?: string
 }) {
   return useQuery({
-    queryKey: ADMIN_KEYS.submissions(params),
+    queryKey: [...ADMIN_KEYS.submissions(params), useReportScope()],
     queryFn: async () => {
       const res = await apiClient.get<{ data: ApiSubmission[] }>(
         "/admins/submissions",
@@ -65,7 +66,10 @@ export function useAdminSubmissionDetailQuery(
   submissionId?: string
 ) {
   return useQuery({
-    queryKey: ADMIN_KEYS.submissionDetail(eventId || "", submissionId || ""),
+    queryKey: [
+      ...ADMIN_KEYS.submissionDetail(eventId || "", submissionId || ""),
+      useReportScope(),
+    ],
     queryFn: async () => {
       if (!eventId || !submissionId)
         throw new Error("Event ID and Submission ID required")

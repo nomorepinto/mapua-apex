@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { filterCollection } from '../common/reporting.js';
 import { OrganizationId, Roles } from '../common/decorators.js';
 import type { Item } from '../common/records.js';
 import type { ParticipantAggregate } from './participants.js';
@@ -16,8 +26,25 @@ export class StudentPostEvalsController {
   }
 
   @Get('postevals')
-  list(@OrganizationId() organizationId: string): Promise<Item[]> {
-    return this.postevals.list(organizationId);
+  async list(
+    @OrganizationId() organizationId: string,
+    @Query('filters') filters?: string,
+  ): Promise<Item[]> {
+    return filterCollection(
+      'postevals',
+      await this.postevals.list(organizationId),
+      filters,
+    );
+  }
+
+  @Post('postevals/report')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  report(
+    @OrganizationId() organizationId: string,
+    @Body() body: unknown,
+  ): Promise<Item> {
+    return this.postevals.report(body, organizationId);
   }
 
   @Post('postevals')

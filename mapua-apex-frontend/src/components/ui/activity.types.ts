@@ -62,7 +62,14 @@ export interface Activity {
   decision: ActivityDecision
   type: string
   nature?: "major" | "minor" | string
-  status?: "Review" | "Returned" | "Rejected" | "Accepted" | "Pending Dean Approval" | "Cancelled"
+  status?:
+    | "Review"
+    | "Returned"
+    | "Rejected"
+    | "Accepted"
+    | "Pending Dean Approval"
+    | "Cancelled"
+    | "Finished"
   description: string
   venue: string
   expectedParticipants: number
@@ -92,6 +99,7 @@ export type StatusVariant = "success" | "warning" | "error" | "outline"
 export function getStatusVariant(status: Activity["status"]): StatusVariant {
   switch (status) {
     case "Accepted":
+    case "Finished":
       return "success"
     case "Review":
     case "Pending Dean Approval":
@@ -106,7 +114,10 @@ export function getStatusVariant(status: Activity["status"]): StatusVariant {
   }
 }
 
-export function getPriorityStyles(priority: ActivityPriority): { bg: string; text: string } {
+export function getPriorityStyles(priority: ActivityPriority): {
+  bg: string
+  text: string
+} {
   switch (priority) {
     case "High":
       return { bg: "bg-red-600", text: "text-white" }
@@ -117,13 +128,29 @@ export function getPriorityStyles(priority: ActivityPriority): { bg: string; tex
   }
 }
 
-export function getDecisionStyles(decision: ActivityDecision): { bg: string; text: string; border: string } {
+export function getDecisionStyles(decision: ActivityDecision): {
+  bg: string
+  text: string
+  border: string
+} {
   switch (decision) {
     case "Review":
-      return { bg: "bg-neutral-100 hover:bg-neutral-200", text: "text-neutral-900 font-semibold", border: "border-neutral-200" }
+      return {
+        bg: "bg-neutral-100 hover:bg-neutral-200",
+        text: "text-neutral-900 font-semibold",
+        border: "border-neutral-200",
+      }
     case "Return":
-      return { bg: "bg-amber-50 hover:bg-amber-100", text: "text-amber-700 font-semibold", border: "border-amber-200" }
+      return {
+        bg: "bg-amber-50 hover:bg-amber-100",
+        text: "text-amber-700 font-semibold",
+        border: "border-amber-200",
+      }
     case "Reject":
-      return { bg: "bg-red-50 hover:bg-red-100", text: "text-red-700 font-semibold", border: "border-red-200" }
+      return {
+        bg: "bg-red-50 hover:bg-red-100",
+        text: "text-red-700 font-semibold",
+        border: "border-red-200",
+      }
   }
 }

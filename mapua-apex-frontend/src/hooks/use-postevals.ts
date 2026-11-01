@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api-client"
+import { useReportScope } from "./use-reporting"
 import {
   type ApiEligiblePostEvalEvent,
   type ApiPostEval,
@@ -16,7 +17,8 @@ export const POSTEVAL_KEYS = {
   eligibleEvents: ["org-posteval-eligible-events"] as const,
   detail: (eventId: string, postevalId: string) =>
     ["posteval-detail", eventId, postevalId] as const,
-  participants: (eventId: string) => ["posteval-participants", eventId] as const,
+  participants: (eventId: string) =>
+    ["posteval-participants", eventId] as const,
   adminAll: (params?: Record<string, string | undefined>) =>
     ["admin-postevals", params] as const,
   adminDetail: (eventId: string, postevalId: string) =>
@@ -27,9 +29,11 @@ export const POSTEVAL_KEYS = {
  * Step-1 picker: the org's passed, still-in-window events with no active
  * post-eval. Backs the dropdown on `/students/postevals`.
  */
-export function useEligiblePostEvalEventsQuery(options?: { enabled?: boolean }) {
+export function useEligiblePostEvalEventsQuery(options?: {
+  enabled?: boolean
+}) {
   return useQuery({
-    queryKey: POSTEVAL_KEYS.eligibleEvents,
+    queryKey: [...POSTEVAL_KEYS.eligibleEvents, useReportScope()],
     queryFn: async () => {
       const res = await apiClient.get<{ data: ApiEligiblePostEvalEvent[] }>(
         "/students/postevals/events"
@@ -46,9 +50,11 @@ export function useEligiblePostEvalEventsQuery(options?: { enabled?: boolean }) 
  */
 export function useOrgPostEvalsQuery(options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: POSTEVAL_KEYS.all,
+    queryKey: [...POSTEVAL_KEYS.all, useReportScope()],
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiPostEval[] }>("/students/postevals")
+      const res = await apiClient.get<{ data: ApiPostEval[] }>(
+        "/students/postevals"
+      )
       return res.data || []
     },
     enabled: options?.enabled ?? true,
@@ -61,9 +67,13 @@ export function useOrgPostEvalsQuery(options?: { enabled?: boolean }) {
  */
 export function usePostEvalDetailQuery(eventId?: string, postevalId?: string) {
   return useQuery({
-    queryKey: POSTEVAL_KEYS.detail(eventId || "", postevalId || ""),
+    queryKey: [
+      ...POSTEVAL_KEYS.detail(eventId || "", postevalId || ""),
+      useReportScope(),
+    ],
     queryFn: async () => {
-      if (!eventId || !postevalId) throw new Error("Event ID and Post-eval ID required")
+      if (!eventId || !postevalId)
+        throw new Error("Event ID and Post-eval ID required")
       const res = await apiClient.get<{ data: ApiPostEval }>(
         `/students/events/${eventId}/postevals/${postevalId}`
       )
@@ -77,9 +87,12 @@ export function usePostEvalDetailQuery(eventId?: string, postevalId?: string) {
  * Wizard Section 3 preview: live attendance + evaluation aggregation for an
  * event the org owns, before any post-eval exists.
  */
-export function useEventParticipantsQuery(eventId?: string, options?: { enabled?: boolean }) {
+export function useEventParticipantsQuery(
+  eventId?: string,
+  options?: { enabled?: boolean }
+) {
   return useQuery({
-    queryKey: POSTEVAL_KEYS.participants(eventId || ""),
+    queryKey: [...POSTEVAL_KEYS.participants(eventId || ""), useReportScope()],
     queryFn: async () => {
       if (!eventId) throw new Error("Event ID required")
       const res = await apiClient.get<{ data: ApiPostEvalParticipation }>(
@@ -99,11 +112,14 @@ export function useOsaarPostEvalsQuery(params?: {
   organization_id?: string
 }) {
   return useQuery({
-    queryKey: POSTEVAL_KEYS.adminAll(params),
+    queryKey: [...POSTEVAL_KEYS.adminAll(params), useReportScope()],
     queryFn: async () => {
-      const res = await apiClient.get<{ data: ApiPostEval[] }>("/admins/postevals", {
-        params,
-      })
+      const res = await apiClient.get<{ data: ApiPostEval[] }>(
+        "/admins/postevals",
+        {
+          params,
+        }
+      )
       return res.data || []
     },
   })
@@ -112,11 +128,18 @@ export function useOsaarPostEvalsQuery(params?: {
 /**
  * A single post-eval for the OSAAR detail modal.
  */
-export function useOsaarPostEvalDetailQuery(eventId?: string, postevalId?: string) {
+export function useOsaarPostEvalDetailQuery(
+  eventId?: string,
+  postevalId?: string
+) {
   return useQuery({
-    queryKey: POSTEVAL_KEYS.adminDetail(eventId || "", postevalId || ""),
+    queryKey: [
+      ...POSTEVAL_KEYS.adminDetail(eventId || "", postevalId || ""),
+      useReportScope(),
+    ],
     queryFn: async () => {
-      if (!eventId || !postevalId) throw new Error("Event ID and Post-eval ID required")
+      if (!eventId || !postevalId)
+        throw new Error("Event ID and Post-eval ID required")
       const res = await apiClient.get<{ data: ApiPostEval }>(
         `/admins/postevals/${eventId}/${postevalId}`
       )
@@ -134,7 +157,13 @@ export function useApprovePostEvalMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ eventId, postevalId }: { eventId: string; postevalId: string }) => {
+    mutationFn: async ({
+      eventId,
+      postevalId,
+    }: {
+      eventId: string
+      postevalId: string
+    }) => {
       const res = await apiClient.post<{ data: ApiPostEval }>(
         `/admins/postevals/${eventId}/${postevalId}/approve`
       )
@@ -143,7 +172,10 @@ export function useApprovePostEvalMutation() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin-postevals"] })
       queryClient.invalidateQueries({
-        queryKey: POSTEVAL_KEYS.adminDetail(variables.eventId, variables.postevalId),
+        queryKey: POSTEVAL_KEYS.adminDetail(
+          variables.eventId,
+          variables.postevalId
+        ),
       })
       // The linked submission became `finished`.
       queryClient.invalidateQueries({ queryKey: ["admin-submissions"] })
@@ -159,7 +191,13 @@ export function useDenyPostEvalMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ eventId, postevalId }: { eventId: string; postevalId: string }) => {
+    mutationFn: async ({
+      eventId,
+      postevalId,
+    }: {
+      eventId: string
+      postevalId: string
+    }) => {
       const res = await apiClient.post<{ data: ApiPostEval }>(
         `/admins/postevals/${eventId}/${postevalId}/deny`
       )
@@ -168,7 +206,10 @@ export function useDenyPostEvalMutation() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin-postevals"] })
       queryClient.invalidateQueries({
-        queryKey: POSTEVAL_KEYS.adminDetail(variables.eventId, variables.postevalId),
+        queryKey: POSTEVAL_KEYS.adminDetail(
+          variables.eventId,
+          variables.postevalId
+        ),
       })
     },
   })

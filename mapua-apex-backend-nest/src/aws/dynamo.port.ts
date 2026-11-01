@@ -11,6 +11,21 @@ export interface QueryArgs {
   consistent?: boolean;
 }
 
+export interface DynamoPage {
+  items: Record<string, unknown>[];
+  lastKey?: Record<string, unknown>;
+}
+
+export interface QueryPageArgs extends QueryArgs {
+  startKey?: Record<string, unknown>;
+  projection?: string;
+}
+
+export interface ScanPageArgs extends ScanArgs {
+  startKey?: Record<string, unknown>;
+  projection?: string;
+}
+
 export interface ScanArgs {
   table: string;
   filter?: string;
@@ -23,8 +38,11 @@ export interface UpdateArgs {
   table: string;
   key: Record<string, unknown>;
   set?: Record<string, unknown>;
+  setIfAbsent?: Record<string, unknown>;
   remove?: string[];
   condition?: string;
+  values?: Record<string, unknown>;
+  names?: Record<string, string>;
 }
 
 export type TransactOp =
@@ -60,6 +78,8 @@ export interface DynamoPort {
     condition?: string,
   ): Promise<void>;
   delete(table: string, key: Record<string, unknown>): Promise<void>;
+  queryPage(args: QueryPageArgs): Promise<DynamoPage>;
+  scanPage(args: ScanPageArgs): Promise<DynamoPage>;
   query(args: QueryArgs): Promise<Record<string, unknown>[]>;
   scan(args: ScanArgs): Promise<Record<string, unknown>[]>;
   update(args: UpdateArgs): Promise<Record<string, unknown>>;
