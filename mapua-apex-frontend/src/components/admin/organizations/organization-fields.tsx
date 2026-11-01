@@ -36,7 +36,8 @@ export function HigherCouncilField({
         <div className="flex flex-col gap-1">
           <FieldLabel htmlFor={id}>Higher council</FieldLabel>
           <FieldDescription>
-            Skips dean on the approval path. Adviser still reviews first.
+            Skips the dean desk. Adviser still reviews first, and this
+            organization does not file a post-evaluation.
           </FieldDescription>
         </div>
       </div>
@@ -61,6 +62,7 @@ export function DeskName({
 }
 
 export function SignatoryDeskCombobox({
+  disabled = false,
   emptyLabel,
   items,
   label,
@@ -69,6 +71,7 @@ export function SignatoryDeskCombobox({
   placeholder,
   value,
 }: {
+  disabled?: boolean
   emptyLabel: string
   items: SignatoryOption[]
   label: string
@@ -81,7 +84,7 @@ export function SignatoryDeskCombobox({
     <Field>
       <FieldLabel>{label}</FieldLabel>
       <Combobox
-        disabled={items.length === 0}
+        disabled={disabled || items.length === 0}
         itemToStringLabel={(item) => item.label}
         itemToStringValue={(item) => item.value}
         items={items}

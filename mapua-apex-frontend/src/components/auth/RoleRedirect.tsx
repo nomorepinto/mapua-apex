@@ -1,6 +1,11 @@
 import { useAuth } from "react-oidc-context"
 import { Navigate } from "react-router"
 
+import { AccountLinkError } from "@/components/auth/account-link-error"
+import {
+  hasSignatoryOrOrganizationId,
+  isPrivilegedAccount,
+} from "@/components/auth/account-link"
 import { PendingAssignment } from "@/components/auth/pending-assignment"
 import { layout } from "@/config"
 
@@ -29,6 +34,15 @@ export function RoleRedirect() {
   }
 
   const userGroups = (auth.user?.profile["cognito:groups"] as string[]) || []
+  const profile = auth.user?.profile as Record<string, unknown> | undefined
+
+  // Admin accounts are not linked to a desk. Everyone else needs one id.
+  if (
+    !isPrivilegedAccount(userGroups) &&
+    !hasSignatoryOrOrganizationId(profile)
+  ) {
+    return <AccountLinkError />
+  }
 
   // Admin → admin panel
   if (hasGroup(userGroups, "admin")) {

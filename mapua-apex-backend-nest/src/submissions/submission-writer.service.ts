@@ -4,8 +4,6 @@ import {
   BookingService,
   type PlannedBooking,
 } from '../bookings/booking.service.js';
-import { AppConfigService } from '../config/app-config.service.js';
-import { addDays, utcToday } from '../common/availability-window.js';
 import {
   eventKey,
   nowIso,
@@ -14,8 +12,13 @@ import {
   stripPrefix,
   submissionKey,
 } from '../common/dynamo-keys.js';
+import {
+  assertEventDateAllowed,
+  eventDateFloorKey,
+} from '../common/event-date.js';
 import { abort } from '../common/http.js';
-import { str, type Item } from '../common/records.js';
+import { record, str, type Item } from '../common/records.js';
+import { AppConfigService } from '../config/app-config.service.js';
 import type { CreateSaafDto, SaafDto } from './dto/saaf.dto.js';
 import {
   dependentIds,
@@ -187,6 +190,121 @@ export class SubmissionWriterService {
     return { before: existing, after: updated };
   }
 
+  /**
+   * OSAAR correction. Pending and returned papers can be rewritten in place.
+   * Status, the current desk, the stored signatory sequence, and room holds
+   * stay as filed. A paper that already reserves a room keeps its event date,
+   * time, and venue.
+   */
+  async adminUpdate(
+    eventId: string,
+    submissionId: string,
+    body: SaafDto,
+  ): Promise<Item> {
+    const existing = await this.submissions.getSubmission(
+      eventId,
+      submissionId,
+    );
+    if (!existing) {
+      throw new NotFoundException('Not Found');
+    }
+    const organizationId = stripPrefix(existing.GSI1PK, 'ORGANIZATION#');
+    if (!organizationId) {
+      throw new NotFoundException('Not Found');
+    }
+    const status = str(existing, 'status');
+    if (status !== 'pending' && status !== 'returned') {
+      abort(422, 'Only pending or returned submissions can be edited.');
+    }
+    const details = this.editedDetails(existing, body);
+    const reserved = hasVenueReservation(existing);
+    if (!reserved) {
+      this.assertDates({
+        ...body,
+        activity_details: details,
+        venue_reservation: { has_reservation: false },
+      });
+    }
+    const dependents = await this.resolveDependents(
+      organizationId,
+      body.collaboration?.dependent_organization_ids ?? [],
+    );
+    const sentAt = str(existing, 'sent_at') ?? nowIso();
+    const updated = await this.submissions.updateSubmission(
+      eventId,
+      submissionId,
+      {
+        collaboration: {
+          dependent_organization_ids: dependents.map((id) =>
+            organizationKey(id),
+          ),
+        },
+        activity_classification: stored(
+          this.editedClassification(existing, body),
+        ),
+        proponents: stored(body.proponents),
+        activity_details: stored(details),
+        institutional_alignment: stored(body.institutional_alignment),
+        detailed_budget_proposal: stored(body.detailed_budget_proposal),
+      },
+    );
+    const previousDependents = dependentIds(existing);
+    for (const added of dependents.filter(
+      (id) => !previousDependents.includes(id),
+    )) {
+      await this.submissions.putCollaboration(
+        added,
+        eventId,
+        submissionId,
+        sentAt,
+      );
+    }
+    for (const removed of previousDependents.filter(
+      (id) => !dependents.includes(id),
+    )) {
+      await this.submissions.deleteCollaboration(
+        removed,
+        eventId,
+        submissionId,
+      );
+    }
+    return updated;
+  }
+
+  private editedClassification(existing: Item, body: SaafDto) {
+    const previous = record(existing.activity_classification);
+    const nature = previous ? str(previous, 'nature') : null;
+    return {
+      ...body.activity_classification,
+      ...(nature ? { nature } : {}),
+    };
+  }
+
+  /** Keep the filed schedule when the paper already holds a room. */
+  private editedDetails(existing: Item, body: SaafDto) {
+    const details = { ...body.activity_details };
+    if (!hasVenueReservation(existing)) {
+      return details;
+    }
+    const previous = record(existing.activity_details);
+    if (!previous) {
+      return details;
+    }
+    const venue = str(previous, 'venue');
+    const start = str(previous, 'date_of_event');
+    const end = str(previous, 'end_date_of_event');
+    const day = str(previous, 'day_of_event');
+    const time = str(previous, 'time_of_event');
+    return {
+      ...details,
+      ...(venue ? { venue } : {}),
+      ...(start ? { date_of_event: start } : {}),
+      ...(end ? { end_date_of_event: end } : {}),
+      ...(day ? { day_of_event: day } : {}),
+      ...(time ? { time_of_event: time } : {}),
+    };
+  }
+
   private async resolveDependents(
     organizationId: string,
     raw: string[],
@@ -205,8 +323,14 @@ export class SubmissionWriterService {
   private assertDates(body: SaafDto): void {
     const start = body.activity_details.date_of_event;
     const end = body.activity_details.end_date_of_event;
-    if (!this.config.allowAnyEventDate() && start < addDays(utcToday(), 10)) {
-      abort(422, 'The date of event must be at least 10 days from today.');
+    const floor = eventDateFloorKey(this.config.allowAnyEventDate());
+    assertEventDateAllowed(start, floor);
+    if (body.venue_reservation.has_reservation) {
+      for (const reservation of body.venue_reservation.reservations ?? []) {
+        for (const selection of reservation.selections ?? []) {
+          assertEventDateAllowed(selection.date, floor);
+        }
+      }
     }
     if (end && end < start) {
       abort(422, 'The end date of event must be on or after the start date.');
@@ -271,15 +395,25 @@ export class SubmissionWriterService {
       collaboration: {
         dependent_organization_ids: dependents.map((id) => organizationKey(id)),
       },
-      activity_classification: body.activity_classification,
-      proponents: body.proponents,
-      activity_details: body.activity_details,
-      institutional_alignment: body.institutional_alignment,
-      detailed_budget_proposal: body.detailed_budget_proposal,
-      venue_reservation: body.venue_reservation,
+      activity_classification: stored(body.activity_classification),
+      proponents: stored(body.proponents),
+      activity_details: stored(body.activity_details),
+      institutional_alignment: stored(body.institutional_alignment),
+      detailed_budget_proposal: stored(body.detailed_budget_proposal),
+      venue_reservation: stored(body.venue_reservation),
       ...(refs.length > 0 ? { booking_refs: refs } : {}),
     };
   }
+}
+
+/** DynamoDB rejects class-validator instances. Store the form as plain data. */
+function stored<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function hasVenueReservation(item: Item): boolean {
+  const venue = record(item.venue_reservation);
+  return venue?.has_reservation === true;
 }
 
 export function refsOf(item: Item): { pk: string; sk: string }[] {

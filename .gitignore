@@ -36,6 +36,7 @@ lerna-debug.log*
 
 # ─── Environment files ─────────────────────────────────────────────
 # Track the templates (.env.example); never the real values.
+.grokadmin
 .env
 .env.*
 !.env.example

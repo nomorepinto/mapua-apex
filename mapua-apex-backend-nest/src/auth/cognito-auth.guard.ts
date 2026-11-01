@@ -102,6 +102,11 @@ export class CognitoAuthGuard implements CanActivate {
         context.getHandler(),
         context.getClass(),
       ]) ?? [];
+    if (!caller.isAdmin && !caller.organizationId && !caller.signatoryId) {
+      throw new UnauthorizedException(
+        'Unauthenticated: Account must have a custom:signatory_id or custom:organization_id.',
+      );
+    }
     if (
       roles.includes('student') &&
       !caller.isAdmin &&

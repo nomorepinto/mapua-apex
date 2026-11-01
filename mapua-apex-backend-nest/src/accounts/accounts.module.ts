@@ -6,6 +6,6 @@ import { CognitoAccountsRepository } from './cognito-accounts.repository.js';
 @Module({
   controllers: [AccountsController],
   providers: [CognitoAccountsRepository, AccountsService],
-  exports: [AccountsService],
+  exports: [AccountsService, CognitoAccountsRepository],
 })
 export class AccountsModule {}

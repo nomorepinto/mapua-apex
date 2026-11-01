@@ -100,8 +100,8 @@ export function OrganizationsTableCard() {
               </EmptyMedia>
               <EmptyTitle>No organizations yet</EmptyTitle>
               <EmptyDescription>
-                Register a CDM account, then assign a dean and an adviser to
-                each organization.
+                Register a CDM account, then assign an adviser. Assign a dean
+                unless the organization is a higher council.
               </EmptyDescription>
             </EmptyHeader>
             {!state.sharedAccountsReady ? (
@@ -153,16 +153,24 @@ export function OrganizationsTableCard() {
                         </TableCell>
                         {ORGANIZATION_ASSIGNABLE_DESK_ITEMS.map((item) => {
                           const signatoryId = deskAssignment(org, item.value)
+                          const deanSkipped =
+                            item.value === "dean" && org.is_higher_council
                           return (
                             <TableCell key={item.value}>
-                              <DeskName
-                                person={
-                                  signatoryId
-                                    ? state.peopleById.get(signatoryId)
-                                    : undefined
-                                }
-                                signatoryId={signatoryId}
-                              />
+                              {deanSkipped ? (
+                                <span className="text-muted-foreground">
+                                  Skipped
+                                </span>
+                              ) : (
+                                <DeskName
+                                  person={
+                                    signatoryId
+                                      ? state.peopleById.get(signatoryId)
+                                      : undefined
+                                  }
+                                  signatoryId={signatoryId}
+                                />
+                              )}
                             </TableCell>
                           )
                         })}

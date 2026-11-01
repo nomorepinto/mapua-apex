@@ -34,9 +34,9 @@ export const MOCK_SESSIONS: Session[] = [
     ipAddress: "136.158.42.10",
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0",
     pagesVisited: [
-      { path: "/student/dashboard", pageName: "Student Dashboard", timestamp: tenMinsAgo },
-      { path: "/student/submissions", pageName: "My Submissions", timestamp: new Date(nowMs - 8 * 60 * 1000).toISOString() },
-      { path: "/student/submissions/new", pageName: "New Event Proposal", timestamp: new Date(nowMs - 5 * 60 * 1000).toISOString() },
+      { path: "/students/dashboard", pageName: "Student Dashboard", timestamp: tenMinsAgo },
+      { path: "/students/submissions", pageName: "New proposal", timestamp: new Date(nowMs - 8 * 60 * 1000).toISOString() },
+      { path: "/students/submissions/saaf", pageName: "Event proposal", timestamp: new Date(nowMs - 5 * 60 * 1000).toISOString() },
     ],
   },
   {
@@ -50,7 +50,7 @@ export const MOCK_SESSIONS: Session[] = [
     ipAddress: "120.28.194.55",
     userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X)",
     pagesVisited: [
-      { path: "/student/submissions", pageName: "My Submissions", timestamp: new Date(nowMs - 4 * 60 * 1000).toISOString() },
+      { path: "/students/submissions", pageName: "New proposal", timestamp: new Date(nowMs - 4 * 60 * 1000).toISOString() },
     ],
   },
   {
@@ -66,8 +66,8 @@ export const MOCK_SESSIONS: Session[] = [
     ipAddress: "180.191.10.99",
     userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15",
     pagesVisited: [
-      { path: "/admin/dashboard", pageName: "Admin Dashboard", timestamp: twoHoursAgo },
-      { path: "/admin/announcements", pageName: "Manage Announcements", timestamp: new Date(nowMs - 90 * 60 * 1000).toISOString() },
+      { path: "/osaar/dashboard", pageName: "OSAAR Dashboard", timestamp: twoHoursAgo },
+      { path: "/osaar/setup/organizations", pageName: "Organizations", timestamp: new Date(nowMs - 90 * 60 * 1000).toISOString() },
     ],
   },
   {
@@ -81,7 +81,7 @@ export const MOCK_SESSIONS: Session[] = [
     ipAddress: "49.145.12.99",
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/121.0.0.0",
     pagesVisited: [
-      { path: "/student/dashboard", pageName: "Student Dashboard", timestamp: nineHoursAgo },
+      { path: "/students/dashboard", pageName: "Student Dashboard", timestamp: nineHoursAgo },
     ],
   },
   {

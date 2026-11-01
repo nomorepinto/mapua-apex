@@ -6,6 +6,11 @@ import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { useSignOut } from "@/hooks/use-sign-out"
 import { useSessionLogger, isIdleExpired } from "@/hooks/use-session-logger"
+import { AccountLinkError } from "./account-link-error"
+import {
+  hasSignatoryOrOrganizationId,
+  isPrivilegedAccount,
+} from "./account-link"
 import { SessionDisplacementDialogs } from "./session-displacement-dialogs"
 
 const SessionTrackerContext = createContext<boolean>(false)
@@ -198,6 +203,15 @@ export function AuthGuard({ children, allowedGroups }: AuthGuardProps) {
           </div>
         )
       }
+    }
+
+    const profile = auth.user?.profile as Record<string, unknown> | undefined
+    const userGroups = (profile?.["cognito:groups"] as string[]) || []
+    if (
+      !isPrivilegedAccount(userGroups) &&
+      !hasSignatoryOrOrganizationId(profile)
+    ) {
+      return <AccountLinkError />
     }
 
     if (isNested) {

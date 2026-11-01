@@ -16,6 +16,7 @@ import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
 import { brand } from "@/config"
 import { SAAF_STEP_ISSUES_ID } from "@/components/submission/validate-saaf-step"
 import { cn } from "@/lib/utils"
+import { useOrgStore } from "@/stores/org-store"
 
 // STEP 1: Classification (Index 0)
 export function SaafClassificationStep() {
@@ -46,6 +47,7 @@ export function SaafPeopleStep() {
   return (
     <SaafStepPanel index={1}>
       <ProponentsSection
+        departmentValues={draft.departmentValues}
         proponents={draft.proponents}
         onUpdate={actions.handleUpdateProponent}
         onRemove={actions.handleRemoveProponent}
@@ -74,6 +76,7 @@ export function SaafReservationStep() {
 // STEP 4: Activity (Index 3 with reservation, Index 2 without)
 export function SaafActivityStep() {
   const { state, actions } = useSaafFormContext()
+  const eventName = useOrgStore((store) => store.eventName)
   const stepIndex = state.includeReservation ? 3 : 2
 
   return (
@@ -82,6 +85,7 @@ export function SaafActivityStep() {
         values={state.draft}
         onChange={actions.updateField}
         includeReservation={state.includeReservation}
+        fallbackTitle={eventName}
       />
     </SaafStepPanel>
   )

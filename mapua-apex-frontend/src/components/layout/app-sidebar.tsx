@@ -340,7 +340,8 @@ export function AppSidebar({
   const [signOutOpen, setSignOutOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const isDesktop = useMediaQuery("lg")
-  const aboutTo = `${homeTo.replace(/\/dashboard$/, "")}/about`
+  const panel = homeTo.split("/").filter(Boolean)[0]
+  const aboutTo = panel ? `/${panel}/about` : "/about"
 
   useEffect(() => {
     if (isDesktop) setMobileOpen(false)

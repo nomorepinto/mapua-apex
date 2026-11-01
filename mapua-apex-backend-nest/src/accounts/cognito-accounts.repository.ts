@@ -41,11 +41,22 @@ export class CognitoAccountsRepository {
     return this.listUsers();
   }
 
+  /**
+   * Match in memory. These custom attributes were added after the pool
+   * existed, so Cognito will not accept them in a ListUsers filter
+   * (`InvalidParameterException: Input fails to satisfy the constraints`).
+   */
   async listByAttribute(
     attribute: typeof SIGNATORY_ATTRIBUTE | typeof ORGANIZATION_ATTRIBUTE,
     value: string,
   ): Promise<CognitoAccount[]> {
-    return this.listUsers(`${attribute} = "${value}"`);
+    const accounts = await this.listUsers();
+    return accounts.filter(
+      (account) =>
+        (attribute === SIGNATORY_ATTRIBUTE
+          ? account.signatoryId
+          : account.organizationId) === value,
+    );
   }
 
   async listGroups(): Promise<string[]> {
@@ -151,7 +162,7 @@ export class CognitoAccountsRepository {
     }
   }
 
-  private async listUsers(filter?: string): Promise<CognitoAccount[]> {
+  private async listUsers(): Promise<CognitoAccount[]> {
     const accounts: CognitoAccount[] = [];
     let paginationToken: string | undefined;
     do {
@@ -159,7 +170,6 @@ export class CognitoAccountsRepository {
         new ListUsersCommand({
           UserPoolId: this.poolId(),
           Limit: PAGE_SIZE,
-          ...(filter ? { Filter: filter } : {}),
           ...(paginationToken ? { PaginationToken: paginationToken } : {}),
         }),
       );

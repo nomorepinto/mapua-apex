@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react"
 import { use } from "react"
-import { useSearchParams } from "react-router"
+import { useNavigate } from "react-router"
 
 import { useAdminCampusesQuery } from "@/hooks/use-campuses"
 import {
@@ -22,21 +22,13 @@ import {
 } from "@/hooks/use-bookings"
 import type { ApiCampus, ApiReservable } from "@/lib/types"
 
-/** The three in-page sections of the cdm /reservables tool. */
+/** The three child routes of the cdm /reservables tool. */
 export type ReservableSection = "add" | "view" | "reserve"
 
-const SECTIONS: ReservableSection[] = ["add", "view", "reserve"]
 const EMPTY_CAMPUSES: ApiCampus[] = []
 const EMPTY_RESERVABLES: ApiReservable[] = []
 
-function parseSection(value: string | null): ReservableSection {
-  return SECTIONS.includes(value as ReservableSection)
-    ? (value as ReservableSection)
-    : "add"
-}
-
 interface ReservablesState {
-  section: ReservableSection
   campuses: ApiCampus[]
   campusId: string | null
   reservables: ApiReservable[]
@@ -50,10 +42,9 @@ interface ReservablesState {
 }
 
 interface ReservablesActions {
-  setSection: (section: ReservableSection) => void
   setCampusId: (campusId: string | null) => void
   setSelectedReservableId: (reservableId: string | null) => void
-  /** Pick a reservable and jump to a section (in-page navigation, no reload). */
+  /** Pick a reservable and open it on a section route. */
   selectReservable: (reservableId: string, section?: ReservableSection) => void
   createReservable: ReturnType<typeof useCreateReservableMutation>
   updateReservable: ReturnType<typeof useUpdateReservableMutation>
@@ -79,9 +70,7 @@ export function useReservablesPage() {
 }
 
 export function ReservablesProvider({ children }: { children: ReactNode }) {
-  // The section is URL-backed so each is deep-linkable via ?section=add|view|reserve.
-  const [searchParams, setSearchParams] = useSearchParams()
-  const section = parseSection(searchParams.get("section"))
+  const navigate = useNavigate()
 
   const campusesQuery = useAdminCampusesQuery()
   const campuses = campusesQuery.data ?? EMPTY_CAMPUSES
@@ -133,12 +122,6 @@ export function ReservablesProvider({ children }: { children: ReactNode }) {
         "Campuses or reservables failed to load."
       : null
 
-  function setSection(next: ReservableSection) {
-    const params = new URLSearchParams(searchParams)
-    params.set("section", next)
-    setSearchParams(params, { replace: true })
-  }
-
   function setCampusId(next: string | null) {
     setCampusOverride(next)
     // A reservable belongs to one campus, so changing campus clears the pick.
@@ -156,12 +139,11 @@ export function ReservablesProvider({ children }: { children: ReactNode }) {
       setCampusOverride(target.campus_id)
     }
     setSelectedReservableId(reservableId)
-    setSection(nextSection)
+    navigate(`/cdm/reservables/${nextSection}`)
   }
 
   const value: ReservablesContextValue = {
     state: {
-      section,
       campuses,
       campusId,
       reservables,
@@ -174,7 +156,6 @@ export function ReservablesProvider({ children }: { children: ReactNode }) {
       loadError,
     },
     actions: {
-      setSection,
       setCampusId,
       setSelectedReservableId,
       selectReservable,

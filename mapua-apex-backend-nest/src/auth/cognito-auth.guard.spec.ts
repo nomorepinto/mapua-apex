@@ -9,6 +9,9 @@ class Probe {
   @Roles('student')
   closed(): void {}
 
+  @Roles('any')
+  any(): void {}
+
   @Public()
   open(): void {}
 }
@@ -23,7 +26,17 @@ const verifier: JwtVerifier = {
         'custom:organization_id': 'org-1',
       };
     }
-    return { sub: 's', 'cognito:groups': ['signatory'] };
+    if (token === 'admin') {
+      return { sub: 's', 'cognito:groups': ['admin'] };
+    }
+    if (token === 'signatory') {
+      return {
+        sub: 's',
+        'cognito:groups': ['signatory'],
+        'custom:signatory_id': 'sig-1',
+      };
+    }
+    return { sub: 's', 'cognito:groups': ['org_submitter'] };
   },
 };
 
@@ -45,7 +58,35 @@ describe('CognitoAuthGuard', () => {
   it('rejects a student route when the organization claim is missing', async () => {
     await expect(
       guard.canActivate(context(Probe.prototype.closed, 'Bearer signatory')),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    ).rejects.toThrow(
+      'Unauthenticated: Missing custom:organization_id in Cognito token.',
+    );
+  });
+
+  it('rejects an account that has neither a signatory id nor an organization id', async () => {
+    await expect(
+      guard.canActivate(context(Probe.prototype.any, 'Bearer unlinked')),
+    ).rejects.toThrow(
+      'Unauthenticated: Account must have a custom:signatory_id or custom:organization_id.',
+    );
+  });
+
+  it('allows an admin account that has neither id', async () => {
+    await expect(
+      guard.canActivate(context(Probe.prototype.any, 'Bearer admin')),
+    ).resolves.toBe(true);
+  });
+
+  it('allows an account that has a signatory id', async () => {
+    await expect(
+      guard.canActivate(context(Probe.prototype.any, 'Bearer signatory')),
+    ).resolves.toBe(true);
+  });
+
+  it('allows a student account that has an organization id', async () => {
+    await expect(
+      guard.canActivate(context(Probe.prototype.closed, 'Bearer student')),
+    ).resolves.toBe(true);
   });
 });
 

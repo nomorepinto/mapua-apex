@@ -1,10 +1,9 @@
-import { useAuth } from "react-oidc-context"
-
 import { Button } from "@/components/ui/button"
 import { layout } from "@/config"
+import { useSignOut } from "@/hooks/use-sign-out"
 
 export function PendingAssignment() {
-  const auth = useAuth()
+  const signOut = useSignOut()
 
   return (
     <div className={layout.center}>
@@ -20,7 +19,7 @@ export function PendingAssignment() {
           type="button"
           variant="outline"
           onClick={() => {
-            void auth.signoutRedirect()
+            void signOut({ localOnly: true })
           }}
         >
           Sign out

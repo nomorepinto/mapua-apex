@@ -12,11 +12,13 @@ import { layout } from "@/config"
 
 export function ProponentsSection({
   proponents,
+  departmentValues = {},
   onUpdate,
   onRemove,
   onAdd,
 }: {
   proponents: Proponent[]
+  departmentValues?: Record<string, string>
   onUpdate: (id: string, field: keyof Proponent, value: string) => void
   onRemove: (id: string) => void
   onAdd: () => void
@@ -30,8 +32,13 @@ export function ProponentsSection({
   const configuredDepartment = currentOrgQuery.data?.department?.trim() || ""
   const organizationDepartment =
     getDepartmentItem(configuredDepartment)?.code || ""
+  const isHigherCouncil = currentOrgQuery.data?.is_higher_council === true
+  // Higher councils skip the dean, so there is no dean department to lock.
+  const choosesDepartment = isHigherCouncil && organizationDepartment === ""
   const departmentIsMissing =
-    !currentOrgQuery.isPending && organizationDepartment === ""
+    !currentOrgQuery.isPending &&
+    !choosesDepartment &&
+    organizationDepartment === ""
 
   return (
     <div className={layout.stack}>
@@ -40,7 +47,17 @@ export function ProponentsSection({
           <Loader2 className="animate-spin" />
           <AlertTitle>Resolving organization department</AlertTitle>
           <AlertDescription>
-            Loading the department assigned to your organization&apos;s dean.
+            Loading the department assigned to your organization.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {choosesDepartment ? (
+        <Alert>
+          <AlertTitle>Choose each proponent&apos;s department</AlertTitle>
+          <AlertDescription>
+            Higher councils skip the dean, so the department is selected on
+            this form.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -64,7 +81,12 @@ export function ProponentsSection({
           proponent={proponent}
           index={index}
           canRemove={canRemove}
-          departmentValue={organizationDepartment}
+          departmentEditable={choosesDepartment}
+          departmentValue={
+            choosesDepartment
+              ? departmentValues[proponent.id] || proponent.department
+              : organizationDepartment
+          }
           organizationName={organizationName}
           onUpdate={onUpdate}
           onRemove={onRemove}

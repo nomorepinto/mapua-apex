@@ -52,6 +52,7 @@ const REQUIRED = [
   'GET /api/v2/admins/monitor/stats',
   'GET /api/v2/admins/submissions',
   'GET /api/v2/admins/events/:event/submissions/:submission',
+  'PUT /api/v2/admins/events/:event/submissions/:submission',
   'GET /api/v2/admins/postevals',
   'GET /api/v2/admins/postevals/:event/:posteval',
   'POST /api/v2/admins/postevals/:event/:posteval/approve',

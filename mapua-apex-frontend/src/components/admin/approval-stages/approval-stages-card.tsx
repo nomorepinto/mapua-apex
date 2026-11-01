@@ -23,7 +23,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import {
   Select,
   SelectItem,
@@ -133,11 +133,11 @@ export function ApprovalStagesCard() {
           </Alert>
         ) : null}
         {!state.loading && state.osaarPeople.length > 0 && !state.canAddStage ? (
-          <FieldDescription>
+          <p className="text-xs text-muted-foreground">
             {state.draft.length >= MAX_STAGES
               ? "OSAAR approval stages cannot exceed 10."
               : "Register another OSAAR signatory before adding a stage."}
-          </FieldDescription>
+          </p>
         ) : null}
       </CardPanel>
       {state.osaarPeople.length > 0 && !state.loading ? (

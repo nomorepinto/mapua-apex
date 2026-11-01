@@ -46,7 +46,7 @@ export function AdminSubmissionsSection() {
           </h2>
           <p className="text-xs text-neutral-500">
             Filter the proposal cohort, then open a row for the full SAAF
-            record.
+            record. Pending and returned papers can be edited from there.
           </p>
         </div>
       </div>

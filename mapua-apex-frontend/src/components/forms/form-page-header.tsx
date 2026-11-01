@@ -1,3 +1,4 @@
+import { MissingAccountLinkBadge } from "@/components/auth/missing-account-link-badge"
 import { layout } from "@/config"
 
 export function FormPageHeader({
@@ -9,7 +10,10 @@ export function FormPageHeader({
 }) {
   return (
     <div className="border-b border-neutral-200 pb-5">
-      <h1 className={layout.pageTitle}>{title}</h1>
+      <h1 className={layout.pageTitle}>
+        {title}
+        <MissingAccountLinkBadge />
+      </h1>
       {subtitle ? <p className={layout.pageSubtitle}>{subtitle}</p> : null}
     </div>
   )

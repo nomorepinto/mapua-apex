@@ -3,20 +3,14 @@ import {
   CalendarDaysIcon,
   PlusIcon,
 } from "lucide-react"
+import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from "react-router"
 
-import { AddReservableSection } from "@/components/admin/reservables/add-reservable-section"
-import { ReserveSection } from "@/components/admin/reservables/reserve-section"
-import {
-  ReservablesProvider,
-  useReservablesPage,
-  type ReservableSection,
-} from "@/components/admin/reservables/reservables-context"
+import { ReservablesProvider, type ReservableSection } from "@/components/admin/reservables/reservables-context"
 import { ReservablesLoadAlert } from "@/components/admin/reservables/reservables-load-alert"
 import {
   SegmentedControl,
   type SegmentedItem,
 } from "@/components/admin/reservables/segmented-control"
-import { ViewReservableSection } from "@/components/admin/reservables/view-reservable-section"
 import { FormPageHeader } from "@/components/forms/form-page-header"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
@@ -27,16 +21,25 @@ const SECTION_ITEMS: SegmentedItem<ReservableSection>[] = [
   { value: "reserve", label: "Reserve", icon: CalendarCheckIcon },
 ]
 
-export function AdminReservablesPage() {
+function resolveSection(pathname: string): ReservableSection {
+  const segment = pathname.split("/").filter(Boolean).pop()
+  return SECTION_ITEMS.some((item) => item.value === segment)
+    ? (segment as ReservableSection)
+    : "add"
+}
+
+export function ReservablesLayout() {
   return (
     <ReservablesProvider>
-      <ReservablesBody />
+      <ReservablesFrame />
     </ReservablesProvider>
   )
 }
 
-function ReservablesBody() {
-  const { state, actions } = useReservablesPage()
+function ReservablesFrame() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const section = resolveSection(location.pathname)
 
   return (
     <div className={layout.page}>
@@ -50,13 +53,23 @@ function ReservablesBody() {
           ariaLabel="Reservables section"
           items={SECTION_ITEMS}
           mode="tablist"
-          onChange={actions.setSection}
-          value={state.section}
+          onChange={(value) => navigate(`/cdm/reservables/${value}`)}
+          value={section}
         />
-        {state.section === "add" ? <AddReservableSection /> : null}
-        {state.section === "view" ? <ViewReservableSection /> : null}
-        {state.section === "reserve" ? <ReserveSection /> : null}
+        <Outlet />
       </div>
     </div>
   )
+}
+
+/** Sends `/cdm/reservables` and old `?section=` links to the matching child path. */
+export function ReservablesIndexRedirect() {
+  const [searchParams] = useSearchParams()
+  const section = searchParams.get("section")
+  const target =
+    section === "add" || section === "view" || section === "reserve"
+      ? section
+      : "add"
+
+  return <Navigate to={`/cdm/reservables/${target}`} replace />
 }
