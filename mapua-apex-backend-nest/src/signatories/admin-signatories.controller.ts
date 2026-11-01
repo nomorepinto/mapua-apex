@@ -28,7 +28,13 @@ export class AdminSignatoriesController {
   @Post()
   @HttpCode(201)
   create(@Body() body: SignatoryDto): Promise<SignatoryView> {
-    return this.signatories.create(body.name, body.role, body.department);
+    return this.signatories.create(
+      body.name,
+      body.role,
+      body.department,
+      body.campus_id,
+      body.all_campuses,
+    );
   }
 
   @Put(':signatory/account')
@@ -50,6 +56,8 @@ export class AdminSignatoriesController {
       body.name,
       body.role,
       body.department,
+      body.campus_id,
+      body.all_campuses,
     );
   }
 

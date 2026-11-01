@@ -108,16 +108,18 @@ desk, status, and room reservation as they are.
 
 ## 9. Three OSAAR review stages
 
-**Status:** Partial — the stage count is adjustable. Confirming the live
-order (Sir Kyle, then Ma'am Grace, then OSAAR) is still open.
+**Status:** Partial — each campus has its own OSAAR order, then one
+all-campus OSAAR. Confirming the live people (Sir Kyle, then Ma'am Grace,
+then the all-campus OSAAR) is still a data step.
 
-**Goal:** Split the OSAAR desk into three stages, in order: Sir Kyle, then
+**Goal:** Split the OSAAR desk into ordered stages: Sir Kyle, then
 Ma'am Grace, then back to OSAAR.
 
-**Done:** Setup → Approval stages stores an ordered list of OSAAR
-signatories. New proposals walk that list. Proposals already sent keep
-the stages they were filed with. Assigning the three named people is a
-data step, not more code.
+**Done:** An OSAAR account belongs to one campus, or is the single
+all-campus account. New proposals walk that campus's OSAARs in the saved
+order, then the all-campus account. Online proposals use the campus marked
+main. Proposals already sent keep the stages they were filed with.
+Assigning the named people is still a data step, not more code.
 
 ## 10. Validation feedback while typing
 

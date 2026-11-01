@@ -9,7 +9,10 @@ import {
   AccountAssignmentCombobox,
   AccountAssignmentSkeleton,
 } from "@/components/admin/accounts/account-assignment-combobox"
-import { useSignatoriesPage } from "@/components/admin/signatories/signatories-context"
+import {
+  osaarCampusLabel,
+  useSignatoriesPage,
+} from "@/components/admin/signatories/signatories-context"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -86,8 +89,8 @@ export function SignatoriesTableCard() {
               <EmptyTitle>No signatories yet</EmptyTitle>
               <EmptyDescription>
                 Add a name and role on the left. Organizations need a CDM
-                account before they can be registered. OSAAR accounts are
-                assigned on Approval stages.
+                account before they can be registered. An OSAAR account chooses
+                its campus here.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -149,6 +152,11 @@ export function SignatoriesTableCard() {
                         {person.role === "dean" && person.department ? (
                           <Badge variant="outline">
                             {person.department.toUpperCase()}
+                          </Badge>
+                        ) : person.role === "osaar" &&
+                          osaarCampusLabel(person, state.campuses) ? (
+                          <Badge variant="outline">
+                            {osaarCampusLabel(person, state.campuses)}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground">—</span>

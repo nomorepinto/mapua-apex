@@ -38,6 +38,7 @@ test("admin builds the campus, desks, organizations, and account links", async (
     dean2: personName("dean2", tag),
     osaar1: personName("osaar1", tag),
     osaar2: personName("osaar2", tag),
+    osaarAll: personName("osaarAll", tag),
     cdm1: personName("cdm1", tag),
   }
   const orgs = {
@@ -65,6 +66,7 @@ test("admin builds the campus, desks, organizations, and account links", async (
 
     await page.goto("/osaar/setup/campuses")
     await captureJson(page, "/admins/campuses", "POST", () => setup.addCampus(campus))
+    await setup.expectMainNotOffered(campus)
     await setup.rejectCampusWithoutDigits(`Half Campus ${tag}`)
 
     await page.goto("/osaar/setup/signatories")
@@ -74,13 +76,17 @@ test("admin builds the campus, desks, organizations, and account links", async (
       ["adv3", "Adviser"],
       ["dean1", "Dean", "SOIT"],
       ["dean2", "Dean", "EECE"],
-      ["osaar1", "OSAAR"],
-      ["osaar2", "OSAAR"],
     ] as const) {
       await captureJson(page, "/admins/signatories", "POST", () =>
-        setup.addSignatory(people[key], role, department ? new RegExp(department).source : undefined) as Promise<void>,
+        setup.addSignatory(people[key], role, department),
       )
     }
+    for (const key of ["osaar1", "osaar2"] as const) {
+      await captureJson(page, "/admins/signatories", "POST", () =>
+        setup.addSignatory(people[key], "OSAAR", undefined, campus),
+      )
+    }
+    await captureJson(page, "/admins/signatories", "POST", () => setup.addSignatory(people.osaarAll, "OSAAR"))
     if (!preexisting) {
       await captureJson(page, "/admins/signatories", "POST", () => setup.addSignatory(people.cdm1, "CDM"))
     }
@@ -94,7 +100,7 @@ test("admin builds the campus, desks, organizations, and account links", async (
     )
     await captureJson(page, "/admins/organizations", "POST", () => setup.addOrganization(orgs.orgC, people.adv3))
 
-    await setup.saveStages(people.osaar1, people.osaar2)
+    await setup.expectOsaarCampuses(campus, people.osaar1, people.osaar2, people.osaarAll)
 
     const adminAccount = accounts.find((row) => row.email?.toLowerCase() === "mapuaapexqaautomation@gmail.com")
     await page.goto("/osaar/setup/signatories")
@@ -108,7 +114,7 @@ test("admin builds the campus, desks, organizations, and account links", async (
         description: "Assigning the signed-in admin did not show the self-assignment error.",
       })
     }
-    for (const key of ["adv1", "adv2", "adv3", "dean1", "dean2", "osaar1", "osaar2"] as const) {
+    for (const key of ["adv1", "adv2", "adv3", "dean1", "dean2", "osaar1", "osaar2", "osaarAll"] as const) {
       await setup.assignAccount(people[key], key)
     }
     await setup.assignAccount(people.cdm1, "cdm1")
@@ -129,7 +135,7 @@ test("admin builds the campus, desks, organizations, and account links", async (
     await admin.close()
   }
 
-  for (const key of ["adv1", "adv2", "adv3", "dean1", "dean2", "osaar1", "osaar2", "cdm1", "orgA", "orgB", "orgC"]) {
+  for (const key of ["adv1", "adv2", "adv3", "dean1", "dean2", "osaar1", "osaar2", "osaarAll", "cdm1", "orgA", "orgB", "orgC"]) {
     await signInAndSaveApex(browser, key)
   }
 })

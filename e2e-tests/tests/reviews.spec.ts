@@ -113,7 +113,7 @@ test("denies a paper at each desk", async ({ browser }) => {
 test("resubmitting as extra-curricular returns the paper to the adviser", async ({ browser }) => {
   const run = readRun()
   const title = `Route Dean ${run.tag}`
-  const roles = ["Adviser", "Dean", "OSAAR", "OSAAR"]
+  const roles = ["Adviser", "Dean", "OSAAR", "OSAAR", "OSAAR"]
   await asUser(browser, "orgA", async (page) => {
     const saaf = new SaafPage(page)
     await saaf.start(title, false)
@@ -124,7 +124,7 @@ test("resubmitting as extra-curricular returns the paper to the adviser", async 
     await captureJson(page, "/students/submissions", "POST", () => saaf.submit())
     rolesMatch(await trackerRoles(page, title), roles)
   })
-  const paper: PaperRecord = { title, org: "orgA", roles, desks: ["adv1", "dean1", "osaar1", "osaar2"] }
+  const paper: PaperRecord = { title, org: "orgA", roles, desks: ["adv1", "dean1", "osaar1", "osaar2", "osaarAll"] }
   writeRun((state) => {
     state.papers["route-dean"] = paper
   })
@@ -147,7 +147,7 @@ test("resubmitting as extra-curricular returns the paper to the adviser", async 
 test("adding a collaborator on resubmit shows who receives the paper", async ({ browser }) => {
   const run = readRun()
   const title = `Route Osaar ${run.tag}`
-  const roles = ["Adviser", "OSAAR", "OSAAR"]
+  const roles = ["Adviser", "OSAAR", "OSAAR", "OSAAR"]
   await asUser(browser, "orgA", async (page) => {
     const saaf = new SaafPage(page)
     await saaf.start(title, false)

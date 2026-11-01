@@ -71,7 +71,7 @@ interface ProponentCardProps {
   proponent: Proponent
   index: number
   canRemove: boolean
-  /** Higher councils have no dean, so the proponent picks a department. */
+  /** Organizations that skip the dean let the proponent pick a department. */
   departmentEditable?: boolean
   departmentValue: string
   /** Name of the applying organization; locks the "Name of Organization" field. */

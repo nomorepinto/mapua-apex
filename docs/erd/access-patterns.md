@@ -30,7 +30,7 @@ Index summary:
 | 6 | Submission timeline / audit | Query | `PK = SUBMISSION#id`, `SK` begins `NOTIFICATION#` | Base |
 | 7 | Signatory inbox (desk queue) | Query | `GSI2PK = SIGNATORY#id`, `GSI2SK` by time (sparse) | GSI2 |
 | 8 | Signatory directory by role | Query | `GSI4PK = ROLE#...`, `GSI4SK` begins `SIGNATORY#` | GSI4 |
-| 8b | OSAAR approval stages | GetItem / PutItem | `PK = SK = SETTINGS#APPROVAL` (`osaar_stages`). Missing item falls back to the single `ROLE#OSAAR` signatory | Base |
+| 8b | OSAAR approval stages | Query | `GSI4PK = ROLE#OSAAR`, then filter `campus_id` and sort `osaar_order`. The all-campus account is the row with `all_campuses`. Online plans use the `CAMPUS` item with `main` | GSI4 |
 | 9 | Current signatory profile (`/signatories/me`) | GetItem | `PK = SIGNATORY#id`, `SK = SIGNATORY#id` | Base |
 | 10 | Admin: all submissions | Query | per org `GSI1PK = ORGANIZATION#id`, `GSI1SK` begins `SUBMISSION#` | GSI1 |
 | 11 | Student org record (`/students/organization`) | GetItem | `PK = ORGANIZATION#id`, `SK = ORGANIZATION#id` | Base |

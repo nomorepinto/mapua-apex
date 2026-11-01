@@ -9,8 +9,8 @@ import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import { cn } from "@/lib/utils"
 
 /**
- * Higher councils skip the post-evaluation. The route stays reachable, but the
- * filing flow is replaced with a short explanation.
+ * Organizations with skip_post_eval do not file a post-evaluation. The route
+ * stays reachable, but the filing flow is replaced with a short explanation.
  */
 export function PostEvalOrganizationGate({ children }: { children: ReactNode }) {
   const organizationQuery = useCurrentOrganizationQuery()
@@ -23,13 +23,13 @@ export function PostEvalOrganizationGate({ children }: { children: ReactNode }) 
     )
   }
 
-  if (organizationQuery.data?.is_higher_council) {
+  if (organizationQuery.data?.skip_post_eval) {
     return (
       <div className={cn(layout.page, layout.stack)}>
         <div className={cn(layout.containerNarrow, layout.stack)}>
           <FormPageHeader
             title="Post-evaluations"
-            subtitle="Higher council organizations do not file a post-evaluation for their events."
+            subtitle="This organization does not file a post-evaluation for its events."
           />
           <div>
             <Button render={<Link to="/students/dashboard" />}>

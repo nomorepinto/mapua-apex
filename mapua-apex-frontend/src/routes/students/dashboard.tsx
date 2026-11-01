@@ -14,7 +14,7 @@ export function OrgDashboard() {
   const organizationQuery = useCurrentOrganizationQuery()
   const showPostEvals =
     !organizationQuery.isPending &&
-    organizationQuery.data?.is_higher_council !== true
+    organizationQuery.data?.skip_post_eval !== true
 
   return (
     <StudentDashboardProvider>

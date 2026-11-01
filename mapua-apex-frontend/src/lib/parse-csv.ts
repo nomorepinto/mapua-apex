@@ -110,12 +110,15 @@ export type SignatoryCsvRow = {
   name: string
   role: SignatoryRole
   department?: string
+  /** Campus name, or `all` for the account that receives every campus. */
+  campus?: string
 }
 
 export type OrganizationCsvRow = {
   name: string
   desks: Record<OrganizationAssignableDeskRole, string>
-  is_higher_council: boolean
+  skip_dean: boolean
+  skip_post_eval: boolean
 }
 
 const ROLE_ALIASES: Record<string, SignatoryRole> = {
@@ -137,12 +140,14 @@ const ORGANIZATION_CSV_COLUMNS: OrganizationAssignableDeskRole[] = [
   "adviser",
 ]
 
-const HIGHER_COUNCIL_ALIASES = [
-  "is_higher_council",
-  "ishighercouncil",
-  "higher_council",
-  "higher council",
-  "highercouncil",
+const SKIP_DEAN_ALIASES = ["skip_dean", "skipdean", "skip dean"]
+const SKIP_POST_EVAL_ALIASES = [
+  "skip_post_eval",
+  "skipposteval",
+  "skip_posteval",
+  "skip post-eval",
+  "skip post eval",
+  "skip_post_evaluation",
 ]
 
 export function parseSignatoryRole(value: string): SignatoryRole | null {
@@ -154,8 +159,9 @@ function headerIndex(header: string[], aliases: string[]): number {
 }
 
 /**
- * Parse a signatory CSV of name, role, and optional department.
- * Department is stored only for deans. A header row is optional.
+ * Parse a signatory CSV of name, role, optional department, and optional campus.
+ * Department is stored only for deans. An OSAAR row needs a campus name or `all`.
+ * A header row is optional.
  */
 export function parseSignatoryCsv(text: string): {
   records: SignatoryCsvRow[]
@@ -172,13 +178,15 @@ export function parseSignatoryCsv(text: string): {
   const hasHeader =
     headerIndex(first, ["name"]) >= 0 ||
     headerIndex(first, ["role"]) >= 0 ||
-    headerIndex(first, ["department", "dept"]) >= 0
-  const header = hasHeader ? first : ["name", "role", "department"]
+    headerIndex(first, ["department", "dept"]) >= 0 ||
+    headerIndex(first, ["campus"]) >= 0
+  const header = hasHeader ? first : ["name", "role", "department", "campus"]
   const start = hasHeader ? 1 : 0
   const nameIdx = Math.max(0, headerIndex(header, ["name"]))
   const roleIdx =
     headerIndex(header, ["role"]) >= 0 ? headerIndex(header, ["role"]) : 1
   const deptIdx = headerIndex(header, ["department", "dept"])
+  const campusIdx = headerIndex(header, ["campus"])
 
   const records: SignatoryCsvRow[] = []
 
@@ -188,9 +196,10 @@ export function parseSignatoryCsv(text: string): {
     const roleRaw = row[roleIdx]?.trim() ?? ""
     const departmentRaw =
       deptIdx >= 0 ? (row[deptIdx]?.trim() ?? "") : (row[2]?.trim() ?? "")
+    const campusRaw = campusIdx >= 0 ? (row[campusIdx]?.trim() ?? "") : ""
     const line = i + 1
 
-    if (!name && !roleRaw && !departmentRaw) {
+    if (!name && !roleRaw && !departmentRaw && !campusRaw) {
       continue
     }
 
@@ -205,6 +214,13 @@ export function parseSignatoryCsv(text: string): {
     const record: SignatoryCsvRow = { name, role }
     if (role === "dean" && departmentRaw) {
       record.department = resolveDepartment(departmentRaw) ?? undefined
+    }
+    if (role === "osaar") {
+      if (!campusRaw) {
+        errors.push(`Row ${line}: an OSAAR signatory needs a campus or all.`)
+        continue
+      }
+      record.campus = campusRaw
     }
     records.push(record)
   }
@@ -230,11 +246,28 @@ function parseCsvBoolean(value: string): boolean | null {
   return null
 }
 
+function csvFlagCell(
+  header: string[],
+  row: string[],
+  aliases: string[],
+  fallbackIndex: number,
+  hasHeader: boolean
+): string {
+  const index = headerIndex(header, aliases)
+  if (index >= 0) {
+    return row[index]?.trim() ?? ""
+  }
+  if (hasHeader) {
+    return ""
+  }
+  return row[fallbackIndex]?.trim() ?? ""
+}
+
 /**
  * Parse an organization CSV.
- * Columns: name, dean, adviser, is_higher_council. A header row is optional.
- * The dean column may be left empty for higher-council rows (they skip the
- * dean desk). Shared CDM and OSAAR desks are not in the file.
+ * Columns: name, dean, adviser, skip_dean, skip_post_eval. A header row is
+ * optional. The dean column may be left empty when skip_dean is true. Shared
+ * CDM and OSAAR desks are not in the file.
  */
 export function parseOrganizationCsv(text: string): {
   rows: OrganizationCsvRow[]
@@ -249,7 +282,9 @@ export function parseOrganizationCsv(text: string): {
 
   const first = rows[0]
   const hasHeader = isOrganizationHeader(first)
-  const header = hasHeader ? first : ["name", "dean", "adviser", "is_higher_council"]
+  const header = hasHeader
+    ? first
+    : ["name", "dean", "adviser", "skip_dean", "skip_post_eval"]
   const start = hasHeader ? 1 : 0
 
   const nameIdx =
@@ -266,7 +301,6 @@ export function parseOrganizationCsv(text: string): {
         ? headerIndex(header, DESK_ALIASES.adviser)
         : 2,
   }
-  const higherCouncilIdx = headerIndex(header, HIGHER_COUNCIL_ALIASES)
 
   const parsed: OrganizationCsvRow[] = []
 
@@ -277,41 +311,55 @@ export function parseOrganizationCsv(text: string): {
       dean: row[deskIdx.dean]?.trim() ?? "",
       adviser: row[deskIdx.adviser]?.trim() ?? "",
     }
-    const flagRaw =
-      higherCouncilIdx >= 0
-        ? (row[higherCouncilIdx]?.trim() ?? "")
-        : hasHeader
-          ? ""
-          : (row[3]?.trim() ?? "")
+    const skipDeanRaw = csvFlagCell(header, row, SKIP_DEAN_ALIASES, 3, hasHeader)
+    const skipPostEvalRaw = csvFlagCell(
+      header,
+      row,
+      SKIP_POST_EVAL_ALIASES,
+      4,
+      hasHeader
+    )
     const line = i + 1
 
-    if (!name && !desks.dean && !desks.adviser && !flagRaw) {
+    if (!name && !desks.dean && !desks.adviser && !skipDeanRaw && !skipPostEvalRaw) {
       continue
     }
 
-    const isHigherCouncil = parseCsvBoolean(flagRaw)
-    if (isHigherCouncil === null) {
+    const skipDean = parseCsvBoolean(skipDeanRaw)
+    const skipPostEval = parseCsvBoolean(skipPostEvalRaw)
+    if (skipDean === null) {
       errors.push(
-        `Row ${line}: is_higher_council must be true, false, yes, no, 1, or 0.`
+        `Row ${line}: skip_dean must be true, false, yes, no, 1, or 0.`
+      )
+      continue
+    }
+    if (skipPostEval === null) {
+      errors.push(
+        `Row ${line}: skip_post_eval must be true, false, yes, no, 1, or 0.`
       )
       continue
     }
 
-    // Higher councils skip the dean desk, so their dean column may be empty.
+    // A skip-dean row may leave the dean column empty.
     const required = ORGANIZATION_CSV_COLUMNS.filter(
-      (role) => role !== "dean" || !isHigherCouncil
+      (role) => role !== "dean" || !skipDean
     )
     const missing = required.filter((role) => !desks[role])
     if (!name || missing.length > 0) {
       errors.push(
-        isHigherCouncil
+        skipDean
           ? `Row ${line}: expected name and adviser.`
           : `Row ${line}: expected name, dean, and adviser.`
       )
       continue
     }
 
-    parsed.push({ name, desks, is_higher_council: isHigherCouncil })
+    parsed.push({
+      name,
+      desks,
+      skip_dean: skipDean,
+      skip_post_eval: skipPostEval,
+    })
   }
 
   return { rows: parsed, errors }

@@ -21,7 +21,7 @@ type ToolCard = {
  */
 export function Tools() {
   const organizationQuery = useCurrentOrganizationQuery()
-  const filesPostEval = organizationQuery.data?.is_higher_council !== true
+  const filesPostEval = organizationQuery.data?.skip_post_eval !== true
   const attendanceUrl = arcusAttendanceUrl()
   const evaluationUrl = arcusEvaluationUrl()
 

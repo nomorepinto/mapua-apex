@@ -46,7 +46,7 @@ export function StudentsLayout() {
 function StudentsFrame() {
   const organizationQuery = useCurrentOrganizationQuery()
   const items =
-    organizationQuery.data?.is_higher_council === true
+    organizationQuery.data?.skip_post_eval === true
       ? STUDENT_NAV.filter((item) => item.to !== "/students/postevals")
       : STUDENT_NAV
 

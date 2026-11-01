@@ -53,7 +53,8 @@ const EMPTY_SIGNATORIES: ApiSignatory[] = []
 interface OrganizationsState {
   name: string
   desks: AssignableDesks
-  isHigherCouncil: boolean
+  skipDean: boolean
+  skipPostEval: boolean
   formError: string
   csvFileName: string
   csvError: string
@@ -82,7 +83,8 @@ interface OrganizationsState {
   editing: ApiOrganization | null
   editName: string
   editDesks: AssignableDesks
-  editIsHigherCouncil: boolean
+  editSkipDean: boolean
+  editSkipPostEval: boolean
   editError: string
   deleteOpen: boolean
   deleteError: string
@@ -95,7 +97,8 @@ interface OrganizationsActions {
     role: OrganizationAssignableDeskRole,
     value: SignatoryOption | null
   ) => void
-  setIsHigherCouncil: (checked: boolean) => void
+  setSkipDean: (checked: boolean) => void
+  setSkipPostEval: (checked: boolean) => void
   handleAddOne: (event: FormEvent<HTMLFormElement>) => Promise<void>
   chooseCsv: (file: File | null, text: string) => void
   handleCsvImport: () => Promise<void>
@@ -107,7 +110,8 @@ interface OrganizationsActions {
     role: OrganizationAssignableDeskRole,
     value: SignatoryOption | null
   ) => void
-  setEditIsHigherCouncil: (checked: boolean) => void
+  setEditSkipDean: (checked: boolean) => void
+  setEditSkipPostEval: (checked: boolean) => void
   handleEditSave: (event: FormEvent<HTMLFormElement>) => Promise<void>
   setDeleteOpen: (open: boolean) => void
   openDelete: () => void
@@ -144,7 +148,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
 
   const [name, setName] = useState("")
   const [desks, setDesks] = useState<AssignableDesks>(emptyDesks)
-  const [isHigherCouncil, setIsHigherCouncil] = useState(false)
+  const [skipDean, setSkipDean] = useState(false)
+  const [skipPostEval, setSkipPostEval] = useState(false)
   const [formError, setFormError] = useState("")
   const [csvRows, setCsvRows] = useState<OrganizationCsvRow[]>([])
   const [csvParseErrors, setCsvParseErrors] = useState<string[]>([])
@@ -154,7 +159,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
   const [editing, setEditing] = useState<ApiOrganization | null>(null)
   const [editName, setEditName] = useState("")
   const [editDesks, setEditDesks] = useState<AssignableDesks>(emptyDesks)
-  const [editIsHigherCouncil, setEditIsHigherCouncil] = useState(false)
+  const [editSkipDean, setEditSkipDean] = useState(false)
+  const [editSkipPostEval, setEditSkipPostEval] = useState(false)
   const [editError, setEditError] = useState("")
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState("")
@@ -206,8 +212,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       const selected: Partial<AssignableDesks> = {}
 
       for (const item of ORGANIZATION_ASSIGNABLE_DESK_ITEMS) {
-        // Higher-council rows skip the dean desk, even when a dean name is filled in.
-        if (item.value === "dean" && row.is_higher_council) {
+        // Skip-dean rows omit the dean desk, even when a dean name is filled in.
+        if (item.value === "dean" && row.skip_dean) {
           continue
         }
         const { match, ambiguous } = resolveSignatoryByRole(
@@ -254,7 +260,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       payloads.push({
         name: row.name.trim(),
         signatories: assignments,
-        is_higher_council: row.is_higher_council,
+        skip_dean: row.skip_dean,
+        skip_post_eval: row.skip_post_eval,
       })
     }
 
@@ -270,7 +277,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       const haystack = [
         org.name,
         org.organization_id,
-        org.is_higher_council ? "higher council" : "",
+        org.skip_dean ? "skip dean" : "",
+        org.skip_post_eval ? "skip post-eval" : "",
         ...ORGANIZATION_ASSIGNABLE_DESK_ITEMS.map((item) => {
           const id = deskAssignment(org, item.value)
           return id ? (peopleById.get(id)?.name ?? id) : ""
@@ -287,14 +295,15 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
     setEditing(org)
     setEditName(org.name)
     setEditDesks({
-      dean: org.is_higher_council
+      dean: org.skip_dean
         ? null
         : optionFromPerson(peopleById.get(deskAssignment(org, "dean") ?? "")),
       adviser: optionFromPerson(
         peopleById.get(deskAssignment(org, "adviser") ?? "")
       ),
     })
-    setEditIsHigherCouncil(Boolean(org.is_higher_council))
+    setEditSkipDean(Boolean(org.skip_dean))
+    setEditSkipPostEval(Boolean(org.skip_post_eval))
     setEditError("")
   }
 
@@ -318,13 +327,13 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       setFormError("Select an adviser.")
       return
     }
-    if (!isHigherCouncil && !desks.dean) {
+    if (!skipDean && !desks.dean) {
       setFormError("Select a dean and an adviser.")
       return
     }
 
     const assignments = withSharedDesks(
-      isHigherCouncil ? null : desks.dean,
+      skipDean ? null : desks.dean,
       desks.adviser,
       signatories
     )
@@ -337,11 +346,13 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       await createOrg.mutateAsync({
         name: trimmed,
         signatories: assignments,
-        is_higher_council: isHigherCouncil,
+        skip_dean: skipDean,
+        skip_post_eval: skipPostEval,
       })
       setName("")
       setDesks(emptyDesks())
-      setIsHigherCouncil(false)
+      setSkipDean(false)
+      setSkipPostEval(false)
       setFormError("")
       toastManager.add({
         title: "Organization added",
@@ -368,7 +379,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       setCsvError(
         errors[0] ??
           (csvRows.length === 0
-            ? "Choose a CSV with name, dean, adviser, and is_higher_council columns."
+            ? "Choose a CSV with name, dean, adviser, skip_dean, and skip_post_eval columns."
             : csvResolved.skippedDuplicates.length > 0
               ? "Every organization in this file is already registered."
               : "No valid organization rows to import.")
@@ -414,13 +425,13 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       setEditError("Select an adviser.")
       return
     }
-    if (!editIsHigherCouncil && !editDesks.dean) {
+    if (!editSkipDean && !editDesks.dean) {
       setEditError("Select a dean and an adviser.")
       return
     }
 
     const assignments = withSharedDesks(
-      editIsHigherCouncil ? null : editDesks.dean,
+      editSkipDean ? null : editDesks.dean,
       editDesks.adviser,
       signatories
     )
@@ -434,7 +445,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         organizationId: editing.organization_id,
         name: trimmed,
         signatories: assignments,
-        is_higher_council: editIsHigherCouncil,
+        skip_dean: editSkipDean,
+        skip_post_eval: editSkipPostEval,
       })
       setEditing(null)
       toastManager.add({
@@ -490,7 +502,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
     state: {
       name,
       desks,
-      isHigherCouncil,
+      skipDean,
+      skipPostEval,
       formError,
       csvFileName,
       csvError,
@@ -512,7 +525,7 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         name.trim().length <= 100 &&
         !/[0-9]/.test(name) &&
         Boolean(desks.adviser) &&
-        (isHigherCouncil || Boolean(desks.dean)),
+        (skipDean || Boolean(desks.dean)),
       sharedCdmName: sharedCdm?.name ?? "—",
       peopleById,
       createPending: createOrg.isPending,
@@ -522,7 +535,8 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
       editing,
       editName,
       editDesks,
-      editIsHigherCouncil,
+      editSkipDean,
+      editSkipPostEval,
       editError,
       deleteOpen,
       deleteError,
@@ -537,13 +551,17 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         setDesks((current) => ({ ...current, [role]: next }))
         if (formError) setFormError("")
       },
-      setIsHigherCouncil: (checked) => {
-        setIsHigherCouncil(checked)
-        // A higher council skips the dean desk, so drop any dean selection made
-        // while the flag was off.
+      setSkipDean: (checked) => {
+        setSkipDean(checked)
+        // Skipping the dean desk drops any dean selection made while the flag
+        // was off.
         if (checked) {
           setDesks((current) => ({ ...current, dean: null }))
         }
+        if (formError) setFormError("")
+      },
+      setSkipPostEval: (checked) => {
+        setSkipPostEval(checked)
         if (formError) setFormError("")
       },
       handleAddOne,
@@ -578,11 +596,15 @@ export function OrganizationsProvider({ children }: { children: ReactNode }) {
         setEditDesks((current) => ({ ...current, [role]: next }))
         if (editError) setEditError("")
       },
-      setEditIsHigherCouncil: (checked) => {
-        setEditIsHigherCouncil(checked)
+      setEditSkipDean: (checked) => {
+        setEditSkipDean(checked)
         if (checked) {
           setEditDesks((current) => ({ ...current, dean: null }))
         }
+        if (editError) setEditError("")
+      },
+      setEditSkipPostEval: (checked) => {
+        setEditSkipPostEval(checked)
         if (editError) setEditError("")
       },
       handleEditSave,

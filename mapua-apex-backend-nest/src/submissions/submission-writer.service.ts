@@ -42,11 +42,14 @@ export class SubmissionWriterService {
       organizationId,
       body.collaboration?.dependent_organization_ids ?? [],
     );
+    const activityDetails = await this.stampCampus(body.activity_details, body);
     const steps = await this.routing.sequenceFor(
       organizationId,
       dependents,
       body.activity_classification.activity_type,
       body.venue_reservation.has_reservation,
+      undefined,
+      activityDetails.campus_id,
     );
     const sequence = steps.map((step) => step.signatory_id);
     await this.ensureEvent(body.event_id, organizationId);
@@ -65,7 +68,7 @@ export class SubmissionWriterService {
       body.event_id,
       submissionId,
       organizationId,
-      body,
+      { ...body, activity_details: activityDetails },
       dependents,
       steps,
       sequence[0] ?? '',
@@ -128,6 +131,11 @@ export class SubmissionWriterService {
     if (frozenOsaar.length === 0) {
       abort(422, 'This submission has no OSAAR stage to keep.');
     }
+    const activityDetails = await this.stampCampus(
+      this.editedDetails(existing, body),
+      body,
+      existing,
+    );
     const steps = await this.routing.sequenceFor(
       organizationId,
       dependents,
@@ -154,7 +162,7 @@ export class SubmissionWriterService {
       eventId,
       submissionId,
       organizationId,
-      body,
+      { ...body, activity_details: activityDetails },
       dependents,
       steps,
       desk,
@@ -214,7 +222,11 @@ export class SubmissionWriterService {
     if (status !== 'pending' && status !== 'returned') {
       abort(422, 'Only pending or returned submissions can be edited.');
     }
-    const details = this.editedDetails(existing, body);
+    const details = await this.stampCampus(
+      this.editedDetails(existing, body),
+      body,
+      existing,
+    );
     const reserved = hasVenueReservation(existing);
     if (!reserved) {
       this.assertDates({
@@ -301,6 +313,36 @@ export class SubmissionWriterService {
       ...(day ? { day_of_event: day } : {}),
       ...(time ? { time_of_event: time } : {}),
     };
+  }
+
+  /**
+   * Writes the campus that owns this plan. An unchanged venue keeps the
+   * campus already stored, including an online plan filed under a previous
+   * main campus.
+   */
+  private async stampCampus(
+    details: SaafDto['activity_details'],
+    body: SaafDto,
+    existing?: Item,
+  ): Promise<SaafDto['activity_details'] & { campus_id: string }> {
+    const venue = details.venue.trim();
+    const previous = existing ? record(existing.activity_details) : null;
+    const previousVenue = previous
+      ? (str(previous, 'venue') ?? '').trim()
+      : null;
+    const previousCampus = previous ? str(previous, 'campus_id') : null;
+    if (previousCampus && previousVenue === venue) {
+      return { ...details, campus_id: previousCampus };
+    }
+    const reservationCampusIds = body.venue_reservation.has_reservation
+      ? (body.venue_reservation.reservations ?? []).map((row) => row.campus_id)
+      : [];
+    const campusId = await this.routing.hostCampusId({
+      venue,
+      reservationCampusIds,
+      keepOnlineCampusId: venue === 'Online' ? previousCampus : null,
+    });
+    return { ...details, campus_id: campusId };
   }
 
   private async resolveDependents(

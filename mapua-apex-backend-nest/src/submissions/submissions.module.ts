@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ApprovalSettingsModule } from '../approval-settings/approval-settings.module.js';
 import { BookingsModule } from '../bookings/bookings.module.js';
+import { CampusesModule } from '../campuses/campuses.module.js';
 import { MailModule } from '../mail/mail.module.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { SignatoriesModule } from '../signatories/signatories.module.js';
@@ -17,9 +17,9 @@ import { SubmissionWriterService } from './submission-writer.service.js';
   imports: [
     OrganizationsModule,
     SignatoriesModule,
+    CampusesModule,
     BookingsModule,
     MailModule,
-    ApprovalSettingsModule,
   ],
   controllers: [
     StudentSubmissionsController,

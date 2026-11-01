@@ -35,6 +35,7 @@ import {
   useSignatoriesQuery,
   useUpdateSignatoryMutation,
 } from "@/hooks/use-admin"
+import { useAdminCampusesQuery } from "@/hooks/use-campuses"
 import { departmentLabel } from "@/lib/departments"
 import {
   buildSignatoryPayload,
@@ -42,13 +43,59 @@ import {
   type ApiSignatory,
 } from "@/lib/dynamodb-adapters"
 import { parseSignatoryCsv, type SignatoryCsvRow } from "@/lib/parse-csv"
+import type { ApiCampus } from "@/lib/types"
+
+const ALL_CAMPUSES = "all"
+const EMPTY_CAMPUSES: ApiCampus[] = []
+
+export type OsaarCampusOption = { label: string; value: string }
 
 const EMPTY_SIGNATORIES: ApiSignatory[] = []
+
+function campusOptions(
+  campuses: ApiCampus[],
+  includeAll: boolean
+): OsaarCampusOption[] {
+  const options = campuses.map((campus) => ({
+    label: campus.name,
+    value: campus.campus_id,
+  }))
+  if (includeAll) {
+    options.push({ label: "All campuses", value: ALL_CAMPUSES })
+  }
+  return options
+}
+
+function assignmentFrom(campusId: string | null): {
+  campusId?: string
+  allCampuses?: boolean
+} | null {
+  if (campusId === ALL_CAMPUSES) return { allCampuses: true }
+  if (campusId) return { campusId }
+  return null
+}
+
+export function osaarCampusLabel(
+  person: ApiSignatory,
+  campuses: ApiCampus[]
+): string {
+  if (person.role !== "osaar") return ""
+  if (person.all_campuses) return "All campuses"
+  return (
+    campuses.find((campus) => campus.campus_id === person.campus_id)?.name ?? ""
+  )
+}
 
 interface SignatoriesState {
   name: string
   role: SignatoryRoleValue | null
   department: DepartmentOption | null
+  campusId: string | null
+  campuses: ApiCampus[]
+  campusItems: OsaarCampusOption[]
+  selectedCampus: OsaarCampusOption | null
+  editCampusItems: OsaarCampusOption[]
+  selectedEditCampus: OsaarCampusOption | null
   formError: string
   csvError: string
   csvFileName: string
@@ -77,6 +124,7 @@ interface SignatoriesState {
   editName: string
   editRole: SignatoryRoleValue | null
   editDepartment: DepartmentOption | null
+  editCampusId: string | null
   editError: string
   deleteOpen: boolean
   deleteError: string
@@ -87,6 +135,7 @@ interface SignatoriesActions {
   changeName: (value: string) => void
   changeRole: (role: SignatoryRoleValue | null) => void
   setDepartment: (value: DepartmentOption | null) => void
+  setCampus: (campusId: string | null) => void
   handleAddOne: (event: FormEvent<HTMLFormElement>) => Promise<void>
   chooseCsv: (file: File | null, text: string) => void
   handleCsvImport: () => Promise<void>
@@ -96,6 +145,7 @@ interface SignatoriesActions {
   changeEditName: (value: string) => void
   changeEditRole: (role: SignatoryRoleValue | null) => void
   setEditDepartment: (value: DepartmentOption | null) => void
+  setEditCampus: (campusId: string | null) => void
   handleEditSave: (event: FormEvent<HTMLFormElement>) => Promise<void>
   setDeleteOpen: (open: boolean) => void
   openDelete: () => void
@@ -121,6 +171,7 @@ export function useSignatoriesPage() {
 
 export function SignatoriesProvider({ children }: { children: ReactNode }) {
   const signatoriesQuery = useSignatoriesQuery()
+  const campusesQuery = useAdminCampusesQuery()
   const accountsQuery = useCognitoAccountsQuery()
   const createSignatory = useCreateSignatoryMutation()
   const updateSignatory = useUpdateSignatoryMutation()
@@ -130,6 +181,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
   const [name, setName] = useState("")
   const [role, setRole] = useState<SignatoryRoleValue | null>(null)
   const [department, setDepartment] = useState<DepartmentOption | null>(null)
+  const [campusId, setCampusId] = useState<string | null>(null)
   const [formError, setFormError] = useState("")
   const [csvError, setCsvError] = useState("")
   const [csvFileName, setCsvFileName] = useState("")
@@ -142,13 +194,32 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
   const [editDepartment, setEditDepartment] = useState<DepartmentOption | null>(
     null
   )
+  const [editCampusId, setEditCampusId] = useState<string | null>(null)
   const [editError, setEditError] = useState("")
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState("")
 
   const signatories = signatoriesQuery.data ?? EMPTY_SIGNATORIES
+  const campuses = campusesQuery.data ?? EMPTY_CAMPUSES
   const accounts = accountsQuery.data ?? EMPTY_ACCOUNTS
   const takenRoles = takenSingletonRoles(signatories)
+  const allCampusTaken = signatories.some((person) => person.all_campuses)
+  const editAllCampusTaken = signatories.some(
+    (person) =>
+      person.all_campuses && person.signatory_id !== editing?.signatory_id
+  )
+  const campusItems = useMemo(
+    () => campusOptions(campuses, !allCampusTaken),
+    [allCampusTaken, campuses]
+  )
+  const editCampusItems = useMemo(
+    () => campusOptions(campuses, !editAllCampusTaken),
+    [campuses, editAllCampusTaken]
+  )
+  const selectedCampus =
+    campusItems.find((item) => item.value === campusId) ?? null
+  const selectedEditCampus =
+    editCampusItems.find((item) => item.value === editCampusId) ?? null
 
   const roleItems = useMemo(
     () => ROLE_ITEMS.filter((item) => !takenRoles.has(item.value)),
@@ -202,13 +273,14 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
         signatoryRoleLabel(person.role),
         person.department ?? "",
         person.department ? departmentLabel(person.department) : "",
+        osaarCampusLabel(person, campuses),
         accountSearchText(accounts, "signatory", person.signatory_id),
       ]
         .join(" ")
         .toLowerCase()
       return haystack.includes(query)
     })
-  }, [accounts, search, sortedSignatories])
+  }, [accounts, campuses, search, sortedSignatories])
 
   const csvPayloads = useMemo(() => {
     const payloads = []
@@ -216,6 +288,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
     const singletonCounts: Record<string, number> = {
       cdm: takenRoles.has("cdm") ? 1 : 0,
     }
+    let allCampusTaken = signatories.some((person) => person.all_campuses)
 
     for (const record of csvRecords) {
       if (record.role in singletonCounts) {
@@ -227,19 +300,57 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
           continue
         }
       }
+      if (record.role === "osaar") {
+        const campusName = record.campus?.trim() ?? ""
+        if (campusName.toLowerCase() === "all") {
+          if (allCampusTaken) {
+            errors.push(
+              `${record.name}: an all-campus OSAAR signatory already exists.`
+            )
+            continue
+          }
+          allCampusTaken = true
+          payloads.push(
+            buildSignatoryPayload(record.name, record.role, record.department, {
+              allCampuses: true,
+            })
+          )
+          continue
+        }
+        const campus = campuses.find(
+          (item) => item.name.trim().toLowerCase() === campusName.toLowerCase()
+        )
+        if (!campus) {
+          errors.push(`${record.name}: campus "${campusName}" does not exist.`)
+          continue
+        }
+        payloads.push(
+          buildSignatoryPayload(record.name, record.role, record.department, {
+            campusId: campus.campus_id,
+          })
+        )
+        continue
+      }
       payloads.push(
         buildSignatoryPayload(record.name, record.role, record.department)
       )
     }
 
     return { payloads, errors }
-  }, [csvParseErrors, csvRecords, takenRoles])
+  }, [campuses, csvParseErrors, csvRecords, signatories, takenRoles])
 
   function openEdit(person: ApiSignatory) {
     setEditing(person)
     setEditName(person.name)
     setEditRole(person.role)
     setEditDepartment(departmentOption(person.department))
+    setEditCampusId(
+      person.role === "osaar"
+        ? person.all_campuses
+          ? ALL_CAMPUSES
+          : (person.campus_id ?? null)
+        : null
+    )
     setEditError("")
   }
 
@@ -261,16 +372,26 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       )
       return
     }
+    if (role === "osaar" && !campusId) {
+      setFormError("Choose the campus this OSAAR account is assigned to.")
+      return
+    }
 
     try {
       await createSignatory.mutateAsync(
-        buildSignatoryPayload(name.trim(), role, department?.value)
+        buildSignatoryPayload(
+          name.trim(),
+          role,
+          department?.value,
+          assignmentFrom(campusId)
+        )
       )
       const addedName = name.trim()
       const addedRole = role
       setName("")
       setRole(null)
       setDepartment(null)
+      setCampusId(null)
       setFormError("")
       toastManager.add({
         title: "Signatory added",
@@ -351,6 +472,10 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       )
       return
     }
+    if (editRole === "osaar" && !editCampusId) {
+      setEditError("Choose the campus this OSAAR account is assigned to.")
+      return
+    }
 
     try {
       await updateSignatory.mutateAsync({
@@ -358,7 +483,8 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
         ...buildSignatoryPayload(
           editName.trim(),
           editRole,
-          editDepartment?.value
+          editDepartment?.value,
+          assignmentFrom(editCampusId)
         ),
       })
       setEditing(null)
@@ -408,6 +534,12 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       name,
       role,
       department,
+      campusId,
+      campuses,
+      campusItems,
+      selectedCampus,
+      editCampusItems,
+      selectedEditCampus,
       formError,
       csvError,
       csvFileName,
@@ -434,7 +566,8 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
         name.trim().length <= 30 &&
         !/^[.]|[^\p{L}\s.]|\d/u.test(name.trim()) &&
         role !== null &&
-        !takenRoles.has(role),
+        !takenRoles.has(role) &&
+        (role !== "osaar" || campusId !== null),
       createPending: createSignatory.isPending,
       bulkPending: bulkCreate.isPending,
       updatePending: updateSignatory.isPending,
@@ -442,6 +575,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       editName,
       editRole,
       editDepartment,
+      editCampusId,
       editError,
       deleteOpen,
       deleteError,
@@ -455,9 +589,14 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       changeRole: (nextRole) => {
         setRole(nextRole)
         if (nextRole !== "dean") setDepartment(null)
+        if (nextRole !== "osaar") setCampusId(null)
         if (formError) setFormError("")
       },
       setDepartment,
+      setCampus: (next) => {
+        setCampusId(next)
+        if (formError) setFormError("")
+      },
       handleAddOne,
       chooseCsv: (file, text) => {
         if (!file) {
@@ -489,9 +628,14 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       changeEditRole: (nextRole) => {
         setEditRole(nextRole)
         if (nextRole !== "dean") setEditDepartment(null)
+        if (nextRole !== "osaar") setEditCampusId(null)
         if (editError) setEditError("")
       },
       setEditDepartment,
+      setEditCampus: (next) => {
+        setEditCampusId(next)
+        if (editError) setEditError("")
+      },
       handleEditSave,
       setDeleteOpen: (open) => {
         setDeleteOpen(open)

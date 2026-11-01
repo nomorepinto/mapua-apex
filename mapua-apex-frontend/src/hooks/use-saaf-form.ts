@@ -110,9 +110,9 @@ export function useSaafForm() {
   const organizationName = currentOrgQuery.data?.name || ""
   const organizationDepartment =
     getDepartmentItem(currentOrgQuery.data?.department)?.code || ""
-  // Higher councils have no dean, so the form cannot stamp a department.
+  // An organization that skips the dean has no dean department to stamp.
   const choosesDepartment =
-    currentOrgQuery.data?.is_higher_council === true &&
+    currentOrgQuery.data?.skip_dean === true &&
     organizationDepartment === ""
 
   // Ensure submission date is always locked to today's date upon opening.
@@ -151,7 +151,7 @@ export function useSaafForm() {
   // organization. Stamp every row with that department, including restored
   // drafts and newly added proponents. Once the lookup settles, an unconfigured
   // organization is deliberately stamped blank so required-field validation
-  // prevents submission. Higher councils have no dean, so they choose a
+  // prevents submission. An organization that skips the dean chooses a
   // department on the form instead of receiving a stamp.
   useEffect(() => {
     if (currentOrgQuery.isPending || choosesDepartment) return

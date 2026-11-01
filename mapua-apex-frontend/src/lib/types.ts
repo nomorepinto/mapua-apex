@@ -123,6 +123,8 @@ export interface SlotSelection {
 export interface ApiCampus {
   campus_id: string
   name: string
+  /** True for the one campus whose OSAARs review online events. */
+  main?: boolean
   /** Allowed classroom-name prefix tokens; [] when the campus defines no naming rule. */
   classroom_name_prefixes?: string[]
   /** Required digit count for classroom names; null when no naming rule. */
@@ -231,6 +233,7 @@ export interface VenueReservation {
 
 export type CreateCampusPayload = {
   name: string
+  main?: boolean
   classroom_name_prefixes?: string[]
   classroom_name_digits?: number | null
 }

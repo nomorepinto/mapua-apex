@@ -57,6 +57,7 @@ export function personName(role: string, tag: string): string {
     dean2: "Dean Echo",
     osaar1: "Osaar One",
     osaar2: "Osaar Two",
+    osaarAll: "Osaar All",
     cdm1: "Cdm Reviewer",
   }
   return `${names[role]} ${tag}`
@@ -78,6 +79,6 @@ export function campusName(tag: string): string {
 /** Visible desk labels. OSAAR stages collapse to the role; order is what matters. */
 export function normalizeDesk(label: string): string {
   const trimmed = label.trim()
-  if (/^OSAAR( \d+)?$/.test(trimmed)) return "OSAAR"
+  if (/OSAAR/i.test(trimmed)) return "OSAAR"
   return trimmed
 }

@@ -31,7 +31,8 @@ export class OrganizationRepository {
   async create(
     name: string,
     desks: Desk[],
-    higherCouncil: boolean,
+    skipDean: boolean,
+    skipPostEval: boolean,
   ): Promise<Item> {
     const id = randomUUID();
     const key = organizationKey(id);
@@ -39,7 +40,8 @@ export class OrganizationRepository {
       PK: key,
       SK: key,
       name,
-      is_higher_council: higherCouncil,
+      skip_dean: skipDean,
+      skip_post_eval: skipPostEval,
       signatories: orderDesks(desks),
     };
     await this.table.put(item);
@@ -50,14 +52,16 @@ export class OrganizationRepository {
     id: string,
     name: string,
     desks: Desk[],
-    higherCouncil: boolean,
+    skipDean: boolean,
+    skipPostEval: boolean,
   ): Promise<Item> {
     const key = organizationKey(id);
     return this.table.update({
       key: { PK: key, SK: key },
       set: {
         name,
-        is_higher_council: higherCouncil,
+        skip_dean: skipDean,
+        skip_post_eval: skipPostEval,
         signatories: orderDesks(desks),
       },
     });

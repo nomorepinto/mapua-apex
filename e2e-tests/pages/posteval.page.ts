@@ -34,7 +34,7 @@ export class PostevalPage {
   async expectCouncilGate() {
     await this.page.goto("/students/postevals")
     await expect(
-      this.page.getByText("Higher council organizations do not file a post-evaluation for their events."),
+      this.page.getByText("This organization does not file a post-evaluation for its events."),
     ).toBeVisible()
   }
 }

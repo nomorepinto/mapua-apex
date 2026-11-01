@@ -1,6 +1,7 @@
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -14,6 +15,11 @@ export class CampusDto {
   @IsString()
   @MaxLength(150)
   name!: string;
+
+  /** The single campus whose OSAARs review online events. */
+  @IsOptional()
+  @IsBoolean()
+  main?: boolean;
 
   @IsOptional()
   @IsArray()

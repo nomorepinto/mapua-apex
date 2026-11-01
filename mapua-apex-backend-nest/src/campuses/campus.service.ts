@@ -4,6 +4,8 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { abort } from '../common/http.js';
+import { stripPrefix } from '../common/dynamo-keys.js';
+import { bool } from '../common/records.js';
 import { normalizePrefixes } from './classroom-naming.js';
 import {
   CampusRepository,
@@ -31,7 +33,13 @@ export class CampusService {
 
   async create(body: CampusDto): Promise<CampusView> {
     const { prefixes, digits } = this.pair(body);
-    return toCampus(await this.campuses.create(body.name, prefixes, digits));
+    const main = body.main === true;
+    if (main) {
+      await this.assertMainAvailable();
+    }
+    return toCampus(
+      await this.campuses.create(body.name, prefixes, digits, main),
+    );
   }
 
   async update(id: string, body: CampusDto): Promise<CampusView> {
@@ -40,8 +48,12 @@ export class CampusService {
       throw new NotFoundException('Not Found');
     }
     const { prefixes, digits } = this.pair(body);
+    const main = body.main === undefined ? bool(existing, 'main') : body.main;
+    if (main && !bool(existing, 'main')) {
+      await this.assertMainAvailable(id);
+    }
     return toCampus(
-      await this.campuses.update(id, body.name, prefixes, digits),
+      await this.campuses.update(id, body.name, prefixes, digits, main),
     );
   }
 
@@ -56,7 +68,26 @@ export class CampusService {
         'This campus still has rooms or equipment and cannot be deleted.',
       );
     }
+    if (await this.campuses.hasAssignedOsaar(id)) {
+      abort(
+        409,
+        'This campus still has OSAAR signatories and cannot be deleted.',
+      );
+    }
     await this.campuses.delete(id);
+  }
+
+  private async assertMainAvailable(exceptId?: string): Promise<void> {
+    const except = exceptId ? stripPrefix(exceptId, 'CAMPUS#') : null;
+    const holder = (await this.campuses.list()).find((item) => {
+      if (!bool(item, 'main')) {
+        return false;
+      }
+      return stripPrefix(item.PK, 'CAMPUS#') !== except;
+    });
+    if (holder) {
+      abort(422, 'A main campus already exists.');
+    }
   }
 
   private pair(body: CampusDto): { prefixes: string[]; digits: number | null } {

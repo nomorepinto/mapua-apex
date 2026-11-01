@@ -1,10 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { AccountsService } from '../accounts/accounts.service.js';
 import type { AccountView } from '../accounts/cognito-account.js';
+import { CampusRepository } from '../campuses/campus.repository.js';
 import { abort } from '../common/http.js';
 import { stripPrefix } from '../common/dynamo-keys.js';
-import { list, str, type Item } from '../common/records.js';
-import { SignatoryRepository } from './signatory.repository.js';
+import { bool, list, num, str, type Item } from '../common/records.js';
+import {
+  SignatoryRepository,
+  type OsaarPlacement,
+} from './signatory.repository.js';
 
 export interface SignatoryView {
   signatory_id: string;
@@ -12,6 +16,9 @@ export interface SignatoryView {
   role: string;
   department: string | null;
   organization_id: null;
+  campus_id: string | null;
+  all_campuses: boolean;
+  osaar_order: number | null;
 }
 
 @Injectable()
@@ -21,6 +28,7 @@ export class SignatoryService {
   constructor(
     private readonly signatories: SignatoryRepository,
     private readonly accounts: AccountsService,
+    private readonly campuses: CampusRepository,
   ) {}
 
   async list(): Promise<SignatoryView[]> {
@@ -39,8 +47,13 @@ export class SignatoryService {
     name: string,
     role: string,
     department?: string | null,
+    campusId?: string | null,
+    allCampuses?: boolean,
   ): Promise<SignatoryView> {
-    return this.toView(await this.signatories.create(name, role, department));
+    const placement = await this.placementFor(role, campusId, allCampuses);
+    return this.toView(
+      await this.signatories.create(name, role, department, placement),
+    );
   }
 
   async update(
@@ -48,13 +61,27 @@ export class SignatoryService {
     name: string,
     role: string,
     department?: string | null,
+    campusId?: string | null,
+    allCampuses?: boolean,
   ): Promise<SignatoryView> {
     const existing = await this.signatories.get(id);
     if (!existing) {
       throw new NotFoundException('Not Found');
     }
     const previousRole = str(existing, 'role') ?? '';
-    const updated = await this.signatories.update(id, name, role, department);
+    const placement = await this.placementFor(
+      role,
+      campusId,
+      allCampuses,
+      existing,
+    );
+    const updated = await this.signatories.update(
+      id,
+      name,
+      role,
+      department,
+      placement,
+    );
     const bare = stripPrefix(id, 'SIGNATORY#') ?? id;
     if (previousRole.toLowerCase() !== role.toLowerCase()) {
       await this.bestEffort(`signatory role ${bare}`, () =>
@@ -140,6 +167,83 @@ export class SignatoryService {
       role: str(item, 'role') ?? '',
       department: str(item, 'department'),
       organization_id: null,
+      campus_id: str(item, 'campus_id'),
+      all_campuses: bool(item, 'all_campuses'),
+      osaar_order: num(item, 'osaar_order'),
     };
+  }
+
+  private async placementFor(
+    role: string,
+    campusId: string | null | undefined,
+    allCampuses: boolean | undefined,
+    existing?: Item,
+  ): Promise<OsaarPlacement | null> {
+    if (role.toLowerCase() !== 'osaar') {
+      return null;
+    }
+    const all = allCampuses === true;
+    const campus = campusId ? stripPrefix(campusId, 'CAMPUS#') : null;
+    if (all && campus) {
+      abort(
+        422,
+        'An all-campus OSAAR signatory cannot also belong to one campus.',
+      );
+    }
+    if (!all && !campus) {
+      abort(
+        422,
+        'An OSAAR signatory must belong to a campus or be the all-campus OSAAR.',
+      );
+    }
+    if (all) {
+      await this.assertOnlyAllCampus(existing);
+      return { campusId: null, allCampuses: true, osaarOrder: null };
+    }
+    const campusItem = await this.campuses.get(campus as string);
+    if (!campusItem) {
+      abort(422, 'The selected campus does not exist.');
+    }
+    const previousCampus = existing ? str(existing, 'campus_id') : null;
+    const previousOrder = existing ? num(existing, 'osaar_order') : null;
+    const sameCampus =
+      existing !== undefined &&
+      str(existing, 'role') === 'osaar' &&
+      !bool(existing, 'all_campuses') &&
+      previousCampus === campus &&
+      previousOrder !== null;
+    const order = sameCampus
+      ? previousOrder
+      : await this.nextOrder(campus as string);
+    return { campusId: campus, allCampuses: false, osaarOrder: order };
+  }
+
+  private async assertOnlyAllCampus(existing?: Item): Promise<void> {
+    const current = existing ? stripPrefix(existing.PK, 'SIGNATORY#') : null;
+    const people = await this.signatories.listByRole('osaar');
+    const taken = people.some((person) => {
+      if (!bool(person, 'all_campuses')) {
+        return false;
+      }
+      return stripPrefix(person.PK, 'SIGNATORY#') !== current;
+    });
+    if (taken) {
+      abort(422, 'An all-campus OSAAR signatory already exists.');
+    }
+  }
+
+  private async nextOrder(campusId: string): Promise<number> {
+    const people = await this.signatories.listByRole('osaar');
+    let max = 0;
+    for (const person of people) {
+      if (
+        str(person, 'campus_id') !== campusId ||
+        bool(person, 'all_campuses')
+      ) {
+        continue;
+      }
+      max = Math.max(max, num(person, 'osaar_order') ?? 0);
+    }
+    return max + 1;
   }
 }

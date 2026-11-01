@@ -21,12 +21,36 @@ export class SetupPages {
 
   async addCampus(name: string) {
     await this.page.getByRole("tab", { name: "Campuses" }).click()
+    await this.releaseMainCampus()
+    const main = this.page.getByRole("checkbox", { name: "Main campus" })
+    await expect(main).toBeVisible()
+    if (!(await main.isChecked())) await main.check()
     await this.page.getByLabel("Name").fill(name)
     await this.page.getByLabel("Allowed prefixes").fill("R")
     await this.page.getByLabel("Digit count").fill("3")
     await this.page.getByRole("button", { name: "Add campus" }).click()
     await expect(this.page.getByRole("dialog", { name: "Campus added" }).first()).toBeVisible()
-    await expect(this.page.getByRole("row", { name })).toBeVisible()
+    await expect(this.page.getByRole("row", { name }).getByText("Main campus", { exact: true })).toBeVisible()
+  }
+
+  async expectMainNotOffered(holder: string) {
+    await expect(this.page.getByRole("checkbox", { name: "Main campus" })).toHaveCount(0)
+    await expect(this.page.getByRole("row", { name: holder }).getByText("Main campus", { exact: true })).toBeVisible()
+  }
+
+  private async releaseMainCampus() {
+    const holder = this.page.getByRole("row").filter({ hasText: "Main campus" })
+    if ((await holder.count()) === 0) return
+    await holder.first().getByRole("button", { name: "Edit" }).click()
+    const dialog = this.page.getByRole("dialog", { name: "Edit campus" })
+    const main = dialog.getByRole("checkbox", { name: "Main campus" })
+    await expect(main).toBeChecked()
+    await main.uncheck()
+    const save = dialog.getByRole("button", { name: "Save changes" })
+    await expect(save).toBeEnabled()
+    await save.click()
+    await expect(this.page.getByRole("dialog", { name: "Campus updated" }).first()).toBeVisible()
+    await expect(this.page.getByRole("checkbox", { name: "Main campus" })).toBeVisible()
   }
 
   async rejectCampusWithoutDigits(name: string) {
@@ -37,12 +61,20 @@ export class SetupPages {
     await expect(this.page.getByText("Add a digit count to complete the classroom name format.")).toBeVisible()
   }
 
-  async addSignatory(name: string, role: "Adviser" | "Dean" | "OSAAR" | "CDM", department?: string) {
+  async addSignatory(
+    name: string,
+    role: "Adviser" | "Dean" | "OSAAR" | "CDM",
+    department?: string,
+    campus?: string,
+  ) {
     await this.page.getByRole("tab", { name: "Signatories" }).click()
     await this.page.getByLabel("Name").fill(name)
     await choose(this.page, this.page.getByRole("combobox", { name: "Role" }), role)
     if (department) {
       await choose(this.page, this.page.getByRole("combobox", { name: "Department" }), department)
+    }
+    if (role === "OSAAR") {
+      await choose(this.page, this.page.getByRole("combobox", { name: "Campus" }), campus ?? "All campuses")
     }
     await this.page.getByRole("button", { name: "Add signatory" }).click()
     await expect(this.page.getByRole("dialog", { name: "Signatory added" }).filter({ hasText: name })).toBeVisible()
@@ -52,7 +84,10 @@ export class SetupPages {
   async addOrganization(name: string, adviser: string, dean?: string) {
     await this.page.getByRole("tab", { name: "Organizations" }).click()
     await this.page.getByLabel("Name").fill(name)
-    if (!dean) await this.page.getByRole("checkbox", { name: "Higher council" }).check()
+    if (!dean) {
+      await this.page.getByRole("checkbox", { name: "Skip dean" }).check()
+      await this.page.getByRole("checkbox", { name: "Skip post-eval" }).check()
+    }
     await choose(this.page, this.page.getByRole("combobox", { name: "Adviser" }), adviser)
     if (dean) await choose(this.page, this.page.getByRole("combobox", { name: "Dean" }), dean)
     await this.page.getByRole("button", { name: "Add organization" }).click()
@@ -60,13 +95,14 @@ export class SetupPages {
     await expect(this.page.getByRole("row", { name })).toBeVisible()
   }
 
-  async saveStages(first: string, second: string) {
+  async expectOsaarCampuses(campus: string, first: string, second: string, all: string) {
     await this.page.getByRole("tab", { name: "Approval stages" }).click()
-    await choose(this.page, this.page.getByRole("combobox", { name: "OSAAR 1" }), first)
-    await this.page.getByRole("button", { name: "Add OSAAR stage" }).click()
-    await choose(this.page, this.page.getByRole("combobox", { name: "OSAAR 2" }), second)
-    await this.page.getByRole("button", { name: "Save stages" }).click()
-    await expect(this.page.getByRole("dialog", { name: "Approval stages saved" }).first()).toBeVisible()
+    const panel = this.page.getByRole("heading", { name: campus, exact: true }).locator("xpath=..")
+    await expect(panel.getByText(first, { exact: true }).locator("xpath=..")).toContainText("1")
+    await expect(panel.getByText(second, { exact: true }).locator("xpath=..")).toContainText("2")
+    await expect(panel.getByText(campus, { exact: true })).toHaveCount(3)
+    await expect(this.page.getByText(all, { exact: true })).toBeVisible()
+    await expect(this.page.getByText("All campuses", { exact: true })).toBeVisible()
   }
 
   async assignAccount(rowName: string, accountLabel: string) {

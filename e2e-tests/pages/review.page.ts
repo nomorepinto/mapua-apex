@@ -10,6 +10,7 @@ const PATHS: Record<string, string> = {
   dean2: "/dean/dashboard",
   osaar1: "/osaar/dashboard/review",
   osaar2: "/osaar/dashboard/review",
+  osaarAll: "/osaar/dashboard/review",
   cdm1: "/cdm/dashboard",
 }
 

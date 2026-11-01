@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DynamoTable } from '../aws/dynamo-table.js';
-import { campusKey, stripPrefix } from '../common/dynamo-keys.js';
-import { num, str, type Item } from '../common/records.js';
+import { campusKey, roleIndex, stripPrefix } from '../common/dynamo-keys.js';
+import { bool, num, str, type Item } from '../common/records.js';
 import {
   classroomHint,
   hasFormat,
@@ -12,6 +12,7 @@ import {
 export interface CampusView {
   campus_id: string;
   name: string;
+  main: boolean;
   classroom_name_prefixes: string[];
   classroom_name_digits: number | null;
   classroom_name_hint: string | null;
@@ -38,9 +39,10 @@ export class CampusRepository {
     name: string,
     prefixes: string[],
     digits: number | null,
+    main: boolean,
   ): Promise<Item> {
     const id = randomUUID();
-    return this.write(id, name, prefixes, digits);
+    return this.write(id, name, prefixes, digits, main);
   }
 
   async update(
@@ -48,13 +50,31 @@ export class CampusRepository {
     name: string,
     prefixes: string[],
     digits: number | null,
+    main: boolean,
   ): Promise<Item> {
-    return this.write(stripPrefix(id, 'CAMPUS#') ?? id, name, prefixes, digits);
+    return this.write(
+      stripPrefix(id, 'CAMPUS#') ?? id,
+      name,
+      prefixes,
+      digits,
+      main,
+    );
   }
 
   delete(id: string): Promise<void> {
     const key = campusKey(id);
     return this.table.delete(key, key);
+  }
+
+  /** An OSAAR account still stores this campus id. */
+  async hasAssignedOsaar(id: string): Promise<boolean> {
+    const bare = stripPrefix(id, 'CAMPUS#') ?? id;
+    const items = await this.table.query({
+      index: 'GSI4',
+      keyCondition: 'GSI4PK = :role',
+      values: { ':role': roleIndex('osaar') },
+    });
+    return items.some((item) => str(item, 'campus_id') === bare);
   }
 
   async hasReservables(id: string): Promise<boolean> {
@@ -72,10 +92,14 @@ export class CampusRepository {
     name: string,
     prefixes: string[],
     digits: number | null,
+    main: boolean,
   ): Promise<Item> {
     const key = campusKey(id);
     const normalized = normalizePrefixes(prefixes);
     const item: Item = { PK: key, SK: key, name };
+    if (main) {
+      item.main = true;
+    }
     if (hasFormat(normalized, digits)) {
       item.classroom_name_prefixes = normalized;
       item.classroom_name_digits = digits;
@@ -92,6 +116,7 @@ export function toCampus(item: Item): CampusView {
   return {
     campus_id: stripPrefix(item.PK, 'CAMPUS#') ?? '',
     name: str(item, 'name') ?? '',
+    main: bool(item, 'main'),
     classroom_name_prefixes: formatted ? prefixes : [],
     classroom_name_digits: formatted ? digits : null,
     classroom_name_hint: formatted ? classroomHint(prefixes, digits) : null,

@@ -20,6 +20,7 @@ import {
   CardPanel,
   CardTitle,
 } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Form } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -99,6 +100,25 @@ function AddCampusForm() {
             ) : null}
             {otherError ? <FieldError>{otherError}</FieldError> : null}
           </Field>
+          {state.offerMain ? (
+            <Field>
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  checked={state.main}
+                  id="campus-main"
+                  name="main"
+                  onCheckedChange={(value) => actions.setMain(value === true)}
+                />
+                <div className="flex flex-col gap-1">
+                  <FieldLabel htmlFor="campus-main">Main campus</FieldLabel>
+                  <FieldDescription>
+                    Online events are approved by this campus&apos;s OSAAR
+                    accounts. Only one campus can hold this title.
+                  </FieldDescription>
+                </div>
+              </div>
+            </Field>
+          ) : null}
           <div className="flex flex-col gap-4 rounded-lg border border-dashed p-3">
             <p className="text-sm font-medium">Classroom name format</p>
             <p className="text-xs text-muted-foreground">

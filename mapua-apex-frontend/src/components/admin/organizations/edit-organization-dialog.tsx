@@ -2,8 +2,9 @@ import { CircleAlertIcon } from "lucide-react"
 
 import { ORGANIZATION_ASSIGNABLE_DESK_ITEMS } from "@/components/admin-osa/signatory-roles"
 import {
-  HigherCouncilField,
   SignatoryDeskCombobox,
+  SkipDeanField,
+  SkipPostEvalField,
 } from "@/components/admin/organizations/organization-fields"
 import {
   ORGANIZATION_NAME_MAX,
@@ -48,7 +49,7 @@ export function EditOrganizationDialog() {
   const canSave =
     isOrganizationNameValid(state.editName) &&
     Boolean(state.editDesks.adviser) &&
-    (state.editIsHigherCouncil || Boolean(state.editDesks.dean))
+    (state.editSkipDean || Boolean(state.editDesks.dean))
 
   return (
     <Dialog
@@ -100,7 +101,7 @@ export function EditOrganizationDialog() {
               ) : null}
             </Field>
             {ORGANIZATION_ASSIGNABLE_DESK_ITEMS.map((item) => {
-              const deanSkipped = item.value === "dean" && state.editIsHigherCouncil
+              const deanSkipped = item.value === "dean" && state.editSkipDean
               return (
                 <SignatoryDeskCombobox
                   disabled={deanSkipped}
@@ -112,7 +113,7 @@ export function EditOrganizationDialog() {
                     actions.changeEditDesk(item.value, value)
                   }
                   optionalLabel={
-                    deanSkipped ? "Skipped for higher councils." : undefined
+                    deanSkipped ? "Skipped. Dean is not in the approval chain." : undefined
                   }
                   placeholder={
                     deanSkipped
@@ -123,10 +124,15 @@ export function EditOrganizationDialog() {
                 />
               )
             })}
-            <HigherCouncilField
-              checked={state.editIsHigherCouncil}
-              id="edit-organization-higher-council"
-              onCheckedChange={actions.setEditIsHigherCouncil}
+            <SkipDeanField
+              checked={state.editSkipDean}
+              id="edit-organization-skip-dean"
+              onCheckedChange={actions.setEditSkipDean}
+            />
+            <SkipPostEvalField
+              checked={state.editSkipPostEval}
+              id="edit-organization-skip-post-eval"
+              onCheckedChange={actions.setEditSkipPostEval}
             />
             {state.editError &&
             !state.editError.toLowerCase().includes("name") &&

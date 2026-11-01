@@ -3,6 +3,7 @@ import { CircleAlertIcon } from "lucide-react"
 import { useCampusesPage } from "@/components/admin/campuses/campuses-context"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogClose,
@@ -115,6 +116,26 @@ export function EditCampusDialog() {
                 </p>
               ) : null}
             </div>
+            {state.offerEditMain ? (
+              <Field>
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    checked={state.editMain}
+                    id="edit-campus-main"
+                    name="main"
+                    onCheckedChange={(value) => actions.setEditMain(value === true)}
+                  />
+                  <div className="flex flex-col gap-1">
+                    <FieldLabel htmlFor="edit-campus-main">Main campus</FieldLabel>
+                    <FieldDescription>
+                      Online events are approved by this campus&apos;s OSAAR
+                      accounts. Clear it here before another campus can hold the
+                      title.
+                    </FieldDescription>
+                  </div>
+                </div>
+              </Field>
+            ) : null}
             {state.editError ? (
               <Alert variant="error">
                 <CircleAlertIcon />

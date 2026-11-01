@@ -4,7 +4,8 @@ ORGANIZATION
 PK: ORGANIZATION#uuid
 SK: ORGANIZATION#uuid
 name: string
-is_higher_council: boolean (default false)
+skip_dean: boolean (default false)
+skip_post_eval: boolean (default false)
 signatories: [
   { role: "adviser", signatory_id: "adv001" },
   { role: "dean",     signatory_id: "dean001" }
@@ -13,13 +14,14 @@ Desk directory for this org (one person per role).
 Allowed desk roles: adviser | dean | osaar | cdm | admin.
 Stored in that role order even if the write sent a different order.
 Not stored on SIGNATORY. Approval routing uses org desks for adviser
-and dean. If is_higher_council is true, Dean is skipped; Adviser still
-reviews first.
+and dean. If skip_dean is true, Dean is skipped; Adviser still
+reviews first. skip_post_eval is independent: when true, the organization
+cannot file a post-evaluation. It does not change the approval chain.
 CDM is campus-wide: the single SIGNATORY whose role is cdm (GSI4
-ROLE#CDM). OSAAR stages are the ordered list on SETTINGS#APPROVAL,
-not an environment variable. When that item is missing, routing falls
-back to the single SIGNATORY whose role is osaar. Rename those people
-in place (PUT /admins/signatories on the same id).
+ROLE#CDM). OSAAR stages are the OSAAR signatories whose campus_id
+matches the plan's campus, in osaar_order, then the one signatory with
+all_campuses true. Online plans use the campus with main true.
+Rename those people in place (PUT /admins/signatories on the same id).
 admin may occupy a desk but is not in the approval sequence.
 GET /public/organizations scans these base items without authentication and
 returns only the bare organization_id and name. Signup does not write
@@ -270,7 +272,9 @@ One active POSTEVAL per event; denied filings remain as history when re-filed.
 Filed by the org submitter while the event's 3-day
 evaluation window is open. WritePostEval gates the write: the linked SUBMISSION
 must be approved/finished (422 otherwise), EventWindow::EVALUATION must still be
-open (422 "The post-evaluation window is closed for this event."), and no
+open (422 "The post-evaluation window is closed for this event."), the
+owning organization's skip_post_eval must not be true (422 "This organization
+does not file a post-evaluation."), and no
 submitted/approved POSTEVAL may already exist for the event (409). Amounts are
 capped at 5 digits (0-99999) and the summary at 100-500 chars. It freezes
 participation_snapshot by aggregating the event's MEMBER#/EVALUATION# children
@@ -372,6 +376,9 @@ SK: SIGNATORY#uuid
 name: string
 role: "adviser" | "cdm" | "dean" | "osaar" | "admin"
 department: string (deans only, e.g. SOIT)
+campus_id: string (OSAAR only; bare campus uuid)
+all_campuses: boolean (OSAAR only; true for the one account that approves every plan)
+osaar_order: number (OSAAR only; 1-based order among that campus's accounts)
 GSI4PK: ROLE#ADVISER | ROLE#CDM | ROLE#DEAN | ROLE#DEAN#{DEPARTMENT} | ROLE#OSAAR | ROLE#ADMIN
 GSI4SK: SIGNATORY#uuid
 
@@ -394,21 +401,16 @@ papers and org desks pointing at the old id. Cognito custom:signatory_id is
 not stored on this item. PUT /admins/signatories/{id}/account sets it, and a
 successful delete clears it on every holder. A role change moves those holders
 into the new role's Cognito group. Both Cognito steps are best-effort.
-CDM stays one person. Several OSAAR people are allowed; new proposals
-read their order from APPROVAL SETTINGS, not from "the" OSAAR row.
+CDM stays one person. Several OSAAR people may share one campus_id.
+Exactly one may set all_campuses. New proposals read osaar_order on
+those rows. PUT /admins/approval-settings rewrites osaar_order for one
+campus. It does not write SETTINGS#APPROVAL.
 
 APPROVAL SETTINGS
 PK: SETTINGS#APPROVAL
 SK: SETTINGS#APPROVAL
-osaar_stages: [
-  { key: "osaar_1", signatory_id: SIGNATORY#uuid },
-  { key: "osaar_2", signatory_id: SIGNATORY#uuid }
-]
-updated_at: timestamp
-One item. The list length is how many OSAAR approvals a new proposal
-needs, in that order. Keys are rewritten osaar_1..n on each PUT.
-Missing item: routing uses the single ROLE#OSAAR signatory. The item
-is not consulted for proposals already sent.
+Legacy item. Routing no longer reads it. Order lives on SIGNATORY
+osaar_order. Existing items may remain in the table.
 
 ANNOUNCEMENT
 PK: ANNOUNCEMENT
@@ -425,15 +427,20 @@ CAMPUS
 PK: CAMPUS#uuid
 SK: CAMPUS#uuid   (same as PK)
 name: string
+main: boolean   (true for the single campus that reviews online events)
 classroom_name_prefixes: [string]   (L of S; optional classroom naming rule)
 classroom_name_digits: number        (N; optional; pairs with the prefix list)
 
 A reservable campus (e.g. "Intramuros Campus", "Makati Campus"), seeded by
 osaar on the /campus page. The SAAF reservation step and the
 activity_details.venue dropdown read the list (GET /students/campuses). List
-scans PK begins_with CAMPUS# AND PK = SK. DELETE /admins/campuses/{id} is
+scans PK begins_with CAMPUS# AND PK = SK. At most one item has main true.
+A create or update that sets main while another item already has it
+returns 422 and does not move the flag. Online event plans use that
+campus's OSAAR accounts. DELETE /admins/campuses/{id} is
 guarded: 409 if any RESERVABLE still lives under PK = CAMPUS#id (delete those
-first); otherwise it removes the item. Rename in place (PUT) to keep the same
+first) or if any SIGNATORY with role osaar still stores this campus_id;
+otherwise it removes the item. Rename in place (PUT) to keep the same
 uuid so RESERVABLE children and stored booking campus_id snapshots stay valid.
 
 classroom_name_prefixes/classroom_name_digits are the campus's optional
@@ -636,7 +643,8 @@ json
     { "role": "adviser", "signatory_id": "adv001" },
     { "role": "dean", "signatory_id": "dean001" }
   ],
-  "is_higher_council": false
+  "skip_dean": false,
+  "skip_post_eval": false
 }
 EVENT
 json
@@ -744,15 +752,18 @@ student PUT that re-routes), the resolver builds an ordered signatory_sequence
 of SIGNATORY#uuid ids and stores it on the item. The sequence starts at
 Adviser, then Dean when activity_type is co-curricular, then OSAAR, then CDM
 when has_reservation is true. If the submitting organization's
-is_higher_council is true, Dean is skipped (even for co-curricular);
+skip_dean is true, Dean is skipped (even for co-curricular);
 Adviser still reviews first, then OSAAR, then CDM when there is a
 reservation. Adviser and Dean come from ORGANIZATION.signatories. OSAAR
-stages come from SETTINGS#APPROVAL (fallback: the single ROLE#OSAAR
-signatory when that item is missing). CDM is the single ROLE#CDM
+stages are that campus's OSAAR signatories in osaar_order, then the
+all-campus account (step key osaar_all). A campus venue uses that
+campus. Venue Online uses the campus with main true. The server writes
+activity_details.campus_id. An unchanged venue keeps the stored campus.
+CDM is the single ROLE#CDM
 signatory. There is no OSAAR_SIGNATORY_ID or CDM_SIGNATORY_ID env var.
 admin is a valid desk role but is not in this sequence. The same write
 stores signatory_steps, one object per hop, with keys adviser:ORG#id,
-dean:ORG#id, osaar_1..n, and cdm. current_signatory / GSI2PK hold whoever
+dean:ORG#id, osaar_1..n, osaar_all, and cdm. current_signatory / GSI2PK hold whoever
 has the paper now; on a fresh submit current_signatory is
 signatory_sequence[0]. On approve, ApproveSubmission reads the stored
 signatory_sequence, finds the current desk, and advances
@@ -773,7 +784,7 @@ across every organization. The chain is built over [proponent, ...dependents]
 in submitted order: first the Adviser of each organization, then the Dean of
 each organization (a Dean step for an org exists only when
 activity_classification.activity_type is co-curricular AND that org's
-is_higher_council is not true), then each OSAAR stage, then CDM when
+skip_dean is not true), then each OSAAR stage, then CDM when
 venue_reservation.has_reservation is true. Signatory ids are de-duplicated
 across the whole chain preserving first occurrence, so a person who is adviser
 and dean (same or across orgs) signs once. Missing adviser / required dean /

@@ -41,6 +41,17 @@ export class SubmissionReviewService {
         dependentIds(item),
         activityType(item),
         hasReservation(item),
+        undefined,
+        await this.routing.hostCampusId({
+          venue: str(record(item.activity_details) ?? {}, 'venue') ?? '',
+          reservationCampusIds: hasReservation(item)
+            ? reservationCampusIds(item)
+            : [],
+          keepOnlineCampusId: str(
+            record(item.activity_details) ?? {},
+            'campus_id',
+          ),
+        }),
       );
       sequence = steps.map((step) => signatoryKey(step.signatory_id));
     }
@@ -119,7 +130,7 @@ export class SubmissionReviewService {
       'the scheduled date';
     const orgId = stripPrefix(item.GSI1PK, 'ORGANIZATION#') ?? '';
     const org = orgId ? await this.organizations.get(orgId) : undefined;
-    const skipsPostEval = org?.is_higher_council === true;
+    const skipsPostEval = org?.skip_post_eval === true;
     const days = this.config.postEvaluationWindowDays();
     const comment = skipsPostEval
       ? `Your event will happen on ${date}. A post-evaluation is not required for this organization.`
@@ -298,6 +309,18 @@ function activityType(item: Item): string {
 
 function hasReservation(item: Item): boolean {
   return record(item.venue_reservation)?.has_reservation === true;
+}
+
+function reservationCampusIds(item: Item): string[] {
+  const venue = record(item.venue_reservation);
+  if (!venue || !Array.isArray(venue.reservations)) {
+    return [];
+  }
+  return venue.reservations.flatMap((entry) => {
+    const row = record(entry);
+    const id = row ? str(row, 'campus_id') : null;
+    return id ? [id] : [];
+  });
 }
 
 function expectedParticipants(item: Item): number | null {

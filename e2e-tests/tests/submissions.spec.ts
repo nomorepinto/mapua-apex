@@ -25,9 +25,9 @@ function drafts(): PaperDraft[] {
     equipment: "Projector",
     slot,
   })
-  const extra = ["Adviser", "OSAAR", "OSAAR"]
+  const extra = ["Adviser", "OSAAR", "OSAAR", "OSAAR"]
   const extraRoom = [...extra, "CDM"]
-  const co = ["Adviser", "Dean", "OSAAR", "OSAAR"]
+  const co = ["Adviser", "Dean", "OSAAR", "OSAAR", "OSAAR"]
   const coRoom = [...co, "CDM"]
   const collab = [
     `${run.orgs.orgA}'s Adviser`,
@@ -36,29 +36,31 @@ function drafts(): PaperDraft[] {
     `${run.orgs.orgB}'s Dean`,
     "OSAAR",
     "OSAAR",
+    "OSAAR",
   ]
-  const councilRoom = ["Adviser", "OSAAR", "OSAAR", "CDM"]
+  const councilRoom = ["Adviser", "OSAAR", "OSAAR", "OSAAR", "CDM"]
   const councilCollab = [
     `${run.orgs.orgC}'s Adviser`,
     `${run.orgs.orgA}'s Adviser`,
     `${run.orgs.orgA}'s Dean`,
     "OSAAR",
     "OSAAR",
+    "OSAAR",
   ]
   const papers: PaperDraft[] = [
-    { key: "P1", title: `Extra Online ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2"], activity: "extra-curricular", reserve: false },
-    { key: "P2", title: `Extra Room ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(0, "R101") },
-    { key: "P3", title: `Co Online ${run.tag}`, org: "orgA", roles: co, desks: ["adv1", "dean1", "osaar1", "osaar2"], activity: "co-curricular", reserve: false },
-    { key: "P4", title: `Co Room Equipment ${run.tag}`, org: "orgA", roles: coRoom, desks: ["adv1", "dean1", "osaar1", "osaar2", "cdm1"], activity: "co-curricular", reserve: true, pick: both(2) },
-    { key: "P5", title: `Co Collab ${run.tag}`, org: "orgA", roles: collab, desks: ["adv1", "adv2", "dean1", "dean2", "osaar1", "osaar2"], activity: "co-curricular", reserve: false, collaborators: [run.orgs.orgB] },
-    { key: "P6", title: `Council Room ${run.tag}`, org: "orgC", roles: councilRoom, desks: ["adv3", "osaar1", "osaar2", "cdm1"], activity: "co-curricular", reserve: true, pick: room(1, "R101"), higherCouncil: true },
-    { key: "P7", title: `Council Collab ${run.tag}`, org: "orgC", roles: councilCollab, desks: ["adv3", "adv1", "dean1", "osaar1", "osaar2"], activity: "co-curricular", reserve: false, collaborators: [run.orgs.orgA], higherCouncil: true },
-    { key: "P9", title: `Deny Adviser ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2"], activity: "extra-curricular", reserve: false },
-    { key: "P10", title: `Deny Dean ${run.tag}`, org: "orgA", roles: co, desks: ["adv1", "dean1", "osaar1", "osaar2"], activity: "co-curricular", reserve: false },
-    { key: "P11", title: `Deny Osaar One ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2"], activity: "extra-curricular", reserve: false },
-    { key: "P12", title: `Deny Osaar Two ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2"], activity: "extra-curricular", reserve: false },
-    { key: "P13", title: `Deny Cdm ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(4, "R101") },
-    { key: "P14", title: `Conflict Hold ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(3, "R101") },
+    { key: "P1", title: `Extra Online ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false },
+    { key: "P2", title: `Extra Room ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(0, "R101") },
+    { key: "P3", title: `Co Online ${run.tag}`, org: "orgA", roles: co, desks: ["adv1", "dean1", "osaar1", "osaar2", "osaarAll"], activity: "co-curricular", reserve: false },
+    { key: "P4", title: `Co Room Equipment ${run.tag}`, org: "orgA", roles: coRoom, desks: ["adv1", "dean1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "co-curricular", reserve: true, pick: both(2) },
+    { key: "P5", title: `Co Collab ${run.tag}`, org: "orgA", roles: collab, desks: ["adv1", "adv2", "dean1", "dean2", "osaar1", "osaar2", "osaarAll"], activity: "co-curricular", reserve: false, collaborators: [run.orgs.orgB] },
+    { key: "P6", title: `Council Room ${run.tag}`, org: "orgC", roles: councilRoom, desks: ["adv3", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "co-curricular", reserve: true, pick: room(1, "R101"), higherCouncil: true },
+    { key: "P7", title: `Council Collab ${run.tag}`, org: "orgC", roles: councilCollab, desks: ["adv3", "adv1", "dean1", "osaar1", "osaar2", "osaarAll"], activity: "co-curricular", reserve: false, collaborators: [run.orgs.orgA], higherCouncil: true },
+    { key: "P9", title: `Deny Adviser ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false },
+    { key: "P10", title: `Deny Dean ${run.tag}`, org: "orgA", roles: co, desks: ["adv1", "dean1", "osaar1", "osaar2", "osaarAll"], activity: "co-curricular", reserve: false },
+    { key: "P11", title: `Deny Osaar One ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false },
+    { key: "P12", title: `Deny Osaar Two ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false },
+    { key: "P13", title: `Deny Cdm ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(4, "R101") },
+    { key: "P14", title: `Conflict Hold ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(3, "R101") },
   ]
   return papers
 }

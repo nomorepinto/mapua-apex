@@ -15,7 +15,40 @@ import {
 } from "@/components/ui/field"
 import type { ApiSignatory } from "@/lib/dynamodb-adapters"
 
-export function HigherCouncilField({
+function OrganizationFlagField({
+  checked,
+  description,
+  id,
+  label,
+  name,
+  onCheckedChange,
+}: {
+  checked: boolean
+  description: string
+  id: string
+  label: string
+  name: string
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return (
+    <Field>
+      <div className="flex items-start gap-2">
+        <Checkbox
+          checked={checked}
+          id={id}
+          name={name}
+          onCheckedChange={(value) => onCheckedChange(value === true)}
+        />
+        <div className="flex flex-col gap-1">
+          <FieldLabel htmlFor={id}>{label}</FieldLabel>
+          <FieldDescription>{description}</FieldDescription>
+        </div>
+      </div>
+    </Field>
+  )
+}
+
+export function SkipDeanField({
   checked,
   id,
   onCheckedChange,
@@ -25,23 +58,35 @@ export function HigherCouncilField({
   onCheckedChange: (checked: boolean) => void
 }) {
   return (
-    <Field>
-      <div className="flex items-start gap-2">
-        <Checkbox
-          checked={checked}
-          id={id}
-          name="is_higher_council"
-          onCheckedChange={(value) => onCheckedChange(value === true)}
-        />
-        <div className="flex flex-col gap-1">
-          <FieldLabel htmlFor={id}>Higher council</FieldLabel>
-          <FieldDescription>
-            Skips the dean desk. Adviser still reviews first, and this
-            organization does not file a post-evaluation.
-          </FieldDescription>
-        </div>
-      </div>
-    </Field>
+    <OrganizationFlagField
+      checked={checked}
+      description="Skips the dean desk. Adviser still reviews first."
+      id={id}
+      label="Skip dean"
+      name="skip_dean"
+      onCheckedChange={onCheckedChange}
+    />
+  )
+}
+
+export function SkipPostEvalField({
+  checked,
+  id,
+  onCheckedChange,
+}: {
+  checked: boolean
+  id: string
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return (
+    <OrganizationFlagField
+      checked={checked}
+      description="This organization does not file a post-evaluation."
+      id={id}
+      label="Skip post-eval"
+      name="skip_post_eval"
+      onCheckedChange={onCheckedChange}
+    />
   )
 }
 

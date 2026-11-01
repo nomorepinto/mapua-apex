@@ -79,7 +79,7 @@ export function SubmissionTrackerModal({
     {
       activityType: detailQuery.data?.activity_classification?.activity_type,
       hasVenue: Boolean(detailQuery.data?.venue_reservation?.has_reservation),
-      isHigherCouncil: Boolean(orgQuery.data?.is_higher_council),
+      skipDean: Boolean(orgQuery.data?.skip_dean),
       orgSignatories: orgQuery.data?.signatories,
       signatorySequence: detailQuery.data?.signatory_sequence,
       signatoryChain: detailQuery.data?.signatory_chain,

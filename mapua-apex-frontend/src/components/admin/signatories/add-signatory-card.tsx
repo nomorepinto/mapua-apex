@@ -123,10 +123,38 @@ function AddSignatoryForm() {
               </SelectPopup>
             </Select>
             <FieldDescription>
-              Dean, adviser, CDM, or OSAAR. CDM is limited to one account. Add
-              an OSAAR account for each approval stage.
+              Dean, adviser, CDM, or OSAAR. CDM is limited to one account. An
+              OSAAR account belongs to one campus, or to every campus.
             </FieldDescription>
           </Field>
+
+          {state.role === "osaar" ? (
+            <Field>
+              <FieldLabel>Campus</FieldLabel>
+              <Select
+                itemToStringValue={(item) => item.value}
+                items={state.campusItems}
+                name="campus"
+                onValueChange={(item) => actions.setCampus(item?.value ?? null)}
+                value={state.selectedCampus}
+              >
+                <SelectTrigger aria-label="Campus">
+                  <SelectValue placeholder="Select campus" />
+                </SelectTrigger>
+                <SelectPopup>
+                  {state.campusItems.map((item) => (
+                    <SelectItem key={item.value} value={item}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
+              <FieldDescription>
+                Events at this campus are approved by this account. All
+                campuses approves every plan after the campus OSAARs.
+              </FieldDescription>
+            </Field>
+          ) : null}
 
           {state.role === "dean" ? (
             <DepartmentSelect
@@ -179,12 +207,13 @@ function ImportSignatoriesCsv() {
       <CardHeader>
         <CardTitle>Import CSV</CardTitle>
         <CardDescription>
-          Columns: name, role, and optional department for deans.
+          Columns: name, role, optional department for deans, and campus for
+          OSAAR (a campus name, or all).
         </CardDescription>
       </CardHeader>
       <CardPanel className="flex flex-col gap-4">
         <CsvFileField
-          description="name, role, department."
+          description="name, role, department, campus."
           error={state.csvError}
           fileName={state.csvFileName}
           id="signatories-csv"
@@ -198,7 +227,7 @@ function ImportSignatoriesCsv() {
             </AlertTitle>
             <AlertDescription>
               Extra CDM rows are skipped. Department is ignored unless the role
-              is dean.
+              is dean. OSAAR rows need a campus.
             </AlertDescription>
           </Alert>
         ) : null}

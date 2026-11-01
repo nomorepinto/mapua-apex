@@ -19,7 +19,7 @@ export function emptyDesks(): AssignableDesks {
 }
 
 export const ORG_CSV_TEMPLATE =
-  "name,dean,adviser,is_higher_council\nMapua Computing Society,Dr. Ana Reyes,Prof. Juan Dela Cruz,false\nIEEE Mapua,,Prof. Elena Tan,true\n"
+  "name,dean,adviser,skip_dean,skip_post_eval\nMapua Computing Society,Dr. Ana Reyes,Prof. Juan Dela Cruz,false,false\nIEEE Mapua,,Prof. Elena Tan,true,true\n"
 
 export function toastBulkResult(created: number, failed: number, noun: string) {
   if (created > 0 && failed === 0) {
@@ -61,8 +61,8 @@ export function withSharedDesks(
   }
 
   return [
-    // Higher-council organizations skip the dean desk, so the dean entry is
-    // only attached when one was actually selected.
+    // Organizations that skip the dean desk attach a dean only when one was
+    // actually selected.
     ...(dean ? [{ role: "dean", signatory_id: dean.value } as const] : []),
     { role: "adviser", signatory_id: adviser.value },
     { role: "cdm", signatory_id: cdm.signatory_id },
