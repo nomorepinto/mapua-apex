@@ -33,7 +33,7 @@ export function DepartmentSelect({
         onValueChange={(item) => onValueChange(item && item.value ? item : null)}
         value={selected}
       >
-        <SelectTrigger>
+        <SelectTrigger aria-label="Department">
           <SelectValue placeholder="Optional" />
         </SelectTrigger>
         <SelectPopup>

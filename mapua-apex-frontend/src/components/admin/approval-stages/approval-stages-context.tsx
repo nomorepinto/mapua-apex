@@ -79,6 +79,7 @@ export function ApprovalStagesProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<DraftOsaarStage[]>([])
   const [hydratedFrom, setHydratedFrom] = useState<string | null>(null)
   const [formError, setFormError] = useState("")
+  const touched = useRef(false)
 
   const settings = settingsQuery.data
   const signature = settings
@@ -87,13 +88,15 @@ export function ApprovalStagesProvider({ children }: { children: ReactNode }) {
         .join("|")
     : null
   const serverDraft = settings ? draftFromStages(settings.osaar_stages) : []
-  if (settings && signature !== hydratedFrom) {
+  if (settings && signature !== hydratedFrom && !touched.current) {
     setHydratedFrom(signature)
     setDraft(serverDraft)
     setFormError("")
   }
   const resolvedDraft =
-    settings && signature !== hydratedFrom ? serverDraft : draft
+    settings && signature !== hydratedFrom && !touched.current ? serverDraft : draft
+  const visibleDraft = useRef(resolvedDraft)
+  visibleDraft.current = resolvedDraft
 
   const signatories = signatoriesQuery.data ?? EMPTY_SIGNATORIES
   const osaarPeople = useMemo(
@@ -144,24 +147,26 @@ export function ApprovalStagesProvider({ children }: { children: ReactNode }) {
     } satisfies ApprovalStagesState,
     actions: {
       setStageSignatory: (localId: string, signatoryId: string) => {
-        if (takenElsewhere(localId).has(signatoryId)) {
-          return
-        }
-        setDraft((current) =>
-          current.map((stage) =>
+        if (!signatoryId || takenElsewhere(localId).has(signatoryId)) return
+        touched.current = true
+        setDraft((current) => {
+          const base = current.length > 0 ? current : visibleDraft.current
+          return base.map((stage) =>
             stage.localId === localId
               ? { ...stage, signatoryId, fallbackName: "" }
               : stage
           )
-        )
+        })
         setFormError("")
       },
       addStage: () => {
+        touched.current = true
         setDraft((current) => {
-          if (current.length >= MAX_STAGES) return current
+          const base = current.length > 0 ? current : visibleDraft.current
+          if (base.length >= MAX_STAGES) return base
           nextId.current += 1
           return [
-            ...current,
+            ...base,
             {
               localId: `new-${nextId.current}`,
               signatoryId: "",
@@ -172,6 +177,7 @@ export function ApprovalStagesProvider({ children }: { children: ReactNode }) {
         setFormError("")
       },
       removeStage: (localId: string) => {
+        touched.current = true
         setDraft((current) =>
           current.length <= 1
             ? current
@@ -191,6 +197,7 @@ export function ApprovalStagesProvider({ children }: { children: ReactNode }) {
         }
         try {
           await updateSettings.mutateAsync(ids)
+          touched.current = false
           toastManager.add({
             title: "Approval stages saved",
             description:

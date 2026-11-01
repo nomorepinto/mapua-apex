@@ -107,7 +107,7 @@ const BudgetRow = memo(function BudgetRow({
               }
             }}
           >
-            <SelectTrigger className="w-full border-transparent bg-transparent shadow-none hover:bg-neutral-100 focus:bg-white focus:border-neutral-300 h-8">
+            <SelectTrigger aria-label="Budget item" className="w-full border-transparent bg-transparent shadow-none hover:bg-neutral-100 focus:bg-white focus:border-neutral-300 h-8">
               <SelectValue placeholder="Select item..." />
             </SelectTrigger>
             <SelectPopup>
@@ -156,6 +156,7 @@ const BudgetRow = memo(function BudgetRow({
           pattern="[0-9]*"
           maxLength={maxQty}
           name={`budgetItem_${index}_quantity`}
+          aria-label="Quantity"
           value={item.quantity}
           onKeyDown={blockNonIntegerKeys}
           onChange={(e) =>
@@ -177,6 +178,7 @@ const BudgetRow = memo(function BudgetRow({
             inputMode="decimal"
             maxLength={5}
             name={`budgetItem_${index}_pricePerUnit`}
+            aria-label="Price per unit"
             value={item.pricePerUnit}
             onKeyDown={blockNonDecimalKeys}
             onChange={(e) =>

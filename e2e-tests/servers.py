@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import socket
 import subprocess
 import time
@@ -31,20 +32,33 @@ SERVERS = (
 )
 
 
+def _hosts(url: str) -> list[str]:
+    if "127.0.0.1" in url:
+        return [url, url.replace("127.0.0.1", "localhost")]
+    if "localhost" in url:
+        return [url, url.replace("localhost", "127.0.0.1")]
+    return [url]
+
+
 def _accepting(port: int) -> bool:
-    try:
-        with socket.create_connection(("127.0.0.1", port), timeout=1):
-            return True
-    except OSError:
-        return False
+    for host in ("127.0.0.1", "localhost"):
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                return True
+        except OSError:
+            continue
+    return False
 
 
 def _responding(url: str) -> bool:
-    try:
-        response = requests.get(url, timeout=3)
-    except requests.RequestException:
-        return False
-    return response.status_code < 500
+    for candidate in _hosts(url):
+        try:
+            response = requests.get(candidate, timeout=3)
+        except requests.RequestException:
+            continue
+        if response.status_code < 500:
+            return True
+    return False
 
 
 class StartedServers:
@@ -92,6 +106,51 @@ class StartedServers:
                     print(f"{spec.name} is ready on port {spec.port}")
                 else:
                     still.append((spec, process))
+            pending = still
+            if pending:
+                time.sleep(1)
+        for spec, _process, _log in list(self._processes):
+            self._warm(spec)
+
+    def _warm(self, spec: AppServer) -> None:
+        if spec.port != 5176:
+            return
+        base = next((url.rstrip("/") for url in _hosts(spec.ready_url) if _responding(url)), "")
+        if not base:
+            return
+        deadline = time.time() + 120
+        seen: set[str] = set()
+        deps: set[str] = set()
+        queue = [
+            "/src/routes/osaar/signatories.tsx",
+            "/src/routes/osaar/setup.tsx",
+            "/src/router.tsx",
+        ]
+        while queue and len(seen) < 80 and time.time() < deadline:
+            path = queue.pop()
+            if path in seen:
+                continue
+            seen.add(path)
+            try:
+                response = requests.get(base + path, timeout=30)
+            except requests.RequestException:
+                continue
+            text = response.text
+            deps.update(re.findall(r"/node_modules/\.vite/deps/[^\"')\s]+", text))
+            for child in re.findall(r'from "(/src/[^"]+)"', text):
+                if child not in seen:
+                    queue.append(child)
+        pending = deps
+        while pending and time.time() < deadline:
+            still: set[str] = set()
+            for path in pending:
+                try:
+                    response = requests.get(base + path, timeout=20)
+                except requests.RequestException:
+                    still.add(path)
+                    continue
+                if response.status_code >= 500:
+                    still.add(path)
             pending = still
             if pending:
                 time.sleep(1)

@@ -115,39 +115,33 @@ export function useSaafForm() {
     currentOrgQuery.data?.is_higher_council === true &&
     organizationDepartment === ""
 
-  // Ensure submission date is always locked to today's date upon opening
+  // Ensure submission date is always locked to today's date upon opening.
+  // Read the store at effect time: a render-closed list is stale once hydration
+  // writes the returned paper in an earlier effect of the same commit.
   useEffect(() => {
+    const proponents = useOrgStore.getState().saafDraft?.proponents
+    if (!proponents?.length) return
     const today = new Date().toISOString().split("T")[0]
-    const current = {
-      ...DEFAULT_SAAF_DRAFT,
-      ...(useOrgStore.getState().saafDraft ?? {}),
-    }
-    const proponents = current.proponents ?? DEFAULT_SAAF_DRAFT.proponents
-    const needsDateUpdate = proponents.some((p) => p.dateOfSubmission !== today)
-
-    if (needsDateUpdate) {
-      useOrgStore.getState().patchSaafDraft({
-        proponents: proponents.map((p) => ({
-          ...p,
-          dateOfSubmission: today,
-        })),
-      })
-    }
-  }, [])
+    if (!proponents.some((proponent) => proponent.dateOfSubmission !== today)) return
+    useOrgStore.getState().patchSaafDraft({
+      proponents: proponents.map((proponent) => ({
+        ...proponent,
+        dateOfSubmission: today,
+      })),
+    })
+  }, [draft.proponents])
 
   // "Name of Organization" is derived from the applying organization rather
   // than typed, so every proponent row is stamped with it. This keeps the
   // payload and PDF correct even for drafts restored from an older session.
   useEffect(() => {
     if (!organizationName) return
-    const proponents = draft.proponents
-    if (proponents.every((p) => p.orgOrCourseSection === organizationName)) {
-      return
-    }
-
+    const proponents = useOrgStore.getState().saafDraft?.proponents
+    if (!proponents?.length) return
+    if (proponents.every((proponent) => proponent.orgOrCourseSection === organizationName)) return
     useOrgStore.getState().patchSaafDraft({
-      proponents: proponents.map((p) => ({
-        ...p,
+      proponents: proponents.map((proponent) => ({
+        ...proponent,
         orgOrCourseSection: organizationName,
       })),
     })
@@ -161,16 +155,15 @@ export function useSaafForm() {
   // department on the form instead of receiving a stamp.
   useEffect(() => {
     if (currentOrgQuery.isPending || choosesDepartment) return
+    const current = useOrgStore.getState().saafDraft
+    const proponents = current?.proponents
+    if (!proponents?.length) return
 
     const departmentValues = Object.fromEntries(
-      draft.proponents.map((proponent) => [
-        proponent.id,
-        organizationDepartment,
-      ])
+      proponents.map((proponent) => [proponent.id, organizationDepartment])
     )
-    const unchanged = draft.proponents.every(
-      (proponent) =>
-        draft.departmentValues[proponent.id] === organizationDepartment
+    const unchanged = proponents.every(
+      (proponent) => current?.departmentValues[proponent.id] === organizationDepartment
     )
 
     if (!unchanged) {

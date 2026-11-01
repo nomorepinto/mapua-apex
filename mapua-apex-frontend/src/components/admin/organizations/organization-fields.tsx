@@ -92,6 +92,7 @@ export function SignatoryDeskCombobox({
         value={value}
       >
         <ComboboxInput
+          aria-label={label}
           placeholder={items.length === 0 ? emptyLabel : placeholder}
           showClear
         />

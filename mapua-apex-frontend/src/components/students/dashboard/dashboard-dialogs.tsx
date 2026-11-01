@@ -13,6 +13,15 @@ export function StudentDashboardDialogs() {
         onClose={actions.closeTracker}
         eventId={state.selectedKeys?.eventId}
         submissionId={state.selectedKeys?.submissionId}
+        onRequestReservationChange={
+          state.selectedKeys
+            ? () => {
+                const { eventId, submissionId } = state.selectedKeys!
+                actions.closeTracker()
+                actions.openReservationChange(eventId, submissionId)
+              }
+            : undefined
+        }
       />
       <ReviewNoticeModal
         notice={state.selectedNotice}

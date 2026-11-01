@@ -111,7 +111,7 @@ function AddSignatoryForm() {
               onValueChange={(item) => actions.changeRole(item?.value ?? null)}
               value={state.selectedRole}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label="Role">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectPopup>

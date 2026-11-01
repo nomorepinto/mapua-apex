@@ -100,7 +100,7 @@ export function ApprovalStagesCard() {
                     }
                     value={selected}
                   >
-                    <SelectTrigger className="min-w-0 flex-1">
+                    <SelectTrigger aria-label={`OSAAR ${index + 1}`} className="min-w-0 flex-1">
                       <SelectValue placeholder="Select OSAAR signatory" />
                     </SelectTrigger>
                     <SelectPopup>
