@@ -177,7 +177,10 @@ describe('authorized report contracts', () => {
     }
   });
   it('rejects displaced, revoked, and stale sessions before report retrieval', async () => {
-    const sessionTable = process.env.AWS_DYNAMODB_SESSION_LOG_TABLE ?? table;
+    // Mirror AppConfigService.sessionLogTable(): an empty/blank env value means
+    // "use the main table", so fall back rather than writing to a "" table.
+    const sessionTable =
+      process.env.AWS_DYNAMODB_SESSION_LOG_TABLE?.trim() || table;
     for (const [path, token] of routes) {
       const key = { PK: userKey(TOKENS[token].sub), SK: activeSessionSk() };
       await store.put(sessionTable, {
