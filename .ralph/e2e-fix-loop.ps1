@@ -87,13 +87,19 @@ function Get-Head([string]$Repo) {
   }
 }
 
-if (-not (Get-Command agent -ErrorAction SilentlyContinue)) {
+function Resolve-Agent {
+  $onPath = Get-Command agent -ErrorAction SilentlyContinue
+  if ($onPath) { return $onPath.Source }
+  $installed = Join-Path $env:LOCALAPPDATA "cursor-agent\agent.cmd"
+  if (Test-Path -LiteralPath $installed) { return $installed }
   throw @"
-Cursor CLI is not on PATH. Install it, open a new terminal, then sign in:
+Cursor CLI is not installed. Install it, open a new terminal, then sign in:
   irm 'https://cursor.com/install?win32=true' | iex
   agent login
 "@
 }
+
+$Agent = Resolve-Agent
 
 if (-not (Test-Path -LiteralPath (Join-Path $E2E "run_e2e.py"))) {
   throw "mapua-apex\e2e-tests\run_e2e.py is not there yet. Start the loop after the suite agent finishes."
@@ -121,7 +127,7 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     exit 0
   }
 
-  Write-Host "=== Iteration $i : python run_e2e.py --event-date $EventDate ==="
+  Write-Host "=== Iteration $i : python run_e2e.py --event-date $EventDate --no-servers ==="
   $beforeDirs = @()
   if (Test-Path -LiteralPath $Reports) {
     $beforeDirs = @(Get-ChildItem -LiteralPath $Reports -Directory | Select-Object -ExpandProperty Name)
@@ -129,7 +135,7 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
 
   Push-Location $E2E
   try {
-    python run_e2e.py --event-date $EventDate
+    python run_e2e.py --event-date $EventDate --no-servers
     $code = $LASTEXITCODE
   }
   finally {
@@ -216,7 +222,7 @@ $VerdictPath
   }
 
   Write-Host "Product bug: $($bug.name)"
-  & agent -p --force --trust --output-format text --workspace $Workspace "Follow the task file exactly: $TaskPath"
+  & $Agent -p --force --trust --output-format text --workspace $Workspace "Follow the task file exactly: $TaskPath"
   if ($LASTEXITCODE -ne 0) {
     throw "agent exited with code $LASTEXITCODE"
   }
@@ -310,3 +316,5 @@ Loop stopped without committing, so those edits stay uncommitted.
 
 Write-Host "Stopped at the iteration cap ($MaxIterations). Log: $BugLog"
 exit 5
+
+Read-Host "Press Enter to exit"

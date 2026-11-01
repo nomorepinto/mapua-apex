@@ -1,7 +1,8 @@
 """Repeatable APEX and Arcus end-to-end runner.
 
 `python run_e2e.py bootstrap` creates the test Cognito users once.
-`python run_e2e.py` then runs every phase and deletes the DynamoDB items it created.
+`python run_e2e.py` starts Nest, Vite, and both Arcus apps when they are not already up,
+runs every phase, deletes the DynamoDB items it created, and stops the apps it started.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from manifest import Manifest
 from phases import arcus, cdm, postevals, preflight, reservation_changes, reviews, setup, submissions
 from phases.context import RunContext
 from report import Report, Step
+from servers import StartedServers
 
 
 def _read_admin() -> tuple[str, str]:
@@ -248,6 +250,7 @@ def main() -> None:
     parser.add_argument("--no-cleanup", action="store_true")
     parser.add_argument("--dry-run-cleanup", action="store_true")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--no-servers", action="store_true", help="Do not start Nest, Vite, or the Arcus apps.")
     args = parser.parse_args()
     settings = load_settings()
     if args.command == "bootstrap":
@@ -262,7 +265,18 @@ def main() -> None:
         )
         print(f"deleted {deleted}, leftovers {leftovers}")
         raise SystemExit(0 if leftovers == 0 or args.dry_run_cleanup else 1)
-    raise SystemExit(run(args))
+    if args.no_servers:
+        raise SystemExit(run(args))
+    started = StartedServers()
+    code = 1
+    try:
+        started.start()
+        code = run(args)
+    except RuntimeError as error:
+        print(error)
+    finally:
+        started.stop()
+    raise SystemExit(code)
 
 
 if __name__ == "__main__":
