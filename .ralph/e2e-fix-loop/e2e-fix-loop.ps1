@@ -2,11 +2,11 @@
 # agent to fix that one bug, commits the application change, and runs again.
 #
 # Usage, from mapua-apex:
-#   powershell -File .\.ralph\e2e-fix-loop.ps1
-#   powershell -File .\.ralph\e2e-fix-loop.ps1 -MaxIterations 3 -EventDate 2026-11-03
+#   powershell -File .\.ralph\e2e-fix-loop\e2e-fix-loop.ps1
+#   powershell -File .\.ralph\e2e-fix-loop\e2e-fix-loop.ps1 -MaxIterations 3 -EventDate 2026-11-03
 #
-# Stop between iterations by creating mapua-apex\e2e-tests\reports\STOP
-# The bug list is mapua-apex\e2e-tests\reports\bug-log.md (gitignored).
+# Stop between iterations by creating mapua-apex\.ralph\e2e-fix-loop\reports\STOP
+# The bug list and each iteration's agent output live under reports\.
 
 [CmdletBinding()]
 param(
@@ -16,15 +16,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$Workspace = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$ApexRepo = Join-Path $Workspace "mapua-apex"
+$ApexRepo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$Workspace = (Resolve-Path (Join-Path $ApexRepo "..")).Path
 $E2E = Join-Path $ApexRepo "e2e-tests"
-$Reports = Join-Path $E2E "reports"
+$SuiteReports = Join-Path $E2E "reports"
+$LoopReports = Join-Path $PSScriptRoot "reports"
 $PromptPath = Join-Path $PSScriptRoot "e2e-fix-prompt.md"
-$BugLog = Join-Path $Reports "bug-log.md"
-$StopFile = Join-Path $Reports "STOP"
-$VerdictPath = Join-Path $Reports "loop-verdict.json"
-$TaskPath = Join-Path $Reports "loop-task.md"
+$BugLog = Join-Path $LoopReports "bug-log.md"
+$StopFile = Join-Path $LoopReports "STOP"
 
 $Repos = @(
   $ApexRepo,
@@ -39,6 +38,24 @@ $Operational = @(
   "restore approval settings",
   "restore cdm holder"
 )
+
+function Stop-Loop {
+  param([int]$Code)
+  Write-Host ""
+  Write-Host "Log: $BugLog"
+  Read-Host "Press Enter to close"
+  exit $Code
+}
+
+trap {
+  Write-Host ""
+  Write-Host "The loop stopped because of an error:"
+  Write-Host $_.Exception.Message
+  if ($_.ScriptStackTrace) { Write-Host $_.ScriptStackTrace }
+  Write-Host ""
+  Read-Host "Press Enter to close"
+  break
+}
 
 function Test-BlockedPath([string]$Path) {
   $norm = ($Path -replace '\\', '/').TrimStart("./")
@@ -99,13 +116,22 @@ Cursor CLI is not installed. Install it, open a new terminal, then sign in:
 "@
 }
 
+function Save-SuiteReport([string]$SourceDir, [string]$DestDir) {
+  foreach ($name in @("report.md", "report.json")) {
+    $source = Join-Path $SourceDir $name
+    if (Test-Path -LiteralPath $source) {
+      Copy-Item -LiteralPath $source -Destination (Join-Path $DestDir $name) -Force
+    }
+  }
+}
+
 $Agent = Resolve-Agent
 
 if (-not (Test-Path -LiteralPath (Join-Path $E2E "run_e2e.py"))) {
   throw "mapua-apex\e2e-tests\run_e2e.py is not there yet. Start the loop after the suite agent finishes."
 }
 
-New-Item -ItemType Directory -Force -Path $Reports | Out-Null
+New-Item -ItemType Directory -Force -Path $LoopReports | Out-Null
 if (-not (Test-Path -LiteralPath $BugLog)) {
   Set-Content -LiteralPath $BugLog -Encoding utf8 -Value "# E2E bug log`r`n"
 }
@@ -124,13 +150,13 @@ $previousSignature = ""
 for ($i = 1; $i -le $MaxIterations; $i++) {
   if (Test-Path -LiteralPath $StopFile) {
     Write-Host "Found $StopFile. Loop stopped."
-    exit 0
+    Stop-Loop 0
   }
 
   Write-Host "=== Iteration $i : python run_e2e.py --event-date $EventDate --no-servers ==="
   $beforeDirs = @()
-  if (Test-Path -LiteralPath $Reports) {
-    $beforeDirs = @(Get-ChildItem -LiteralPath $Reports -Directory | Select-Object -ExpandProperty Name)
+  if (Test-Path -LiteralPath $SuiteReports) {
+    $beforeDirs = @(Get-ChildItem -LiteralPath $SuiteReports -Directory | Select-Object -ExpandProperty Name)
   }
 
   Push-Location $E2E
@@ -142,21 +168,28 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     Pop-Location
   }
 
-  $newDir = Get-ChildItem -LiteralPath $Reports -Directory |
-    Where-Object { $beforeDirs -notcontains $_.Name } |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+  $newDir = $null
+  if (Test-Path -LiteralPath $SuiteReports) {
+    $newDir = Get-ChildItem -LiteralPath $SuiteReports -Directory |
+      Where-Object { $beforeDirs -notcontains $_.Name } |
+      Sort-Object LastWriteTime -Descending |
+      Select-Object -First 1
+  }
   if (-not $newDir) {
     throw "The suite did not write a new report directory."
   }
+
+  $iterDir = Join-Path $LoopReports ("{0:d2}-{1}" -f $i, $newDir.Name)
+  New-Item -ItemType Directory -Force -Path $iterDir | Out-Null
+  Save-SuiteReport $newDir.FullName $iterDir
 
   $reportPath = Join-Path $newDir.FullName "report.json"
   $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
 
   if ($report.passed -and $code -eq 0) {
-    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`nSuite passed on iteration $i ($EventDate).`r`n"
-    Write-Host "Suite passed. Loop finished. Log: $BugLog"
-    exit 0
+    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`nSuite passed on iteration $i ($EventDate).`r`nSaved: $iterDir`r`n"
+    Write-Host "Suite passed. Loop finished."
+    Stop-Loop 0
   }
 
   $fails = @($report.steps | Where-Object { $_.status -eq "fail" -and -not $_.gap })
@@ -165,24 +198,24 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
 
   if ($code -eq 2 -or ($product.Count -eq 0 -and $ops.Count -gt 0)) {
     $detail = ($ops | ForEach-Object { "- $($_.name): $($_.detail)" }) -join "`r`n"
-    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`n## Iteration $i`r`nNot a product bug. Loop stopped.`r`n$detail`r`n"
+    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`n## Iteration $i`r`nNot a product bug. Loop stopped.`r`n$detail`r`nSaved: $iterDir`r`n"
     Write-Host "Stopped. This failure is environment or cleanup, not a product bug."
     Write-Host $detail
-    exit 2
+    Stop-Loop 2
   }
 
   if ($product.Count -eq 0) {
-    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`n## Iteration $i`r`nSuite failed with no product fail step (exit $code). Loop stopped.`r`n"
+    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`n## Iteration $i`r`nSuite failed with no product fail step (exit $code). Loop stopped.`r`nSaved: $iterDir`r`n"
     Write-Host "Stopped. Exit $code and no product failure in $reportPath"
-    exit 1
+    Stop-Loop 1
   }
 
   $bug = $product[0]
   $signature = "$($bug.name)|$($bug.http)|$($bug.detail)"
   if ($signature -eq $previousSignature) {
-    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`n## Iteration $i`r`nSame failure as the previous run. Loop stopped.`r`n- $($bug.name): $($bug.detail)`r`n"
+    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`n## Iteration $i`r`nSame failure as the previous run. Loop stopped.`r`n- $($bug.name): $($bug.detail)`r`nSaved: $iterDir`r`n"
     Write-Host "Stopped. The same failure came back after a fix attempt: $($bug.name)"
-    exit 3
+    Stop-Loop 3
   }
   $previousSignature = $signature
 
@@ -200,6 +233,10 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
   ) -join "`r`n"
   if (-not $others) { $others = "(none)" }
 
+  $TaskPath = Join-Path $iterDir "task.md"
+  $VerdictPath = Join-Path $iterDir "verdict.json"
+  $AgentLog = Join-Path $iterDir "agent.txt"
+
   @"
 Follow the instructions in:
 $PromptPath
@@ -215,16 +252,20 @@ $others
 
 Write the verdict to:
 $VerdictPath
+
+Do not write any file under mapua-apex/e2e-tests.
 "@ | Set-Content -LiteralPath $TaskPath -Encoding utf8
 
-  if (Test-Path -LiteralPath $VerdictPath) {
-    Remove-Item -LiteralPath $VerdictPath -Force
-  }
-
   Write-Host "Product bug: $($bug.name)"
-  & $Agent -p --force --trust --output-format text --workspace $Workspace "Follow the task file exactly: $TaskPath"
-  if ($LASTEXITCODE -ne 0) {
-    throw "agent exited with code $LASTEXITCODE"
+  & $Agent -p --force --trust --output-format text --workspace $Workspace "Follow the task file exactly: $TaskPath" 2>&1 |
+    ForEach-Object {
+      $line = "$_"
+      Add-Content -LiteralPath $AgentLog -Encoding utf8 -Value $line
+      Write-Host $line
+    }
+  $agentExit = $LASTEXITCODE
+  if ($agentExit -ne 0) {
+    throw "agent exited with code $agentExit. Output: $AgentLog"
   }
 
   foreach ($repo in $Repos) {
@@ -246,12 +287,12 @@ $VerdictPath
 - Detail: $($bug.detail)
 - Verdict: $($verdict.kind)
 - Summary: $($verdict.summary)
+- Saved: $iterDir
 "@
 
   if ($verdict.kind -ne "product") {
     Write-Host "Stopped. Verdict is '$($verdict.kind)': $($verdict.summary)"
-    Write-Host "Log: $BugLog"
-    exit 4
+    Stop-Loop 4
   }
 
   $message = "$($verdict.commit_message)".Trim()
@@ -299,7 +340,13 @@ Loop stopped without committing, so those edits stay uncommitted.
         git reset HEAD -- @stage
         throw "git commit failed in $repo"
       }
-      $committed += "$(Split-Path $repo -Leaf) $(git rev-parse --short HEAD)"
+      $short = (git rev-parse --short HEAD).Trim()
+      $committed += "$(Split-Path $repo -Leaf) $short"
+      Set-Content -LiteralPath (Join-Path $iterDir "commit.txt") -Encoding utf8 -Value @"
+repo: $repo
+commit: $short
+message: $message
+"@
     }
     finally {
       Pop-Location
@@ -312,9 +359,8 @@ Loop stopped without committing, so those edits stay uncommitted.
 
   Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "- Commit: $($committed -join ', ') $message`r`n"
   Write-Host "Committed: $($committed -join ', ')"
+  Write-Host "Saved: $iterDir"
 }
 
-Write-Host "Stopped at the iteration cap ($MaxIterations). Log: $BugLog"
-exit 5
-
-Read-Host "Press Enter to exit"
+Write-Host "Stopped at the iteration cap ($MaxIterations)."
+Stop-Loop 5

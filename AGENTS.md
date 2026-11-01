@@ -24,6 +24,13 @@ These rules apply across the entire repository (both `mapua-apex-frontend` and `
 - **API routes edited → update the API contract docs.** Whenever you change an API route, controller, request/response shape, status code, or backend data model, update both `API_ROUTES.md` and `DynamoDB Schema.txt` (at the repository root) in the same change. Do not leave them describing the pre-change behavior.
 - **Major change → verify the `docs/` files first, then fix if inaccurate.** After a significant change, check the reference documents under `docs/` (e.g. `docs/erd/objects.md`, `docs/erd/access-patterns.md`, `docs/erd/erd.mmd` and its generated `mapua-apex-data-model.pdf`) against the current code and data model. If they are still accurate, leave them. If they are inaccurate, update them to match reality (and rebuild the PDF via `docs/erd/build_pdf.py` when the ERD changed).
 
+## E2E Suite
+
+- **A feature added or changed must update `e2e-tests` in the same change.** When you add a feature or change behavior a user or API caller can observe, extend the phase that already owns it under `e2e-tests/phases/` (`setup`, `cdm`, `submissions`, `reviews`, `arcus`, `postevals`, `reservation_changes`). Assert the new or changed outcome, and update any existing step whose expected result no longer matches.
+- If no current phase owns the behavior, add a phase module and register it in `e2e-tests/run_e2e.py`: the import, the run order, and the `--phase` choices. Browser-only checks go in `e2e-tests/ui_smoke.py` (`python run_e2e.py --ui`).
+- Record every DynamoDB item the new steps create on the run manifest, the same way the existing phases do, so cleanup still deletes them.
+- A refactor that does not change observable behavior does not need a suite edit.
+
 ## Cloud Scripts (boto3)
 
 - When asked to write a script that utilizes cloud resources through **boto3**, always place the script in the `mapua-apex-frontend/scripts/` folder.

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 from apex_client import ApiError
-from fixtures import STUDENT_NUMBERS, reservation, saaf_body
+from fixtures import reservation, saaf_body
 from phases.context import Paper, RunContext
 from report import Step
 
@@ -55,7 +55,6 @@ def run(ctx: RunContext) -> None:
     day = ctx.day_name
     campus = ctx.ids["campus"]
     osaar = ("osaar1", "osaar2")
-    email = ctx.accounts["orgA"]["email"]
 
     def body(title, activity, venue, reserved, reservations=None, dependents=None, org="orgA"):
         return saaf_body(
@@ -154,4 +153,3 @@ def run(ctx: RunContext) -> None:
         ctx.report.add(Step("submit P8 equipment only", "fail", f"expected 422, got {status}", status))
         if not ctx.keep_going:
             raise SystemExit(1)
-    del email, STUDENT_NUMBERS
