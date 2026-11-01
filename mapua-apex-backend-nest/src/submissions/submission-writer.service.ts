@@ -237,11 +237,13 @@ export class SubmissionWriterService {
             organizationKey(id),
           ),
         },
-        activity_classification: this.editedClassification(existing, body),
-        proponents: body.proponents,
-        activity_details: details,
-        institutional_alignment: body.institutional_alignment,
-        detailed_budget_proposal: body.detailed_budget_proposal,
+        activity_classification: stored(
+          this.editedClassification(existing, body),
+        ),
+        proponents: stored(body.proponents),
+        activity_details: stored(details),
+        institutional_alignment: stored(body.institutional_alignment),
+        detailed_budget_proposal: stored(body.detailed_budget_proposal),
       },
     );
     const previousDependents = dependentIds(existing);
@@ -391,15 +393,20 @@ export class SubmissionWriterService {
       collaboration: {
         dependent_organization_ids: dependents.map((id) => organizationKey(id)),
       },
-      activity_classification: body.activity_classification,
-      proponents: body.proponents,
-      activity_details: body.activity_details,
-      institutional_alignment: body.institutional_alignment,
-      detailed_budget_proposal: body.detailed_budget_proposal,
-      venue_reservation: body.venue_reservation,
+      activity_classification: stored(body.activity_classification),
+      proponents: stored(body.proponents),
+      activity_details: stored(body.activity_details),
+      institutional_alignment: stored(body.institutional_alignment),
+      detailed_budget_proposal: stored(body.detailed_budget_proposal),
+      venue_reservation: stored(body.venue_reservation),
       ...(refs.length > 0 ? { booking_refs: refs } : {}),
     };
   }
+}
+
+/** DynamoDB rejects class-validator instances. Store the form as plain data. */
+function stored<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function hasVenueReservation(item: Item): boolean {
