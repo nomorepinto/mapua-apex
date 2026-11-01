@@ -1,0 +1,7 @@
+accounts.local.json
+state/
+reports/
+.auth/
+__pycache__/
+*.pyc
+.venv/
