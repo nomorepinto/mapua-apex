@@ -89,7 +89,6 @@ export function PostEvalQueue() {
       <div className="mb-4">
         <ReportToolbar
           kind="postevals"
-          endpoint="/admins/postevals"
           filters={report.filters}
           onChange={report.setFilters}
           onReset={report.reset}

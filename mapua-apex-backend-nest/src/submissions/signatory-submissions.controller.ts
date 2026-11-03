@@ -2,8 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Header,
-  HttpCode,
   Param,
   Patch,
   Post,
@@ -43,16 +41,6 @@ export class SignatorySubmissionsController {
       await this.query.history(signatoryId),
       filters,
     );
-  }
-
-  @Post('submissions/history/report')
-  @HttpCode(200)
-  @Header('Cache-Control', 'no-store')
-  report(
-    @SignatoryId() signatoryId: string,
-    @Body() body: unknown,
-  ): Promise<Item> {
-    return this.query.report(body, 'history', signatoryId);
   }
 
   @Get('events/:event/submissions/:submission')

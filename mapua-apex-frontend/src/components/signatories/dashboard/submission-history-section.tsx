@@ -230,7 +230,6 @@ export function SubmissionHistorySection() {
       <div className="mb-4">
         <ReportToolbar
           kind="proposals"
-          endpoint="/signatories/submissions/history"
           filters={report.filters}
           onChange={report.setFilters}
           onReset={report.reset}

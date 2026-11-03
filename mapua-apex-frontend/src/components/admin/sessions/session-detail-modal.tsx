@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dialog"
 import { RecordTimeline } from "@/components/reports/record-timeline"
 import { sessionTimeline } from "@/lib/timeline-reporting"
-import { fetchSessionDetail } from "@/hooks/use-monitor"
 import { SessionStatusBadge } from "./session-status-badge"
 import type { Session } from "@/types/logs"
 import { LoadingBlock } from "@/components/ui/loading-block"
@@ -131,12 +130,6 @@ export function SessionDetailModal({
                 key={sessionId}
                 kind="session_timeline"
                 source={sessionTimeline(session)}
-                scope={`Opened session ${sessionId}`}
-                loadSource={async (signal) =>
-                  sessionTimeline(
-                    (await fetchSessionDetail(sessionId, signal)).session
-                  )
-                }
               />
             </div>
           ) : (

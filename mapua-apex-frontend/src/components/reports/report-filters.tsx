@@ -267,6 +267,7 @@ export function ReportFilterControls({
   count,
   requiredDates = false,
   allowAllDates = true,
+  hideDates = false,
 }: {
   kind: ReportKind
   filters: ReportFilters
@@ -276,12 +277,20 @@ export function ReportFilterControls({
   count?: number
   requiredDates?: boolean
   allowAllDates?: boolean
+  hideDates?: boolean
 }) {
   const definition = REPORTS[kind]
   const [resetVersion, setResetVersion] = useState(0)
   const reset = () => {
     setResetVersion((value) => value + 1)
     if (onReset) onReset()
+    else if (hideDates)
+      onChange({
+        start_date: filters.start_date,
+        end_date: filters.end_date,
+        date_basis: filters.date_basis,
+        sort: "desc",
+      })
     else
       onChange(
         requiredDates || !allowAllDates
@@ -304,21 +313,27 @@ export function ReportFilterControls({
       className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4"
     >
       <div className="flex flex-wrap items-end gap-3">
-        <ReportSelect
-          label="Date preset"
-          value={preset}
-          options={Object.fromEntries(DATE_PRESETS.map((name) => [name, name]))}
-          onChange={(value) => {
-            if (value !== "Custom")
-              onChange({ ...filters, ...presetRange(value) })
-          }}
-        />
-        <ReportSelect
-          label="Date basis"
-          value={filters.date_basis ?? Object.keys(definition.dates)[0]}
-          options={definition.dates}
-          onChange={(date_basis) => onChange({ ...filters, date_basis })}
-        />
+        {!hideDates && (
+          <>
+            <ReportSelect
+              label="Date preset"
+              value={preset}
+              options={Object.fromEntries(
+                DATE_PRESETS.map((name) => [name, name])
+              )}
+              onChange={(value) => {
+                if (value !== "Custom")
+                  onChange({ ...filters, ...presetRange(value) })
+              }}
+            />
+            <ReportSelect
+              label="Date basis"
+              value={filters.date_basis ?? Object.keys(definition.dates)[0]}
+              options={definition.dates}
+              onChange={(date_basis) => onChange({ ...filters, date_basis })}
+            />
+          </>
+        )}
         <ReportSelect
           label="Sort"
           value={filters.sort ?? "desc"}
@@ -334,13 +349,15 @@ export function ReportFilterControls({
           onChange={(search) => onChange({ ...filters, search })}
         />
       </div>
-      <DateRangeInputs
-        key={resetVersion}
-        filters={filters}
-        onChange={onChange}
-        required={requiredDates}
-        allowAllDates={allowAllDates}
-      />
+      {!hideDates && (
+        <DateRangeInputs
+          key={resetVersion}
+          filters={filters}
+          onChange={onChange}
+          required={requiredDates}
+          allowAllDates={allowAllDates}
+        />
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {Object.entries(definition.facets)
           .filter(

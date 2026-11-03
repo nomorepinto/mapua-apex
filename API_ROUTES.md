@@ -425,18 +425,15 @@ Dates are inclusive Asia/Manila calendar days, not UTC days. Invalid/reversed ra
 
 ### Read-only Report Routes
 
-All paths below accept **POST**, return **200** with `{ "data": ReportPayload }`, and set `Cache-Control: no-store`. No files are stored/uploaded by these endpoints.
+All paths below accept **POST**, return **200** with `{ "data": ReportPayload }`, and set `Cache-Control: no-store`. No files are stored/uploaded by these endpoints. Report generation is restricted to OSAAR and super administrators: the four collection reports require the dedicated `report_admin` permission (`admin`, `osaar`, `super_admin`) and the session report requires `session_admin` (`admin`, `super_admin`). The former student and signatory report endpoints were removed — in-place log/history panels only filter, and every date range and PDF/CSV export now lives on the gated Reports & Export page.
 
 | Endpoint | Report type | Visibility |
 |---|---|---|
-| `/api/v2/admins/monitor/sessions/report` | `sessions` | Admin/super-admin only |
-| `/api/v2/admins/monitor/activity/report` | `activity` | Existing administrative monitor access |
-| `/api/v2/admins/submissions/report` | `proposals` | Existing administrative submission access |
-| `/api/v2/students/submissions/report` | `proposals` | Caller organization and authorized collaboration masters |
-| `/api/v2/signatories/submissions/history/report` | `proposals` | Existing signatory history/desk visibility |
-| `/api/v2/admins/postevals/report` | `postevals` | Existing administrative post-evaluation access |
-| `/api/v2/students/postevals/report` | `postevals` | Caller organization |
-| `/api/v2/admins/campuses/{campus}/reservation-changes/report` | `reservation_changes` | Existing administrative campus visibility |
+| `/api/v2/admins/monitor/sessions/report` | `sessions` | `session_admin` — admin, super_admin |
+| `/api/v2/admins/monitor/activity/report` | `activity` | `report_admin` — admin, OSAAR, super_admin |
+| `/api/v2/admins/submissions/report` | `proposals` | `report_admin` — admin, OSAAR, super_admin |
+| `/api/v2/admins/postevals/report` | `postevals` | `report_admin` — admin, OSAAR, super_admin |
+| `/api/v2/admins/campuses/{campus}/reservation-changes/report` | `reservation_changes` | `report_admin` — admin, OSAAR, super_admin |
 
 Request example:
 ```json

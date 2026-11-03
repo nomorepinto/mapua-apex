@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Query,
   HttpCode,
   Param,
@@ -39,16 +38,6 @@ export class StudentSubmissionsController {
       await this.query.studentList(organizationId),
       filters,
     );
-  }
-
-  @Post('submissions/report')
-  @HttpCode(200)
-  @Header('Cache-Control', 'no-store')
-  report(
-    @OrganizationId() organizationId: string,
-    @Body() body: unknown,
-  ): Promise<Item> {
-    return this.query.report(body, 'student', organizationId);
   }
 
   @Post('submissions')

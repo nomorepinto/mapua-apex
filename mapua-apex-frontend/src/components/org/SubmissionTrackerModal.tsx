@@ -14,7 +14,6 @@ import {
   useCurrentOrganizationQuery,
   useSubmissionDetailQuery,
   useSubmissionNotificationsQuery,
-  fetchSubmissionNotifications,
 } from "@/hooks/use-submissions"
 import {
   apiNotificationsToStepper,
@@ -611,17 +610,6 @@ export function SubmissionTrackerModal({
                       notificationsQuery.data,
                       submissionId
                     )}
-                    scope={`Opened proposal ${eventId}:${submissionId}`}
-                    loadSource={async (signal) =>
-                      proposalTimeline(
-                        await fetchSubmissionNotifications(
-                          eventId,
-                          submissionId,
-                          signal
-                        ),
-                        submissionId
-                      )
-                    }
                   />
                 )
               )}

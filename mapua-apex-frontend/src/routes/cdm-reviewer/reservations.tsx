@@ -45,7 +45,6 @@ function ReservationsBody() {
         {state.campusId && (
           <ReportToolbar
             kind="reservation_changes"
-            endpoint={`/admins/campuses/${encodeURIComponent(state.campusId)}/reservation-changes`}
             filters={report.filters}
             onChange={report.setFilters}
             onReset={report.reset}

@@ -33,6 +33,7 @@ export class AdminReservationChangesController {
   }
 
   @Post('campuses/:campus/reservation-changes/report')
+  @Roles('report_admin')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   report(

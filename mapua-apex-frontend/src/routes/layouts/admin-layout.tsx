@@ -1,11 +1,15 @@
-import { ClockIcon, FileCheck2Icon } from "lucide-react"
+import { ClockIcon, FileCheck2Icon, FileDownIcon } from "lucide-react"
 import { Outlet } from "react-router"
 import { useAuth } from "react-oidc-context"
 
 import { AuthGuard } from "@/components/auth/AuthGuard"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { layout } from "@/config"
-import { SESSION_LOG_GROUPS, ACTIVITY_LOG_GROUPS } from "@/constants/auth"
+import {
+  SESSION_LOG_GROUPS,
+  ACTIVITY_LOG_GROUPS,
+  REPORT_EXPORT_GROUPS,
+} from "@/constants/auth"
 
 export function AdminLayout() {
   const auth = useAuth()
@@ -15,6 +19,9 @@ export function AdminLayout() {
   )
   const isActivityViewer = userGroups.some((g) =>
     ACTIVITY_LOG_GROUPS.some((target) => g.toLowerCase() === target.toLowerCase())
+  )
+  const isReportExporter = userGroups.some((g) =>
+    REPORT_EXPORT_GROUPS.some((target) => g.toLowerCase() === target.toLowerCase())
   )
 
   const adminNav = [
@@ -33,6 +40,15 @@ export function AdminLayout() {
             label: "Activity Log",
             to: "/admin/activities",
             icon: FileCheck2Icon,
+          },
+        ]
+      : []),
+    ...(isReportExporter
+      ? [
+          {
+            label: "Reports & Export",
+            to: "/admin/reports",
+            icon: FileDownIcon,
           },
         ]
       : []),

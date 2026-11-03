@@ -42,6 +42,7 @@ export class AdminSubmissionsController {
   }
 
   @Post('submissions/report')
+  @Roles('report_admin')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   report(@Body() body: unknown): Promise<Item> {

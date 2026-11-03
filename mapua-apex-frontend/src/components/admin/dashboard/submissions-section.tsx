@@ -53,7 +53,6 @@ export function AdminSubmissionsSection() {
 
       <ReportToolbar
         kind="proposals"
-        endpoint="/admins/submissions"
         filters={report.filters}
         onChange={report.setFilters}
         onReset={report.reset}

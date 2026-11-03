@@ -32,6 +32,7 @@ export class AdminPostEvalsController {
   }
 
   @Post('postevals/report')
+  @Roles('report_admin')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   report(@Body() body: unknown): Promise<Item> {

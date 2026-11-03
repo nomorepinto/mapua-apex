@@ -37,6 +37,7 @@ export class MonitorController {
   }
 
   @Post('activity/report')
+  @Roles('report_admin')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   activityReport(@Body() body: unknown): Promise<Item> {

@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   HttpCode,
   Param,
   Post,
@@ -35,16 +34,6 @@ export class StudentPostEvalsController {
       await this.postevals.list(organizationId),
       filters,
     );
-  }
-
-  @Post('postevals/report')
-  @HttpCode(200)
-  @Header('Cache-Control', 'no-store')
-  report(
-    @OrganizationId() organizationId: string,
-    @Body() body: unknown,
-  ): Promise<Item> {
-    return this.postevals.report(body, organizationId);
   }
 
   @Post('postevals')

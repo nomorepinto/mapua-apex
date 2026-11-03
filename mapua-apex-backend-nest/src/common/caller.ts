@@ -6,7 +6,13 @@ export const ADMIN_DEFAULT_SIGNATORY_ID =
   '22734f67-3f9f-4ffd-9d44-0aceab2c0497';
 
 export type RouteRole =
-  'student' | 'signatory' | 'admin' | 'session_admin' | 'super_admin' | 'any';
+  | 'student'
+  | 'signatory'
+  | 'admin'
+  | 'session_admin'
+  | 'report_admin'
+  | 'super_admin'
+  | 'any';
 
 export interface AuthenticatedCaller {
   sub: string;
@@ -42,6 +48,7 @@ export const ROUTE_GROUPS: Record<
   ],
   admin: ['admin', 'osaar', 'cdm_reviewer', 'cdm', 'super_admin'],
   session_admin: ['admin', 'super_admin'],
+  report_admin: ['admin', 'osaar', 'super_admin'],
   super_admin: ['super_admin'],
 };
 

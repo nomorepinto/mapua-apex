@@ -90,14 +90,12 @@ export function AdminMonitorSessionsPage() {
         {/* SESSION ANALYTICS SECTION (Charts & Heatmap) */}
         <ReportToolbar
           kind="sessions"
-          endpoint={report.endpoint}
           filters={filters}
           onChange={setFilters}
           onReset={report.reset}
           options={report.options}
           count={report.rows.length}
           ready={sessionsQuery.isSuccess && !isRefreshing}
-          showSummary
         />
 
         {/* DATA TABLE (FULL WIDTH + STICKY HEADER) */}

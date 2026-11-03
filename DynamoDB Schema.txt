@@ -1018,8 +1018,13 @@ ________________
 
 REPORTING (NestJS /api/v2)
 No new table, GSI, report-storage item, or visit-log collection is introduced.
-POST report handlers under existing session/activity/submission/post-evaluation/
+POST report handlers under the admin session/activity/submission/post-evaluation/
 campus reservation-change collections return HTTP 200 public JSON and no-store.
+Report generation is role-gated: the session report requires session_admin
+(admin, super_admin) and the four collection reports require report_admin
+(admin, osaar, super_admin). The former student and signatory report handlers
+were removed; in-place log/history panels only filter, and every date range and
+PDF/CSV export lives on the gated Reports & Export page.
 See API_ROUTES.md for the complete request/response and column allowlists.
 
 Dates: inclusive Manila calendar dates become UTC [start, next-day end).

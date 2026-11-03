@@ -82,14 +82,12 @@ export function AdminMonitorActivitiesPage() {
         {/* STAT CARDS SECTION */}
         <ReportToolbar
           kind="activity"
-          endpoint={report.endpoint}
           filters={filters}
           onChange={setFilters}
           onReset={report.reset}
           options={report.options}
           count={report.rows.length}
           ready={activitiesQuery.isSuccess && !isRefreshing}
-          showSummary
         />
 
         {/* DATA TABLE */}

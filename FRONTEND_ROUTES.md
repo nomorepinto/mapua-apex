@@ -25,10 +25,11 @@ Sign-in is Amazon Cognito (OIDC). Unauthenticated hits on a guarded layout redir
 
 **Post-login hand-off** (`RoleRedirect`, first match wins): `admin` → `/admin/sessions`; `osaar` → `/osaar/dashboard`; `cdm_reviewer` → `/cdm/dashboard`; `dean` → `/dean/dashboard`; `org_adviser` → `/adviser/dashboard`; `org_submitter` → `/students/dashboard`. A signed-in user with none of those groups stays on `/` and sees `PendingAssignment` until OSAAR links the account.
 
-**Log monitor gating.** Two page groups are wrapped in an extra `AuthGuard` at the route level (constants in `src/constants/auth.ts`):
+**Log monitor gating.** Three page groups are wrapped in an extra `AuthGuard` at the route level (constants in `src/constants/auth.ts`):
 
 - `SESSION_LOG_GROUPS = ["admin"]` — gates `/admin/sessions`.
 - `ACTIVITY_LOG_GROUPS = ["admin", "osaar", "cdm_reviewer", "cdm"]` — gates the Activity Log pages reused across sections (`/admin/activities`, `/osaar/activities`, `/cdm/activities`).
+- `REPORT_EXPORT_GROUPS = ["admin", "super_admin", "osaar"]` — gates the date-scoped Reports & Export page (`/admin/reports`, `/osaar/reports`). Every PDF/CSV export and its date range live there; in-place log/history panels only filter. The Session log report type is offered only to callers in `SESSION_LOG_GROUPS`, mirroring the backend `session_admin` role.
 
 ---
 
@@ -99,7 +100,7 @@ Layout: `OrgAdviserLayout` (`src/routes/layouts/org-adviser-layout.tsx`). Sideba
 
 ## OSAAR routes (`/osaar`)
 
-Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboard, Setup, Post-evals, Activity Log.
+Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboard, Setup, Post-evals, Activity Log, Reports & Export.
 
 | Path | Component | Source file | Notes |
 | :---- | :---- | :---- | :---- |
@@ -118,6 +119,7 @@ Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboar
 | `/osaar/setup` (index) | redirect | — | → `organizations`. |
 | `/osaar/review` | `PassThroughLayout` | — | Index and every child redirect to `/osaar/dashboard/review`. |
 | `/osaar/activities` | `AdminMonitorActivitiesPage` | `src/routes/admin/monitor-activities.tsx` | Reused admin page, wrapped in `AuthGuard` `ACTIVITY_LOG_GROUPS`. |
+| `/osaar/reports` | `ReportsExportPage` | `src/routes/reports/reports-export.tsx` | Date-scoped report builder + PDF/CSV export, wrapped in `AuthGuard` `REPORT_EXPORT_GROUPS`. The Session log type is hidden here (OSAAR is not in `SESSION_LOG_GROUPS`). |
 | `/osaar/about` | `About` | `src/routes/about.tsx` | Shared. |
 | `/osaar/*` | redirect | — | → `dashboard` |
 
@@ -125,7 +127,7 @@ Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboar
 
 ## Admin routes (`/admin`)
 
-Layout: `AdminLayout` (`src/routes/layouts/admin-layout.tsx`). Sidebar: Session Log (when in `SESSION_LOG_GROUPS`), Activity Log (when in `ACTIVITY_LOG_GROUPS`). Home logo links to `/admin/sessions`. Admin is effectively the super-admin monitoring panel.
+Layout: `AdminLayout` (`src/routes/layouts/admin-layout.tsx`). Sidebar: Session Log (when in `SESSION_LOG_GROUPS`), Activity Log (when in `ACTIVITY_LOG_GROUPS`), Reports & Export (when in `REPORT_EXPORT_GROUPS`). Home logo links to `/admin/sessions`. Admin is effectively the super-admin monitoring panel.
 
 | Path | Component | Source file | Notes |
 | :---- | :---- | :---- | :---- |
@@ -137,6 +139,7 @@ Layout: `AdminLayout` (`src/routes/layouts/admin-layout.tsx`). Sidebar: Session 
 | `/admin/monitor/overview` | redirect | — | → `/admin/sessions` |
 | `/admin/monitor/sessions` | redirect | — | → `/admin/sessions` |
 | `/admin/monitor/activities` | redirect | — | → `/admin/activities` |
+| `/admin/reports` | `ReportsExportPage` | `src/routes/reports/reports-export.tsx` | Date-scoped report builder + PDF/CSV export for every collection, wrapped in `AuthGuard` `REPORT_EXPORT_GROUPS`. Admin sees all five report types (including Session log). |
 | `/admin/about` | `About` | `src/routes/about.tsx` | Shared. |
 | `/admin/*` | redirect | — | → `/admin/sessions` |
 

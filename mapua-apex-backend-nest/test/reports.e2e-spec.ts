@@ -8,15 +8,15 @@ import { SubmissionQueryService } from '../src/submissions/submission-query.serv
 import { reportTimeout, reportTooLarge } from '../src/common/report-budget.js';
 
 const filters = { start_date: '2024-02-29', end_date: '2024-02-29' };
+// Report routes that survive the OSAAR/super-admin lockdown. The scoped
+// student/signatory report endpoints were removed, and the reservation-changes
+// report is now `report_admin`, so CDM reviewers can no longer export it.
 const routes: [string, keyof typeof TOKENS][] = [
   ['admins/monitor/sessions', 'admin'],
   ['admins/monitor/activity', 'osaar'],
   ['admins/submissions', 'admin'],
-  ['students/submissions', 'student'],
-  ['signatories/submissions/history', 'signatory'],
   ['admins/postevals', 'osaar'],
-  ['students/postevals', 'student'],
-  ['admins/campuses/campus-1/reservation-changes', 'cdm'],
+  ['admins/campuses/campus-1/reservation-changes', 'admin'],
 ];
 describe('authorized report contracts', () => {
   let app: INestApplication;
@@ -81,7 +81,7 @@ describe('authorized report contracts', () => {
       expect(invalid.body.code).toBe('INVALID_REPORT_FILTER');
     });
   }
-  it('keeps sessions admin-only without narrowing the shared administrative alias', async () => {
+  it('keeps sessions super-admin-only and narrows activity reports to report admins', async () => {
     for (const token of [
       'osaar',
       'cdm',
@@ -103,19 +103,27 @@ describe('authorized report contracts', () => {
         .set('Authorization', bearer(token))
         .expect(401);
     }
+    // Activity reports are now `report_admin` (admin + osaar + super_admin), so
+    // CDM reviewers lose export access while OSAAR keeps it.
     await request(app.getHttpServer())
       .post('/api/v2/admins/monitor/activity/report')
       .set('Authorization', bearer('cdm'))
       .send({ filters })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/api/v2/admins/monitor/activity/report')
+      .set('Authorization', bearer('osaar'))
+      .send({ filters })
       .expect(200);
   });
-  it('requires organization and signatory claims and rejects wrong groups', async () => {
+  it('rejects callers outside the report_admin group on surviving report routes', async () => {
     for (const [path, token] of [
-      ['students/submissions', 'missingOrganization'],
-      ['students/postevals', 'missingOrganization'],
-      ['signatories/submissions/history', 'missingSignatory'],
       ['admins/submissions', 'student'],
-      ['students/submissions', 'signatory'],
+      ['admins/submissions', 'signatory'],
+      ['admins/submissions', 'cdm'],
+      ['admins/postevals', 'cdm'],
+      ['admins/monitor/activity', 'cdm'],
+      ['admins/campuses/campus-1/reservation-changes', 'cdm'],
     ] as const) {
       await request(app.getHttpServer())
         .post(`/api/v2/${path}/report`)
@@ -124,7 +132,7 @@ describe('authorized report contracts', () => {
         .expect(401);
     }
   });
-  it('does not disclose cross-organization rows, facets or unknown-date counts', async () => {
+  it('removes scoped report endpoints and keeps student data organization-scoped', async () => {
     await store.put(table, {
       PK: 'EVENT#unknown',
       SK: 'SUBMISSION#unknown',
@@ -132,28 +140,28 @@ describe('authorized report contracts', () => {
       GSI1SK: 'SUBMISSION#unknown',
       status: 'pending',
     });
+    // The scoped student/signatory report endpoints were deleted for the
+    // OSAAR/super-admin lockdown, so they must not resolve for any caller.
+    for (const [path, token] of [
+      ['students/submissions', 'student'],
+      ['students/postevals', 'student'],
+      ['signatories/submissions/history', 'signatory'],
+    ] as const) {
+      await request(app.getHttpServer())
+        .post(`/api/v2/${path}/report`)
+        .set('Authorization', bearer(token))
+        .send({ filters })
+        .expect(404);
+    }
+    // The student submission list stays organization-scoped: org-1 never sees
+    // org-2 rows.
     const own = await request(app.getHttpServer())
-      .post('/api/v2/students/submissions/report')
+      .get('/api/v2/students/submissions')
       .set('Authorization', bearer('student'))
-      .send({ filters })
       .expect(200);
-    expect(own.body.data.total_count).toBe(1);
-    expect(own.body.data.coverage.unknown_date_candidates).toBe(0);
+    expect(own.body.data).toHaveLength(1);
     expect(JSON.stringify(own.body)).not.toContain('org-2');
-    const hidden = await request(app.getHttpServer())
-      .post('/api/v2/students/submissions/report')
-      .set('Authorization', bearer('student'))
-      .send({ filters: { ...filters, values: { organization_id: ['org-2'] } } })
-      .expect(200);
-    expect(hidden.body.data.total_count).toBe(0);
-    expect(hidden.body.data.breakdowns.organization).toBeUndefined();
-    const history = await request(app.getHttpServer())
-      .post('/api/v2/signatories/submissions/history/report')
-      .set('Authorization', bearer('signatory'))
-      .send({ filters })
-      .expect(200);
-    expect(history.body.data.total_count).toBe(1);
-    expect(JSON.stringify(history.body)).not.toContain('Private organization');
+    // Cross-organization notifications remain forbidden.
     await request(app.getHttpServer())
       .get('/api/v2/students/events/org-2/submissions/org-2/notifications')
       .set('Authorization', bearer('student'))
@@ -247,12 +255,13 @@ describe('authorized report contracts', () => {
       event_id: 'org-2',
       submission_id: 'org-2',
     });
+    // The scoped report endpoint is gone, but the student submission list uses
+    // the same organization + collaboration iterator.
     const response = await request(app.getHttpServer())
-      .post('/api/v2/students/submissions/report')
+      .get('/api/v2/students/submissions')
       .set('Authorization', bearer('student'))
-      .send({ filters })
       .expect(200);
-    expect(response.body.data.total_count).toBe(2);
+    expect(response.body.data).toHaveLength(2);
     await store.put(table, {
       PK: 'ORGANIZATION#org-1',
       SK: 'COLLAB#missing',
@@ -260,9 +269,8 @@ describe('authorized report contracts', () => {
       submission_id: 'missing',
     });
     const failure = await request(app.getHttpServer())
-      .post('/api/v2/students/submissions/report')
+      .get('/api/v2/students/submissions')
       .set('Authorization', bearer('student'))
-      .send({ filters })
       .expect(503);
     expect(failure.body.data).toBeUndefined();
     expect(failure.body.code).toBe('RETRIEVAL_INCOMPLETE');

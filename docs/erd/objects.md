@@ -101,7 +101,7 @@ submission, including any collaboration.
 | `GSI2PK` | string | `SIGNATORY#uuid` — sparse signatory inbox (present while `pending`/`returned`) |
 | `GSI2SK` | timestamp | Desk queue time |
 
-The NestJS `/api/v2` report API enumerates the authorized organization/desk/collaboration scope before applying dates; GSI1 is organization/ID-based, not date-based. Editable updates condition on status/latest date/current desk and do not overwrite reporting timestamps from stale reads. Final approval uses `if_not_exists`. Historical recovery is dry-run-first, accepts only reliable linked creation/final-approval evidence, and conditionally avoids replacing concurrent values. Unknown dates and log retention produce explicit coverage notes, never fabricated cohort dates. Reports do not create persistent data objects.
+The NestJS `/api/v2` report API enumerates the authorized organization/collaboration scope before applying dates; GSI1 is organization/ID-based, not date-based. Editable updates condition on status/latest date/current desk and do not overwrite reporting timestamps from stale reads. Final approval uses `if_not_exists`. Historical recovery is dry-run-first, accepts only reliable linked creation/final-approval evidence, and conditionally avoids replacing concurrent values. Unknown dates and log retention produce explicit coverage notes, never fabricated cohort dates. Reports do not create persistent data objects.
 
 ### activity_classification
 

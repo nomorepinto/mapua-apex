@@ -1,7 +1,11 @@
 import { createBrowserRouter, Navigate, Outlet } from "react-router"
 
 import { layout } from "@/config"
-import { SESSION_LOG_GROUPS, ACTIVITY_LOG_GROUPS } from "@/constants/auth"
+import {
+  SESSION_LOG_GROUPS,
+  ACTIVITY_LOG_GROUPS,
+  REPORT_EXPORT_GROUPS,
+} from "@/constants/auth"
 import { AdminLayout } from "@/routes/layouts/admin-layout"
 import { CdmReviewerLayout } from "@/routes/layouts/cdm-reviewer-layout"
 import { DeanLayout } from "@/routes/layouts/dean-layout"
@@ -456,6 +460,22 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "reports",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { ReportsExportPage } = await import(
+            "@/routes/reports/reports-export"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={REPORT_EXPORT_GROUPS}>
+                <ReportsExportPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
         path: "about",
         HydrateFallback: RouteFallback,
         lazy: async () => {
@@ -531,6 +551,22 @@ export const router = createBrowserRouter([
             Component: () => <Navigate to="/admin/activities" replace />,
           },
         ],
+      },
+      {
+        path: "reports",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { ReportsExportPage } = await import(
+            "@/routes/reports/reports-export"
+          )
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={REPORT_EXPORT_GROUPS}>
+                <ReportsExportPage />
+              </AuthGuard>
+            ),
+          }
+        },
       },
       {
         path: "about",

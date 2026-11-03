@@ -68,10 +68,10 @@ Index summary:
 ## NestJS reporting access patterns
 
 - Session logs: monthly GSI1 `LOG#SESSION#YYYY-MM` partitions; activity logs: daily GSI3 `DATE#YYYY-MM-DD` partitions. Inclusive Manila days traverse every intersecting UTC bucket. Opaque continuation includes bucket/key, filter/caller fingerprint, direction and retrieval cutoff. Empty filtered pages do not terminate retrieval.
-- Proposal reports reuse patterns 3/4/10 and existing signatory history scope, enumerating the fully paginated organization directory first. GSI1 is not date-indexed; date filtering/aggregation occurs after authorized traversal. Compound event/submission identity deduplicates collaboration pointers.
+- Proposal reports reuse patterns 3/4/10, enumerating the fully paginated organization directory first. GSI1 is not date-indexed; date filtering/aggregation occurs after authorized traversal. Compound event/submission identity deduplicates collaboration pointers.
 - Post-evaluation reports reuse 29/30; campus reservation changes query `GSI6PK = CAMPUS#id` and hydrate related submissions in batches. Batch reads deduplicate and retry unprocessed keys; missing/throttled required records fail rather than silently reduce totals.
 - New submission first-filing/source fields are preserved by conditional editable updates. Final approval sets `fully_approved_at` only if absent. Historical backfill is offline-testable and dry-run-first; cloud runs require approval.
-- Report POSTs are read-only HTTP 200/no-store projections, bounded by 366 days, 10,000 detail rows, 4 MiB, and 20 seconds. Summary-only aggregation is complete within those budgets. Unknown dates and retention coverage are disclosed separately from retrieval success. No report storage, new GSI, or new visit collection is introduced.
+- Report POSTs are read-only HTTP 200/no-store projections, bounded by 366 days, 10,000 detail rows, 4 MiB, and 20 seconds. Summary-only aggregation is complete within those budgets. Unknown dates and retention coverage are disclosed separately from retrieval success. No report storage, new GSI, or new visit collection is introduced. Report generation is role-gated: the session report requires `session_admin` (admin, super_admin) and the four collection reports require `report_admin` (admin, osaar, super_admin). The former student and signatory report endpoints were removed, so all exports now come from the admin/OSAAR Reports & Export page.
 
 ## Page / feature → objects accessed
 

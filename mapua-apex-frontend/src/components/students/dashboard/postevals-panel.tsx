@@ -81,7 +81,6 @@ export function PostEvalsPanel() {
       <div className="mb-4">
         <ReportToolbar
           kind="postevals"
-          endpoint="/students/postevals"
           filters={report.filters}
           onChange={report.setFilters}
           onReset={report.reset}

@@ -69,7 +69,6 @@ export function SubmissionsPanel() {
       <div className="mb-4">
         <ReportToolbar
           kind="proposals"
-          endpoint="/students/submissions"
           filters={report.filters}
           onChange={report.setFilters}
           onReset={report.reset}

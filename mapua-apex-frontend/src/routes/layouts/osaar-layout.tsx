@@ -1,4 +1,10 @@
-import { ClipboardListIcon, FileCheck2Icon, HomeIcon, Settings2Icon } from "lucide-react"
+import {
+  ClipboardListIcon,
+  FileCheck2Icon,
+  FileDownIcon,
+  HomeIcon,
+  Settings2Icon,
+} from "lucide-react"
 import { Outlet } from "react-router"
 
 import { AuthGuard } from "@/components/auth/AuthGuard"
@@ -25,6 +31,11 @@ const OSAAR_NAV = [
     label: "Activity Log",
     to: "/osaar/activities",
     icon: FileCheck2Icon,
+  },
+  {
+    label: "Reports & Export",
+    to: "/osaar/reports",
+    icon: FileDownIcon,
   },
 ]
 
