@@ -3,8 +3,24 @@ import type { Item } from '../common/records.js';
 import { RoutingService, type SignatoryStep } from './routing.service.js';
 
 describe('RoutingService', () => {
-  let osaarIds = ['osaar-1'];
   let cdmId: string | null = null;
+  const osaarPeople: Item[] = [
+    {
+      PK: 'SIGNATORY#osaar-1',
+      role: 'osaar',
+      campus_id: 'intramuros',
+      osaar_order: 1,
+    },
+    {
+      PK: 'SIGNATORY#osaar-all',
+      role: 'osaar',
+      all_campuses: true,
+    },
+  ];
+  const campusItems = new Map<string, Item>([
+    ['intramuros', { PK: 'CAMPUS#intramuros', name: 'Intramuros', main: true }],
+    ['makati', { PK: 'CAMPUS#makati', name: 'Makati' }],
+  ]);
   const organizations = {
     async get(id: string): Promise<Item | undefined> {
       if (id === 'missing') {
@@ -14,7 +30,8 @@ describe('RoutingService', () => {
         PK: `ORGANIZATION#${id}`,
         SK: `ORGANIZATION#${id}`,
         name: id === 'council' ? 'Council' : 'Society',
-        is_higher_council: id === 'council',
+        skip_dean: id === 'council',
+        skip_post_eval: false,
         signatories: [{ role: 'adviser', signatory_id: `${id}-adviser` }],
       };
     },
@@ -23,8 +40,16 @@ describe('RoutingService', () => {
     async findIdByRole(role: string): Promise<string | null> {
       return role === 'cdm' ? cdmId : null;
     },
+    async listByRole(role: string): Promise<Item[]> {
+      return role === 'osaar' ? osaarPeople : [];
+    },
     async get(id: string): Promise<Item | undefined> {
-      if (id === 'osaar-1' || id === 'legacy-osaar') {
+      if (
+        id === 'osaar-1' ||
+        id === 'osaar-2' ||
+        id === 'legacy-osaar' ||
+        id === 'osaar-all'
+      ) {
         return { role: 'osaar', name: id };
       }
       if (id.endsWith('-adviser')) {
@@ -33,26 +58,35 @@ describe('RoutingService', () => {
       return undefined;
     },
   };
-  const approvalSettings = {
-    async osaarStageIds(): Promise<string[]> {
-      return osaarIds;
+  const campuses = {
+    async get(id: string): Promise<Item | undefined> {
+      return campusItems.get(id);
+    },
+    async list(): Promise<Item[]> {
+      return [...campusItems.values()];
     },
   };
   const routing = new RoutingService(
     organizations as never,
     signatories as never,
-    approvalSettings as never,
+    campuses as never,
   );
 
   function ids(steps: SignatoryStep[]): string[] {
     return steps.map((step) => step.signatory_id);
   }
 
-  it('skips the dean desk for a higher council and stops before an unconfigured CDM desk', async () => {
-    osaarIds = ['osaar-1'];
+  it('skips the dean desk when skip_dean is set and stops before an unconfigured CDM desk', async () => {
     cdmId = null;
     await expect(
-      routing.sequenceFor('council', [], 'co-curricular', false),
+      routing.sequenceFor(
+        'council',
+        [],
+        'co-curricular',
+        false,
+        undefined,
+        'intramuros',
+      ),
     ).resolves.toMatchObject([
       {
         key: 'adviser:ORG#council',
@@ -64,6 +98,12 @@ describe('RoutingService', () => {
         key: 'osaar_1',
         role: 'osaar',
         signatory_id: 'osaar-1',
+        organization_id: null,
+      },
+      {
+        key: 'osaar_all',
+        role: 'osaar',
+        signatory_id: 'osaar-all',
         organization_id: null,
       },
     ]);
@@ -80,37 +120,63 @@ describe('RoutingService', () => {
   it('rejects a reservation when no CDM signatory is configured', async () => {
     cdmId = null;
     await expect(
-      routing.sequenceFor('council', [], 'extra-curricular', true),
+      routing.sequenceFor(
+        'council',
+        [],
+        'extra-curricular',
+        true,
+        undefined,
+        'intramuros',
+      ),
     ).rejects.toMatchObject({
       response: { message: 'No cdm signatory is configured.' },
     });
   });
 
-  it('appends every configured OSAAR stage before CDM', async () => {
-    osaarIds = ['osaar-1', 'osaar-2'];
+  it('appends the campus OSAARs, then the all-campus OSAAR, before CDM', async () => {
+    const added: Item = {
+      PK: 'SIGNATORY#osaar-2',
+      role: 'osaar',
+      campus_id: 'intramuros',
+      osaar_order: 2,
+    };
+    osaarPeople.splice(1, 0, added);
     cdmId = 'cdm-1';
-    const steps = await routing.sequenceFor(
-      'society',
-      [],
-      'extra-curricular',
-      true,
-    );
-    expect(steps.map((step) => step.key)).toEqual([
-      'adviser:ORG#society',
-      'osaar_1',
-      'osaar_2',
-      'cdm',
-    ]);
-    expect(ids(steps)).toEqual([
-      'society-adviser',
-      'osaar-1',
-      'osaar-2',
-      'cdm-1',
-    ]);
+    try {
+      const steps = await routing.sequenceFor(
+        'society',
+        [],
+        'extra-curricular',
+        true,
+        undefined,
+        'intramuros',
+      );
+      expect(steps.map((step) => step.key)).toEqual([
+        'adviser:ORG#society',
+        'osaar_1',
+        'osaar_2',
+        'osaar_all',
+        'cdm',
+      ]);
+      expect(ids(steps)).toEqual([
+        'society-adviser',
+        'osaar-1',
+        'osaar-2',
+        'osaar-all',
+        'cdm-1',
+      ]);
+    } finally {
+      osaarPeople.splice(osaarPeople.indexOf(added), 1);
+    }
   });
 
-  it('uses the supplied OSAAR stages instead of the current settings', async () => {
-    osaarIds = ['new-osaar'];
+  it('routes an online plan through the main campus', async () => {
+    await expect(
+      routing.hostCampusId({ venue: 'Online', reservationCampusIds: [] }),
+    ).resolves.toBe('intramuros');
+  });
+
+  it('uses the supplied OSAAR stages instead of the current campus', async () => {
     const steps = await routing.sequenceFor(
       'society',
       [],

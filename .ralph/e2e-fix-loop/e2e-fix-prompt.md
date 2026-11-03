@@ -17,14 +17,14 @@ These are not product bugs. Do not edit code for them:
 
 - Fix one bug: the step named in the task file. Leave every other failure for the next pass.
 - Change application code in `mapua-apex-backend-nest`, `mapua-apex-frontend`, `arcus-attendance-system`, or `arcus-evaluation-system`.
-- Do not edit `mapua-apex/e2e-tests`, this prompt, or the loop script. Do not flip a failure into a gap, skip an assertion, or loosen a test to make the run pass.
+- Do not create or edit anything under `mapua-apex/e2e-tests`. Do not edit this prompt or the loop script. Do not flip a failure into a gap, skip an assertion, or loosen a test to make the run pass.
 - Do not open `.env`, `.env.*`, `.grokadmin`, or `accounts.local.json`.
 - Do not run `git commit`, `git add`, `git push`, or `git reset`. The loop commits after you exit.
 - Do not start a new test run. The loop does that.
 
 ## Verdict
 
-Write `mapua-apex/e2e-tests/reports/loop-verdict.json` and nothing else when you are not fixing a product bug.
+Write the verdict file to the path given in the task file, under `.ralph/e2e-fix-loop`. When you are not fixing a product bug, that verdict file is the only file you write.
 
 ```json
 {

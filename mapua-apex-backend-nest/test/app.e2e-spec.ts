@@ -13,7 +13,8 @@ describe('API contract', () => {
       PK: 'ORGANIZATION#org-1',
       SK: 'ORGANIZATION#org-1',
       name: 'Society',
-      is_higher_council: false,
+      skip_dean: false,
+      skip_post_eval: false,
       signatories: [],
     });
   });

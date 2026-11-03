@@ -20,6 +20,6 @@ export class AdminApprovalSettingsController {
   update(
     @Body() body: UpdateApprovalSettingsDto,
   ): Promise<ApprovalSettingsView> {
-    return this.settings.replace(body.osaar_stage_signatory_ids);
+    return this.settings.replace(body.campus_id, body.signatory_ids);
   }
 }

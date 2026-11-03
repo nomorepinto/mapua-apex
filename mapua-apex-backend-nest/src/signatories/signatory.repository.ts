@@ -4,6 +4,13 @@ import { DynamoTable } from '../aws/dynamo-table.js';
 import { roleIndex, signatoryKey, stripPrefix } from '../common/dynamo-keys.js';
 import type { Item } from '../common/records.js';
 
+/** Campus membership for an OSAAR account. Other roles leave this unset. */
+export interface OsaarPlacement {
+  campusId: string | null;
+  allCampuses: boolean;
+  osaarOrder: number | null;
+}
+
 @Injectable()
 export class SignatoryRepository {
   constructor(private readonly table: DynamoTable) {}
@@ -31,15 +38,20 @@ export class SignatoryRepository {
 
   /** Every signatory id with this role. Dean rows are keyed per department. */
   async listIdsByRole(role: string, limit?: number): Promise<string[]> {
-    const items = await this.table.query({
+    const items = await this.listByRole(role, limit);
+    return items.flatMap((item) => {
+      const id = stripPrefix(item.PK, 'SIGNATORY#');
+      return id ? [id] : [];
+    });
+  }
+
+  /** Every signatory with this role. Dean rows without a department only. */
+  listByRole(role: string, limit?: number): Promise<Item[]> {
+    return this.table.query({
       index: 'GSI4',
       keyCondition: 'GSI4PK = :role',
       values: { ':role': roleIndex(role) },
       ...(limit ? { limit, allPages: false } : {}),
-    });
-    return items.flatMap((item) => {
-      const id = stripPrefix(item.PK, 'SIGNATORY#');
-      return id ? [id] : [];
     });
   }
 
@@ -47,8 +59,9 @@ export class SignatoryRepository {
     name: string,
     role: string,
     department?: string | null,
+    placement?: OsaarPlacement | null,
   ): Promise<Item> {
-    return this.write(randomUUID(), name, role, department);
+    return this.write(randomUUID(), name, role, department, placement);
   }
 
   async update(
@@ -56,13 +69,23 @@ export class SignatoryRepository {
     name: string,
     role: string,
     department?: string | null,
+    placement?: OsaarPlacement | null,
   ): Promise<Item> {
     return this.write(
       stripPrefix(id, 'SIGNATORY#') ?? id,
       name,
       role,
       department,
+      placement,
     );
+  }
+
+  async setOsaarOrder(id: string, order: number): Promise<void> {
+    const key = signatoryKey(id);
+    await this.table.update({
+      key: { PK: key, SK: key },
+      set: { osaar_order: order },
+    });
   }
 
   delete(id: string): Promise<void> {
@@ -96,6 +119,7 @@ export class SignatoryRepository {
     name: string,
     role: string,
     department?: string | null,
+    placement?: OsaarPlacement | null,
   ): Promise<Item> {
     const normalized = role.toLowerCase();
     const dept =
@@ -114,6 +138,14 @@ export class SignatoryRepository {
       GSI4SK: key,
       ...(dept ? { department: dept } : {}),
     };
+    if (normalized === 'osaar' && placement?.allCampuses) {
+      item.all_campuses = true;
+    } else if (normalized === 'osaar' && placement?.campusId) {
+      item.campus_id = placement.campusId;
+      if (placement.osaarOrder !== null) {
+        item.osaar_order = placement.osaarOrder;
+      }
+    }
     await this.table.put(item);
     return item;
   }

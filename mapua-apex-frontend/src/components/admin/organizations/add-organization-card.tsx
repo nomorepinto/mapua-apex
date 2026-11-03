@@ -16,8 +16,9 @@ import {
   sanitizeOrganizationName,
 } from "@/components/admin/organizations/organization-name"
 import {
-  HigherCouncilField,
   SignatoryDeskCombobox,
+  SkipDeanField,
+  SkipPostEvalField,
 } from "@/components/admin/organizations/organization-fields"
 import { useOrganizationsPage } from "@/components/admin/organizations/organizations-context"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -61,7 +62,7 @@ function AddOrganizationForm() {
 
   const areDesksValid =
     Boolean(state.desks.adviser) &&
-    (state.isHigherCouncil || Boolean(state.desks.dean))
+    (state.skipDean || Boolean(state.desks.dean))
 
   const canAdd =
     state.canAddOrganization &&
@@ -105,7 +106,7 @@ function AddOrganizationForm() {
           </Field>
 
           {ORGANIZATION_ASSIGNABLE_DESK_ITEMS.map((item) => {
-            const deanSkipped = item.value === "dean" && state.isHigherCouncil
+            const deanSkipped = item.value === "dean" && state.skipDean
             return (
               <SignatoryDeskCombobox
                 disabled={deanSkipped}
@@ -115,7 +116,7 @@ function AddOrganizationForm() {
                 label={item.label}
                 onValueChange={(value) => actions.changeDesk(item.value, value)}
                 optionalLabel={
-                  deanSkipped ? "Skipped for higher councils." : undefined
+                  deanSkipped ? "Skipped. Dean is not in the approval chain." : undefined
                 }
                 placeholder={
                   deanSkipped ? "Skipped" : `Search ${item.label.toLowerCase()}`
@@ -125,10 +126,15 @@ function AddOrganizationForm() {
             )
           })}
 
-          <HigherCouncilField
-            checked={state.isHigherCouncil}
-            id="organization-higher-council"
-            onCheckedChange={actions.setIsHigherCouncil}
+          <SkipDeanField
+            checked={state.skipDean}
+            id="organization-skip-dean"
+            onCheckedChange={actions.setSkipDean}
+          />
+          <SkipPostEvalField
+            checked={state.skipPostEval}
+            id="organization-skip-post-eval"
+            onCheckedChange={actions.setSkipPostEval}
           />
 
           {!state.sharedAccountsReady && !state.signatoriesLoading ? (
@@ -146,7 +152,7 @@ function AddOrganizationForm() {
 
           {state.sharedAccountsReady &&
             state.missingAssignable.some(
-              (item) => !(item.value === "dean" && state.isHigherCouncil)
+              (item) => !(item.value === "dean" && state.skipDean)
             ) &&
             !state.signatoriesLoading ? (
             <Alert variant="warning">
@@ -194,14 +200,15 @@ function ImportOrganizationsCsv() {
       <CardHeader>
         <CardTitle>Import CSV</CardTitle>
         <CardDescription>
-          Four columns: organization name, dean, adviser, is_higher_council. A
-          higher-council row skips the dean, and any dean name in that row is
-          ignored. The shared CDM account is attached automatically.
+          Five columns: organization name, dean, adviser, skip_dean,
+          skip_post_eval. A skip-dean row leaves the dean empty, and any dean
+          name in that row is ignored. The shared CDM account is attached
+          automatically.
         </CardDescription>
       </CardHeader>
       <CardPanel className="flex flex-col gap-4">
         <CsvFileField
-          description="name, dean, adviser, is_higher_council."
+          description="name, dean, adviser, skip_dean, skip_post_eval."
           error={state.csvError}
           fileName={state.csvFileName}
           id="organizations-csv"

@@ -144,10 +144,7 @@ export class PostEvalService {
       throw new NotFoundException('Not Found');
     }
     if (await this.skipsPostEval(organizationId)) {
-      abort(
-        422,
-        'Higher council organizations do not file a post-evaluation.',
-      );
+      abort(422, 'This organization does not file a post-evaluation.');
     }
     const status = str(submission, 'status');
     if (status !== 'approved' && status !== 'finished') {
@@ -287,7 +284,7 @@ export class PostEvalService {
 
   private async skipsPostEval(organizationId: string): Promise<boolean> {
     const org = await this.organizations.get(organizationId);
-    return org?.is_higher_council === true;
+    return org?.skip_post_eval === true;
   }
 
   private windowOpen(date: string): boolean {

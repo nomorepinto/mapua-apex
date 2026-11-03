@@ -1,129 +1,123 @@
 import { describe, expect, it } from 'vitest';
 import type { Item } from '../common/records.js';
 import { ApprovalSettingsService } from './approval-settings.service.js';
-import type { StoredOsaarStage } from './approval-settings.repository.js';
 
 describe('ApprovalSettingsService', () => {
-  let stored: Item | undefined;
-  let saved: StoredOsaarStage[] | undefined;
-  const people = new Map<string, Item>([
-    ['osaar-1', { PK: 'SIGNATORY#osaar-1', name: 'Sir Kyle', role: 'osaar' }],
-    ['osaar-2', { PK: 'SIGNATORY#osaar-2', name: 'Maam Grace', role: 'osaar' }],
-    ['dean-1', { PK: 'SIGNATORY#dean-1', name: 'Dean', role: 'dean' }],
+  const campuses = new Map<string, Item>([
+    [
+      'intramuros',
+      {
+        PK: 'CAMPUS#intramuros',
+        SK: 'CAMPUS#intramuros',
+        name: 'Intramuros',
+        main: true,
+      },
+    ],
+    ['makati', { PK: 'CAMPUS#makati', SK: 'CAMPUS#makati', name: 'Makati' }],
   ]);
-  let roleIds = ['osaar-1'];
+  const people = new Map<string, Item>([
+    [
+      'osaar-1',
+      {
+        PK: 'SIGNATORY#osaar-1',
+        name: 'Sir Kyle',
+        role: 'osaar',
+        campus_id: 'intramuros',
+        osaar_order: 1,
+      },
+    ],
+    [
+      'osaar-2',
+      {
+        PK: 'SIGNATORY#osaar-2',
+        name: 'Maam Grace',
+        role: 'osaar',
+        campus_id: 'intramuros',
+        osaar_order: 2,
+      },
+    ],
+    [
+      'osaar-all',
+      {
+        PK: 'SIGNATORY#osaar-all',
+        name: 'All Campus',
+        role: 'osaar',
+        all_campuses: true,
+      },
+    ],
+  ]);
+  const orders: { id: string; order: number }[] = [];
 
-  const settings = {
-    async get(): Promise<Item | undefined> {
-      return stored;
+  const signatories = {
+    async listByRole(role: string): Promise<Item[]> {
+      return role === 'osaar' ? [...people.values()] : [];
     },
-    async save(stages: StoredOsaarStage[]): Promise<Item> {
-      saved = stages;
-      stored = {
-        PK: 'SETTINGS#APPROVAL',
-        SK: 'SETTINGS#APPROVAL',
-        osaar_stages: stages,
-      };
-      return stored;
+    async setOsaarOrder(id: string, order: number): Promise<void> {
+      orders.push({ id, order });
+      const person = people.get(id);
+      if (person) {
+        person.osaar_order = order;
+      }
     },
   };
-  const signatories = {
-    async get(id: string): Promise<Item | undefined> {
-      return people.get(id);
+  const campusRepo = {
+    async list(): Promise<Item[]> {
+      return [...campuses.values()];
     },
-    async listIdsByRole(role: string): Promise<string[]> {
-      return role === 'osaar' ? roleIds : [];
+    async get(id: string): Promise<Item | undefined> {
+      return campuses.get(id);
     },
   };
   const service = new ApprovalSettingsService(
-    settings as never,
     signatories as never,
+    campusRepo as never,
   );
 
-  it('falls back to the single OSAAR signatory when nothing is saved', async () => {
-    stored = undefined;
-    roleIds = ['osaar-1'];
-    await expect(service.view()).resolves.toEqual({
-      osaar_stages: [
+  it('groups OSAAR accounts by campus and names the all-campus account', async () => {
+    await expect(service.view()).resolves.toMatchObject({
+      all_campus_signatory: {
+        signatory_id: 'osaar-all',
+        signatory_name: 'All Campus',
+      },
+      unassigned: [],
+      campuses: [
         {
-          key: 'osaar_1',
-          order: 1,
-          signatory_id: 'osaar-1',
-          signatory_name: 'Sir Kyle',
+          campus_id: 'intramuros',
+          campus_name: 'Intramuros',
+          osaar_stages: [
+            { order: 1, signatory_id: 'osaar-1', campus_name: 'Intramuros' },
+            { order: 2, signatory_id: 'osaar-2', campus_name: 'Intramuros' },
+          ],
         },
+        { campus_id: 'makati', campus_name: 'Makati', osaar_stages: [] },
       ],
     });
-    await expect(service.osaarStageIds()).resolves.toEqual(['osaar-1']);
   });
 
-  it('returns no stages when several OSAAR accounts exist and nothing is saved', async () => {
-    stored = undefined;
-    roleIds = ['osaar-1', 'osaar-2'];
-    await expect(service.view()).resolves.toEqual({ osaar_stages: [] });
-    await expect(service.osaarStageIds()).rejects.toMatchObject({
+  it('rejects a list that is not exactly the campus OSAAR accounts', async () => {
+    await expect(
+      service.replace('intramuros', ['osaar-1']),
+    ).rejects.toMatchObject({
       response: {
         message:
-          'More than one OSAAR signatory exists. Configure OSAAR approval stages before sending a proposal.',
+          'OSAAR approval stages must list each OSAAR assigned to this campus.',
       },
     });
   });
 
-  it('rejects a stage that is not an OSAAR signatory', async () => {
-    await expect(service.replace(['osaar-1', 'dean-1'])).rejects.toMatchObject({
-      response: {
-        message: 'Each OSAAR stage must be an existing OSAAR signatory.',
-      },
-    });
-  });
-
-  it('rejects a repeated signatory', async () => {
-    await expect(service.replace(['osaar-1', 'osaar-1'])).rejects.toMatchObject(
-      {
-        response: {
-          message: 'Each OSAAR stage must be a different signatory.',
-        },
-      },
-    );
-  });
-
-  it('saves ordered stages and serves them to new submissions', async () => {
-    stored = undefined;
-    saved = undefined;
-    await expect(service.replace(['osaar-2', 'osaar-1'])).resolves.toEqual({
-      osaar_stages: [
-        {
-          key: 'osaar_1',
-          order: 1,
-          signatory_id: 'osaar-2',
-          signatory_name: 'Maam Grace',
-        },
-        {
-          key: 'osaar_2',
-          order: 2,
-          signatory_id: 'osaar-1',
-          signatory_name: 'Sir Kyle',
-        },
-      ],
-    });
-    expect(saved).toEqual([
-      { key: 'osaar_1', signatory_id: 'SIGNATORY#osaar-2' },
-      { key: 'osaar_2', signatory_id: 'SIGNATORY#osaar-1' },
+  it('rewrites the saved order for one campus', async () => {
+    orders.length = 0;
+    const view = await service.replace('intramuros', ['osaar-2', 'osaar-1']);
+    expect(orders).toEqual([
+      { id: 'osaar-2', order: 1 },
+      { id: 'osaar-1', order: 2 },
     ]);
-    await expect(service.osaarStageIds()).resolves.toEqual([
+    const group = view.campuses.find(
+      (campus) => campus.campus_id === 'intramuros',
+    );
+    expect(group?.osaar_stages.map((stage) => stage.signatory_id)).toEqual([
       'osaar-2',
       'osaar-1',
     ]);
-  });
-
-  it('rejects a saved stage whose signatory is no longer OSAAR', async () => {
-    stored = {
-      osaar_stages: [{ key: 'osaar_1', signatory_id: 'SIGNATORY#dean-1' }],
-    };
-    await expect(service.osaarStageIds()).rejects.toMatchObject({
-      response: {
-        message:
-          'An OSAAR approval stage points at a signatory that is no longer an OSAAR account.',
-      },
-    });
   });
 });

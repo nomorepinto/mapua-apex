@@ -1,0 +1,15 @@
+{
+  "name": "mapua-apex-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^24.0.0",
+    "@types/qrcode": "^1.5.5",
+    "qrcode": "^1.5.4",
+    "typescript": "^5.9.0"
+  }
+}

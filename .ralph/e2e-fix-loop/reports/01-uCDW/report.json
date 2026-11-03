@@ -1,0 +1,163 @@
+{
+  "tag": "uCDW",
+  "passed": true,
+  "cleanup_before": 0,
+  "cleanup_after": 80,
+  "leftovers": 0,
+  "steps": [
+    {
+      "name": "preflight",
+      "status": "pass",
+      "detail": "event date 2026-11-02",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "setup campus",
+      "status": "pass",
+      "detail": "e88b9ff3-ca71-48c5-9ad1-62e2ea353a47",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "setup signatories",
+      "status": "pass",
+      "detail": "cdm reused",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "setup organizations",
+      "status": "pass",
+      "detail": "three organizations",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "setup approval stages",
+      "status": "pass",
+      "detail": "osaar1 then osaar2",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "setup account links",
+      "status": "pass",
+      "detail": "desk and organization accounts linked",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "cdm reservables and holds",
+      "status": "pass",
+      "detail": "",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P1",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P2",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a -> a638aec7-7d9d-4cd9-81db-e841189d6b80",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P3",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> 248cf68b-9462-4553-9ed5-6939e198d815 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P4",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> 248cf68b-9462-4553-9ed5-6939e198d815 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a -> a638aec7-7d9d-4cd9-81db-e841189d6b80",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P5",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> 6fe236b7-03b5-4524-97a7-f227b58e5f6f -> 248cf68b-9462-4553-9ed5-6939e198d815 -> cfcfa46e-187c-4c35-8f11-950d9cd25e0e -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P6",
+      "status": "pass",
+      "detail": "b1de9990-1a0b-4a30-9280-8351cf35e511 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a -> a638aec7-7d9d-4cd9-81db-e841189d6b80",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P7",
+      "status": "pass",
+      "detail": "b1de9990-1a0b-4a30-9280-8351cf35e511 -> 546b4716-53fd-4955-b365-dd76e1a2c9f7 -> 248cf68b-9462-4553-9ed5-6939e198d815 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P9",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P10",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> 248cf68b-9462-4553-9ed5-6939e198d815 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P11",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P12",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P13",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a -> a638aec7-7d9d-4cd9-81db-e841189d6b80",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P14",
+      "status": "pass",
+      "detail": "546b4716-53fd-4955-b365-dd76e1a2c9f7 -> ae8f9427-3c40-42bf-9953-6550fd0fafac -> 2949ffde-3a85-4bd9-a783-52d968ccef0a -> a638aec7-7d9d-4cd9-81db-e841189d6b80",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P8 equipment only",
+      "status": "pass",
+      "detail": "422 as expected",
+      "http": 422,
+      "gap": false
+    },
+    {
+      "name": "cleanup after",
+      "status": "pass",
+      "detail": "deleted 80, left 0",
+      "http": null,
+      "gap": false
+    }
+  ]
+}

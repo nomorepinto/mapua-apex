@@ -27,7 +27,11 @@ export class OrganizationDto {
 
   @IsOptional()
   @IsBoolean()
-  is_higher_council?: boolean;
+  skip_dean?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  skip_post_eval?: boolean;
 
   @IsOptional()
   @IsArray()

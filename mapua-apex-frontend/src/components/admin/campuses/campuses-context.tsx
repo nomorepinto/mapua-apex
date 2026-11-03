@@ -74,6 +74,9 @@ function resolveClassroomFormat(
 
 interface CampusesState {
   name: string
+  main: boolean
+  offerMain: boolean
+  hasMain: boolean
   formError: string
   prefixesText: string
   digitsText: string
@@ -97,6 +100,8 @@ interface CampusesState {
   editName: string
   editPrefixesText: string
   editDigitsText: string
+  editMain: boolean
+  offerEditMain: boolean
   editError: string
   deleteOpen: boolean
   deleteError: string
@@ -107,6 +112,7 @@ interface CampusesActions {
   changeName: (value: string) => void
   changePrefixes: (value: string) => void
   changeDigits: (value: string) => void
+  setMain: (value: boolean) => void
   handleAddOne: (event: FormEvent<HTMLFormElement>) => Promise<void>
   chooseCsv: (file: File | null, text: string) => void
   handleCsvImport: () => Promise<void>
@@ -116,6 +122,7 @@ interface CampusesActions {
   changeEditName: (value: string) => void
   changeEditPrefixes: (value: string) => void
   changeEditDigits: (value: string) => void
+  setEditMain: (value: boolean) => void
   handleEditSave: (event: FormEvent<HTMLFormElement>) => Promise<void>
   setDeleteOpen: (open: boolean) => void
   openDelete: () => void
@@ -148,6 +155,8 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
   const [formError, setFormError] = useState("")
   const [prefixesText, setPrefixesText] = useState("")
   const [digitsText, setDigitsText] = useState("")
+  const [main, setMain] = useState(false)
+  const [mainTouched, setMainTouched] = useState(false)
   const [csvNames, setCsvNames] = useState<string[]>([])
   const [csvFileName, setCsvFileName] = useState("")
   const [csvError, setCsvError] = useState("")
@@ -156,11 +165,15 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
   const [editName, setEditName] = useState("")
   const [editPrefixesText, setEditPrefixesText] = useState("")
   const [editDigitsText, setEditDigitsText] = useState("")
+  const [editMain, setEditMain] = useState(false)
   const [editError, setEditError] = useState("")
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState("")
 
   const campuses = campusesQuery.data ?? EMPTY_CAMPUSES
+  const hasMain = campuses.some((campus) => campus.main === true)
+  const offerMain = !campusesQuery.isLoading && !hasMain
+  const mainChecked = offerMain && (mainTouched ? main : campuses.length === 0)
 
   const existingNames = useMemo(
     () => new Set(campuses.map((campus) => campus.name.trim().toLowerCase())),
@@ -172,6 +185,8 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
     const errors: string[] = []
     const skippedDuplicates: string[] = []
     const seen = new Set<string>()
+    const listIsEmpty = campuses.length === 0
+    let claimedMain = hasMain
 
     for (const raw of csvNames) {
       const trimmed = raw.trim()
@@ -184,11 +199,13 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
         continue
       }
       seen.add(key)
-      payloads.push({ name: trimmed })
+      const mainCampus = listIsEmpty && !claimedMain
+      if (mainCampus) claimedMain = true
+      payloads.push(mainCampus ? { name: trimmed, main: true } : { name: trimmed })
     }
 
     return { payloads, errors, skippedDuplicates }
-  }, [csvNames, existingNames])
+  }, [campuses.length, csvNames, existingNames, hasMain])
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -205,6 +222,7 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
     setEditName(campus.name)
     setEditPrefixesText((campus.classroom_name_prefixes ?? []).join(", "))
     setEditDigitsText(campus.classroom_name_digits != null ? String(campus.classroom_name_digits) : "")
+    setEditMain(campus.main === true)
     setEditError("")
   }
 
@@ -229,10 +247,16 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await createCampus.mutateAsync({ name: trimmed, ...format.payload })
+      await createCampus.mutateAsync({
+        name: trimmed,
+        ...(offerMain ? { main: mainChecked } : {}),
+        ...format.payload,
+      })
       setName("")
       setPrefixesText("")
       setDigitsText("")
+      setMain(false)
+      setMainTouched(false)
       setFormError("")
       toastManager.add({
         title: "Campus added",
@@ -303,9 +327,11 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      const canEditMain = editing.main === true || !hasMain
       await updateCampus.mutateAsync({
         campusId: editing.campus_id,
         name: trimmed,
+        ...(canEditMain ? { main: editMain } : {}),
         ...format.payload,
       })
       setEditing(null)
@@ -351,6 +377,9 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
   const value: CampusesContextValue = {
     state: {
       name,
+      main: mainChecked,
+      offerMain,
+      hasMain,
       formError,
       prefixesText,
       digitsText,
@@ -374,6 +403,8 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
       editName,
       editPrefixesText,
       editDigitsText,
+      editMain,
+      offerEditMain: editing !== null && (editing.main === true || !hasMain),
       editError,
       deleteOpen,
       deleteError,
@@ -391,6 +422,10 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
       changeDigits: (next) => {
         setDigitsText(next)
         if (formError) setFormError("")
+      },
+      setMain: (next) => {
+        setMainTouched(true)
+        setMain(next)
       },
       handleAddOne,
       chooseCsv: (file, text) => {
@@ -426,6 +461,7 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
         setEditDigitsText(next)
         if (editError) setEditError("")
       },
+      setEditMain,
       handleEditSave,
       setDeleteOpen: (open) => {
         setDeleteOpen(open)

@@ -1,0 +1,317 @@
+{
+  "tag": "qIyo",
+  "passed": true,
+  "cleanup_before": 0,
+  "cleanup_after": 261,
+  "leftovers": 0,
+  "steps": [
+    {
+      "name": "preflight",
+      "status": "pass",
+      "detail": "event date 2026-11-02",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "setup campus",
+      "status": "pass",
+      "detail": "9b29a0ee-cdfd-4f09-a2ba-45d23ebfdf3a",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "setup signatories",
+      "status": "pass",
+      "detail": "cdm reused",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "setup organizations",
+      "status": "pass",
+      "detail": "three organizations",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "setup approval stages",
+      "status": "pass",
+      "detail": "osaar1 then osaar2",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "setup account links",
+      "status": "pass",
+      "detail": "desk and organization accounts linked",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "cdm reservables and holds",
+      "status": "pass",
+      "detail": "",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P1",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P2",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db -> a638aec7-7d9d-4cd9-81db-e841189d6b80",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P3",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> f6ac2aa3-121c-4526-a163-068553ade4c6 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P4",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> f6ac2aa3-121c-4526-a163-068553ade4c6 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db -> a638aec7-7d9d-4cd9-81db-e841189d6b80",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P5",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> 7a3442be-136d-4aea-88b0-824f320ce087 -> f6ac2aa3-121c-4526-a163-068553ade4c6 -> 1c12451c-da09-4a8e-88d0-5adfede0cc99 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P6",
+      "status": "pass",
+      "detail": "bb3a3e38-54ca-4a6d-bfaa-c93eb2d5f231 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db -> a638aec7-7d9d-4cd9-81db-e841189d6b80",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P7",
+      "status": "pass",
+      "detail": "bb3a3e38-54ca-4a6d-bfaa-c93eb2d5f231 -> 06913718-9667-49a9-8067-b4b490c67049 -> f6ac2aa3-121c-4526-a163-068553ade4c6 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P9",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P10",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> f6ac2aa3-121c-4526-a163-068553ade4c6 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P11",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P12",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P13",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db -> a638aec7-7d9d-4cd9-81db-e841189d6b80",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P14",
+      "status": "pass",
+      "detail": "06913718-9667-49a9-8067-b4b490c67049 -> a9ebf3f8-2102-4d8e-b692-7e2313ddd0ba -> eb2f7cce-6759-43cb-9866-74ccf594b9db -> a638aec7-7d9d-4cd9-81db-e841189d6b80",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "submit P8 equipment only",
+      "status": "pass",
+      "detail": "422 as expected",
+      "http": 422,
+      "gap": false
+    },
+    {
+      "name": "admin edit P1",
+      "status": "pass",
+      "detail": "lineup unchanged",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "approve P1",
+      "status": "pass",
+      "detail": "",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "approve P2",
+      "status": "pass",
+      "detail": "",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "approve P3",
+      "status": "pass",
+      "detail": "",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "approve P6",
+      "status": "pass",
+      "detail": "",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "approve P7",
+      "status": "pass",
+      "detail": "",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "return and approve P5",
+      "status": "pass",
+      "detail": "resumed at each desk",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "return and approve P4",
+      "status": "pass",
+      "detail": "resumed at each desk",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "deny P9 at adv1",
+      "status": "pass",
+      "detail": "edit after deny is 422",
+      "http": 422,
+      "gap": false
+    },
+    {
+      "name": "deny P10 at dean1",
+      "status": "pass",
+      "detail": "edit after deny is 422",
+      "http": 422,
+      "gap": false
+    },
+    {
+      "name": "deny P11 at osaar1",
+      "status": "pass",
+      "detail": "edit after deny is 422",
+      "http": 422,
+      "gap": false
+    },
+    {
+      "name": "deny P12 at osaar2",
+      "status": "pass",
+      "detail": "edit after deny is 422",
+      "http": 422,
+      "gap": false
+    },
+    {
+      "name": "deny P13 at cdm1",
+      "status": "pass",
+      "detail": "edit after deny is 422",
+      "http": 422,
+      "gap": false
+    },
+    {
+      "name": "resubmit extra-curricular restarts at adviser",
+      "status": "pass",
+      "detail": "",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "resubmit at OSAAR with a new collaborator",
+      "status": "gap",
+      "detail": "resumed at OSAAR, so the new adviser was skipped",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "final approval blocked by CDM hold",
+      "status": "pass",
+      "detail": "409 at CDM",
+      "http": 409,
+      "gap": false
+    },
+    {
+      "name": "arcus",
+      "status": "skip",
+      "detail": "event date is not today",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "postevals",
+      "status": "skip",
+      "detail": "event date is not today",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "reservation changes on P4",
+      "status": "pass",
+      "detail": "reschedule, deny, cancel",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "finished paper badge",
+      "status": "gap",
+      "detail": "The API stores finished. The student badge maps that status to Pending.",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "student reservation change entry",
+      "status": "gap",
+      "detail": "The suite files reservation changes through the API. No page calls that dialog.",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "stale reservation draft",
+      "status": "gap",
+      "detail": "Choosing no on the start page does not clear reservation picks already stored in the draft.",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "cleanup after",
+      "status": "pass",
+      "detail": "deleted 261, left 0",
+      "http": null,
+      "gap": false
+    }
+  ]
+}

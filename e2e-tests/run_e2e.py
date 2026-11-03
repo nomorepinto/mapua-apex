@@ -2,14 +2,15 @@
 
 `python run_e2e.py bootstrap` creates the test Cognito users once.
 `python run_e2e.py` starts Nest, Vite, and both Arcus apps when they are not already up,
-runs every phase, deletes the DynamoDB items it created, and stops the apps it started.
+runs the Playwright browser suite, deletes the DynamoDB items it created, and stops the apps it started.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import sys
+import os
+import subprocess
 from datetime import date, datetime
 
 from apex_client import ApiError, ApexClient, Cognito
@@ -20,14 +21,24 @@ from cleanup import (
     leftover_count,
     release_test_groups,
     restore_settings,
+    snapshot_settings,
 )
-from config import ACCOUNTS_PATH, ADMIN_FILE, REPORTS_DIR, STATE_DIR, Settings, load_settings
+from config import ACCOUNTS_PATH, ADMIN_FILE, E2E_DIR, REPORTS_DIR, STATE_DIR, Settings, load_settings
 from fixtures import ACCOUNT_KEYS, ORG_KEYS, PLUS_TAG, SHARED_PASSWORD, SIGNATORY_KEYS, STUDENT_KEYS, run_tag
 from manifest import Manifest
-from phases import arcus, cdm, postevals, preflight, reservation_changes, reviews, setup, submissions
-from phases.context import RunContext
+from phases import preflight
 from report import Report, Step
 from servers import StartedServers
+
+PROJECTS = {
+    "setup": "setup",
+    "cdm": "cdm",
+    "submissions": "submissions",
+    "reviews": "reviews",
+    "arcus": "arcus",
+    "postevals": "postevals",
+    "reservation_changes": "reservation-changes",
+}
 
 
 def _read_admin() -> tuple[str, str]:
@@ -103,30 +114,56 @@ def bootstrap(settings: Settings) -> None:
     print(f"Wrote {ACCOUNTS_PATH.name}. Later runs do not prompt.")
 
 
-def _unlink(ctx: RunContext) -> None:
-    admin = ctx.admin
+def _unlink(admin: ApexClient, manifest: Manifest, report: Report) -> None:
     if not admin.token:
         return
-    for signatory_id in ctx.manifest.data.get("created_signatory_ids") or []:
+    for signatory_id in manifest.data.get("created_signatory_ids") or []:
         try:
             admin.request("PUT", f"/admins/signatories/{signatory_id}/account", {"username": None})
         except ApiError:
             continue
-    for org_id in ctx.manifest.data.get("created_org_ids") or []:
+    for org_id in manifest.data.get("created_org_ids") or []:
         try:
             admin.request("PUT", f"/admins/organizations/{org_id}/account", {"username": None})
         except ApiError:
             continue
-    cdm_id = ctx.manifest.data.get("preexisting_cdm_id")
+    cdm_id = manifest.data.get("preexisting_cdm_id")
     if cdm_id:
         try:
             admin.request(
                 "PUT",
                 f"/admins/signatories/{cdm_id}/account",
-                {"username": ctx.manifest.data.get("preexisting_cdm_holder")},
+                {"username": manifest.data.get("preexisting_cdm_holder")},
             )
         except ApiError as error:
-            ctx.report.add(Step("restore cdm holder", "fail", str(error), error.status))
+            report.add(Step("restore cdm holder", "fail", str(error), error.status))
+
+
+def _reload_manifest(manifest: Manifest) -> None:
+    if not manifest.path.is_file():
+        return
+    fresh = json.loads(manifest.path.read_text(encoding="utf-8"))
+    manifest.data.clear()
+    manifest.data.update(fresh)
+
+
+def _playwright(settings: Settings, tag: str, event_date: date, skip_day_of: bool, manifest: Manifest, phase: str | None) -> int:
+    env = os.environ.copy()
+    env["E2E_TAG"] = tag
+    env["E2E_EVENT_DATE"] = event_date.isoformat()
+    env["E2E_SKIP_DAY_OF"] = "1" if skip_day_of else ""
+    env["MANIFEST_PATH"] = str(manifest.path)
+    env["E2E_FRONTEND_BASE"] = settings.frontend_base
+    env["E2E_ATTENDANCE_BASE"] = settings.attendance_base
+    env["E2E_EVALUATION_BASE"] = settings.evaluation_base
+    command = ["npx", "playwright", "test"]
+    if phase:
+        command.extend(["--project", PROJECTS[phase]])
+    if os.name == "nt":
+        completed = subprocess.run(" ".join(command), cwd=E2E_DIR, env=env, shell=True)
+    else:
+        completed = subprocess.run(command, cwd=E2E_DIR, env=env)
+    return completed.returncode
 
 
 def _parse_date(value: str | None) -> tuple[date, bool]:
@@ -163,55 +200,43 @@ def run(args: argparse.Namespace) -> int:
                 return 1
 
     admin = ApexClient(settings, manifest)
-    ctx = RunContext(
-        settings=settings,
-        report=report,
-        manifest=manifest,
-        tag=tag,
-        event_date=event_date,
-        skip_day_of=skip_day_of,
-        admin=admin,
-        accounts=accounts,
-        keep_going=args.keep_going,
-    )
-    ctx.report_dir = REPORTS_DIR / tag
     code = 0
     try:
-        preflight.run(ctx)
+        preflight.run(settings, report, event_date, skip_day_of)
         admin_session = admin.login(accounts["admin"]["email"], accounts["admin"]["password"])
         manifest.add_account(admin_session["sub"], accounts["admin"]["email"])
         for key in SIGNATORY_KEYS + ORG_KEYS + STUDENT_KEYS:
             signed_in = ApexClient(settings, manifest)
             signed_in.login(accounts[key]["email"], accounts[key]["password"], start_session=False)
             manifest.add_account(signed_in.sub, accounts[key]["email"])
-        ctx.clients.clear()
         admin.login(accounts["admin"]["email"], accounts["admin"]["password"])
-        if args.phase in (None, "setup"):
-            setup.run(ctx)
-        if args.phase in (None, "cdm"):
-            cdm.run(ctx)
-        if args.phase in (None, "submissions"):
-            submissions.run(ctx)
-        if args.phase in (None, "reviews"):
-            reviews.run(ctx)
-        if args.phase in (None, "arcus"):
-            arcus.run(ctx)
-        if args.phase in (None, "postevals"):
-            postevals.run(ctx)
-        if args.phase in (None, "reservation_changes"):
-            reservation_changes.run(ctx)
-        if args.ui and args.phase is None:
-            from ui_smoke import run as ui_run
-
-            ui_run(ctx)
-        report.add(Step("finished paper badge", "gap", "The API stores finished. The student badge maps that status to Pending.", gap=True))
-        report.add(Step("student reservation change entry", "gap", "The suite files reservation changes through the API. No page calls that dialog.", gap=True))
-        report.add(Step("stale reservation draft", "gap", "Choosing no on the start page does not clear reservation picks already stored in the draft.", gap=True))
+        snapshot_settings(settings, manifest)
+        browser_code = _playwright(settings, tag, event_date, skip_day_of, manifest, args.phase)
+        _reload_manifest(manifest)
+        if browser_code:
+            report.add(Step("playwright", "fail", f"npx playwright test exited {browser_code}"))
+            code = browser_code
+        else:
+            report.add(Step("playwright", "pass", "browser journeys finished"))
+        report.add(
+            Step(
+                "finished paper badge",
+                "gap",
+                "The API stores finished. The student badge maps that status to Pending.",
+                gap=True,
+            )
+        )
     except SystemExit as exit_error:
         code = int(exit_error.code or 1)
     finally:
+        _reload_manifest(manifest)
         if not args.no_cleanup and admin.token:
-            _unlink(ctx)
+            try:
+                admin.login(accounts["admin"]["email"], accounts["admin"]["password"])
+            except ApiError as error:
+                report.add(Step("refresh admin session", "fail", str(error), error.status))
+                code = code or 1
+            _unlink(admin, manifest, report)
             release_test_groups(
                 settings,
                 [accounts[key]["email"] for key in SIGNATORY_KEYS + ORG_KEYS + STUDENT_KEYS],
@@ -243,8 +268,7 @@ def run(args: argparse.Namespace) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description="APEX and Arcus end-to-end suite")
     parser.add_argument("command", nargs="?", default="run", choices=["run", "bootstrap", "cleanup"])
-    parser.add_argument("--phase", choices=["setup", "cdm", "submissions", "reviews", "arcus", "postevals", "reservation_changes"])
-    parser.add_argument("--ui", action="store_true")
+    parser.add_argument("--phase", choices=list(PROJECTS), help="Run this Playwright project and the projects it depends on.")
     parser.add_argument("--event-date", help="YYYY-MM-DD. A date other than today skips Arcus and post-evals.")
     parser.add_argument("--keep-going", action="store_true")
     parser.add_argument("--no-cleanup", action="store_true")

@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { ApprovalSettingsService } from '../approval-settings/approval-settings.service.js';
+import { CampusRepository } from '../campuses/campus.repository.js';
 import { abort } from '../common/http.js';
 import { stripPrefix } from '../common/dynamo-keys.js';
-import { record, str, type Item } from '../common/records.js';
+import { bool, num, record, str, type Item } from '../common/records.js';
 import { desksOf } from '../organizations/organization.repository.js';
 import { OrganizationRepository } from '../organizations/organization.repository.js';
 import { SignatoryRepository } from '../signatories/signatory.repository.js';
+
+const ONLINE_VENUE = 'Online';
 
 export interface SignatoryStep {
   key: string;
@@ -19,7 +21,7 @@ export class RoutingService {
   constructor(
     private readonly organizations: OrganizationRepository,
     private readonly signatories: SignatoryRepository,
-    private readonly approvalSettings: ApprovalSettingsService,
+    private readonly campuses: CampusRepository,
   ) {}
 
   async sequenceFor(
@@ -28,6 +30,7 @@ export class RoutingService {
     activityType: string,
     hasReservation: boolean,
     osaarStageIds?: string[],
+    hostCampusId?: string,
   ): Promise<SignatoryStep[]> {
     const orgIds = unique([proponentOrgId, ...dependentOrgIds]);
     const orgs = new Map<string, Item>();
@@ -50,7 +53,7 @@ export class RoutingService {
     if (activityType === 'co-curricular') {
       for (const id of orgIds) {
         const org = orgs.get(id) as Item;
-        if (org.is_higher_council === true) {
+        if (org.skip_dean === true) {
           continue;
         }
         steps.push({
@@ -61,12 +64,15 @@ export class RoutingService {
         });
       }
     }
-    const osaarIds =
-      osaarStageIds ?? (await this.approvalSettings.osaarStageIds());
-    if (osaarIds.length === 0) {
+    const resolved =
+      osaarStageIds ?? (await this.osaarIdsForCampus(hostCampusId));
+    const allCampusId = osaarStageIds
+      ? null
+      : (resolved[resolved.length - 1] ?? null);
+    if (resolved.length === 0) {
       abort(422, 'No osaar signatory is configured.');
     }
-    for (const id of osaarIds) {
+    for (const id of resolved) {
       steps.push({
         key: 'osaar',
         role: 'osaar',
@@ -82,7 +88,123 @@ export class RoutingService {
         organization_id: null,
       });
     }
-    return dedupeSteps(steps);
+    return dedupeSteps(steps, allCampusId);
+  }
+
+  /**
+   * Campus that owns a new or edited plan. A room reservation uses that
+   * room's campus. Online uses the main campus unless the paper already
+   * recorded one. A campus venue matches the campus name.
+   */
+  async hostCampusId(input: {
+    venue: string;
+    reservationCampusIds: string[];
+    keepOnlineCampusId?: string | null;
+  }): Promise<string> {
+    const venue = input.venue.trim();
+    const reservationIds = [
+      ...new Set(
+        input.reservationCampusIds
+          .map((id) => stripPrefix(id, 'CAMPUS#') ?? id)
+          .filter((id) => id !== ''),
+      ),
+    ];
+    if (reservationIds.length > 1) {
+      abort(422, 'The venue campus must match the reserved campus.');
+    }
+    if (reservationIds.length === 1) {
+      const reserved = reservationIds[0] as string;
+      const campus = await this.campuses.get(reserved);
+      if (!campus) {
+        abort(422, 'The selected campus does not exist.');
+      }
+      if (venue === ONLINE_VENUE) {
+        abort(422, 'An online event cannot reserve a room.');
+      }
+      const name = str(campus, 'name') ?? '';
+      if (venue !== '' && venue !== name) {
+        abort(422, 'The venue campus must match the reserved campus.');
+      }
+      return reserved;
+    }
+    if (venue === ONLINE_VENUE) {
+      const kept = input.keepOnlineCampusId
+        ? stripPrefix(input.keepOnlineCampusId, 'CAMPUS#')
+        : null;
+      if (kept) {
+        const existing = await this.campuses.get(kept);
+        if (existing) {
+          return kept;
+        }
+      }
+      const main = (await this.campuses.list()).find((item) =>
+        bool(item, 'main'),
+      );
+      const mainId = main ? stripPrefix(main.PK, 'CAMPUS#') : null;
+      if (!mainId) {
+        abort(422, 'No main campus is configured.');
+      }
+      return mainId;
+    }
+    const matches = (await this.campuses.list()).filter(
+      (item) => (str(item, 'name') ?? '') === venue,
+    );
+    if (matches.length !== 1) {
+      abort(422, 'The selected campus does not exist.');
+    }
+    return stripPrefix(matches[0]?.PK, 'CAMPUS#') ?? '';
+  }
+
+  private async osaarIdsForCampus(
+    campusId: string | undefined,
+  ): Promise<string[]> {
+    const bare = campusId ? stripPrefix(campusId, 'CAMPUS#') : null;
+    if (!bare) {
+      abort(422, 'The selected campus does not exist.');
+    }
+    const campus = await this.campuses.get(bare);
+    if (!campus) {
+      abort(422, 'The selected campus does not exist.');
+    }
+    const name = str(campus, 'name') ?? 'this campus';
+    const people = await this.signatories.listByRole('osaar');
+    const campusPeople = people
+      .filter(
+        (person) =>
+          str(person, 'role') === 'osaar' &&
+          !bool(person, 'all_campuses') &&
+          str(person, 'campus_id') === bare,
+      )
+      .sort((left, right) => {
+        const order =
+          (num(left, 'osaar_order') ?? 0) - (num(right, 'osaar_order') ?? 0);
+        if (order !== 0) {
+          return order;
+        }
+        return (str(left, 'PK') ?? '').localeCompare(str(right, 'PK') ?? '');
+      });
+    if (campusPeople.length === 0) {
+      abort(422, `No OSAAR signatory is configured for ${name}.`);
+    }
+    const allCampus = people.filter(
+      (person) =>
+        str(person, 'role') === 'osaar' && bool(person, 'all_campuses'),
+    );
+    if (allCampus.length === 0) {
+      abort(422, 'No all-campus OSAAR signatory is configured.');
+    }
+    if (allCampus.length > 1) {
+      abort(422, 'More than one all-campus OSAAR signatory exists.');
+    }
+    const ids = campusPeople.flatMap((person) => {
+      const id = stripPrefix(person.PK, 'SIGNATORY#');
+      return id ? [id] : [];
+    });
+    const allId = stripPrefix(allCampus[0]?.PK, 'SIGNATORY#');
+    if (!allId) {
+      abort(422, 'No all-campus OSAAR signatory is configured.');
+    }
+    return [...ids, allId];
   }
 
   /**
@@ -265,7 +387,10 @@ function readStoredSteps(submission: Item): SignatoryStep[] | null {
   });
 }
 
-function dedupeSteps(steps: SignatoryStep[]): SignatoryStep[] {
+function dedupeSteps(
+  steps: SignatoryStep[],
+  allCampusId: string | null,
+): SignatoryStep[] {
   const seen = new Set<string>();
   const kept: SignatoryStep[] = [];
   for (const step of steps) {
@@ -279,6 +404,9 @@ function dedupeSteps(steps: SignatoryStep[]): SignatoryStep[] {
   return kept.map((step) => {
     if (step.role !== 'osaar') {
       return step;
+    }
+    if (allCampusId && step.signatory_id === allCampusId) {
+      return { ...step, key: 'osaar_all' };
     }
     osaar += 1;
     return { ...step, key: `osaar_${osaar}` };

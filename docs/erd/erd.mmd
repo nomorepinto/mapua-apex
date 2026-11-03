@@ -6,14 +6,14 @@
 %% DEADLINE REMINDER is intentionally omitted (deprecated: orphaned read path,
 %% no producer). See "DynamoDB Schema.txt" -> Deprecated / removed objects.
 graph TD
-    ORGANIZATION["<b>ORGANIZATION</b><br/>PK = ORGANIZATION#uuid<br/>SK = ORGANIZATION#uuid<br/>------------------<br/>name<br/>is_higher_council<br/>signatories[] : role -&gt; signatory_id"]
+    ORGANIZATION["<b>ORGANIZATION</b><br/>PK = ORGANIZATION#uuid<br/>SK = ORGANIZATION#uuid<br/>------------------<br/>name<br/>skip_dean<br/>skip_post_eval<br/>signatories[] : role -&gt; signatory_id"]
 
     ORG_MEMBER["<b>ORGANIZATION_MEMBER</b><br/>PK = ORGANIZATION#uuid<br/>SK = MEMBER#studentId<br/>------------------<br/>lastname / firstname<br/>student_number<br/>(apex-owned roster)"]
 
     EVENT["<b>EVENT</b><br/>PK = EVENT#uuid<br/>SK = EVENT#uuid<br/>------------------<br/>sent_at<br/>GSI1PK = ORGANIZATION#uuid<br/>GSI1SK = sent_at"]
 
     SUBMISSION["<b>SUBMISSION</b><br/>PK = EVENT#uuid<br/>SK = SUBMISSION#uuid<br/>------------------<br/>submission_type / status<br/>sent_at (latest)<br/>first_submitted_at / source<br/>fully_approved_at<br/>current_signatory<br/>signatory_sequence[]<br/>signatory_steps[]<br/>collaboration.dependent_organization_ids[]<br/>activity_classification<br/>activity_details / proponents[]<br/>detailed_budget_proposal<br/>venue_reservation : reservations[]<br/>booking_refs[]<br/>GSI1PK = ORGANIZATION#uuid<br/>GSI2PK = SIGNATORY#uuid (sparse inbox)"]
-    SETTINGS["<b>APPROVAL SETTINGS</b><br/>PK = SETTINGS#APPROVAL<br/>SK = SETTINGS#APPROVAL<br/>------------------<br/>osaar_stages[]<br/>updated_at"]
+    SETTINGS["<b>OSAAR ON SIGNATORY</b><br/>campus_id<br/>all_campuses<br/>osaar_order<br/>------------------<br/>CAMPUS.main reviews online plans"]
 
     NOTIFICATION["<b>NOTIFICATION</b><br/>PK = SUBMISSION#uuid<br/>SK = NOTIFICATION#timestamp<br/>------------------<br/>signatory<br/>notif_type<br/>comment"]
 

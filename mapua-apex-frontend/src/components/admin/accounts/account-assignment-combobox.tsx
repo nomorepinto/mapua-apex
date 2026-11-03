@@ -75,6 +75,7 @@ export function AccountAssignmentCombobox({
       >
         <ComboboxInput
           aria-label="Assigned account"
+          clearProps={{ "aria-label": "Clear assigned account" }}
           disabled={busy}
           placeholder="Unassigned"
           showClear={selected !== null}

@@ -71,7 +71,7 @@ interface ProponentCardProps {
   proponent: Proponent
   index: number
   canRemove: boolean
-  /** Higher councils have no dean, so the proponent picks a department. */
+  /** Organizations that skip the dean let the proponent pick a department. */
   departmentEditable?: boolean
   departmentValue: string
   /** Name of the applying organization; locks the "Name of Organization" field. */
@@ -300,6 +300,7 @@ export const ProponentCard = memo(function ProponentCard({
               }}
             >
               <SelectTrigger
+                aria-label="Department"
                 className={cn(
                   "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
                   !selectedDeptCode && "saaf-glow-invalid"
@@ -361,6 +362,7 @@ export const ProponentCard = memo(function ProponentCard({
             }}
           >
             <SelectTrigger
+              aria-label="Program"
               className={cn(
                 "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
                 !selectedDeptCode &&
@@ -417,6 +419,7 @@ export const ProponentCard = memo(function ProponentCard({
             }}
           >
             <SelectTrigger
+              aria-label="Year level"
               className={cn(
                 "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
                 !currentYear && "saaf-glow-invalid"

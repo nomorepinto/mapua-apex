@@ -24,6 +24,14 @@ These rules apply across the entire repository (both `mapua-apex-frontend` and `
 - **API routes edited → update the API contract docs.** Whenever you change an API route, controller, request/response shape, status code, or backend data model, update both `API_ROUTES.md` and `DynamoDB Schema.txt` (at the repository root) in the same change. Do not leave them describing the pre-change behavior.
 - **Major change → verify the `docs/` files first, then fix if inaccurate.** After a significant change, check the reference documents under `docs/` (e.g. `docs/erd/objects.md`, `docs/erd/access-patterns.md`, `docs/erd/erd.mmd` and its generated `mapua-apex-data-model.pdf`) against the current code and data model. If they are still accurate, leave them. If they are inaccurate, update them to match reality (and rebuild the PDF via `docs/erd/build_pdf.py` when the ERD changed).
 
+## E2E Suite
+
+- **A feature added or changed must update `e2e-tests` in the same change.** When you add a feature or change behavior a user can see, extend the Playwright spec and page object for that screen under `e2e-tests/tests/` and `e2e-tests/pages/`. The projects run in order: `auth`, `setup`, `cdm`, `submissions`, `reviews`, `arcus`, `postevals`, `reservation-changes`. Assert the visible result (status badge, tracker desk, alert, disabled button). Specs may record ids from responses the page already sends. They do not create or approve through the API.
+- If no current project owns the behavior, add a spec, a project in `e2e-tests/playwright.config.ts` that depends on the projects it needs, and a `--phase` choice in `e2e-tests/run_e2e.py`.
+- Record every DynamoDB item the new steps create on the run manifest, the same way `e2e-tests/support/manifest.ts` records ids from the page response, so cleanup still deletes them.
+- **Run the suite once the feature's own tests pass.** Finish the unit and other tests that belong to the feature first. When those pass, run `python run_e2e.py` from `e2e-tests/` as the final integration test. The feature is not finished while that run is failing: read the Playwright list output and `e2e-tests/reports/<tag>/`, fix the feature or the suite, and run it again.
+- A refactor that does not change observable behavior does not need a suite edit or a suite run.
+
 ## Cloud Scripts (boto3)
 
 - When asked to write a script that utilizes cloud resources through **boto3**, always place the script in the `mapua-apex-frontend/scripts/` folder.

@@ -54,7 +54,8 @@ export function EditSignatoryDialog() {
   const canSave =
     isSignatoryNameValid(state.editName) &&
     state.editRole !== null &&
-    !takenRoles.has(state.editRole)
+    !takenRoles.has(state.editRole) &&
+    (state.editRole !== "osaar" || state.editCampusId !== null)
 
   return (
     <Dialog
@@ -125,6 +126,28 @@ export function EditSignatoryDialog() {
                 </SelectPopup>
               </Select>
             </Field>
+            {state.editRole === "osaar" ? (
+              <Field>
+                <FieldLabel>Campus</FieldLabel>
+                <Select
+                  itemToStringValue={(item) => item.value}
+                  items={state.editCampusItems}
+                  onValueChange={(item) => actions.setEditCampus(item?.value ?? null)}
+                  value={state.selectedEditCampus}
+                >
+                  <SelectTrigger aria-label="Campus">
+                    <SelectValue placeholder="Select campus" />
+                  </SelectTrigger>
+                  <SelectPopup>
+                    {state.editCampusItems.map((item) => (
+                      <SelectItem key={item.value} value={item}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              </Field>
+            ) : null}
             {state.editRole === "dean" ? (
               <DepartmentSelect
                 items={state.editDepartmentItems}

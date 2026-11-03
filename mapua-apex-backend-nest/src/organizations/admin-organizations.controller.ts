@@ -36,7 +36,8 @@ export class AdminOrganizationsController {
   create(@Body() body: OrganizationDto): Promise<OrganizationView> {
     return this.organizations.create(
       body.name,
-      body.is_higher_council,
+      body.skip_dean,
+      body.skip_post_eval,
       body.signatories,
     );
   }
@@ -62,7 +63,8 @@ export class AdminOrganizationsController {
     return this.organizations.update(
       organization,
       body.name,
-      body.is_higher_council,
+      body.skip_dean,
+      body.skip_post_eval,
       body.signatories,
     );
   }

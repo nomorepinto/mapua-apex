@@ -15,3 +15,18 @@ export function CampusesLoadAlert() {
     </Alert>
   )
 }
+
+export function MainCampusAlert() {
+  const { state } = useCampusesPage()
+  if (state.loading || state.loadError || state.hasMain) return null
+
+  return (
+    <Alert variant="warning">
+      <CircleAlertIcon />
+      <AlertTitle>No main campus</AlertTitle>
+      <AlertDescription>
+        Online events cannot be sent until one campus is the main campus.
+      </AlertDescription>
+    </Alert>
+  )
+}

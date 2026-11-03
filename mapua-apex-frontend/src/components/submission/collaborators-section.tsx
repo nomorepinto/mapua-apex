@@ -109,11 +109,10 @@ export function CollaboratorsSection({
       ) : (
         <Select
           multiple
-          aria-label="Collaborating organizations"
           value={selected}
           onValueChange={(next) => handleValueChange(next as string[])}
         >
-          <SelectTrigger>
+          <SelectTrigger aria-label="Collaborating organizations">
             <SelectValue>{renderValue}</SelectValue>
           </SelectTrigger>
           <SelectPopup alignItemWithTrigger={false}>

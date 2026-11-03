@@ -1,6 +1,7 @@
 import { Building2Icon, PencilIcon } from "lucide-react"
 
 import { useCampusesPage } from "@/components/admin/campuses/campuses-context"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -104,7 +105,12 @@ export function CampusesTableCard() {
                       }}
                     >
                       <TableCell className="whitespace-normal">
-                        <div className="font-medium">{campus.name}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{campus.name}</span>
+                          {campus.main ? (
+                            <Badge variant="outline">Main campus</Badge>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button

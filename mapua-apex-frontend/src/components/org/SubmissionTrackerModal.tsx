@@ -46,6 +46,7 @@ interface SubmissionTrackerModalProps {
   onClose: () => void
   eventId?: string | null
   submissionId?: string | null
+  onRequestReservationChange?: () => void
 }
 
 export function SubmissionTrackerModal({
@@ -53,6 +54,7 @@ export function SubmissionTrackerModal({
   onClose,
   eventId,
   submissionId,
+  onRequestReservationChange,
 }: SubmissionTrackerModalProps) {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<"details" | "progress">("details")
@@ -79,7 +81,7 @@ export function SubmissionTrackerModal({
     {
       activityType: detailQuery.data?.activity_classification?.activity_type,
       hasVenue: Boolean(detailQuery.data?.venue_reservation?.has_reservation),
-      isHigherCouncil: Boolean(orgQuery.data?.is_higher_council),
+      skipDean: Boolean(orgQuery.data?.skip_dean),
       orgSignatories: orgQuery.data?.signatories,
       signatorySequence: detailQuery.data?.signatory_sequence,
       signatoryChain: detailQuery.data?.signatory_chain,
@@ -89,6 +91,12 @@ export function SubmissionTrackerModal({
   const canResubmit = detailQuery.data?.status === "returned"
   const isDependent = detailQuery.data?.role === "dependent"
   const isDenied = detailQuery.data?.status === "denied"
+  const canRequestReservationChange = Boolean(
+    onRequestReservationChange &&
+      !isDependent &&
+      detailQuery.data?.status === "approved" &&
+      detailQuery.data?.venue_reservation?.has_reservation
+  )
 
   const returnNotifications = useMemo(() => {
     if (!notificationsQuery.data || notificationsQuery.data.length === 0)
@@ -832,6 +840,15 @@ export function SubmissionTrackerModal({
               className="cursor-pointer bg-[#8B0000] font-bold text-white shadow-xs hover:bg-[#700000]"
             >
               Edit and resubmit
+            </Button>
+          ) : null}
+          {canRequestReservationChange ? (
+            <Button
+              type="button"
+              onClick={onRequestReservationChange}
+              className="bg-[#8B0000] text-white hover:bg-[#700000] font-bold shadow-xs cursor-pointer"
+            >
+              Request a reservation change
             </Button>
           ) : null}
           <Button

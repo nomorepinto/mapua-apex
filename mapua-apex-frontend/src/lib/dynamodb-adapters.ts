@@ -210,10 +210,25 @@ export interface ApiOsaarStage {
   order: number
   signatory_id: string
   signatory_name: string
+  campus_id: string
+  campus_name: string
+}
+
+export interface ApiNamedSignatory {
+  signatory_id: string
+  signatory_name: string
+}
+
+export interface ApiApprovalCampus {
+  campus_id: string
+  campus_name: string
+  osaar_stages: ApiOsaarStage[]
 }
 
 export interface ApiApprovalSettings {
-  osaar_stages: ApiOsaarStage[]
+  campuses: ApiApprovalCampus[]
+  all_campus_signatory: ApiNamedSignatory | null
+  unassigned: ApiNamedSignatory[]
 }
 
 export interface ApiDeadline {
@@ -244,8 +259,11 @@ export interface ApiSignatory {
   signatory_id: string
   name: string
   role: ApiSignatoryRole
-  department?: string
-  organization_id?: string
+  department?: string | null
+  organization_id?: string | null
+  campus_id?: string | null
+  all_campuses?: boolean
+  osaar_order?: number | null
 }
 
 export interface ApiCognitoAccount {
@@ -262,13 +280,15 @@ export interface ApiOrganization {
   organization_id: string
   name: string
   department?: string | null
-  is_higher_council?: boolean
+  skip_dean?: boolean
+  skip_post_eval?: boolean
   signatories?: ApiOrganizationSignatory[]
 }
 
 export type CreateOrganizationPayload = {
   name: string
-  is_higher_council?: boolean
+  skip_dean?: boolean
+  skip_post_eval?: boolean
   signatories: ApiOrganizationSignatory[]
 }
 
@@ -276,6 +296,8 @@ export type CreateSignatoryPayload = {
   name: string
   role: ApiSignatoryRole
   department?: string
+  campus_id?: string
+  all_campuses?: boolean
 }
 
 export interface ApiMember {
@@ -293,13 +315,21 @@ export type CreateMemberPayload = {
 export function buildSignatoryPayload(
   name: string,
   role: ApiSignatoryRole,
-  department?: string | null
+  department?: string | null,
+  campus?: { campusId?: string | null; allCampuses?: boolean } | null
 ): CreateSignatoryPayload {
   const payload: CreateSignatoryPayload = { name, role }
   if (role === "dean") {
     const normalized = department?.trim().toUpperCase()
     if (normalized) {
       payload.department = normalized
+    }
+  }
+  if (role === "osaar") {
+    if (campus?.allCampuses) {
+      payload.all_campuses = true
+    } else if (campus?.campusId) {
+      payload.campus_id = campus.campusId
     }
   }
   return payload
@@ -598,10 +628,10 @@ export function formatDocumentId(id?: string | null, prefix = "SAAF"): string {
 function expectedSignatoryRoles(options?: {
   activityType?: string
   hasVenue?: boolean
-  isHigherCouncil?: boolean
+  skipDean?: boolean
 }): string[] {
   const roles: string[] = ["Adviser"]
-  if (options?.activityType === "co-curricular" && !options?.isHigherCouncil) {
+  if (options?.activityType === "co-curricular" && !options?.skipDean) {
     roles.push("Dean")
   }
   roles.push("OSAAR")
@@ -618,7 +648,7 @@ function expectedSignatoryRoles(options?: {
 function resolveExpectedRoles(options?: {
   activityType?: string
   hasVenue?: boolean
-  isHigherCouncil?: boolean
+  skipDean?: boolean
   orgSignatories?: Array<{
     role?: string
     signatory_id?: string
@@ -635,7 +665,7 @@ function resolveExpectedRoles(options?: {
         index,
         options?.activityType,
         options?.hasVenue,
-        options?.isHigherCouncil
+        options?.skipDean
       )
     )
   }
@@ -655,7 +685,7 @@ export function formatSignatoryRole(
   fallbackIndex?: number,
   activityType?: string,
   hasVenue?: boolean,
-  isHigherCouncil?: boolean
+  skipDean?: boolean
 ): string {
   if (!signatoryIdOrRole || signatoryIdOrRole === "—") return "—"
 
@@ -668,6 +698,7 @@ export function formatSignatoryRole(
   if (raw === "adviser" || raw.includes("adviser") || raw.startsWith("adv"))
     return "Adviser"
   if (raw === "dean" || raw.includes("dean")) return "Dean"
+  if (raw === "osaar_all") return "All-campus OSAAR"
   const osaarStage = /^osaar_(\d+)$/.exec(raw)
   if (osaarStage) return `OSAAR ${osaarStage[1]}`
   if (raw === "osaar" || raw.includes("osaar") || raw === "osa") return "OSAAR"
@@ -701,7 +732,7 @@ export function formatSignatoryRole(
     const expectedRoles = expectedSignatoryRoles({
       activityType,
       hasVenue,
-      isHigherCouncil,
+      skipDean,
     })
     if (fallbackIndex >= 0 && fallbackIndex < expectedRoles.length) {
       return expectedRoles[fallbackIndex]
@@ -1094,7 +1125,7 @@ export function apiNotificationsToStepper(
   options?: {
     activityType?: string
     hasVenue?: boolean
-    isHigherCouncil?: boolean
+    skipDean?: boolean
     orgSignatories?: Array<{
       role?: string
       signatory_id?: string
@@ -1125,7 +1156,7 @@ export function apiNotificationsToStepper(
       index,
       options?.activityType,
       options?.hasVenue,
-      options?.isHigherCouncil
+      options?.skipDean
     )
 
   // Build the ordered steps. With the derived chain each step is keyed by its

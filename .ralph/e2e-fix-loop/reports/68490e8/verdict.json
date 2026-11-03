@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "POST /students/submissions returned 500 because DynamoDB rejected class-validator form objects; the writer now stores those fields as plain maps.",
+  "commit_message": "fixed submission save of validated forms"
+}

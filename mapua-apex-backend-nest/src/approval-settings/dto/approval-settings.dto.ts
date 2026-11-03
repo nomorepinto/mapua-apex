@@ -9,12 +9,17 @@ import {
 } from 'class-validator';
 
 export class UpdateApprovalSettingsDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  campus_id!: string;
+
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(30)
   @ArrayUnique()
   @IsString({ each: true })
   @MinLength(1, { each: true })
   @MaxLength(80, { each: true })
-  osaar_stage_signatory_ids!: string[];
+  signatory_ids!: string[];
 }

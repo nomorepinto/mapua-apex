@@ -317,10 +317,10 @@ export function useUpdateApprovalSettingsMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (signatoryIds: string[]) => {
+    mutationFn: async (input: { campusId: string; signatoryIds: string[] }) => {
       const res = await apiClient.put<{ data: ApiApprovalSettings }>(
         "/admins/approval-settings",
-        { osaar_stage_signatory_ids: signatoryIds }
+        { campus_id: input.campusId, signatory_ids: input.signatoryIds }
       )
       return res.data
     },

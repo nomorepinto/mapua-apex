@@ -5,3 +5,7 @@ reports/
 __pycache__/
 *.pyc
 .venv/
+node_modules/
+test-results/
+playwright-report/
+blob-report/

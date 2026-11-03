@@ -18,7 +18,8 @@ person occupies each approval role for this org.
 | `PK` | string | `ORGANIZATION#uuid` |
 | `SK` | string | `ORGANIZATION#uuid` (same as PK) |
 | `name` | string | Display name |
-| `is_higher_council` | boolean | Default `false`. When true, the Dean step is skipped in routing |
+| `skip_dean` | boolean | Default `false`. When true, the Dean step is skipped in routing |
+| `skip_post_eval` | boolean | Default `false`. When true, the organization cannot file a post-evaluation. Independent of `skip_dean` |
 | `signatories` | list | Desk directory, one person per role: `{ role, signatory_id }` |
 | `signatories[].role` | string | One of `adviser / dean / osaar / cdm / admin` |
 | `signatories[].signatory_id` | string | Plain copy of a SIGNATORY id |
@@ -27,7 +28,8 @@ Allowed desk roles are stored in the order `adviser → dean → osaar → cdm �
 regardless of write order. `admin` may hold a desk but is **not** part of the
 approval sequence. `cdm` is campus-wide: routing uses the single SIGNATORY
 item whose role is `cdm` (`GSI4PK` `ROLE#CDM`), not a per-org desk. OSAAR
-stages are the ordered list on `SETTINGS#APPROVAL` (see below). A per-org
+stages are the OSAAR signatories assigned to the plan's campus, in
+`osaar_order`, then the one signatory with `all_campuses`. A per-org
 `osaar` desk is not used to pick the hop.
 
 ---
@@ -188,6 +190,9 @@ account uses `custom:organization_id` the same way.
 | `name` | string | |
 | `role` | string | `adviser / cdm / dean / osaar / admin` |
 | `department` | string | Deans only (e.g. `SOIT`) |
+| `campus_id` | string | OSAAR only. Bare campus uuid. Many OSAAR accounts may share one campus |
+| `all_campuses` | boolean | OSAAR only. True for the single account that approves every plan. No `campus_id` |
+| `osaar_order` | number | OSAAR only. 1-based order among that campus's accounts |
 | `GSI4PK` | string | `ROLE#ADVISER / ROLE#CDM / ROLE#DEAN / ROLE#DEAN#{DEPARTMENT} / ROLE#OSAAR / ROLE#ADMIN` |
 | `GSI4SK` | string | `SIGNATORY#uuid` |
 
@@ -195,27 +200,17 @@ Other items copy the signatory id rather than join back to SIGNATORY:
 `ORGANIZATION.signatories[].signatory_id`, `SUBMISSION.current_signatory` /
 `GSI2PK`, and `NOTIFICATION.signatory`. Renaming keeps the same uuid; deleting
 a SIGNATORY does not rewrite those copies. CDM stays one person.
-Several OSAAR people are allowed; new proposals take their order from
-APPROVAL SETTINGS.
+Several OSAAR people may share a campus. New proposals take that campus's
+accounts in `osaar_order`, then the all-campus account.
 
 ---
 
 ## APPROVAL SETTINGS
 
-One item. Its `osaar_stages` list is how many OSAAR approvals a **new**
-proposal needs, in that order. Proposals already sent keep the stages
-stored on their own `signatory_steps`.
-
-| Property | Type | Notes |
-|---|---|---|
-| `PK` | string | `SETTINGS#APPROVAL` |
-| `SK` | string | `SETTINGS#APPROVAL` |
-| `osaar_stages` | list | `{ key, signatory_id }`. Keys are `osaar_1`..`n`, rewritten on each save. Each `signatory_id` is `SIGNATORY#uuid` with role `osaar`, all distinct |
-| `updated_at` | timestamp | Last save |
-
-When the item is missing, routing uses the single `ROLE#OSAAR` signatory.
-Zero OSAAR signatories, or more than one with nothing saved, rejects a
-new proposal.
+Legacy item (`PK`/`SK` `SETTINGS#APPROVAL`). Routing no longer reads it.
+OSAAR order is `osaar_order` on each campus OSAAR signatory.
+`PUT /admins/approval-settings` rewrites that order for one campus.
+Proposals already sent keep the stages stored on their own `signatory_steps`.
 
 ---
 
@@ -361,11 +356,13 @@ dropdown read the list.
 | `PK` | string | `CAMPUS#uuid` |
 | `SK` | string | `CAMPUS#uuid` (same as PK) |
 | `name` | string | Display name |
+| `main` | boolean | True for the single campus whose OSAARs review online events. A second `true` is rejected and the flag is not moved |
 | `classroom_name_prefixes` | list | **Optional.** Allowed classroom-name prefix tokens (1–10 letters each, up to 30; normalized uppercase + deduped). Stored only when paired with `classroom_name_digits` |
 | `classroom_name_digits` | number | **Optional.** Required digit count (1–4). With the prefix list it defines how this campus's classroom rooms are named (e.g. `MPO` + 3 → `MPO123`) |
 
 List scans `PK` begins `CAMPUS#` AND `PK = SK`. Delete is guarded: **409** if any
-RESERVABLE still lives under `PK = CAMPUS#id`. Rename in place (PUT) to keep the
+RESERVABLE still lives under `PK = CAMPUS#id`, or if an OSAAR signatory still
+stores this campus id. Rename in place (PUT) to keep the
 same uuid so RESERVABLE children and stored booking `campus_id` snapshots stay
 valid. The classroom format is authored on the osaar `/campus` Add/Edit page; a
 campus without it cannot host classroom rooms.

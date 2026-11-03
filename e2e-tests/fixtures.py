@@ -15,6 +15,7 @@ ACCOUNT_KEYS = [
     "dean2",
     "osaar1",
     "osaar2",
+    "osaarAll",
     "cdm1",
     "orgA",
     "orgB",
@@ -23,7 +24,7 @@ ACCOUNT_KEYS = [
     "stu2",
 ]
 
-SIGNATORY_KEYS = ["adv1", "adv2", "adv3", "dean1", "dean2", "osaar1", "osaar2", "cdm1"]
+SIGNATORY_KEYS = ["adv1", "adv2", "adv3", "dean1", "dean2", "osaar1", "osaar2", "osaarAll", "cdm1"]
 ORG_KEYS = ["orgA", "orgB", "orgC"]
 STUDENT_KEYS = ["stu1", "stu2"]
 

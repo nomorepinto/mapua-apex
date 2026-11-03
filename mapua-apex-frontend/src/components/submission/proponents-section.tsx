@@ -32,9 +32,9 @@ export function ProponentsSection({
   const configuredDepartment = currentOrgQuery.data?.department?.trim() || ""
   const organizationDepartment =
     getDepartmentItem(configuredDepartment)?.code || ""
-  const isHigherCouncil = currentOrgQuery.data?.is_higher_council === true
-  // Higher councils skip the dean, so there is no dean department to lock.
-  const choosesDepartment = isHigherCouncil && organizationDepartment === ""
+  const skipDean = currentOrgQuery.data?.skip_dean === true
+  // Skipping the dean leaves no dean department to lock.
+  const choosesDepartment = skipDean && organizationDepartment === ""
   const departmentIsMissing =
     !currentOrgQuery.isPending &&
     !choosesDepartment &&
@@ -56,8 +56,8 @@ export function ProponentsSection({
         <Alert>
           <AlertTitle>Choose each proponent&apos;s department</AlertTitle>
           <AlertDescription>
-            Higher councils skip the dean, so the department is selected on
-            this form.
+            This organization skips the dean, so the department is selected
+            on this form.
           </AlertDescription>
         </Alert>
       ) : null}

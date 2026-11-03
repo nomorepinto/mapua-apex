@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { PostEvalService } from './posteval.service.js';
 
-describe('PostEvalService higher council', () => {
+describe('PostEvalService skip post-eval', () => {
   const organizations = {
     async get() {
-      return { is_higher_council: true };
+      return { skip_post_eval: true };
     },
   };
   const postevals = {
     async listOrg() {
-      throw new Error('higher councils have no eligible events');
+      throw new Error('skip-post-eval orgs have no eligible events');
     },
     async put() {
-      throw new Error('higher councils cannot file a post-evaluation');
+      throw new Error('skip-post-eval orgs cannot file a post-evaluation');
     },
   };
   const submissions = {
@@ -31,11 +31,11 @@ describe('PostEvalService higher council', () => {
     { postEvaluationWindowDays: () => 3 } as never,
   );
 
-  it('returns no eligible events for a higher council', async () => {
+  it('returns no eligible events when post-eval is skipped', async () => {
     await expect(service.eligible('council')).resolves.toEqual([]);
   });
 
-  it('refuses a post-evaluation filed by a higher council', async () => {
+  it('refuses a post-evaluation when post-eval is skipped', async () => {
     await expect(
       service.create('council', {
         event_id: 'event-1',
@@ -45,7 +45,7 @@ describe('PostEvalService higher council', () => {
       }),
     ).rejects.toMatchObject({
       response: {
-        message: 'Higher council organizations do not file a post-evaluation.',
+        message: 'This organization does not file a post-evaluation.',
       },
     });
   });

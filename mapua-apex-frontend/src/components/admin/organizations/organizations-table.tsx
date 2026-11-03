@@ -101,7 +101,7 @@ export function OrganizationsTableCard() {
               <EmptyTitle>No organizations yet</EmptyTitle>
               <EmptyDescription>
                 Register a CDM account, then assign an adviser. Assign a dean
-                unless the organization is a higher council.
+                unless the organization skips the dean desk.
               </EmptyDescription>
             </EmptyHeader>
             {!state.sharedAccountsReady ? (
@@ -124,7 +124,8 @@ export function OrganizationsTableCard() {
                     <TableHead>Organization</TableHead>
                     <TableHead>Dean</TableHead>
                     <TableHead>Adviser</TableHead>
-                    <TableHead>Higher council</TableHead>
+                    <TableHead>Skip dean</TableHead>
+                    <TableHead>Skip post-eval</TableHead>
                     <TableHead>Account</TableHead>
                     <TableHead className="w-28 text-right">
                       <span className="sr-only">Actions</span>
@@ -134,7 +135,7 @@ export function OrganizationsTableCard() {
                 <TableBody>
                   {state.filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell className="text-muted-foreground" colSpan={6}>
+                      <TableCell className="text-muted-foreground" colSpan={7}>
                         No organizations match “{state.search}”.
                       </TableCell>
                     </TableRow>
@@ -154,7 +155,7 @@ export function OrganizationsTableCard() {
                         {ORGANIZATION_ASSIGNABLE_DESK_ITEMS.map((item) => {
                           const signatoryId = deskAssignment(org, item.value)
                           const deanSkipped =
-                            item.value === "dean" && org.is_higher_council
+                            item.value === "dean" && org.skip_dean
                           return (
                             <TableCell key={item.value}>
                               {deanSkipped ? (
@@ -174,9 +175,8 @@ export function OrganizationsTableCard() {
                             </TableCell>
                           )
                         })}
-                        <TableCell>
-                          {org.is_higher_council ? "Yes" : "—"}
-                        </TableCell>
+                        <TableCell>{org.skip_dean ? "Yes" : "—"}</TableCell>
+                        <TableCell>{org.skip_post_eval ? "Yes" : "—"}</TableCell>
                         <TableCell
                           onContextMenu={(event) => event.stopPropagation()}
                         >

@@ -21,7 +21,8 @@ export interface OrganizationView {
   organization_id: string;
   name: string;
   department: string | null;
-  is_higher_council: boolean;
+  skip_dean: boolean;
+  skip_post_eval: boolean;
   signatories: Desk[];
 }
 
@@ -70,14 +71,16 @@ export class OrganizationService {
 
   async create(
     name: string,
-    higherCouncil: boolean | undefined,
+    skipDean: boolean | undefined,
+    skipPostEval: boolean | undefined,
     desks: DeskDto[] | undefined,
   ): Promise<OrganizationView> {
     const ordered = await this.checkedDesks(desks ?? []);
     const item = await this.organizations.create(
       name,
       ordered,
-      higherCouncil === true,
+      skipDean === true,
+      skipPostEval === true,
     );
     return this.toView(item, null);
   }
@@ -85,7 +88,8 @@ export class OrganizationService {
   async update(
     id: string,
     name: string,
-    higherCouncil: boolean | undefined,
+    skipDean: boolean | undefined,
+    skipPostEval: boolean | undefined,
     desks: DeskDto[],
   ): Promise<OrganizationView> {
     const existing = await this.organizations.get(id);
@@ -93,11 +97,19 @@ export class OrganizationService {
       throw new NotFoundException('Not Found');
     }
     const ordered = await this.checkedDesks(desks);
-    const keepHigher =
-      higherCouncil === undefined
-        ? existing.is_higher_council === true
-        : higherCouncil;
-    const item = await this.organizations.update(id, name, ordered, keepHigher);
+    const keepSkipDean =
+      skipDean === undefined ? existing.skip_dean === true : skipDean;
+    const keepSkipPostEval =
+      skipPostEval === undefined
+        ? existing.skip_post_eval === true
+        : skipPostEval;
+    const item = await this.organizations.update(
+      id,
+      name,
+      ordered,
+      keepSkipDean,
+      keepSkipPostEval,
+    );
     return this.toView({ ...existing, ...item }, null);
   }
 
@@ -217,7 +229,8 @@ export class OrganizationService {
         '',
       name: str(item, 'name') ?? '',
       department,
-      is_higher_council: item.is_higher_council === true,
+      skip_dean: item.skip_dean === true,
+      skip_post_eval: item.skip_post_eval === true,
       signatories: desksOf(item),
     };
   }

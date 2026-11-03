@@ -48,6 +48,7 @@ function ActualAmountInput({
         type="text"
         inputMode="decimal"
         name={name}
+        aria-label="Actual amount"
         maxLength={POST_EVAL_AMOUNT_MAX_DIGITS}
         value={value}
         placeholder="0"

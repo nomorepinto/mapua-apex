@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsIn,
   IsOptional,
   IsString,
@@ -21,4 +22,17 @@ export class SignatoryDto {
   @IsString()
   @MaxLength(32)
   department?: string | null;
+
+  /** Required for an OSAAR account that belongs to one campus. */
+  @ValidateIf((body: SignatoryDto) => body.role === 'osaar')
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  campus_id?: string | null;
+
+  /** The single OSAAR account that approves every campus. */
+  @ValidateIf((body: SignatoryDto) => body.role === 'osaar')
+  @IsOptional()
+  @IsBoolean()
+  all_campuses?: boolean;
 }
