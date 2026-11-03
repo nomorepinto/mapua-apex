@@ -127,3 +127,26 @@ Assigning the named people is still a data step, not more code.
 
 **Goal:** Show field errors while the user is still filling in the form, not
 only after they submit or leave the page.
+
+## 11. e2e-tests coverage for the Reports & Export restructure
+
+**Status:** Deferred — not wired into the `e2e-tests/` suite yet.
+
+**Goal:** Per the AGENTS.md "E2E Suite" rule (added on `origin/master`), the
+user-visible reporting restructure should be covered by the `e2e-tests/`
+Playwright suite: date range + PDF/CSV export moved to the gated
+`/admin/reports` and `/osaar/reports` pages (`REPORT_EXPORT_GROUPS` = admin,
+super_admin, osaar); in-place log/history filters and record timelines made
+filter-only; report endpoints gated to `report_admin` (sessions stay
+`session_admin`); student/signatory report endpoints removed.
+
+**Notes:**
+- No current `e2e-tests` project owns reports/monitor behavior, so this needs a
+  new spec under `e2e-tests/tests/`, a page object under `e2e-tests/pages/`, a
+  project in `e2e-tests/playwright.config.ts` that depends on the projects it
+  needs, and a `--phase` choice in `e2e-tests/run_e2e.py`.
+- Already covered elsewhere: `mapua-apex-frontend/scripts/report-browser.test.mjs`
+  (Playwright harness) and backend `test/reports.e2e-spec.ts` (17 tests, green).
+- Running the suite needs `npm ci` + `playwright install` inside `e2e-tests/`,
+  live backend + frontend servers, and Cognito test users — deferred until that
+  environment is available.
