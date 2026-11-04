@@ -51,6 +51,8 @@ export function useSaafForm() {
   const fetcher = useFetcher<SubmissionActionData>()
   const reserveFacilities = useOrgStore((state) => state.reserveFacilities)
   const includeReservation = reserveFacilities === "yes"
+  const withBudget = useOrgStore((state) => state.withBudget)
+  const includeBudget = withBudget === "yes"
   useHydrateEditingSubmission()
   const isSubmitting =
     navigation.state === "submitting" || fetcher.state === "submitting"
@@ -299,13 +301,15 @@ export function useSaafForm() {
   )
 
   // Proposed Budget is locked to the itemized Detailed Budget grand total so the
-  // summary figure can never disagree with the line items entered later.
+  // summary figure can never disagree with the line items entered later. A
+  // no-budget activity has no line items, so the field stays at its "0.00" default.
   useEffect(() => {
+    if (!includeBudget) return
     const next = grandTotal.toFixed(2)
     if ((useOrgStore.getState().saafDraft?.proposedBudget ?? "") !== next) {
       useOrgStore.getState().patchSaafDraft({ proposedBudget: next })
     }
-  }, [grandTotal])
+  }, [grandTotal, includeBudget])
 
   const revealInvalidFields = useCallback(
     (root: ParentNode) => {
@@ -340,7 +344,8 @@ export function useSaafForm() {
       const issues = getSaafStepIssues(
         step as SaafStepIndex,
         draft,
-        includeReservation
+        includeReservation,
+        includeBudget
       )
 
       // The reservation page additionally owns the catalog picks, which live in
@@ -366,7 +371,7 @@ export function useSaafForm() {
       setShowErrors(false)
       return true
     },
-    [draft, includeReservation, revealInvalidFields, setShowErrors]
+    [draft, includeReservation, includeBudget, revealInvalidFields, setShowErrors]
   )
 
   // Validates standard HTML5 constraints and specific custom form rules
@@ -379,7 +384,7 @@ export function useSaafForm() {
         ? ([0, 1, 2, 3, 4] as const)
         : ([0, 1, 2, 3] as const)
       const issues = steps.flatMap((step) =>
-        getSaafStepIssues(step, draft, includeReservation)
+        getSaafStepIssues(step, draft, includeReservation, includeBudget)
       )
 
       // When the wizard includes the reservation step, it must hold at least one
@@ -406,7 +411,7 @@ export function useSaafForm() {
       setShowErrors(false)
       return true
     },
-    [draft, includeReservation, revealInvalidFields, setShowErrors]
+    [draft, includeReservation, includeBudget, revealInvalidFields, setShowErrors]
   )
 
   const handleClearForm = useCallback(() => {
@@ -461,7 +466,8 @@ export function useSaafForm() {
         saafAllGibberishFields(
           draft,
           includeReservation,
-          withReservationDefaults(useOrgStore.getState().reservationDraft)
+          withReservationDefaults(useOrgStore.getState().reservationDraft),
+          includeBudget
         )
       )
       if (flagged.length > 0) {
@@ -476,7 +482,7 @@ export function useSaafForm() {
       setShowConfirmModal(true)
       return true
     },
-    [draft, includeReservation, validateForm]
+    [draft, includeReservation, includeBudget, validateForm]
   )
 
   const handleConfirmProceed = useCallback(
@@ -490,12 +496,15 @@ export function useSaafForm() {
   const handleSavePdf = useCallback(() => {
     void saveProposalPdf({
       ...draft,
+      // A no-budget draft must not leak stale line items into the PDF.
+      hasBudget: includeBudget,
+      budgetItems: includeBudget ? draft.budgetItems : [],
       proponents: draft.proponents.map((p) => ({
         ...p,
         department: draft.departmentValues[p.id] || p.department,
       })),
     })
-  }, [draft])
+  }, [draft, includeBudget])
 
   return {
     draft,
@@ -509,6 +518,7 @@ export function useSaafForm() {
     submitError,
     grandTotal,
     reserveFacilities,
+    includeBudget,
     updateField,
     handleAddProponent,
     handleRemoveProponent,

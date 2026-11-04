@@ -109,6 +109,7 @@ export const REPORT_DEFINITIONS: Record<ReportKind, ReportDefinition> = {
       type: 'Activity type',
       department: 'Proponent department',
       has_reservation: 'Has reservation',
+      has_budget: 'Has budget',
       collaboration_role: 'Collaboration role',
     },
     columns: {
@@ -121,6 +122,7 @@ export const REPORT_DEFINITIONS: Record<ReportKind, ReportDefinition> = {
       latest_submitted_at: 'Latest submitted (Manila)',
       event_date: 'Event date',
       has_reservation: 'Has reservation',
+      has_budget: 'Has budget',
       collaboration_role: 'Collaboration role',
       proposed_budget: 'Proposed budget (PHP)',
       planned_participants: 'Planned participant places',
@@ -196,6 +198,7 @@ const ENUM_FILTERS: Partial<Record<ReportKind, Record<string, string[]>>> = {
     ],
     type: ['co-curricular', 'extra-curricular'],
     has_reservation: ['true', 'false'],
+    has_budget: ['true', 'false'],
     collaboration_role: ['proponent', 'dependent'],
   },
   postevals: { status: ['submitted', 'approved', 'denied'] },
@@ -418,6 +421,8 @@ export function reportRow(kind: ReportKind, item: Item): ReportRow {
     const details = record(item.activity_details) ?? {};
     const classification = record(item.activity_classification) ?? {};
     const venue = record(item.venue_reservation) ?? {};
+    // Legacy papers carry no `has_budget` key, which means they had a budget.
+    const budget = record(item.detailed_budget_proposal) ?? {};
     const proponents = Array.isArray(item.proponents) ? item.proponents : [];
     const first = record(proponents[0]) ?? {};
     const collaboration = record(item.collaboration) ?? {};
@@ -441,6 +446,7 @@ export function reportRow(kind: ReportKind, item: Item): ReportRow {
       event_end:
         text(details, 'end_date_of_event') || text(details, 'date_of_event'),
       has_reservation: venue.has_reservation === true,
+      has_budget: budget.has_budget !== false,
       collaboration_role: text(item, 'role') || 'proponent',
       collaborative: dependentIds.length > 0,
       collaboration_ids: JSON.stringify(
@@ -455,7 +461,12 @@ export function reportRow(kind: ReportKind, item: Item): ReportRow {
             ].filter(Boolean)
           : [],
       ),
-      proposed_budget: numberCell(details.proposed_budget),
+      // A no-budget row stores 0 but is "no budget", not a ₱0 spend, so it is
+      // excluded from the budget samples.
+      proposed_budget:
+        budget.has_budget === false
+          ? null
+          : numberCell(details.proposed_budget),
       planned_participants: numberCell(details.expected_participants),
       duration_minutes: ['recorded', 'linked_creation_evidence'].includes(
         text(item, 'first_submitted_at_source'),

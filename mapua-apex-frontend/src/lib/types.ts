@@ -90,6 +90,11 @@ export interface BudgetItem {
 }
 
 export interface DetailedBudgetProposal {
+  /**
+   * False when the activity operates without a budget (absent on items filed
+   * before the flag existed — read as true). Mirrors `has_reservation`.
+   */
+  has_budget?: boolean
   items: BudgetItem[]
   grand_total: number
 }

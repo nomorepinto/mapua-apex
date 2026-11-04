@@ -11,7 +11,7 @@ import {
 } from '../common/dynamo-keys.js';
 import { abort } from '../common/http.js';
 import { eventWindow } from '../common/manila.js';
-import { record, str, type Item } from '../common/records.js';
+import { list, record, str, type Item } from '../common/records.js';
 import { OrganizationRepository } from '../organizations/organization.repository.js';
 import { SubmissionRepository } from '../submissions/submission.repository.js';
 import {
@@ -149,6 +149,19 @@ export class PostEvalService {
     const status = str(submission, 'status');
     if (status !== 'approved' && status !== 'finished') {
       abort(422, 'A post-evaluation can only be filed for an approved event.');
+    }
+    // A submission filed without a budget has no financial report to file.
+    if (submissionHasNoBudget(submission)) {
+      const report = record(body.financial_report) ?? {};
+      if (
+        list(report, 'budget_items').length > 0 ||
+        list(report, 'added_items').length > 0
+      ) {
+        abort(
+          422,
+          'This activity was filed without a budget, so it has no financial report.',
+        );
+      }
     }
     const date = str(
       record(submission.activity_details) ?? {},
@@ -322,6 +335,11 @@ export class PostEvalService {
       participation_snapshot: item.participation_snapshot ?? null,
     };
   }
+}
+
+/** `has_budget: false` on the stored proposal; a missing key means a legacy paper with a budget. */
+function submissionHasNoBudget(submission: Item): boolean {
+  return record(submission.detailed_budget_proposal)?.has_budget === false;
 }
 
 function effectiveDate(submission: Item): string | null {

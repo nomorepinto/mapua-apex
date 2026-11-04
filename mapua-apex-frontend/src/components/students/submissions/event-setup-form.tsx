@@ -19,6 +19,11 @@ const FACILITY_ITEMS: { label: string; value: "yes" | "no" }[] = [
   { label: "No, do not reserve facilities", value: "no" },
 ]
 
+const BUDGET_ITEMS: { label: string; value: "yes" | "no" }[] = [
+  { label: "Yes, we will operate with a budget", value: "yes" },
+  { label: "No, this activity has no budget", value: "no" },
+]
+
 export function EventSetupForm() {
   const { state, actions } = useSubmissionsStart()
   const eventNameGibberish = useGibberishField(state.eventName)
@@ -27,7 +32,7 @@ export function EventSetupForm() {
     <div id="submission-start-form" className={cn(layout.stack, "w-full")}>
       <FormPageHeader
         title="Create your Activity Proposal"
-        subtitle="Academic Term: 2026 - 2027 • Enter your event title and facility reservation preference"
+        subtitle="Academic Term: 2026 - 2027 • Enter your event title, facility reservation, and budget preference"
       />
 
       <form
@@ -98,6 +103,43 @@ export function EventSetupForm() {
             </SelectTrigger>
             <SelectPopup className="bg-white text-neutral-900">
               {FACILITY_ITEMS.map((item) => (
+                <SelectItem
+                  key={item.value}
+                  value={item}
+                  className="text-neutral-900 data-highlighted:bg-neutral-100 data-highlighted:text-neutral-900"
+                >
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        </Field>
+
+        <Field className="w-full">
+          <FieldLabel htmlFor="withBudget">
+            Will you be operating with a budget? <span className="text-red-500">*</span>
+          </FieldLabel>
+          <Select
+            items={BUDGET_ITEMS}
+            itemToStringValue={(item) => item.value}
+            name="withBudget"
+            value={
+              BUDGET_ITEMS.find(
+                (item) => item.value === state.withBudget
+              ) ?? null
+            }
+            onValueChange={(item) =>
+              actions.changeWithBudget(item?.value ?? "")
+            }
+          >
+            <SelectTrigger
+              id="withBudget"
+              className="w-full border-neutral-200 bg-white text-neutral-900"
+            >
+              <SelectValue placeholder="Select an option" />
+            </SelectTrigger>
+            <SelectPopup className="bg-white text-neutral-900">
+              {BUDGET_ITEMS.map((item) => (
                 <SelectItem
                   key={item.value}
                   value={item}

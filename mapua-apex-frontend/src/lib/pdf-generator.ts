@@ -42,6 +42,8 @@ export interface SAAFPdfData {
         quantity?: string | number
         pricePerUnit?: string | number
     }>
+    /** When false the money lines and budget table are omitted from the PDF. */
+    hasBudget?: boolean
 }
 
 export interface ReservationPdfData {
@@ -129,8 +131,12 @@ export function generateProposalPdf(
             ["Venue", saafData.activityVenue || "N/A"],
             ["Date / Day / Time", `${saafData.dateOfEvent || ""} (${saafData.dayOfEvent || ""}) at ${saafData.timeOfEvent || ""}`],
             ["Expected Participants", String(saafData.expectedParticipants || "0")],
-            ["Individual Contribution", `PHP ${Number(saafData.individualContribution || 0).toFixed(2)}`],
-            ["Proposed Budget", `PHP ${Number(saafData.proposedBudget || 0).toFixed(2)}`],
+            ...(saafData.hasBudget === false
+                ? []
+                : ([
+                    ["Individual Contribution", `PHP ${Number(saafData.individualContribution || 0).toFixed(2)}`],
+                    ["Proposed Budget", `PHP ${Number(saafData.proposedBudget || 0).toFixed(2)}`],
+                ] as string[][])),
         ],
     })
 
@@ -157,31 +163,33 @@ export function generateProposalPdf(
 
     y = (doc as any).lastAutoTable.finalY + 4
 
-    // Budget Table
-    let grandTotal = 0
-    const budgetRows = (saafData.budgetItems || []).map((b) => {
-        const qty = Number(b.quantity) || 0
-        const price = Number(b.pricePerUnit) || 0
-        const total = qty * price
-        grandTotal += total
-        return [
-            String(b.item || ""),
-            String(b.unit || "pc"),
-            String(qty),
-            `PHP ${price.toFixed(2)}`,
-            `PHP ${total.toFixed(2)}`,
-        ]
-    })
+    // Budget Table (skipped for a no-budget activity)
+    if (saafData.hasBudget !== false) {
+        let grandTotal = 0
+        const budgetRows = (saafData.budgetItems || []).map((b) => {
+            const qty = Number(b.quantity) || 0
+            const price = Number(b.pricePerUnit) || 0
+            const total = qty * price
+            grandTotal += total
+            return [
+                String(b.item || ""),
+                String(b.unit || "pc"),
+                String(qty),
+                `PHP ${price.toFixed(2)}`,
+                `PHP ${total.toFixed(2)}`,
+            ]
+        })
 
-    budgetRows.push(["Grand Total", "", "", "", `PHP ${grandTotal.toFixed(2)}`])
+        budgetRows.push(["Grand Total", "", "", "", `PHP ${grandTotal.toFixed(2)}`])
 
-    autoTable(doc, {
-        startY: y,
-        head: [["Item", "Unit", "Qty", "Price per Unit", "Total"]],
-        headStyles: { fillColor: [60, 60, 60], textColor: [255, 255, 255], fontSize: 8 },
-        styles: { fontSize: 7.5, cellPadding: 1.5 },
-        body: budgetRows,
-    })
+        autoTable(doc, {
+            startY: y,
+            head: [["Item", "Unit", "Qty", "Price per Unit", "Total"]],
+            headStyles: { fillColor: [60, 60, 60], textColor: [255, 255, 255], fontSize: 8 },
+            styles: { fontSize: 7.5, cellPadding: 1.5 },
+            body: budgetRows,
+        })
+    }
 
     // ================= PAGE 2: RESERVATION (IF APPLICABLE) =================
     if (reservationData) {

@@ -363,6 +363,7 @@ export function useReservationForm() {
 
   const handleSavePdf = useCallback(() => {
     const saafDraft = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
+    const withBudget = useOrgStore.getState().withBudget
     const current = withReservationDefaults(
       useOrgStore.getState().reservationDraft ?? DEFAULT_RESERVATION_DRAFT
     )
@@ -389,6 +390,7 @@ export function useReservationForm() {
         sdgExplanation: saafDraft.sdgExplanation,
         proponents: saafDraft.proponents || [],
         budgetItems: saafDraft.budgetItems || [],
+        hasBudget: withBudget !== "no",
       },
       reservationDraftToPdfData(current)
     )

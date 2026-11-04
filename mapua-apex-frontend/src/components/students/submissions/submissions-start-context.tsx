@@ -14,6 +14,7 @@ import { useOrgStore } from "@/stores/org-store"
 interface SubmissionsStartState {
   eventName: string
   reserveFacilities: "yes" | "no" | ""
+  withBudget: "yes" | "no" | ""
   error: string | null
   guideOpen: boolean
 }
@@ -21,6 +22,7 @@ interface SubmissionsStartState {
 interface SubmissionsStartActions {
   changeEventName: (value: string) => void
   changeReserveFacilities: (value: "yes" | "no" | "") => void
+  changeWithBudget: (value: "yes" | "no" | "") => void
   submit: (event: FormEvent) => void
   setGuideOpen: (open: boolean) => void
 }
@@ -47,15 +49,19 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
   const navigate = useNavigate()
   const savedName = useOrgStore((state) => state.eventName)
   const savedChoice = useOrgStore((state) => state.reserveFacilities)
+  const savedBudget = useOrgStore((state) => state.withBudget)
   const [eventName, setEventName] = useState(savedName)
   const [reserveFacilities, setReserveFacilities] = useState<"yes" | "no" | "">(
     savedChoice ?? ""
+  )
+  const [withBudget, setWithBudget] = useState<"yes" | "no" | "">(
+    savedBudget ?? ""
   )
   const [error, setError] = useState<string | null>(null)
   const [guideOpen, setGuideOpen] = useState(false)
 
   const value: SubmissionsStartContextValue = {
-    state: { eventName, reserveFacilities, error, guideOpen },
+    state: { eventName, reserveFacilities, withBudget, error, guideOpen },
     actions: {
       changeEventName: (next) => {
         setEventName(next)
@@ -63,6 +69,10 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
       },
       changeReserveFacilities: (next) => {
         setReserveFacilities(next)
+        setError(null)
+      },
+      changeWithBudget: (next) => {
+        setWithBudget(next)
         setError(null)
       },
       setGuideOpen,
@@ -86,6 +96,10 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
           setError("Choose whether you will reserve school facilities.")
           return
         }
+        if (withBudget !== "yes" && withBudget !== "no") {
+          setError("Choose whether you will operate with a budget.")
+          return
+        }
 
         const existingDraft = useOrgStore.getState().saafDraft
         const wasEditing = Boolean(useOrgStore.getState().editingEventId)
@@ -94,7 +108,7 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
           useOrgStore.getState().clearSaafDraft()
           useOrgStore.getState().clearReservationDraft()
         }
-        useOrgStore.getState().setSubmissionStart(name, reserveFacilities)
+        useOrgStore.getState().setSubmissionStart(name, reserveFacilities, withBudget)
         useOrgStore.getState().setSaafDraft({
           ...DEFAULT_SAAF_DRAFT,
           ...(wasEditing ? {} : (existingDraft ?? {})),

@@ -85,6 +85,7 @@ export function SaafActivityStep() {
         values={state.draft}
         onChange={actions.updateField}
         includeReservation={state.includeReservation}
+        includeBudget={state.includeBudget}
         fallbackTitle={eventName}
       />
     </SaafStepPanel>
@@ -102,13 +103,16 @@ export function SaafAlignmentStep() {
         values={state.draft}
         onChange={actions.updateField}
       />
-      <BudgetProposalSection
-        items={state.draft.budgetItems}
-        grandTotal={state.grandTotal}
-        onUpdate={actions.handleUpdateBudgetItem}
-        onRemove={actions.handleRemoveBudgetItem}
-        onAdd={actions.handleAddBudgetItem}
-      />
+      {/* A no-budget activity never shows the line-item table. */}
+      {state.includeBudget && (
+        <BudgetProposalSection
+          items={state.draft.budgetItems}
+          grandTotal={state.grandTotal}
+          onUpdate={actions.handleUpdateBudgetItem}
+          onRemove={actions.handleRemoveBudgetItem}
+          onAdd={actions.handleAddBudgetItem}
+        />
+      )}
     </SaafStepPanel>
   )
 }

@@ -29,6 +29,8 @@ export function PostEvalSummaryStep() {
 // STEP 2: Financial Report (Index 1)
 export function PostEvalFinancialStep() {
   const { state, actions } = usePostEvalFormContext()
+  // A no-budget submission never shows the financial page.
+  if (!state.includeFinancial) return null
 
   return (
     <PostEvalStepPanel index={1}>

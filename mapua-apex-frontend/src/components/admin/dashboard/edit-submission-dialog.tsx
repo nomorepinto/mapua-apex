@@ -54,6 +54,7 @@ import {
   apiSubmissionToDrafts,
   buildSaafApiPayload,
   omitEventIdFromPayload,
+  submissionHasBudget,
   submissionOrganizationId,
   type ApiSubmission,
 } from "@/lib/dynamodb-adapters"
@@ -91,13 +92,14 @@ function budgetIssues(items: BudgetItem[]): string[] {
 function editIssues(
   draft: SaafDraft,
   originalStart: string,
-  hasReservation: boolean
+  hasReservation: boolean,
+  includeBudget = true
 ): string[] {
   const steps: SaafStepIndex[] = hasReservation
     ? [0, 1, 2, 3, 4]
     : [0, 1, 2, 3]
   const fieldIssues = steps.flatMap((step) =>
-    getSaafStepIssues(step, draft, hasReservation)
+    getSaafStepIssues(step, draft, hasReservation, includeBudget)
   )
   const kept = fieldIssues.filter((issue) => {
     if (
@@ -113,14 +115,19 @@ function editIssues(
       issue
     )
   })
-  return [...kept, ...budgetIssues(draft.budgetItems)]
+  // A no-budget paper carries no line items, so the budget table is not checked.
+  return [
+    ...kept,
+    ...(includeBudget ? budgetIssues(draft.budgetItems) : []),
+  ]
 }
 
 function visibleWarnings(
   draft: SaafDraft,
-  originalStart: string
+  originalStart: string,
+  includeBudget = true
 ): Record<string, string> {
-  const warnings = { ...saafFieldWarnings(draft) }
+  const warnings = { ...saafFieldWarnings(draft, includeBudget) }
   if (
     draft.dateOfEvent === originalStart &&
     warnings.dateOfEvent === EVENT_DATE_TOO_SOON_MESSAGE
@@ -172,6 +179,9 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
   const [formError, setFormError] = useState("")
 
   const hasReservation = Boolean(submission.venue_reservation?.has_reservation)
+  // A no-budget paper keeps its answer: the money fields stay hidden and the
+  // stored zeros are re-sent instead of the stale draft figures.
+  const hasBudget = submissionHasBudget(submission)
   const originalStart = submission.activity_details?.date_of_event || ""
   const organizationId = submissionOrganizationId(submission)
   const organizationName =
@@ -179,9 +189,11 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
       ? submission.organization_name
       : draft.proponents[0]?.orgOrCourseSection || ""
   const issues = showErrors
-    ? editIssues(draft, originalStart, hasReservation)
+    ? editIssues(draft, originalStart, hasReservation, hasBudget)
     : []
-  const warnings = showErrors ? visibleWarnings(draft, originalStart) : {}
+  const warnings = showErrors
+    ? visibleWarnings(draft, originalStart, hasBudget)
+    : {}
 
   const venueNames = useMemo(() => {
     const names = (campusesQuery.data ?? []).map((campus) => campus.name)
@@ -255,13 +267,13 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setShowErrors(true)
-    const nextIssues = editIssues(draft, originalStart, hasReservation)
+    const nextIssues = editIssues(draft, originalStart, hasReservation, hasBudget)
     if (nextIssues.length > 0) {
       setFormError(nextIssues[0] ?? "Fix the highlighted fields.")
       return
     }
     const flagged = await checkGibberishFields(
-      saafAllGibberishFields(draft, false)
+      saafAllGibberishFields(draft, false, null, hasBudget)
     )
     if (flagged.length > 0) {
       setFormError(
@@ -273,7 +285,9 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
       await updateSubmission.mutateAsync({
         eventId: submission.event_id,
         submissionId: submission.submission_id,
-        payload: omitEventIdFromPayload(buildSaafApiPayload(draft)),
+        payload: omitEventIdFromPayload(
+          buildSaafApiPayload(draft, null, undefined, hasBudget)
+        ),
       })
       toastManager.add({
         title: "Submission updated",
@@ -360,6 +374,7 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
               values={draft}
               onChange={updateField}
               lockSchedule={hasReservation}
+              includeBudget={hasBudget}
               titleEditable
               venueNames={venueNames}
             />
@@ -369,7 +384,8 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
               onChange={updateField}
             />
 
-            <BudgetProposalSection
+            {hasBudget && (
+              <BudgetProposalSection
               items={draft.budgetItems}
               grandTotal={budgetTotal(draft.budgetItems)}
               onUpdate={(id, field, value) =>
@@ -395,6 +411,7 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
                 ])
               }
             />
+            )}
           </div>
         </FieldWarnings>
       </DialogPanel>

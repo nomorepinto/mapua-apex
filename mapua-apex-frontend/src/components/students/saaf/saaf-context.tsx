@@ -49,6 +49,7 @@ interface SaafFormState {
   farthestStep: WizardStepIndex
   finalStep: WizardStepIndex
   includeReservation: boolean
+  includeBudget: boolean
   showErrors: boolean
   touched: Record<string, boolean>
   stepIssues: string[]
@@ -103,7 +104,8 @@ function earnedStepFromDraft(
   draft: SaafDraft,
   finalStep: WizardStepIndex,
   includeReservation: boolean,
-  reservationDraft: any
+  reservationDraft: any,
+  includeBudget: boolean = true
 ): WizardStepIndex {
   let earned: WizardStepIndex = 0
   const stepsToCheck = includeReservation
@@ -118,13 +120,18 @@ function earnedStepFromDraft(
           draft.activityVenue,
           draft.expectedParticipants
         ) ||
-        !isSaafStepComplete(2, draft, true)
+        !isSaafStepComplete(2, draft, true, includeBudget)
       ) {
         break
       }
     } else {
       if (
-        !isSaafStepComplete(index as SaafStepIndex, draft, includeReservation)
+        !isSaafStepComplete(
+          index as SaafStepIndex,
+          draft,
+          includeReservation,
+          includeBudget
+        )
       ) {
         break
       }
@@ -156,6 +163,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const includeReservation = form.reserveFacilities === "yes"
+  const includeBudget = form.includeBudget
   const finalStep: WizardStepIndex = includeReservation ? 4 : 3
   const storedReservationDraft = useOrgStore((state) => state.reservationDraft)
   const reservationDraft = withReservationDefaults(storedReservationDraft)
@@ -169,7 +177,8 @@ export function SaafProvider({ children }: { children: ReactNode }) {
         draft,
         finalStep,
         includeReservation,
-        reservationDraft
+        reservationDraft,
+        includeBudget
       )
     ),
     finalStep
@@ -185,7 +194,8 @@ export function SaafProvider({ children }: { children: ReactNode }) {
     const issues = getSaafStepIssues(
       targetStep as SaafStepIndex,
       draft,
-      includeReservation
+      includeReservation,
+      includeBudget
     )
     if (includeReservation && targetStep === 2) {
       issues.push(
@@ -205,7 +215,8 @@ export function SaafProvider({ children }: { children: ReactNode }) {
           targetStep,
           draft,
           includeReservation,
-          reservationDraft
+          reservationDraft,
+          includeBudget
         )
       )
     )
@@ -231,7 +242,8 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       targetStep,
       draft,
       includeReservation,
-      reservationDraft
+      reservationDraft,
+      includeBudget
     )
     if (fields.length === 0) return false
     if ((await checkGibberishFields(fields)).length === 0) return false
@@ -251,7 +263,8 @@ export function SaafProvider({ children }: { children: ReactNode }) {
           firstIncompleteWizardStep(
             draft,
             includeReservation,
-            reservationDraft
+            reservationDraft,
+            includeBudget
           ) ?? next
         if (blocker !== step) setStep(blocker)
         form.validateStep(blocker, formRef.current)
@@ -291,11 +304,11 @@ export function SaafProvider({ children }: { children: ReactNode }) {
           reservationDraft,
           draft.activityVenue,
           draft.expectedParticipants
-        ) && isSaafStepComplete(2, draft, true)
-      : isSaafStepComplete(step as SaafStepIndex, draft, includeReservation)
+        ) && isSaafStepComplete(2, draft, true, includeBudget)
+      : isSaafStepComplete(step as SaafStepIndex, draft, includeReservation, includeBudget)
 
   const formComplete =
-    isSaafDraftComplete(draft, includeReservation) &&
+    isSaafDraftComplete(draft, includeReservation, includeBudget) &&
     (!includeReservation ||
       isReservationStepComplete(
         reservationDraft,
@@ -316,6 +329,7 @@ export function SaafProvider({ children }: { children: ReactNode }) {
       farthestStep,
       finalStep,
       includeReservation,
+      includeBudget,
       showErrors: form.showErrors,
       touched,
       stepIssues: form.showErrors ? unresolvedStepIssues(step) : [],
@@ -383,7 +397,8 @@ export function SaafProvider({ children }: { children: ReactNode }) {
         const blocker = firstIncompleteWizardStep(
           draft,
           includeReservation,
-          reservationDraft
+          reservationDraft,
+          includeBudget
         )
         if (blocker === null || blocker === step) return
         setStep(blocker)

@@ -54,7 +54,8 @@ export function reservationDraftToPdfData(
 }
 
 export async function saveSubmissionAsPdf(submission: ApiSubmission) {
-  const { saaf, reservation, hasReservation } = apiSubmissionToDrafts(submission)
+  const { saaf, reservation, hasReservation, hasBudget } =
+    apiSubmissionToDrafts(submission)
   const currentDraft = withReservationDefaults(reservation)
 
   await saveProposalPdf(
@@ -79,6 +80,7 @@ export async function saveSubmissionAsPdf(submission: ApiSubmission) {
       sdgExplanation: saaf.sdgExplanation,
       proponents: saaf.proponents || [],
       budgetItems: saaf.budgetItems || [],
+      hasBudget,
     },
     hasReservation ? reservationDraftToPdfData(currentDraft) : null
   )
@@ -119,6 +121,7 @@ export async function saveActivityAsPdf(activity: Activity) {
       quantity: b.quantity,
       pricePerUnit: b.pricePerUnit,
     })),
+    hasBudget: activity.hasBudget !== false,
   }
 
   const hasEquipment = (activity.equipmentRequested?.length || 0) > 0

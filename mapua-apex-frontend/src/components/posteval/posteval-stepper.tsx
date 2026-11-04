@@ -3,29 +3,38 @@ import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
 /**
- * Fixed 3-step rail for the post-eval wizard. Simpler than the SAAF stepper:
- * no reservation branch, so the step count never changes. Completed steps stay
+ * Step rail for the post-eval wizard. The financial page is dropped for a
+ * no-budget submission, collapsing the rail to two steps; the remaining steps
+ * keep their wizard indices so navigation is unchanged. Completed steps stay
  * clickable so the submitter can jump back to fix an earlier section.
  */
 export function PostEvalStepper({
   step,
   farthestStep,
   eventTitle,
+  includeFinancial = true,
   onStepSelect,
 }: {
   step: PostEvalStepIndex
   farthestStep: PostEvalStepIndex
   eventTitle?: string
+  includeFinancial?: boolean
   onStepSelect: (step: PostEvalStepIndex) => void
 }) {
-  const steps = POST_EVAL_STEPS
-  const activeStep = Math.min(step, steps.length - 1)
+  const steps = POST_EVAL_STEPS.map((item, index) => ({
+    item,
+    index: index as PostEvalStepIndex,
+  })).filter(({ index }) => includeFinancial || index !== 1)
 
-  const stepStates = steps.map((item, index) => {
-    const active = index === activeStep
+  // `index` is the wizard step the panels key off; `position` is the 1-based
+  // number shown on the rail, which shifts when the financial page is dropped.
+  const stepStates = steps.map(({ item, index }, position) => {
+    const active = index === step
     const done = index <= farthestStep && !active
-    return { item, index, active, done, clickable: done }
+    return { item, index, position, active, done, clickable: done }
   })
+  const activeState =
+    stepStates.find(({ index }) => index === step) ?? stepStates[0]
 
   return (
     <div className="space-y-3">
@@ -35,12 +44,12 @@ export function PostEvalStepper({
 
       {/* Mobile progress rail */}
       <ol className="flex items-center sm:hidden">
-        {stepStates.map(({ item, index, active, done, clickable }) => (
+        {stepStates.map(({ item, index, position, active, done, clickable }) => (
           <li
             key={item.id}
-            className={cn("flex items-center", index > 0 && "flex-1")}
+            className={cn("flex items-center", position > 0 && "flex-1")}
           >
-            {index > 0 && (
+            {position > 0 && (
               <span
                 aria-hidden
                 className={cn(
@@ -51,6 +60,7 @@ export function PostEvalStepper({
             )}
             <StepBall
               index={index}
+              number={position + 1}
               active={active}
               done={done}
               clickable={clickable}
@@ -62,8 +72,13 @@ export function PostEvalStepper({
       </ol>
 
       {/* Desktop cards */}
-      <ol className="hidden gap-2 sm:grid sm:grid-cols-3">
-        {stepStates.map(({ item, index, active, done, clickable }) => {
+      <ol
+        className={cn(
+          "hidden gap-2 sm:grid",
+          includeFinancial ? "sm:grid-cols-3" : "sm:grid-cols-2"
+        )}
+      >
+        {stepStates.map(({ item, index, position, active, done, clickable }) => {
           const className = cn(
             "flex min-h-11 w-full items-center gap-2 rounded-xl border px-3 py-2 text-left",
             active && "border-[#8B0000] bg-[#8B0000] text-white",
@@ -81,14 +96,14 @@ export function PostEvalStepper({
                   onClick={() => onStepSelect(index as PostEvalStepIndex)}
                   aria-label={`Go to ${item.label}`}
                 >
-                  <StepMarker index={index} active={active} done={done} />
+                  <StepMarker number={position + 1} active={active} done={done} />
                   <span className="text-xs font-semibold leading-tight">
                     {item.label}
                   </span>
                 </button>
               ) : (
                 <div className={className} aria-current={active ? "step" : undefined}>
-                  <StepMarker index={index} active={active} done={done} />
+                  <StepMarker number={position + 1} active={active} done={done} />
                   <span className="text-xs font-semibold leading-tight">
                     {item.label}
                   </span>
@@ -99,18 +114,19 @@ export function PostEvalStepper({
         })}
       </ol>
       <p className={layout.pageSubtitle}>
-        Step {activeStep + 1} of {steps.length} · {steps[activeStep].label}
+        Step {activeState.position + 1} of {stepStates.length} ·{" "}
+        {activeState.item.label}
       </p>
     </div>
   )
 }
 
 function StepMarker({
-  index,
+  number,
   active,
   done,
 }: {
-  index: number
+  number: number
   active: boolean
   done: boolean
 }) {
@@ -123,20 +139,22 @@ function StepMarker({
         !active && !done && "bg-neutral-100 text-neutral-600"
       )}
     >
-      {index + 1}
+      {number}
     </span>
   )
 }
 
 function StepBall({
   index,
+  number,
   active,
   done,
   clickable,
   label,
   onSelect,
 }: {
-  index: number
+  index: PostEvalStepIndex
+  number: number
   active: boolean
   done: boolean
   clickable: boolean
@@ -155,14 +173,14 @@ function StepBall({
     <button
       type="button"
       className={className}
-      onClick={() => onSelect(index as PostEvalStepIndex)}
+      onClick={() => onSelect(index)}
       aria-label={`Go to ${label}`}
     >
-      {index + 1}
+      {number}
     </button>
   ) : (
     <div className={className} aria-current={active ? "step" : undefined}>
-      {index + 1}
+      {number}
     </div>
   )
 }

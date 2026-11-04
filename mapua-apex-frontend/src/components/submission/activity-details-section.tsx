@@ -65,6 +65,7 @@ export function ActivityDetailsSection({
   values,
   onChange,
   includeReservation = false,
+  includeBudget = true,
   lockSchedule = false,
   titleEditable = false,
   venueNames,
@@ -73,6 +74,8 @@ export function ActivityDetailsSection({
   values: DetailsFields
   onChange: (key: any, value: any) => void
   includeReservation?: boolean
+  /** The activity operates with a budget; hides the individual contribution field. */
+  includeBudget?: boolean
   /** Date, time, and venue stay read-only. Participants stay editable. */
   lockSchedule?: boolean
   titleEditable?: boolean
@@ -476,32 +479,34 @@ export function ActivityDetailsSection({
               <FieldWarning name="expectedParticipants" />
             </div>
           )}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-neutral-800">
-              Amount of Individual Contribution{" "}
-              <span className="text-red-500">*</span>
-            </label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              name="individualContribution"
-              placeholder="0.00"
-              maxLength={4}
-              max={5000}
-              value={values.individualContribution}
-              onKeyDown={blockNonDecimalKeys}
-              onChange={(e) => {
-                onChange(
-                  "individualContribution",
-                  sanitizeDecimalInput(e.target.value).slice(0, 4)
-                )
-              }}
-              style={{ color: "#171717" }}
-              className="no-spinner h-9.5 rounded-lg border-neutral-300 bg-white text-center !text-neutral-900 placeholder:text-neutral-400"
-              required
-            />
-            <FieldWarning name="individualContribution" />
-          </div>
+          {includeBudget && (
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-neutral-800">
+                Amount of Individual Contribution{" "}
+                <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                name="individualContribution"
+                placeholder="0.00"
+                maxLength={4}
+                max={5000}
+                value={values.individualContribution}
+                onKeyDown={blockNonDecimalKeys}
+                onChange={(e) => {
+                  onChange(
+                    "individualContribution",
+                    sanitizeDecimalInput(e.target.value).slice(0, 4)
+                  )
+                }}
+                style={{ color: "#171717" }}
+                className="no-spinner h-9.5 rounded-lg border-neutral-300 bg-white text-center !text-neutral-900 placeholder:text-neutral-400"
+                required
+              />
+              <FieldWarning name="individualContribution" />
+            </div>
+          )}
         </div>
       </div>
     </div>

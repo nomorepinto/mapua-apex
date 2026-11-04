@@ -184,14 +184,20 @@ export class BudgetItemDto {
 }
 
 export class BudgetDto {
+  /** False for a no-budget submission; a missing key means an older paper that always had a budget. */
+  @IsOptional()
+  @IsBoolean()
+  has_budget?: boolean;
+
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => BudgetItemDto)
-  items!: BudgetItemDto[];
+  items?: BudgetItemDto[];
 
+  @IsOptional()
   @IsNumber()
-  grand_total!: number;
+  grand_total?: number;
 }
 
 export class SelectionDto {

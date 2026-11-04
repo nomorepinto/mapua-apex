@@ -32,7 +32,8 @@ export function useHydrateEditingSubmission() {
     state.setEditingSubmission(eventId, submissionId)
     state.setSubmissionStart(
       drafts.saaf.activityTitle,
-      drafts.hasReservation ? "yes" : "no"
+      drafts.hasReservation ? "yes" : "no",
+      drafts.hasBudget ? "yes" : "no"
     )
     if (drafts.hasReservation) {
       state.setSaafValidated(true)

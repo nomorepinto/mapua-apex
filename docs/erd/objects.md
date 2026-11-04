@@ -135,7 +135,11 @@ and 9:00 PM, end not earlier than start, and start ≠ end.
 
 ### detailed_budget_proposal
 
-`items[] { item_no, unit, quantity, price_per_unit, total }`, `grand_total`.
+`has_budget`, `items[] { item_no, unit, quantity, price_per_unit, total }`, `grand_total`.
+
+| Property | Type | Notes |
+|---|---|---|
+| `has_budget` | boolean | Drives whether the budget UI is shown; a **missing** key means an older paper that had a budget (`true`). When `false` the paper stores `items: []`, `grand_total: 0` and `activity_details.proposed_budget`/`individual_contribution` of `0`; readers hide the budget and the post-eval wizard skips its financial step. Does **not** affect routing (only `has_reservation` does) |
 
 ### venue_reservation & booking_refs
 

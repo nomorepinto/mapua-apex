@@ -96,6 +96,8 @@ export interface ApiSubmission {
     sdg_explanation?: string
   }
   detailed_budget_proposal?: {
+    /** False when the activity operates without a budget; absent = legacy (true). */
+    has_budget?: boolean
     items?: Array<{
       item_no: string
       /** Free-text measuring unit ("pc", "box", …); legacy rows stored a number. */
@@ -336,13 +338,25 @@ export function buildSignatoryPayload(
 }
 
 /**
+ * Whether a stored submission operates with a budget. Mirrors the
+ * `has_reservation` convention: the flag lives inside the section it governs,
+ * and items filed before the flag existed are read as having a budget.
+ */
+export function submissionHasBudget(submission: {
+  detailed_budget_proposal?: { has_budget?: boolean }
+}): boolean {
+  return submission.detailed_budget_proposal?.has_budget !== false
+}
+
+/**
  * Transforms frontend SAAF + Reservation draft states into the exact JSON
  * payload expected by POST /api/v1/students/submissions
  */
 export function buildSaafApiPayload(
   saafDraft: SaafDraft,
   reservationDraft?: ReservationDraft | null,
-  existingEventId?: string
+  existingEventId?: string,
+  hasBudget = true
 ) {
   const event_id = existingEventId || crypto.randomUUID()
   // Proposed budget is locked to the itemized Detailed Budget grand total so the
@@ -395,8 +409,12 @@ export function buildSaafApiPayload(
       day_of_event: saafDraft.dayOfEvent || "",
       time_of_event: saafDraft.timeOfEvent || "",
       expected_participants: Number(saafDraft.expectedParticipants) || 0,
-      individual_contribution: Number(saafDraft.individualContribution) || 0,
-      proposed_budget: grandTotal,
+      // The money fields only exist for a budgeted activity; a no-budget paper
+      // stores zeros so any reader that predates the flag degrades safely.
+      individual_contribution: hasBudget
+        ? Number(saafDraft.individualContribution) || 0
+        : 0,
+      proposed_budget: hasBudget ? grandTotal : 0,
     },
     institutional_alignment: {
       mission_statements: {
@@ -409,15 +427,20 @@ export function buildSaafApiPayload(
       sdg_explanation: saafDraft.sdgExplanation || "",
     },
     detailed_budget_proposal: {
-      items: (saafDraft.budgetItems || []).map((b, idx) => ({
-        item_no: b.item || String(idx + 1),
-        // Unit is a free-text label ("pc", "box", …), sent as typed.
-        unit: (b.unit || "").trim() || "pc",
-        quantity: Number(b.quantity) || 0,
-        price_per_unit: Number(b.pricePerUnit) || 0,
-        total: (Number(b.quantity) || 0) * (Number(b.pricePerUnit) || 0),
-      })),
-      grand_total: grandTotal,
+      has_budget: hasBudget,
+      // A no-budget paper carries no line items at all, so nothing budget-related
+      // can surface in a reviewer view or the saved proposal PDF.
+      items: hasBudget
+        ? (saafDraft.budgetItems || []).map((b, idx) => ({
+            item_no: b.item || String(idx + 1),
+            // Unit is a free-text label ("pc", "box", …), sent as typed.
+            unit: (b.unit || "").trim() || "pc",
+            quantity: Number(b.quantity) || 0,
+            price_per_unit: Number(b.pricePerUnit) || 0,
+            total: (Number(b.quantity) || 0) * (Number(b.pricePerUnit) || 0),
+          }))
+        : [],
+      grand_total: hasBudget ? grandTotal : 0,
     },
     venue_reservation: {
       has_reservation: hasReservation,
@@ -917,8 +940,11 @@ export function apiSubmissionToDashboardRow(
       ),
       time: submission.activity_details?.time_of_event || "",
       expected_attendees: submission.activity_details?.expected_participants,
+      // A no-budget paper shows no figure anywhere it is surfaced.
       budget:
-        typeof budget === "number" ? `₱${budget.toLocaleString("en-PH")}` : "—",
+        typeof budget === "number" && submissionHasBudget(submission)
+          ? `₱${budget.toLocaleString("en-PH")}`
+          : "—",
       proponent:
         formatProponentName(firstProponent) ||
         firstProponent?.org_or_course_section ||
@@ -1070,8 +1096,11 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     venue: submission.activity_details?.venue || "—",
     expectedParticipants:
       submission.activity_details?.expected_participants || 0,
+    // A no-budget paper shows no figure anywhere it is surfaced.
     proposedBudget:
-      typeof budget === "number" ? `₱${budget.toLocaleString("en-PH")}` : "—",
+      typeof budget === "number" && submissionHasBudget(submission)
+        ? `₱${budget.toLocaleString("en-PH")}`
+        : "—",
     proponents: (submission.proponents || []).map((proponent) => ({
       role:
         proponent.position_title ||
@@ -1101,6 +1130,7 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
       }
     ),
     hasReservation: Boolean(submission.venue_reservation?.has_reservation),
+    hasBudget: submissionHasBudget(submission),
     dateOfEvent: submission.activity_details?.date_of_event,
     endDateOfEvent: submission.activity_details?.end_date_of_event,
     budgetGrandTotal:
@@ -1376,6 +1406,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
   saaf: SaafDraft
   reservation: ReservationDraft
   hasReservation: boolean
+  hasBudget: boolean
 } {
   const proponents = (submission.proponents || []).map((proponent, index) => ({
     id: proponent.id || String(index + 1),
@@ -1483,6 +1514,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
     },
     reservation,
     hasReservation: Boolean(submission.venue_reservation?.has_reservation),
+    hasBudget: submissionHasBudget(submission),
   }
 }
 

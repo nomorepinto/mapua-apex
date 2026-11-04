@@ -42,7 +42,10 @@ function activityFields(draft: SaafDraft): GibberishField[] {
   ]
 }
 
-function budgetFields(draft: SaafDraft): GibberishField[] {
+function budgetFields(draft: SaafDraft, includeBudget = true): GibberishField[] {
+  // A no-budget activity renders no line items, so its stale draft rows are out
+  // of scope for the detector.
+  if (!includeBudget) return []
   return draft.budgetItems.map((item, index) => ({
     label: `Budget item ${index + 1} · Item`,
     value: item.item,
@@ -77,7 +80,8 @@ export function saafStepGibberishFields(
   step: number,
   draft: SaafDraft,
   includeReservation: boolean,
-  reservationDraft?: ReservationDraft | null
+  reservationDraft?: ReservationDraft | null,
+  includeBudget?: boolean
 ): GibberishField[] {
   if (includeReservation && step === 2) {
     return reservationGibberishFields(reservationDraft)
@@ -89,7 +93,8 @@ export function saafStepGibberishFields(
   if (step === 1) return proponentFields(draft)
   if (step === detailsStep) return activityFields(draft)
   // SaafAlignmentStep renders the alignment section and the budget table together.
-  if (step === alignmentStep) return [...alignmentFields(draft), ...budgetFields(draft)]
+  if (step === alignmentStep)
+    return [...alignmentFields(draft), ...budgetFields(draft, includeBudget !== false)]
 
   return []
 }
@@ -98,12 +103,13 @@ export function saafStepGibberishFields(
 export function saafAllGibberishFields(
   draft: SaafDraft,
   includeReservation: boolean,
-  reservationDraft?: ReservationDraft | null
+  reservationDraft?: ReservationDraft | null,
+  includeBudget?: boolean
 ): GibberishField[] {
   return [
     ...proponentFields(draft),
     ...activityFields(draft),
-    ...budgetFields(draft),
+    ...budgetFields(draft, includeBudget !== false),
     ...alignmentFields(draft),
     ...(includeReservation ? reservationGibberishFields(reservationDraft) : []),
   ]

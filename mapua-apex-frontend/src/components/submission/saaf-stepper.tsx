@@ -8,6 +8,10 @@ export const SAAF_STEPS = [
   { id: "alignment", label: "Alignment & budget" },
 ] as const
 
+// The alignment page owns the budget table only when the activity operates
+// with a budget; without one the step is just the institutional alignment.
+const ALIGNMENT_STEP_NO_BUDGET = { id: "alignment", label: "Alignment" }
+
 export const RESERVATION_STEP = { id: "reservation", label: "Reservation" }
 
 /** Step indices for the wizard */
@@ -19,24 +23,29 @@ export function SaafStepper({
   farthestStep,
   eventTitle,
   includeReservation,
+  includeBudget = true,
   onStepSelect,
 }: {
   step: WizardStepIndex
   farthestStep: WizardStepIndex
   eventTitle?: string
   includeReservation: boolean
+  includeBudget?: boolean
   onStepSelect: (step: WizardStepIndex) => void
 }) {
   // Step order: Classification (1), People (2), Reservation (3), Activity (4), Alignment & budget (5)
+  const alignmentStep = includeBudget
+    ? SAAF_STEPS[3]
+    : ALIGNMENT_STEP_NO_BUDGET
   const steps = includeReservation
     ? [
       SAAF_STEPS[0], // Classification
       SAAF_STEPS[1], // People
       RESERVATION_STEP, // Reservation
       SAAF_STEPS[2], // Activity
-      SAAF_STEPS[3], // Alignment & budget
+      alignmentStep, // Alignment & budget
     ]
-    : [...SAAF_STEPS]
+    : [SAAF_STEPS[0], SAAF_STEPS[1], SAAF_STEPS[2], alignmentStep]
 
   const activeStep = Math.min(step, steps.length - 1)
 

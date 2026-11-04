@@ -87,7 +87,8 @@ test("admin edit keeps the current desk", async ({ browser }) => {
 
 test("approves the straight-through papers", async ({ browser }) => {
   const papers = readRun().papers
-  for (const key of ["P1", "P2", "P3", "P6", "P7"]) await approveAll(browser, papers[key])
+  // P15 is the no-budget paper; approving it makes it eligible for a post-eval.
+  for (const key of ["P1", "P2", "P3", "P6", "P7", "P15"]) await approveAll(browser, papers[key])
 })
 
 test("returns and approves P5 and P4 at every desk", async ({ browser }) => {

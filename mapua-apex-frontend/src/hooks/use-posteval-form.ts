@@ -24,6 +24,7 @@ import {
   isPostEvalDraftComplete,
 } from "@/components/posteval/validate"
 import { useSubmissionDetailQuery } from "@/hooks/use-submissions"
+import { submissionHasBudget } from "@/lib/dynamodb-adapters"
 import { sanitizeDecimalInput, sanitizeIntegerInput } from "@/lib/numeric-input"
 import { useOrgStore } from "@/stores/org-store"
 
@@ -66,6 +67,12 @@ export function usePostEvalForm() {
   const eventId = draft.selectedEventId
   const submissionId = draft.selectedSubmissionId
   const submissionQuery = useSubmissionDetailQuery(eventId, submissionId)
+  // A submission filed without a budget collapses the wizard to two steps: the
+  // financial page disappears. Until the linked submission is loaded the wizard
+  // keeps its three steps, so nothing flickers on first paint.
+  const includeFinancial = submissionQuery.data
+    ? submissionHasBudget(submissionQuery.data)
+    : true
 
   // Seed Section 2's read-only budget lines from the linked submission the first
   // time the wizard opens for an event. Guarded so it never overwrites amounts
@@ -196,19 +203,19 @@ export function usePostEvalForm() {
 
   const validateStep = useCallback(
     (step: PostEvalStepIndex): boolean => {
-      if (getPostEvalStepIssues(step, draft).length > 0) {
+      if (getPostEvalStepIssues(step, draft, includeFinancial).length > 0) {
         setShowErrors(true)
         return false
       }
       setShowErrors(false)
       return true
     },
-    [draft]
+    [draft, includeFinancial]
   )
 
   const validateForm = useCallback((): boolean => {
     const issues = ([0, 1, 2] as const).flatMap((step) =>
-      getPostEvalStepIssues(step, draft)
+      getPostEvalStepIssues(step, draft, includeFinancial)
     )
     if (issues.length > 0) {
       setShowErrors(true)
@@ -216,7 +223,7 @@ export function usePostEvalForm() {
     }
     setShowErrors(false)
     return true
-  }, [draft])
+  }, [draft, includeFinancial])
 
   const handleInitiateSubmit = useCallback(
     (e: MouseEvent): boolean => {
@@ -250,7 +257,8 @@ export function usePostEvalForm() {
     submitError,
     initialGrandTotal,
     actualGrandTotal,
-    formComplete: isPostEvalDraftComplete(draft),
+    includeFinancial,
+    formComplete: isPostEvalDraftComplete(draft, includeFinancial),
     submissionLoading: submissionQuery.isPending,
     updateField,
     handleSummaryChange,

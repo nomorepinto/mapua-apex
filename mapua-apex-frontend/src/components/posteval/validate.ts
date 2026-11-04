@@ -45,13 +45,15 @@ function financialIssues(draft: PostEvalDraft): string[] {
 /** Every open item on one page, each line naming the field. */
 export function getPostEvalStepIssues(
   step: PostEvalStepIndex,
-  draft: PostEvalDraft
+  draft: PostEvalDraft,
+  includeFinancial = true
 ): string[] {
   switch (step) {
     case 0:
       return summaryIssues(draft)
     case 1:
-      return financialIssues(draft)
+      // A no-budget submission has no financial page, so nothing to resolve.
+      return includeFinancial ? financialIssues(draft) : []
     case 2:
       // Section 3 is a read-only preview; nothing for the submitter to resolve.
       return []
@@ -62,14 +64,19 @@ export function getPostEvalStepIssues(
 
 export function isPostEvalStepComplete(
   step: PostEvalStepIndex,
-  draft: PostEvalDraft
+  draft: PostEvalDraft,
+  includeFinancial = true
 ): boolean {
-  return getPostEvalStepIssues(step, draft).length === 0
+  return getPostEvalStepIssues(step, draft, includeFinancial).length === 0
 }
 
-export function isPostEvalDraftComplete(draft: PostEvalDraft): boolean {
+export function isPostEvalDraftComplete(
+  draft: PostEvalDraft,
+  includeFinancial = true
+): boolean {
   return (
-    isPostEvalStepComplete(0, draft) && isPostEvalStepComplete(1, draft)
+    isPostEvalStepComplete(0, draft, includeFinancial) &&
+    isPostEvalStepComplete(1, draft, includeFinancial)
   )
 }
 
@@ -78,10 +85,11 @@ export function isPostEvalDraftComplete(draft: PostEvalDraft): boolean {
  * ready. Submit uses it to move the reader to the offending page.
  */
 export function firstIncompletePostEvalStep(
-  draft: PostEvalDraft
+  draft: PostEvalDraft,
+  includeFinancial = true
 ): PostEvalStepIndex | null {
   for (const step of [0, 1, 2] as const) {
-    if (!isPostEvalStepComplete(step, draft)) return step
+    if (!isPostEvalStepComplete(step, draft, includeFinancial)) return step
   }
   return null
 }
@@ -89,10 +97,12 @@ export function firstIncompletePostEvalStep(
 /** True when the given step has anything worth clearing. */
 export function postEvalStepHasUserInput(
   step: PostEvalStepIndex,
-  draft: PostEvalDraft
+  draft: PostEvalDraft,
+  includeFinancial = true
 ): boolean {
   if (step === 0) return draft.summary.trim().length > 0
   if (step === 1) {
+    if (!includeFinancial) return false
     return (
       draft.financialReport.addedItems.length > 0 ||
       draft.financialReport.budgetItems.some((item) => item.actualAmount !== "")

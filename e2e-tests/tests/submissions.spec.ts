@@ -10,6 +10,7 @@ type PaperDraft = PaperRecord & {
   key: string
   activity: "extra-curricular" | "co-curricular"
   reserve: boolean
+  budget?: boolean
   pick?: Omit<ReservationPick, "campus">
   collaborators?: string[]
   higherCouncil?: boolean
@@ -61,6 +62,7 @@ function drafts(): PaperDraft[] {
     { key: "P12", title: `Deny Osaar Two ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false },
     { key: "P13", title: `Deny Cdm ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(4, "R101") },
     { key: "P14", title: `Conflict Hold ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(3, "R101") },
+    { key: "P15", title: `No Budget ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false, budget: false },
   ]
   return papers
 }
@@ -70,8 +72,9 @@ async function file(browser: import("@playwright/test").Browser, paper: PaperDra
   const session = await openApex(browser, paper.org)
   const saaf = new SaafPage(session.page)
   const email = account("admin").email
+  const budget = paper.budget !== false
   try {
-    await saaf.start(paper.title, paper.reserve)
+    await saaf.start(paper.title, paper.reserve, budget)
     await saaf.classification(paper.activity)
     await saaf.people(email, { chooseDepartment: Boolean(paper.higherCouncil), stay: Boolean(paper.collaborators) })
     if (paper.collaborators) {
@@ -80,11 +83,17 @@ async function file(browser: import("@playwright/test").Browser, paper: PaperDra
     }
     if (paper.reserve && paper.pick) {
       await saaf.reservation({ campus: run.campus, ...paper.pick })
-      await saaf.activityReserved()
+      await saaf.activityReserved(budget)
     } else {
-      await saaf.activityOnline()
+      await saaf.activityOnline("Online", budget)
     }
-    await saaf.alignment()
+    if (!budget) {
+      // The alignment page must carry no budget UI at all for a no-budget paper.
+      await saaf.alignment(false)
+      await saaf.expectBudgetAbsent()
+    } else {
+      await saaf.alignment()
+    }
     await captureJson(session.page, "/students/submissions", "POST", () => saaf.submit())
     const actual = await trackerRoles(session.page, paper.title)
     rolesMatch(actual, paper.roles)
@@ -97,7 +106,7 @@ async function file(browser: import("@playwright/test").Browser, paper: PaperDra
 }
 
 test.describe("submissions", () => {
-  for (const paper of ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P11", "P12", "P13", "P14"]) {
+  for (const paper of ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P11", "P12", "P13", "P14", "P15"]) {
     test(`files ${paper}`, async ({ browser }) => {
       const draft = drafts().find((item) => item.key === paper)
       if (!draft) throw new Error(paper)

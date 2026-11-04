@@ -243,10 +243,12 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
                   <span className="font-medium text-neutral-600 sm:text-right">{displayActivity.venue}</span>
                 </div>
 
-                <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-bold text-neutral-900">Estimated Budget</span>
-                  <span className="font-medium text-neutral-600 sm:text-right">{displayActivity.proposedBudget}</span>
-                </div>
+                {displayActivity.hasBudget !== false && (
+                  <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="font-bold text-neutral-900">Estimated Budget</span>
+                    <span className="font-medium text-neutral-600 sm:text-right">{displayActivity.proposedBudget}</span>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
                   <span className="font-bold text-neutral-900">Number of Participants</span>

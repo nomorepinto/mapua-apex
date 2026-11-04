@@ -164,9 +164,18 @@ institutional_alignment: {
   core_values_explanation, peo_explanation, sdg_explanation
 }
 detailed_budget_proposal: {
+  has_budget: boolean          (new; a MISSING key means an older paper that had a budget)
   items: [{ item_no, unit, quantity, price_per_unit, total }]
   grand_total
 }
+A paper filed with "no budget" stores has_budget false, an empty items: [],
+and grand_total 0; activity_details.proposed_budget and individual_contribution
+also store 0. Every reader (submission wizard, tracker/reviewer modals, saved
+proposal PDF, the post-eval wizard, and reporting aggregation) hides the budget
+UI and excludes such rows from budget samples when has_budget is false. A
+no-budget submission has no financial report, so the post-eval wizard skips its
+financial step and the API rejects any filed financial lines for it (422).
+Routing is unaffected: the signatory sequence keys only off venue_reservation.
 venue_reservation: {
   has_reservation: boolean
   reservations: [{
@@ -721,6 +730,7 @@ json
     "sdg_explanation": "Supports SDG 4: Quality Education."
   },
   "detailed_budget_proposal": {
+    "has_budget": true,
     "items": [{ "item_no": "1", "unit": 1, "quantity": 60, "price_per_unit": 50, "total": 3000 }],
     "grand_total": 3000
   },

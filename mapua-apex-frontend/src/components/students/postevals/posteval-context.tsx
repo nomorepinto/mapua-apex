@@ -51,6 +51,7 @@ interface PostEvalFormState {
   currentStepComplete: boolean
   formComplete: boolean
   canClear: boolean
+  includeFinancial: boolean
   initialGrandTotal: number
   actualGrandTotal: number
 }
@@ -91,10 +92,13 @@ const PostEvalFormContext = createContext<PostEvalFormContextValue | null>(null)
  * How far the submitter has earned: the first page whose predecessors are all
  * complete. Lets a restored draft jump straight to its last open section.
  */
-function earnedStepFromDraft(draft: PostEvalDraft): PostEvalStepIndex {
+function earnedStepFromDraft(
+  draft: PostEvalDraft,
+  includeFinancial: boolean
+): PostEvalStepIndex {
   let earned: PostEvalStepIndex = 0
   for (const index of [0, 1, 2] as const) {
-    if (!isPostEvalStepComplete(index, draft)) break
+    if (!isPostEvalStepComplete(index, draft, includeFinancial)) break
     earned = Math.min(index + 1, FINAL_STEP) as PostEvalStepIndex
   }
   return earned
@@ -114,7 +118,7 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
   const formRef = useRef<HTMLFormElement>(null)
   const navigate = useNavigate()
   const form = usePostEvalForm()
-  const { draft } = form
+  const { draft, includeFinancial } = form
   const [requestedStep, setStep] = useState<PostEvalStepIndex>(0)
   const [advancedStep, setAdvancedStep] = useState<PostEvalStepIndex>(0)
   // Submit-time gibberish verdict for the event summary, surfaced through the same
@@ -123,12 +127,12 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
 
   const step = requestedStep
   const farthestStep = Math.min(
-    Math.max(advancedStep, earnedStepFromDraft(draft)),
+    Math.max(advancedStep, earnedStepFromDraft(draft, includeFinancial)),
     FINAL_STEP
   ) as PostEvalStepIndex
 
   const unresolvedStepIssues = (targetStep: PostEvalStepIndex): string[] => [
-    ...getPostEvalStepIssues(targetStep, draft),
+    ...getPostEvalStepIssues(targetStep, draft, includeFinancial),
     // Named by the same verdicts the Continue gate produced, so the block and the
     // list can never disagree.
     ...gibberishIssueLines(postEvalStepGibberishFields(targetStep, draft)),
@@ -157,7 +161,8 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
       if (next > farthestStep) {
         // Never skip past a page that still has open items: land the submitter on
         // the blocker and reveal it instead of silently ignoring the click.
-        const blocker = firstIncompletePostEvalStep(draft) ?? next
+        const blocker =
+          firstIncompletePostEvalStep(draft, includeFinancial) ?? next
         if (blocker !== step) setStep(blocker)
         form.validateStep(blocker)
         return
@@ -177,7 +182,10 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
       if (!form.validateStep(step)) return
       if (step >= FINAL_STEP) return
       if (await blockOnGibberish(step)) return
-      const next = (step + 1) as PostEvalStepIndex
+      // The hidden financial page is never landed on: straight to attendance.
+      const next = (includeFinancial || step !== 0
+        ? step + 1
+        : 2) as PostEvalStepIndex
       setAdvancedStep((current) => (next > current ? next : current))
       setStep(next)
       window.scrollTo({ top: 0, behavior: "smooth" })
@@ -189,8 +197,8 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
     goToStep((step - 1) as PostEvalStepIndex)
   }
 
-  const currentStepComplete = isPostEvalStepComplete(step, draft)
-  const canClear = postEvalStepHasUserInput(step, draft)
+  const currentStepComplete = isPostEvalStepComplete(step, draft, includeFinancial)
+  const canClear = postEvalStepHasUserInput(step, draft, includeFinancial)
 
   const confirmClear = useCallback(() => {
     const current = useOrgStore.getState().postEvalDraft
@@ -227,6 +235,7 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
       currentStepComplete,
       formComplete: form.formComplete,
       canClear,
+      includeFinancial,
       initialGrandTotal: form.initialGrandTotal,
       actualGrandTotal: form.actualGrandTotal,
     },
@@ -263,7 +272,7 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
           if (form.handleInitiateSubmit(event)) return
           // Submit checks every page, so a rejection is usually about another
           // page. Move there and reveal it rather than listing other pages' fields.
-          const blocker = firstIncompletePostEvalStep(draft)
+          const blocker = firstIncompletePostEvalStep(draft, includeFinancial)
           if (blocker === null || blocker === step) return
           setStep(blocker)
           form.validateStep(blocker)

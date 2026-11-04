@@ -241,7 +241,10 @@ function proponentWarnings(
   }
 }
 
-export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
+export function saafFieldWarnings(
+  draft: SaafDraft,
+  includeBudget = true
+): Record<string, string> {
   const warnings: Record<string, string> = {}
 
   if (!draft.activityType) warnings.activityType = "Select an activity type."
@@ -315,12 +318,15 @@ export function saafFieldWarnings(draft: SaafDraft): Record<string, string> {
   } else if (Number(draft.expectedParticipants) > 3000) {
     warnings.expectedParticipants = "Cannot exceed 3000 participants."
   }
-  if (isBlank(draft.individualContribution)) {
-    warnings.individualContribution = REQUIRED
-  } else if (Number(draft.individualContribution) > 5000) {
-    warnings.individualContribution = "Cannot exceed 5000."
+  // The money fields only exist for an activity that operates with a budget.
+  if (includeBudget) {
+    if (isBlank(draft.individualContribution)) {
+      warnings.individualContribution = REQUIRED
+    } else if (Number(draft.individualContribution) > 5000) {
+      warnings.individualContribution = "Cannot exceed 5000."
+    }
+    if (isBlank(draft.proposedBudget)) warnings.proposedBudget = REQUIRED
   }
-  if (isBlank(draft.proposedBudget)) warnings.proposedBudget = REQUIRED
 
   if (!(draft.mission1 || draft.mission2 || draft.mission3)) {
     warnings.mission = "Select at least one mission statement."
@@ -432,9 +438,10 @@ function warningKeyLabel(key: string, proponents: Proponent[]): string {
 function stepWarningEntries(
   step: SaafStepIndex,
   draft: SaafDraft,
-  includeReservation = false
+  includeReservation = false,
+  includeBudget = true
 ): Array<[string, string]> {
-  const warnings = saafFieldWarnings(draft)
+  const warnings = saafFieldWarnings(draft, includeBudget)
   const map = includeReservation
     ? STEP_PREFIXES_WITH_RESERVATION
     : STEP_PREFIXES_NO_RESERVATION
@@ -449,9 +456,10 @@ function stepWarningEntries(
 export function getSaafStepIssues(
   step: SaafStepIndex,
   draft: SaafDraft,
-  includeReservation = false
+  includeReservation = false,
+  includeBudget = true
 ): string[] {
-  return stepWarningEntries(step, draft, includeReservation).map(
+  return stepWarningEntries(step, draft, includeReservation, includeBudget).map(
     ([key, message]) => `${warningKeyLabel(key, draft.proponents)}: ${message}`
   )
 }
@@ -459,14 +467,15 @@ export function getSaafStepIssues(
 export function isSaafStepComplete(
   step: SaafStepIndex,
   draft: SaafDraft,
-  includeReservation: boolean = false
+  includeReservation: boolean = false,
+  includeBudget: boolean = true
 ): boolean {
-  return stepWarningEntries(step, draft, includeReservation).length === 0
+  return stepWarningEntries(step, draft, includeReservation, includeBudget).length === 0
 }
 
-export function isSaafDraftComplete(draft: SaafDraft, includeReservation: boolean = false): boolean {
+export function isSaafDraftComplete(draft: SaafDraft, includeReservation: boolean = false, includeBudget: boolean = true): boolean {
   const total = includeReservation ? ([0, 1, 2, 3, 4] as const) : ([0, 1, 2, 3] as const)
-  return total.every((step) => isSaafStepComplete(step, draft, includeReservation))
+  return total.every((step) => isSaafStepComplete(step, draft, includeReservation, includeBudget))
 }
 
 const RESERVATION_EMPTY_MESSAGE =
@@ -622,14 +631,15 @@ export function isReservationStepComplete(
 export function firstIncompleteWizardStep(
   draft: SaafDraft,
   includeReservation: boolean,
-  reservationDraft: ReservationDraft
+  reservationDraft: ReservationDraft,
+  includeBudget: boolean = true
 ): WizardStepIndex | null {
   const steps = includeReservation
     ? ([0, 1, 2, 3, 4] as const)
     : ([0, 1, 2, 3] as const)
 
   for (const step of steps) {
-    if (!isSaafStepComplete(step, draft, includeReservation)) {
+    if (!isSaafStepComplete(step, draft, includeReservation, includeBudget)) {
       return step as WizardStepIndex
     }
     if (

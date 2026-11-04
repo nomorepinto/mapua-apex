@@ -49,6 +49,7 @@ export function PostEvalStepperControl() {
       step={state.step}
       farthestStep={state.farthestStep}
       eventTitle={state.draft.eventTitle}
+      includeFinancial={state.includeFinancial}
       onStepSelect={actions.goToStep}
     />
   )

@@ -115,6 +115,39 @@ describe('report aggregation and coverage', () => {
     });
     expect(JSON.stringify(result)).not.toContain('GSI1PK');
   });
+  it('treats no-budget proposals as "no budget", not a ₱0 spend', async () => {
+    const row = reportRow(
+      'proposals',
+      proposal('1', 'approved', {
+        activity_details: { title_and_nature: 'Forum', proposed_budget: 0 },
+        detailed_budget_proposal: {
+          has_budget: false,
+          items: [],
+          grand_total: 0,
+        },
+      }),
+    );
+    expect(row.has_budget).toBe(false);
+    expect(row.proposed_budget).toBeNull();
+    // Legacy rows without the key still count as having a budget.
+    expect(reportRow('proposals', proposal('2')).has_budget).toBe(true);
+    const result = await generateReport(
+      'proposals',
+      { filters },
+      'test',
+      async () => [
+        proposal('1'),
+        proposal('3', 'approved', {
+          activity_details: { title_and_nature: 'No-cost drive' },
+          detailed_budget_proposal: { has_budget: false },
+        }),
+      ],
+    );
+    expect(result.summary).toMatchObject({
+      proposed_budget_php: 250.25,
+      budget_sample_count: 1,
+    });
+  });
   it('keeps unknown first dates unknown even if latest or event dates are known', async () => {
     const result = await generateReport(
       'proposals',

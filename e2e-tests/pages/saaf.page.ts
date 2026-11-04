@@ -21,13 +21,18 @@ export type ReservationPick = {
 export class SaafPage {
   constructor(private readonly page: Page) {}
 
-  async start(title: string, reserve: boolean) {
+  async start(title: string, reserve: boolean, budget = true) {
     await this.page.goto("/students/submissions")
     await this.page.getByLabel("Event name").fill(title)
     await choose(
       this.page,
       this.page.getByLabel("Are you going to reserve school facilities?"),
       reserve ? "Yes, reserve school facilities" : "No, do not reserve facilities",
+    )
+    await choose(
+      this.page,
+      this.page.getByLabel("Will you be operating with a budget?"),
+      budget ? "Yes, we will operate with a budget" : "No, this activity has no budget",
     )
     await this.page.getByRole("button", { name: "Continue" }).click()
     await expect(this.page.getByRole("heading", { name: "Student Activity Application Form" })).toBeVisible()
@@ -103,7 +108,7 @@ export class SaafPage {
     await expect(panel.getByText("Reserve at least one room on the left first.")).toBeVisible()
   }
 
-  async activityOnline(campusOnline = "Online") {
+  async activityOnline(campusOnline = "Online", budget = true) {
     const panel = stepPanel(this.page)
     await panel.getByPlaceholder(/comprehensive summary/).fill(PROSE)
     await panel.getByPlaceholder(/primary targets/).fill(PROSE)
@@ -117,26 +122,36 @@ export class SaafPage {
     await choose(this.page, panel.getByRole("combobox", { name: "End minute" }), "20")
     await choose(this.page, panel.getByRole("combobox", { name: "End AM or PM" }), "AM")
     await panel.locator("[name='expectedParticipants']").fill("40")
-    await panel.getByPlaceholder("0.00").fill("0")
+    // The individual contribution input only exists for a with-budget paper.
+    if (budget) await panel.getByPlaceholder("0.00").fill("0")
     await this.continue()
   }
 
-  async activityReserved() {
+  async activityReserved(budget = true) {
     const panel = stepPanel(this.page)
     await panel.getByPlaceholder(/comprehensive summary/).fill(PROSE)
     await panel.getByPlaceholder(/primary targets/).fill(PROSE)
-    await panel.getByPlaceholder("0.00").fill("0")
+    if (budget) await panel.getByPlaceholder("0.00").fill("0")
     await this.continue()
   }
 
-  async alignment() {
+  async alignment(budget = true) {
     const panel = stepPanel(this.page)
     await panel.getByRole("checkbox", { name: /globally competitive/ }).check()
     await panel.getByPlaceholder(/core values/).fill(PROSE)
     await panel.getByPlaceholder(/targeted SDGs/).fill(PROSE)
+    if (!budget) return
     await choose(this.page, panel.getByRole("combobox", { name: "Budget item" }), "Food and Refreshments")
     await panel.getByRole("textbox", { name: "Quantity" }).fill("2")
     await panel.getByRole("textbox", { name: "Price per unit" }).fill("50")
+  }
+
+  /** A no-budget paper never renders the line-item table or the money inputs. */
+  async expectBudgetAbsent() {
+    const panel = stepPanel(this.page)
+    await expect(panel.getByRole("combobox", { name: "Budget item" })).toHaveCount(0)
+    await expect(this.page.getByPlaceholder("0.00")).toHaveCount(0)
+    await expect(this.page.getByText("Alignment & budget")).toHaveCount(0)
   }
 
   async submit() {

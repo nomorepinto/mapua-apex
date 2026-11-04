@@ -187,7 +187,10 @@ export function SubmissionDetailDialog() {
                     `${selectedActivity.time ? selectedActivity.time + " " : ""}${selectedActivity.date}`,
                   ],
                   ["Venue", selectedActivity.venue],
-                  ["Estimated Budget", selectedActivity.proposedBudget],
+                  // A no-budget paper never shows an estimated budget row.
+                  ...(selectedActivity.hasBudget === false
+                    ? []
+                    : [["Estimated Budget", selectedActivity.proposedBudget]]),
                   [
                     "Number of Participants",
                     selectedActivity.expectedParticipants,

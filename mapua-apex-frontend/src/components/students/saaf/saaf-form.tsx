@@ -91,6 +91,7 @@ export function SaafStepperControl() {
       farthestStep={state.farthestStep}
       eventTitle={state.draft.activityTitle}
       includeReservation={state.includeReservation}
+      includeBudget={state.includeBudget}
       onStepSelect={actions.goToStep}
     />
   )

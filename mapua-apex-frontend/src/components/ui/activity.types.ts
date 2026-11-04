@@ -86,6 +86,8 @@ export interface Activity {
   budgetItems?: ActivityBudgetItem[]
   /** Whether the activity has a venue/equipment reservation requested */
   hasReservation?: boolean
+  /** Whether the activity operates with a budget (absent on legacy rows = true). */
+  hasBudget?: boolean
   /** Raw start date of the event in YYYY-MM-DD */
   dateOfEvent?: string
   /** Raw end date of the event in YYYY-MM-DD */

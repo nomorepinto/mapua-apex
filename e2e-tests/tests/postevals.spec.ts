@@ -69,6 +69,16 @@ test("OSAAR approves P2 and the student badge stays pending", async ({ browser }
   }
 })
 
+test("a no-budget submission files a post-eval without the financial step", async ({ browser }) => {
+  const paper = readRun().papers.P15
+  const org = await openApex(browser, "orgA")
+  try {
+    await new PostevalPage(org.page).file(paper.title, { noBudget: true })
+  } finally {
+    await org.close()
+  }
+})
+
 test("a denied post-evaluation can be filed again", async ({ browser }) => {
   const paper = readRun().papers.P3
   const org = await openApex(browser, "orgA")
