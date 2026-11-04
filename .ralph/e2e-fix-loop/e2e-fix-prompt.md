@@ -37,8 +37,10 @@ Write the verdict file to the path given in the task file, under `.ralph/e2e-fix
 
 `kind` is `product`, `test`, or `environment`.
 
-- `product`: you changed application code. `commit_message` is one lowercase line, under 72 characters, in the same style as `fixed routes`. No ticket id, no period, no secret.
-- `test`: the spec or fixture is wrong. Change no files. Say why in `summary`.
-- `environment`: AWS/Cognito/DynamoDB config issue. Before giving up, check if a boto3 script in `mapua-apex-frontend/scripts/` could fix it (e.g., `add_cognito_arcus_callbacks.py` for redirect URLs, `add_cognito_client_scopes.py` for OAuth scopes). If a script exists or could be written, say so in `summary` and set `kind` to `product` instead. Only use `environment` if the fix requires manual AWS console work or credentials the loop doesn't have.
+- `product`: you changed files (application code OR harness helpers under `e2e-tests/support/**` / `e2e-tests/pages/**`). `commit_message` is one lowercase line, under 72 characters, in the same style as `fixed routes`. No ticket id, no period, no secret. The loop commits your changes only when kind is `product`.
+- `test`: the spec or fixture is wrong and you changed NO files. Say why in `summary`.
+- `environment`: AWS/Cognito/DynamoDB config issue and you changed NO files. Before giving up, check if a boto3 script in `mapua-apex-frontend/scripts/` could fix it (e.g., `add_cognito_arcus_callbacks.py` for redirect URLs, `add_cognito_client_scopes.py` for OAuth scopes). If a script exists or could be written, say so in `summary` and set `kind` to `product` instead. Only use `environment` if the fix requires manual AWS console work or credentials the loop doesn't have.
+
+IMPORTANT: If you edited ANY file (including page objects or support helpers), you MUST use `kind: "product"` with a `commit_message`. Using `test` or `environment` after changing files causes the loop to stop WITHOUT committing your work.
 
 After the verdict file is written, stop.
