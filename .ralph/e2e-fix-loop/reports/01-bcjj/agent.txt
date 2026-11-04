@@ -1,0 +1,9 @@
+﻿I fixed the arcus sign-in failure: a product bug, not a test problem.
+
+**Cause:** The Arcus `/api/auth/login` authorize URL had no `prompt`. Cognito remembered the previous hosted-UI session, jumped straight to the callback, and never showed the password field. The page snapshot showed the email field empty with "Missing email address." and `auth.ts:81` waiting for a password input that never appeared.
+
+**Fix:** Both Arcus apps now send `prompt=login` when building the authorize URL:
+- `arcus-attendance-system/src/lib/auth/cognito.ts:44`
+- `arcus-evaluation-system/src/lib/auth/cognito.ts:44`
+
+I left the harness untouched. I didn't run the suite; the loop will. The verdict is at `.ralph/e2e-fix-loop/reports/01-bcjj/verdict.json` with `kind: product`.

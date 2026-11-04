@@ -70,3 +70,10 @@ Same failure as the previous run. Loop stopped.
 - playwright: npx playwright test exited 1
 Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\02-VHsq
 
+
+## Iteration 1 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1; failed: arcus.spec.ts:16 @ students register and the officer scans their codes @ TimeoutError: locator.waitFor: Timeout 15000ms exceeded. @ auth.ts:81
+- Verdict: product
+- Summary: The Arcus authorize URL omitted prompt=login, so Cognito's retained hosted-UI session skipped the login form and the password field never appeared; both Arcus apps now force the sign-in form.
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-bcjj

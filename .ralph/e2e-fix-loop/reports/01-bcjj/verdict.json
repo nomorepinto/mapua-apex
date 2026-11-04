@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "The Arcus authorize URL omitted prompt=login, so Cognito's retained hosted-UI session skipped the login form and the password field never appeared; both Arcus apps now force the sign-in form.",
+  "commit_message": "fixed arcus sign-in skipping the login form"
+}
