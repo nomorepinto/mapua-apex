@@ -10,8 +10,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 from datetime import date, datetime
+from pathlib import Path
 
 from apex_client import ApiError, ApexClient, Cognito
 from cleanup import (
@@ -152,7 +154,58 @@ def _reload_manifest(manifest: Manifest) -> None:
     manifest.data.update(fresh)
 
 
-def _playwright(settings: Settings, tag: str, event_date: date, skip_day_of: bool, manifest: Manifest, phase: str | None) -> int:
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _clean(text: str) -> str:
+    return _ANSI.sub("", text or "").strip()
+
+
+def _failed_tests(json_path: Path) -> list[str]:
+    """Extract a stable, distinctive signature for each failed Playwright test.
+
+    The suite's step detail used to be a constant ("npx playwright test exited 1"),
+    so every Playwright failure looked identical to the fix loop and it could never
+    tell a progressed failure from a repeated one. Each entry here combines the spec
+    location, the test title, the error type, and the first source frame, which is
+    unique per real failure.
+    """
+    try:
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+    failures: list[str] = []
+
+    def frame(message: str) -> str:
+        for match in re.finditer(r"at\s+[^\n]*?([\w.-]+\.(?:ts|tsx|js)):?(\d+)?", message):
+            return f"{match.group(1)}:{match.group(2) or '?'}"
+        return ""
+
+    def walk(suite: dict, parent_file: str) -> None:
+        file = suite.get("file") or parent_file
+        for sub in suite.get("suites", []) or []:
+            walk(sub, file)
+        for spec in suite.get("specs", []) or []:
+            title = spec.get("title", "")
+            line = spec.get("line", "")
+            for test in spec.get("tests", []) or []:
+                for result in test.get("results", []) or []:
+                    if result.get("status") not in ("failed", "timedOut", "interrupted"):
+                        continue
+                    errors = result.get("errors") or []
+                    message = _clean(errors[0].get("message", "")) if errors else _clean((result.get("error") or {}).get("message", ""))
+                    head = message.split("\n", 1)[0][:120]
+                    where = frame(message)
+                    parts = [p for p in (f"{file}:{line}" if file else "", title, head, where) if p]
+                    failures.append(" @ ".join(parts))
+
+    for suite in data.get("suites", []) or []:
+        walk(suite, suite.get("file", ""))
+    return failures
+
+
+def _playwright(settings: Settings, tag: str, event_date: date, skip_day_of: bool, manifest: Manifest, phase: str | None) -> tuple[int, str]:
     env = os.environ.copy()
     env["E2E_TAG"] = tag
     env["E2E_EVENT_DATE"] = event_date.isoformat()
@@ -161,14 +214,19 @@ def _playwright(settings: Settings, tag: str, event_date: date, skip_day_of: boo
     env["E2E_FRONTEND_BASE"] = settings.frontend_base
     env["E2E_ATTENDANCE_BASE"] = settings.attendance_base
     env["E2E_EVALUATION_BASE"] = settings.evaluation_base
-    command = ["npx", "playwright", "test"]
+    json_path = E2E_DIR / f".playwright-json-{tag}.json"
+    json_path.unlink(missing_ok=True)
+    env["PLAYWRIGHT_JSON_OUTPUT_NAME"] = str(json_path)
+    command = ["npx", "playwright", "test", "--reporter=list,json"]
     if phase:
         command.extend(["--project", PROJECTS[phase]])
     if os.name == "nt":
         completed = subprocess.run(" ".join(command), cwd=E2E_DIR, env=env, shell=True)
     else:
         completed = subprocess.run(command, cwd=E2E_DIR, env=env)
-    return completed.returncode
+    failures = _failed_tests(json_path) if json_path.is_file() else []
+    json_path.unlink(missing_ok=True)
+    return completed.returncode, "; ".join(failures[:6])
 
 
 def _parse_date(value: str | None) -> tuple[date, bool]:
@@ -216,10 +274,13 @@ def run(args: argparse.Namespace) -> int:
             manifest.add_account(signed_in.sub, accounts[key]["email"])
         admin.login(accounts["admin"]["email"], accounts["admin"]["password"])
         snapshot_settings(settings, manifest)
-        browser_code = _playwright(settings, tag, event_date, skip_day_of, manifest, args.phase)
+        browser_code, browser_failures = _playwright(settings, tag, event_date, skip_day_of, manifest, args.phase)
         _reload_manifest(manifest)
         if browser_code:
-            report.add(Step("playwright", "fail", f"npx playwright test exited {browser_code}"))
+            detail = f"npx playwright test exited {browser_code}"
+            if browser_failures:
+                detail = f"{detail}; failed: {browser_failures}"
+            report.add(Step("playwright", "fail", detail))
             code = browser_code
         else:
             report.add(Step("playwright", "pass", "browser journeys finished"))
