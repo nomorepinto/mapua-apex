@@ -21,7 +21,17 @@ export class ReviewPage {
     await this.page.goto(PATHS[desk])
     await this.page.getByLabel("Search review queue").fill(title)
     await this.page.getByRole("button", { name: `View details for ${title}` }).click()
-    await expect(this.page.getByRole("dialog", { name: `${title} Proposal` })).toBeVisible()
+    const dialog = this.page.getByRole("dialog", { name: `${title} Proposal` })
+    await expect(dialog).toBeVisible()
+    // The dialog paints before the desk's review queue finishes loading. Until
+    // that query resolves the paper is not yet in the "For Review" list, so the
+    // modal treats it as read-only history and renders no Return / Reject /
+    // Approve buttons (use-review-dashboard isReadOnly). Wait for the actionable
+    // footer once here so approve(), returnProposal(), and reject() never race a
+    // still-loading queue — the same hydration guard approve() already relies on.
+    await expect(
+      this.page.getByRole("button", { name: "Return Proposal" }).first(),
+    ).toBeVisible({ timeout: 30_000 })
   }
 
   async approve() {
