@@ -91,7 +91,9 @@ export class EvaluationPage {
 
   async file(eventTitle: string) {
     await this.open("/")
-    await this.page.getByRole("link", { name: new RegExp(eventTitle) }).click()
+    // The event card is one link whose accessible name runs on with the
+    // organization, date, venue, and "Complete evaluation" text.
+    await this.page.getByRole("link", { name: new RegExp(`^${eventTitle}\\s*`) }).click()
     await this.page.getByLabel("Department").click()
     await this.page.getByRole("option", { name: /Information Technology/ }).first().click()
     await this.page.getByRole("radio", { name: "Yes", exact: true }).check()

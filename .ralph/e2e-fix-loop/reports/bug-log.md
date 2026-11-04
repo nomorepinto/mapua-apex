@@ -122,3 +122,10 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 - Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-cCRy
 - Agent stopped without a product fix (exit 1, likely max-turns). Operator input needed: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-cCRy\agent.txt
 
+
+## Iteration 2 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1; failed: arcus.spec.ts:58 @ a checked-in student files an evaluation @ TimeoutError: locator.click: Timeout 20000ms exceeded. @ attendance.page.ts:95
+- Verdict: product
+- Summary: EvaluationPage.file used an anchored name regex on the AES event card link, whose accessible name is the whole card text (title, org, date, venue, Complete evaluation), so the click never matched; the pattern now accepts the trailing card text.
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\02-XZNe

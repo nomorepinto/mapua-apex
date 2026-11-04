@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "EvaluationPage.file used an anchored name regex on the AES event card link, whose accessible name is the whole card text (title, org, date, venue, Complete evaluation), so the click never matched; the pattern now accepts the trailing card text.",
+  "commit_message": "fixed evaluation event link locator"
+}
