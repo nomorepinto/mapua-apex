@@ -68,23 +68,26 @@ export async function openApex(browser: Browser, key: string): Promise<{ page: P
 async function hostedLogin(page: Page, startUrl: string, credentials: Account) {
   await page.goto(`${startUrl}/api/auth/login`, { waitUntil: "domcontentloaded" })
   const email = page.locator("input[name='username'], input[name='email'], input[type='email']").first()
-  await email.fill(credentials.email)
-
-  // Cognito's managed login asks for email first and reveals the password on
-  // a second step; the classic hosted UI keeps both fields on one page.
-  // Support both by only clicking Next when the password is not yet visible.
   const password = page.locator("input[name='password'], input[type='password']").first()
   const next = page.getByRole("button", { name: /^next$/i }).first()
-  // The managed-login SPA paints the email step first, then reveals either the
-  // password (classic hosted UI) or the Next button (two-step) asynchronously,
-  // and Next can re-render between a visibility check and a single click. Poll
-  // instead of clicking once: re-click Next whenever it is the actionable
-  // control until the password field renders. A one-shot check/click can run
-  // before Next hydrates, skip, and leave the password hidden (a flaky 15s
-  // timeout).
+  // Cognito's managed login asks for the email first and reveals the password on
+  // a second step; the classic hosted UI keeps both fields on one page. The
+  // managed-login SPA renders the email step asynchronously and can re-mount the
+  // input after hydration, wiping a value filled too early — the form then shows
+  // "Missing email address" and Next never reveals the password. It also renders
+  // Next asynchronously, so a one-shot fill/check/click can skip or be undone.
+  // Drive the whole first step from a poll: keep the email populated (re-fill
+  // whenever the SPA clears it), and in the two-step flow click Next only once
+  // the field holds the address, until the password step renders.
   await expect
     .poll(
       async () => {
+        if (await email.isVisible().catch(() => false)) {
+          const typed = await email.inputValue().catch(() => "")
+          if (typed !== credentials.email) {
+            await email.fill(credentials.email).catch(() => undefined)
+          }
+        }
         if (await password.isVisible().catch(() => false)) return "password"
         if ((await next.isVisible().catch(() => false)) && (await next.isEnabled().catch(() => false))) {
           await next.click().catch(() => undefined)
