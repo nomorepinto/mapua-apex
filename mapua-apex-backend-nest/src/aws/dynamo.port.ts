@@ -32,6 +32,13 @@ export interface ScanArgs {
   values?: Record<string, unknown>;
   names?: Record<string, string>;
   maxItems?: number;
+  /**
+   * Strongly-consistent read on the base table. Scans are eventually consistent
+   * by default, so a list read issued right after a write (e.g. the admin
+   * signatory/campus/organization lists refetched immediately after a create)
+   * can miss the just-written item. Valid on the base table only, never a GSI.
+   */
+  consistent?: boolean;
 }
 
 export interface UpdateArgs {

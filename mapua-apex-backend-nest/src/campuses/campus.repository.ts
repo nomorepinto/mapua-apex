@@ -27,6 +27,8 @@ export class CampusRepository {
       filter: 'begins_with(PK, :pk) AND PK = SK',
       values: { ':pk': 'CAMPUS#' },
       maxItems: 100,
+      // Read-after-write: refetched right after a campus create/update.
+      consistent: true,
     });
   }
 

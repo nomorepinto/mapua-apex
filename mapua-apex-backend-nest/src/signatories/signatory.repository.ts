@@ -20,6 +20,9 @@ export class SignatoryRepository {
       filter: 'begins_with(PK, :pk) AND PK = SK',
       values: { ':pk': 'SIGNATORY#' },
       maxItems: 100,
+      // Read-after-write: the admin UI refetches this list immediately after a
+      // create/update, so a strongly-consistent scan keeps the new row visible.
+      consistent: true,
     });
   }
 
@@ -99,6 +102,7 @@ export class SignatoryRepository {
       filter: 'begins_with(PK, :pk) AND PK = SK',
       values: { ':pk': 'ORGANIZATION#' },
       maxItems: 100,
+      consistent: true,
     });
   }
 

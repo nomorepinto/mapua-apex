@@ -24,6 +24,9 @@ export class OrganizationRepository {
         values: { ':pk': 'ORGANIZATION#' },
         maxItems: 200,
         startKey,
+        // Read-after-write: the admin UI refetches this list right after an
+        // organization create, so a strongly-consistent scan keeps the new row.
+        consistent: true,
       });
       items.push(...page.items);
       startKey = page.lastKey;

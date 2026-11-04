@@ -103,6 +103,7 @@ export class DynamoAdapter implements DynamoPort, OnModuleDestroy {
         ProjectionExpression: args.projection,
         ExclusiveStartKey: args.startKey,
         Limit: args.maxItems ?? 200,
+        ConsistentRead: args.consistent,
       }),
       reportRequestOptions(),
     );
@@ -154,6 +155,7 @@ export class DynamoAdapter implements DynamoPort, OnModuleDestroy {
           ExpressionAttributeNames: args.names,
           ExclusiveStartKey: startKey,
           Limit: max - items.length,
+          ConsistentRead: args.consistent,
         }),
         reportRequestOptions(),
       );
