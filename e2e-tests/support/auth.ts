@@ -75,6 +75,15 @@ async function hostedLogin(page: Page, startUrl: string, credentials: Account) {
   // Support both by only clicking Next when the password is not yet visible.
   const password = page.locator("input[name='password'], input[type='password']").first()
   const next = page.getByRole("button", { name: /^next$/i }).first()
+  // The managed-login SPA paints the email step first, then reveals either the
+  // password (classic hosted UI) or the Next button (two-step) asynchronously.
+  // Decide only once one of them is actually present: checking instantly after
+  // the email fill can run before Next renders, skip the click, and leave the
+  // password field permanently hidden (a flaky 15s timeout at the wait below).
+  await Promise.race([
+    password.waitFor({ state: "visible", timeout: 20_000 }),
+    next.waitFor({ state: "visible", timeout: 20_000 }),
+  ]).catch(() => undefined)
   if (!(await password.isVisible().catch(() => false)) && (await next.isVisible().catch(() => false))) {
     await next.click()
   }
