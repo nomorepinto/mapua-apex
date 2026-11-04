@@ -1,0 +1,3 @@
+﻿Root cause was a product bug in the evaluation app, not locator drift. Attendance registration now writes the student profile under `STUDENT#{id}` (arcus-attendance-system/src/store/dynamodb-keys.ts:8), but `lookupStudent` in `arcus-evaluation-system/src/lib/student-lookup.ts` only read `MEMBER#{id}`. The `/forms` page therefore rendered "Your student profile could not be found" (visible in the failure screenshot), so the Department select never appeared and `getByLabel("Department").click()` timed out at attendance.page.ts:97.
+
+Fix: `getMember` now reads the `STUDENT#{id}` profile first and falls back to the legacy `MEMBER#` key. Typecheck reports no errors in the edited file, and `npm test` (10/10) passes. Verdict written as `product`.

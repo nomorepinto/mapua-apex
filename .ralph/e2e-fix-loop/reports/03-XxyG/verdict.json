@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "attendance registration writes the student profile at PK=SK=STUDENT#{id}, but the evaluation app's lookupStudent only read MEMBER#{id}, so /forms showed 'Your student profile could not be found' and the Department field never rendered; getMember now reads the STUDENT# profile first, falling back to the legacy MEMBER# key.",
+  "commit_message": "fixed evaluation student profile lookup key"
+}
