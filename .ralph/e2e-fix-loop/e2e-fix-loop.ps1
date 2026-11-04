@@ -302,8 +302,12 @@ You may edit e2e-tests/support/** and e2e-tests/pages/** (harness). Do not edit 
 "@
 
   if ($agentExit -ne 0) {
-    Write-Host "Agent exited with code $agentExit. Bug-log entry written."
-    throw "agent exited with code $agentExit. Output: $AgentLog"
+    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "- Agent stopped without a product fix (exit $agentExit, likely max-turns). Operator input needed: $AgentLog`r`n"
+    Write-Host ""
+    Write-Host "The agent stopped without a fix (exit $agentExit, most likely it hit the 40-turn budget)."
+    Write-Host "This usually means the bug needs operator input: an environment/config value the agent cannot edit (for example an Arcus app's APEX_API_BASE_URL in its gitignored .env), or a harder cross-system fix."
+    Write-Host "Agent output: $AgentLog"
+    Stop-Loop 7
   }
 
   foreach ($repo in $Repos) {
