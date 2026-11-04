@@ -149,6 +149,10 @@ if (-not $EventDate) {
 }
 
 $previousSignature = ""
+# True when the previous iteration ended with the agent unable to produce a fix
+# (max-turns). Lets the same-signature guard tell "a committed fix did not work"
+# apart from "a flake the agent could not reproduce came back on a plain re-run".
+$previousWasNoFix = $false
 
 for ($i = 1; $i -le $MaxIterations; $i++) {
   if (Test-Path -LiteralPath $StopFile) {
@@ -224,6 +228,15 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
   $bug = $product[0]
   $signature = "$($bug.name)|$($bug.http)|$($bug.detail)"
   if ($signature -eq $previousSignature) {
+    if ($previousWasNoFix) {
+      # The agent could not fix this on the previous pass and we re-ran the suite
+      # to check whether it was a flake. The identical failure came back with no
+      # fix applied, so another re-run will not help either: this needs operator
+      # input (an env/config value the agent cannot edit, or a harder fix).
+      Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`n## Iteration $i`r`nSame failure returned after a no-fix re-run. Loop stopped for operator input.`r`n- $($bug.name): $($bug.detail)`r`nSaved: $iterDir`r`n"
+      Write-Host "Stopped. The same failure returned after the agent could not fix it and a re-run did not clear it: $($bug.name)"
+      Stop-Loop 7
+    }
     Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`n## Iteration $i`r`nSame failure as the previous run. Loop stopped.`r`n- $($bug.name): $($bug.detail)`r`nSaved: $iterDir`r`n"
     Write-Host "Stopped. The same failure came back after a fix attempt: $($bug.name)"
     Stop-Loop 3
@@ -267,6 +280,7 @@ $VerdictPath
 You may edit e2e-tests/support/** and e2e-tests/pages/** (harness). Do not edit e2e-tests/tests/** (specs).
 "@ | Set-Content -LiteralPath $TaskPath -Encoding utf8
 
+  $previousWasNoFix = $false
   Write-Host "Product bug: $($bug.name)"
   $agentOutput = @()
   & $Agent -p --output-format text --permission-mode bypass_permissions --no-session-persistence --max-turns 40 --cwd $Workspace "Follow the task file exactly: $TaskPath" 2>&1 |
@@ -302,12 +316,29 @@ You may edit e2e-tests/support/** and e2e-tests/pages/** (harness). Do not edit 
 "@
 
   if ($agentExit -ne 0) {
-    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "- Agent stopped without a product fix (exit $agentExit, likely max-turns). Operator input needed: $AgentLog`r`n"
+    # The agent burned its turn budget without writing a product verdict. More often
+    # than not this is a flaky/intermittent failure it could not reproduce, not a
+    # bug that genuinely needs a human. Do NOT halt the whole run here: discard the
+    # agent's unreviewed partial edits and re-run the suite. If it was a flake, the
+    # re-run clears it and the loop advances to the next real bug; if the identical
+    # failure comes back, the same-signature guard above stops the loop for operator
+    # input on the next iteration.
+    Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "- Agent stopped without a fix (exit $agentExit, likely max-turns). Discarded its unreviewed edits and re-running; if the same failure returns the loop stops for operator input. Agent log: $AgentLog`r`n"
+    foreach ($repo in $Repos) {
+      Push-Location $repo
+      try {
+        git checkout -- . 2>&1 | Out-Null
+      }
+      finally {
+        Pop-Location
+      }
+    }
     Write-Host ""
-    Write-Host "The agent stopped without a fix (exit $agentExit, most likely it hit the 40-turn budget)."
-    Write-Host "This usually means the bug needs operator input: an environment/config value the agent cannot edit (for example an Arcus app's APEX_API_BASE_URL in its gitignored .env), or a harder cross-system fix."
+    Write-Host "The agent stopped without a fix (exit $agentExit, most likely the 40-turn budget)."
+    Write-Host "Discarded its unreviewed edits and re-running the suite instead of stopping: a flake will clear and the loop advances, and if this exact failure returns the loop stops for operator input."
     Write-Host "Agent output: $AgentLog"
-    Stop-Loop 7
+    $previousWasNoFix = $true
+    continue
   }
 
   foreach ($repo in $Repos) {
