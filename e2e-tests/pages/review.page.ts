@@ -37,15 +37,32 @@ export class ReviewPage {
   async approve() {
     const approve = this.page.getByRole("button", { name: "Approve Proposal" })
     const major = this.page.getByRole("button", { name: "Major Event" })
-    // Waiting for Approve to render means the modal body has hydrated, so the
-    // presence of the classification control below is reliable (not a race).
     await expect(approve).toBeVisible()
-    // OSAAR desks render the event-nature control and gate Approve behind it;
-    // every other desk omits it. Approve is also briefly disabled while the
-    // booking-conflict check runs, so decide on the control, not the disabled
-    // state, then wait for Approve to settle enabled.
-    if (await major.isVisible()) await major.click()
-    await expect(approve).toBeEnabled()
+    // OSAAR desks render an event-nature control and gate Approve behind it,
+    // flagging the button title="Select an event classification first" until a
+    // nature is set; every other desk omits the control and the title. The app's
+    // classification handler is fire-and-forget (errors are caught, not thrown),
+    // so a single isVisible()+click can silently miss: right after a return and
+    // resubmit the control may still be hydrating, or the PATCH may land before
+    // the fresh submission is ready. Drive the gate off the Approve title itself
+    // — wait for the control, click it, and re-click until the title clears.
+    const gate = "Select an event classification first"
+    if ((await approve.getAttribute("title")) === gate) {
+      await expect(major).toBeVisible({ timeout: 30_000 })
+      await expect
+        .poll(
+          async () => {
+            if ((await approve.getAttribute("title")) !== gate) return "cleared"
+            // Major is disabled while the classification mutation is in flight,
+            // so this only re-clicks when a prior attempt truly didn't stick.
+            if (await major.isEnabled().catch(() => false)) await major.click()
+            return "gated"
+          },
+          { timeout: 30_000, intervals: [500] },
+        )
+        .toBe("cleared")
+    }
+    await expect(approve).toBeEnabled({ timeout: 30_000 })
     await approve.click()
     const confirm = this.page.getByRole("dialog", { name: /Endorse/ })
     await confirm.getByRole("button", { name: "Proceed" }).click()

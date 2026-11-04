@@ -49,6 +49,11 @@ Diagnosing an empty Arcus event dropdown (a scanner/officer `getByRole("option",
 
 Note: `e2e-tests/state/run.json` holds only the fixture plan (tag, people, orgs, papers); it has NO event-date field. The event date flows from `--event-date` into `E2E_EVENT_DATE` and is identical across every phase of one run, so the submissions and the Arcus window always agree. Never claim a date mismatch by reading run.json.
 
+Diagnosing a review-desk action that times out in `e2e-tests/pages/review.page.ts` (Approve/Reject/Return never becomes clickable, or Approve stays `disabled`). These are modal-hydration races, NOT backend bugs, and the page object already guards them — extend the guard, do not touch the backend:
+1. The detail modal renders its Return/Reject/Approve footer only once the desk's review queue resolves and the paper is in the "For Review" list (`use-review-dashboard.ts isReadOnly`). Until then the modal is read-only history with no action buttons. `ReviewPage.open()` already waits for the "Return Proposal" footer before returning; if a new action path races this, wait for the actionable footer the same way.
+2. OSAAR desks additionally gate Approve behind an event-nature classification: the Approve button carries `title="Select an event classification first"` until Minor/Major is chosen, and the classification PATCH (`handleClassificationChange`) is fire-and-forget (errors caught, not thrown). So never decide with a one-shot `major.isVisible()`+click — read the Approve `title`, wait for the "Major Event" control, click it, and re-click (via `expect.poll`) until the title clears. `ReviewPage.approve()` already does this.
+3. Only if the classification PATCH genuinely 4xx/5xxs (check the backend response, not the disabled button) is there a product bug in `/signatories/events/:eventId/submissions/:submissionId/classification`. A disabled Approve with the classification title is a harness-timing symptom.
+
 IMPORTANT: If you edited ANY file (including page objects or support helpers), you MUST use `kind: "product"` with a `commit_message`. Using `test` or `environment` after changing files causes the loop to stop WITHOUT committing your work.
 
 After the verdict file is written, stop.
