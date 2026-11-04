@@ -9,8 +9,16 @@ import { root } from "../support/env"
 export class AttendancePage {
   constructor(private readonly page: Page) {}
 
+  async dismissInstructions() {
+    const dialog = this.page.getByRole("dialog", { name: "Before you continue" })
+    await dialog.waitFor({ state: "visible" })
+    await dialog.getByRole("button", { name: "Agree and proceed" }).click()
+    await expect(dialog).toBeHidden()
+  }
+
   async register(first: string, last: string, studentNumber: string) {
     await this.page.goto("/")
+    await this.dismissInstructions()
     await this.page.getByLabel("First Name").fill(first)
     await this.page.getByLabel("Last Name").fill(last)
     await this.page.getByLabel("Student Number").fill(studentNumber)
