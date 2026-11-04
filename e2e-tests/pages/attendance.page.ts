@@ -6,6 +6,32 @@ import { expect, type Page } from "@playwright/test"
 
 import { attendanceBase, evaluationBase, root } from "../support/env"
 
+// The scanner and officer views fetch their event list asynchronously: while
+// loading they render a skeleton (no combobox at all) and an empty list leaves
+// the Select disabled. A Select only puts its options in the DOM while open, so
+// a one-shot trigger click either fires before hydration or opens an empty /
+// disabled dropdown and the target option never renders (a flaky 20s timeout).
+// Re-open the dropdown each tick until the option appears instead.
+async function chooseEvent(page: Page, eventTitle: string) {
+  const option = page.getByRole("option", { name: new RegExp(eventTitle) })
+  await expect
+    .poll(
+      async () => {
+        if (await option.isVisible().catch(() => false)) return "open"
+        const combobox = page.getByRole("combobox").first()
+        if (await combobox.isVisible().catch(() => false)) {
+          if (await combobox.isEnabled().catch(() => false)) await combobox.click().catch(() => undefined)
+        } else {
+          await page.getByLabel("Event").click().catch(() => undefined)
+        }
+        return "waiting"
+      },
+      { timeout: 30_000, intervals: [500] },
+    )
+    .toBe("open")
+  await option.click()
+}
+
 export class AttendancePage {
   constructor(private readonly page: Page) {}
 
@@ -41,10 +67,7 @@ export class AttendancePage {
     fs.mkdirSync(path.dirname(file), { recursive: true })
     await QRCode.toFile(file, studentNumber)
     await this.open("/scanner")
-    await this.page.getByLabel("Event").click().catch(async () => {
-      await this.page.getByRole("combobox").first().click()
-    })
-    await this.page.getByRole("option", { name: new RegExp(eventTitle) }).click()
+    await chooseEvent(this.page, eventTitle)
     await this.page.getByRole("button", { name: "Upload File" }).click()
     await this.page.locator("input[type='file']").setInputFiles(file)
   }
@@ -84,8 +107,7 @@ export class EvaluationPage {
 
   async expectAttendance(eventTitle: string) {
     await this.open("/officer")
-    await this.page.getByLabel("Event").click()
-    await this.page.getByRole("option", { name: new RegExp(eventTitle) }).click()
+    await chooseEvent(this.page, eventTitle)
     await expect(this.page.getByText(/([2-9]|\d{2,}) attendance records/)).toBeVisible()
   }
 

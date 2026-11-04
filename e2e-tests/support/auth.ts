@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 
-import { type Browser, type BrowserContext, type Page } from "@playwright/test"
+import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test"
 
 import { account, attendanceBase, authDir, evaluationBase, type Account } from "./env"
 
@@ -76,18 +76,24 @@ async function hostedLogin(page: Page, startUrl: string, credentials: Account) {
   const password = page.locator("input[name='password'], input[type='password']").first()
   const next = page.getByRole("button", { name: /^next$/i }).first()
   // The managed-login SPA paints the email step first, then reveals either the
-  // password (classic hosted UI) or the Next button (two-step) asynchronously.
-  // Decide only once one of them is actually present: checking instantly after
-  // the email fill can run before Next renders, skip the click, and leave the
-  // password field permanently hidden (a flaky 15s timeout at the wait below).
-  await Promise.race([
-    password.waitFor({ state: "visible", timeout: 20_000 }),
-    next.waitFor({ state: "visible", timeout: 20_000 }),
-  ]).catch(() => undefined)
-  if (!(await password.isVisible().catch(() => false)) && (await next.isVisible().catch(() => false))) {
-    await next.click()
-  }
-  await password.waitFor({ state: "visible", timeout: 15_000 })
+  // password (classic hosted UI) or the Next button (two-step) asynchronously,
+  // and Next can re-render between a visibility check and a single click. Poll
+  // instead of clicking once: re-click Next whenever it is the actionable
+  // control until the password field renders. A one-shot check/click can run
+  // before Next hydrates, skip, and leave the password hidden (a flaky 15s
+  // timeout).
+  await expect
+    .poll(
+      async () => {
+        if (await password.isVisible().catch(() => false)) return "password"
+        if ((await next.isVisible().catch(() => false)) && (await next.isEnabled().catch(() => false))) {
+          await next.click().catch(() => undefined)
+        }
+        return "waiting"
+      },
+      { timeout: 30_000, intervals: [500] },
+    )
+    .toBe("password")
   await password.fill(credentials.password)
 
   await page.locator("button[type='submit'], input[type='submit']").first().click()

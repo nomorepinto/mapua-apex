@@ -328,6 +328,13 @@ You may edit e2e-tests/support/** and e2e-tests/pages/** (harness). Do not edit 
       Push-Location $repo
       try {
         git checkout -- . 2>&1 | Out-Null
+        # `git checkout -- .` only reverts tracked files, so any scratch file the
+        # agent created (probe scripts, throwaway .mjs) survives and piles up
+        # across iterations. Drop untracked files too: -fd respects .gitignore, so
+        # runtime state (state/, .auth/, accounts.local.json, reports/,
+        # test-results/) is untouched, and -e .ralph keeps the loop's own
+        # per-iteration artifacts (task.md, agent.txt, verdict.json, reports).
+        git clean -fd -e .ralph 2>&1 | Out-Null
       }
       finally {
         Pop-Location
