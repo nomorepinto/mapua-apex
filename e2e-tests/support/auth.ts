@@ -67,9 +67,20 @@ export async function openApex(browser: Browser, key: string): Promise<{ page: P
 
 async function hostedLogin(page: Page, startUrl: string, credentials: Account) {
   await page.goto(`${startUrl}/api/auth/login`, { waitUntil: "domcontentloaded" })
-  const username = page.locator("input[name='username'], input[name='email'], input[type='email']").first()
-  await username.fill(credentials.email)
-  await page.locator("input[name='password'], input[type='password']").first().fill(credentials.password)
+  const email = page.locator("input[name='username'], input[name='email'], input[type='email']").first()
+  await email.fill(credentials.email)
+
+  // Cognito's managed login asks for email first and reveals the password on
+  // a second step; the classic hosted UI keeps both fields on one page.
+  // Support both by only clicking Next when the password is not yet visible.
+  const password = page.locator("input[name='password'], input[type='password']").first()
+  const next = page.getByRole("button", { name: /^next$/i }).first()
+  if (!(await password.isVisible().catch(() => false)) && (await next.isVisible().catch(() => false))) {
+    await next.click()
+  }
+  await password.waitFor({ state: "visible", timeout: 15_000 })
+  await password.fill(credentials.password)
+
   await page.locator("button[type='submit'], input[type='submit']").first().click()
   await page.waitForURL(`${startUrl}/**`, { timeout: 45_000 })
 }
