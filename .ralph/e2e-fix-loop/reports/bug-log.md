@@ -26,3 +26,12 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 Suite passed on iteration 1 (2026-11-02).
 Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-qIyo
 
+
+## Iteration 1 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1
+- Verdict: environment
+- Summary: Cognito rejected the Arcus attendance callback with redirect_mismatch: the apex-attendance-system client only registers http://localhost:3000/api/auth/callback while the app and suite run on 3001, so add http://localhost:3001/api/auth/callback (and logout http://localhost:3001/) in the user pool.
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-JfDq
+- Note: agent hit qodercli max-turns (40) after writing verdict.json, so the loop exited via throw before logging this entry. No product code change; fix belongs in the Cognito user pool app client settings.
+

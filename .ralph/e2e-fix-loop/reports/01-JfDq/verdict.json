@@ -1,0 +1,4 @@
+{
+  "kind": "environment",
+  "summary": "Cognito rejected the Arcus attendance callback with redirect_mismatch: the apex-attendance-system client only registers http://localhost:3000/api/auth/callback while the app and suite run on 3001, so add http://localhost:3001/api/auth/callback (and logout http://localhost:3001/) in the user pool."
+}
