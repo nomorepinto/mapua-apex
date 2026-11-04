@@ -105,6 +105,29 @@ export class SetupPages {
     await expect(this.page.getByText("All campuses", { exact: true })).toBeVisible()
   }
 
+  /** Assert the campus stage list is `first` above `second`, on the Approval stages tab. */
+  async expectStageOrder(campus: string, first: string, second: string) {
+    await this.page.getByRole("tab", { name: "Approval stages" }).click()
+    const panel = this.page.getByRole("heading", { name: campus, exact: true }).locator("xpath=..")
+    await expect(panel.getByText(first, { exact: true }).locator("xpath=..")).toContainText("1")
+    await expect(panel.getByText(second, { exact: true }).locator("xpath=..")).toContainText("2")
+  }
+
+  /** Nudge a stage one slot toward the front of its campus list. */
+  async moveStageUp(stageName: string) {
+    const up = this.page.getByRole("button", { name: `Move ${stageName} up` })
+    await expect(up).toBeEnabled()
+    await up.click()
+  }
+
+  /** Persist the current draft order and wait for the success toast. */
+  async saveStages() {
+    const save = this.page.getByRole("button", { name: "Save stages" })
+    await expect(save).toBeEnabled()
+    await save.click()
+    await expect(this.page.getByText("Approval stages saved")).toBeVisible()
+  }
+
   async assignAccount(rowName: string, accountLabel: string) {
     const box = this.page.getByRole("row", { name: rowName }).getByRole("combobox", { name: "Assigned account" })
     await box.click()

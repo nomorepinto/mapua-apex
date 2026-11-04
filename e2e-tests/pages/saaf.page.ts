@@ -200,8 +200,10 @@ export class SaafPage {
 }
 
 export async function trackerRoles(page: Page, title: string): Promise<string[]> {
-  await page.getByLabel("Search proposals").fill(title)
-  await page.getByRole("button", { name: title }).first().click()
+  // The dashboard renders several "Search records" toolbars (proposals, post-evals);
+  // scope to the proposals panel so the tracker search is unambiguous.
+  await page.getByRole("region", { name: "Proposal statistics filters" }).getByLabel("Search records").fill(title)
+  await page.locator("tr").filter({ hasText: title }).first().click()
   const dialog = page.getByRole("dialog", { name: `${title} Proposal` })
   await dialog.getByRole("button", { name: "Milestone & Progress" }).click()
   const reviewers = dialog.getByText("Required Reviewers", { exact: true }).locator("xpath=..")

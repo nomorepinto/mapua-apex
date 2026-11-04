@@ -102,6 +102,17 @@ test("admin builds the campus, desks, organizations, and account links", async (
 
     await setup.expectOsaarCampuses(campus, people.osaar1, people.osaar2, people.osaarAll)
 
+    // Approval-stage reorder is self-restoring: swap the campus order, persist it,
+    // prove it stuck after a reload, then swap it back so later phases see the seed order.
+    await setup.moveStageUp(people.osaar2)
+    await setup.saveStages()
+    await setup.expectStageOrder(campus, people.osaar2, people.osaar1)
+    await page.reload()
+    await setup.expectStageOrder(campus, people.osaar2, people.osaar1)
+    await setup.moveStageUp(people.osaar1)
+    await setup.saveStages()
+    await setup.expectStageOrder(campus, people.osaar1, people.osaar2)
+
     const adminAccount = accounts.find((row) => row.email?.toLowerCase() === "mapuaapexqaautomation@gmail.com")
     await page.goto("/osaar/setup/signatories")
     const selfAssign = await setup.rejectAdminSelfAssign(

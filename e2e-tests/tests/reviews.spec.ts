@@ -64,7 +64,7 @@ async function denyAt(browser: Browser, paper: PaperRecord, target: string) {
   await asUser(browser, paper.org, async (page) => {
     const dashboard = new DashboardPage(page)
     await dashboard.expectDenied(paper.title)
-    await dashboard.expectBadge(paper.title, "Cancelled")
+    await dashboard.expectBadge(paper.title, "Denied")
   })
 }
 

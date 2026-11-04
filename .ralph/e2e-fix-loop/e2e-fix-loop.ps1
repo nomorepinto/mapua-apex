@@ -1,5 +1,5 @@
-# Runs the APEX end-to-end suite. On a product bug, asks the Cursor CLI
-# agent to fix that one bug, commits the application change, and runs again.
+# Runs the APEX end-to-end suite. On a product bug, asks the Qoder CLI
+# (qodercli) agent to fix that one bug, commits the application change, and runs again.
 #
 # Usage, from mapua-apex:
 #   powershell -File .\.ralph\e2e-fix-loop\e2e-fix-loop.ps1
@@ -105,14 +105,14 @@ function Get-Head([string]$Repo) {
 }
 
 function Resolve-Agent {
-  $onPath = Get-Command agent -ErrorAction SilentlyContinue
+  $onPath = Get-Command qodercli -ErrorAction SilentlyContinue
   if ($onPath) { return $onPath.Source }
-  $installed = Join-Path $env:LOCALAPPDATA "cursor-agent\agent.cmd"
+  $installed = Join-Path $env:USERPROFILE ".qoder\bin\qodercli\qodercli.exe"
   if (Test-Path -LiteralPath $installed) { return $installed }
   throw @"
-Cursor CLI is not installed. Install it, open a new terminal, then sign in:
-  irm 'https://cursor.com/install?win32=true' | iex
-  agent login
+Qoder CLI (qodercli) is not installed. Install it, open a new terminal, then sign in:
+  Install the Qoder IDE (bundles qodercli under .qoder\bin\qodercli) or the standalone Qoder CLI.
+  qodercli            # first run starts an interactive sign-in, or export QODER_PERSONAL_ACCESS_TOKEN
 "@
 }
 
@@ -257,7 +257,7 @@ Do not write any file under mapua-apex/e2e-tests.
 "@ | Set-Content -LiteralPath $TaskPath -Encoding utf8
 
   Write-Host "Product bug: $($bug.name)"
-  & $Agent -p --force --trust --output-format text --workspace $Workspace "Follow the task file exactly: $TaskPath" 2>&1 |
+  & $Agent -p --output-format text --permission-mode bypass_permissions --no-session-persistence --max-turns 40 --cwd $Workspace "Follow the task file exactly: $TaskPath" 2>&1 |
     ForEach-Object {
       $line = "$_"
       Add-Content -LiteralPath $AgentLog -Encoding utf8 -Value $line

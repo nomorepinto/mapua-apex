@@ -38,6 +38,11 @@ PROJECTS = {
     "arcus": "arcus",
     "postevals": "postevals",
     "reservation_changes": "reservation-changes",
+    "members": "members",
+    "announcements": "announcements",
+    "calendar": "calendar",
+    "monitor": "monitor",
+    "reports": "reports",
 }
 
 

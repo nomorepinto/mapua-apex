@@ -34,5 +34,14 @@ export default defineConfig({
       testMatch: /reservation-changes\.spec\.ts/,
       dependencies: ["postevals"],
     },
+    { name: "members", testMatch: /members\.spec\.ts/, dependencies: ["setup"] },
+    { name: "announcements", testMatch: /announcements\.spec\.ts/, dependencies: ["setup"] },
+    { name: "calendar", testMatch: /calendar\.spec\.ts/, dependencies: ["reviews"] },
+    {
+      name: "monitor",
+      testMatch: /monitor\.spec\.ts/,
+      dependencies: ["reservation-changes"],
+    },
+    { name: "reports", testMatch: /reports\.spec\.ts/, dependencies: ["monitor"] },
   ],
 })

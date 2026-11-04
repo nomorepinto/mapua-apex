@@ -2,20 +2,39 @@ import { expect, type Page } from "@playwright/test"
 
 import { PROSE } from "../support/data"
 
+/**
+ * The student dashboard renders several "Search records" toolbars (proposals,
+ * post-evals). Narrow to the proposals panel so a locator is unambiguous.
+ */
+function proposalSearch(page: Page) {
+  return page
+    .getByRole("region", { name: "Proposal statistics filters" })
+    .getByLabel("Search records")
+}
+
+/**
+ * The proposals table row for a title. Scoped to a `<tr>` so the active-search
+ * chip ("Search: {title}") that the toolbar renders — also role=button — never
+ * collides with the row when narrowing by accessible name.
+ */
+function proposalRow(page: Page, title: string) {
+  return page.locator("tr").filter({ hasText: title })
+}
+
 export class DashboardPage {
   constructor(private readonly page: Page) {}
 
   async openProposal(title: string) {
     await this.page.goto("/students/dashboard")
-    await this.page.getByLabel("Search proposals").fill(title)
-    await this.page.getByRole("button", { name: title }).first().click()
+    await proposalSearch(this.page).fill(title)
+    await proposalRow(this.page, title).first().click()
     await expect(this.page.getByRole("dialog", { name: `${title} Proposal` })).toBeVisible()
   }
 
   async expectBadge(title: string, badge: string) {
     await this.page.goto("/students/dashboard")
-    await this.page.getByLabel("Search proposals").fill(title)
-    await expect(this.page.getByRole("button", { name: title }).first()).toContainText(badge)
+    await proposalSearch(this.page).fill(title)
+    await expect(proposalRow(this.page, title).first()).toContainText(badge)
   }
 
   async expectReturned(title: string) {

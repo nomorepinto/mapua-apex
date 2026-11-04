@@ -25,9 +25,18 @@ export class ReviewPage {
   }
 
   async approve() {
+    const approve = this.page.getByRole("button", { name: "Approve Proposal" })
     const major = this.page.getByRole("button", { name: "Major Event" })
-    if (await major.count()) await major.click()
-    await this.page.getByRole("button", { name: "Approve Proposal" }).click()
+    // Waiting for Approve to render means the modal body has hydrated, so the
+    // presence of the classification control below is reliable (not a race).
+    await expect(approve).toBeVisible()
+    // OSAAR desks render the event-nature control and gate Approve behind it;
+    // every other desk omits it. Approve is also briefly disabled while the
+    // booking-conflict check runs, so decide on the control, not the disabled
+    // state, then wait for Approve to settle enabled.
+    if (await major.isVisible()) await major.click()
+    await expect(approve).toBeEnabled()
+    await approve.click()
     const confirm = this.page.getByRole("dialog", { name: /Endorse/ })
     await confirm.getByRole("button", { name: "Proceed" }).click()
     await expect(confirm).toBeHidden()
