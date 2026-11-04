@@ -1,0 +1,44 @@
+{
+  "tag": "ULfO",
+  "passed": true,
+  "cleanup_before": 418,
+  "cleanup_after": 444,
+  "leftovers": 0,
+  "steps": [
+    {
+      "name": "cleanup before",
+      "status": "pass",
+      "detail": "deleted 418, left 0",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "preflight",
+      "status": "pass",
+      "detail": "event date 2026-11-06",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "playwright",
+      "status": "pass",
+      "detail": "browser journeys finished",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "finished paper badge",
+      "status": "gap",
+      "detail": "The API stores finished. The student badge maps that status to Pending.",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "cleanup after",
+      "status": "pass",
+      "detail": "deleted 444, left 0",
+      "http": null,
+      "gap": false
+    }
+  ]
+}
