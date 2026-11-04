@@ -342,14 +342,15 @@ export const router = createBrowserRouter([
             },
           },
           {
+            // Calendar is a view of the Submissions tab now, not a section of
+            // its own; old bookmarks land on the same thing they showed before.
             path: "calendar",
-            HydrateFallback: RouteFallback,
-            lazy: async () => {
-              const { AdminDashboardCalendarPage } = await import(
-                "@/routes/osaar/dashboard-calendar"
-              )
-              return { Component: AdminDashboardCalendarPage }
-            },
+            Component: () => (
+              <Navigate
+                to="/osaar/dashboard/submissions?view=calendar"
+                replace
+              />
+            ),
           },
           {
             path: "submissions",

@@ -289,6 +289,8 @@ export function useReviewDashboard() {
     hasActivities: activitiesList.length > 0,
     isLoading: queueQuery.isLoading,
     isHistoryLoading: historyQuery.isLoading,
+    /** Surfaced by the history table so a failed load is not shown as empty. */
+    isHistoryError: historyQuery.isError,
     isActing:
       approveMutation.isPending || returnMutation.isPending || denyMutation.isPending,
     isUpdatingClassification: updateClassificationMutation.isPending,

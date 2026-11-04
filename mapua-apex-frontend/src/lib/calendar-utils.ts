@@ -1,12 +1,13 @@
 import { getDateKey, parseDateKey } from "@/lib/date-key"
 
 /**
- * Shared calendar helpers used by both the admin (OSAAR) applications calendar
- * and the CDM reservations calendar.
+ * Shared calendar helpers used by the submissions calendar every desk renders
+ * (`SubmissionCalendarSection`) and by the CDM reservations calendar.
  *
- * These are pure, presentational utilities only. Each dashboard keeps its own
- * status-mapping and data-fetching logic, since they operate on different
- * domain types (`DashboardSubmissionRow` vs `Activity`).
+ * These are pure, presentational utilities only — month/weekday names, date-key
+ * coercion and range expansion. Status mapping lives with the row model instead:
+ * both calendars plot `Activity` rows through `getSubmissionCalendarStatus`, so
+ * a desk's dots mean the same thing on either grid.
  */
 
 export type CalendarStatusFilter = "all" | "approved" | "under_review" | "denied"

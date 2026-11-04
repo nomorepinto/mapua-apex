@@ -63,7 +63,7 @@ Layout: `CdmReviewerLayout` (`src/routes/layouts/cdm-reviewer-layout.tsx`). Side
 | Path | Component | Source file | Notes |
 | :---- | :---- | :---- | :---- |
 | `/cdm` | redirect | — | → `dashboard` |
-| `/cdm/dashboard` | `CdmReviewerDashboard` | `src/routes/cdm-reviewer/dashboard.tsx` | CDM review home. |
+| `/cdm/dashboard` | `CdmReviewerDashboard` | `src/routes/cdm-reviewer/dashboard.tsx` | CDM review home. Table (`?view=table`, default) shows the review queue + submission history; `?view=calendar` shows the reservations calendar. |
 | `/cdm/reservations` | `CdmReservationsPage` | `src/routes/cdm-reviewer/reservations.tsx` | Master–detail desk to resolve student requests to cancel or reschedule an approved paper's holds (Cancel event / Reschedule / Deny). |
 | `/cdm/reservables` | `AdminReservablesPage` | `src/routes/cdm-reviewer/reservables.tsx` | Add / View / Reserve reservables (segmented control). |
 | `/cdm/activities` | `AdminMonitorActivitiesPage` | `src/routes/admin/monitor-activities.tsx` | Reused admin page, wrapped in `AuthGuard` `ACTIVITY_LOG_GROUPS`. |
@@ -79,7 +79,7 @@ Layout: `DeanLayout` (`src/routes/layouts/dean-layout.tsx`). Sidebar: Dashboard.
 | Path | Component | Source file | Notes |
 | :---- | :---- | :---- | :---- |
 | `/dean` | redirect | — | → `dashboard` |
-| `/dean/dashboard` | `DeanDashboard` | `src/routes/dean/dashboard.tsx` | Review queue + submission history. |
+| `/dean/dashboard` | `DeanDashboard` | `src/routes/dean/dashboard.tsx` | Review queue + submission history in Table view (default); `?view=calendar` plots the same papers. |
 | `/dean/about` | `About` | `src/routes/about.tsx` | Shared. |
 | `/dean/*` | redirect | — | → `dashboard` |
 
@@ -92,7 +92,7 @@ Layout: `OrgAdviserLayout` (`src/routes/layouts/org-adviser-layout.tsx`). Sideba
 | Path | Component | Source file | Notes |
 | :---- | :---- | :---- | :---- |
 | `/adviser` | redirect | — | → `dashboard` |
-| `/adviser/dashboard` | `OrgAdviserDashboard` | `src/routes/org-adviser/dashboard.tsx` | Adviser review queue. |
+| `/adviser/dashboard` | `OrgAdviserDashboard` | `src/routes/org-adviser/dashboard.tsx` | Adviser review queue in Table view (default); `?view=calendar` shows the shared calendar in the adviser's three-state colors (approved / pending / cancelled). |
 | `/adviser/about` | `About` | `src/routes/about.tsx` | Shared. |
 | `/adviser/*` | redirect | — | → `dashboard` |
 
@@ -105,10 +105,10 @@ Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboar
 | Path | Component | Source file | Notes |
 | :---- | :---- | :---- | :---- |
 | `/osaar` | redirect | — | → `dashboard` |
-| `/osaar/dashboard` | `OsaarDashboardLayout` | `src/routes/osaar/dashboard.tsx` | Shell with a segmented tab bar over the dashboard sub-pages. |
-| `/osaar/dashboard/review` | `AdminDashboardReviewPage` | `src/routes/osaar/dashboard-review.tsx` | Review queue and submission history. First section. |
-| `/osaar/dashboard/calendar` | `AdminDashboardCalendarPage` | `src/routes/osaar/dashboard-calendar.tsx` | All submissions calendar. |
-| `/osaar/dashboard/submissions` | `AdminDashboardSubmissionsPage` | `src/routes/osaar/dashboard-submissions.tsx` | All submissions. |
+| `/osaar/dashboard` | `OsaarDashboardLayout` | `src/routes/osaar/dashboard.tsx` | Shell with a segmented tab bar (Review / Submissions / Announcements) over the dashboard sub-pages. Review and Submissions also show a Table / Calendar switch under the tab bar, backed by `?view=`. |
+| `/osaar/dashboard/review` | `AdminDashboardReviewPage` | `src/routes/osaar/dashboard-review.tsx` | Review queue and submission history; `?view=calendar` plots both. First section. |
+| `/osaar/dashboard/calendar` | redirect | — | Retired tab. → `/osaar/dashboard/submissions?view=calendar`. |
+| `/osaar/dashboard/submissions` | `AdminDashboardSubmissionsPage` | `src/routes/osaar/dashboard-submissions.tsx` | Current + submission history tables; `?view=calendar` for the same records on the calendar. |
 | `/osaar/dashboard/announcements` | `AdminDashboardAnnouncementsPage` | `src/routes/osaar/dashboard-announcements.tsx` | Announcements. |
 | `/osaar/dashboard` (index) | redirect | — | → `review`. |
 | `/osaar/setup` | `OsaarSetupLayout` | `src/routes/osaar/setup.tsx` | Shell with a segmented tab bar over the master-data sub-pages. |

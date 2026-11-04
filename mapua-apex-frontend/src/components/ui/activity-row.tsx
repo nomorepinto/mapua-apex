@@ -3,16 +3,46 @@ import type React from "react"
 
 import { TableCell, TableRow } from "@/components/ui/table"
 import { formatDocumentId } from "@/lib/dynamodb-adapters"
-import type { Activity } from "./activity.types"
+import { cn } from "@/lib/utils"
+import { getStatusVariant, type Activity } from "./activity.types"
 
 // ─── ActivityRow ──────────────────────────────────────────────────────────────
+
+/** Tail pill for tables that report the processed `status` instead of the decision. */
+function StatusBadge({ status }: { status: Activity["status"] }) {
+  const variant = getStatusVariant(status)
+  const classes =
+    variant === "success"
+      ? "bg-emerald-500/10 text-emerald-700 border-emerald-200"
+      : variant === "error"
+        ? "bg-rose-500/10 text-rose-600 border-rose-200"
+        : variant === "warning"
+          ? "bg-amber-500/10 text-amber-600 border-amber-200"
+          : "bg-neutral-100 text-neutral-600 border-neutral-200"
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+        classes
+      )}
+    >
+      {status ?? "—"}
+    </span>
+  )
+}
 
 export interface ActivityRowProps {
   activity: Activity
   onSelect: (activity: Activity) => void
+  /**
+   * Which field the trailing column reports: the actionable `decision`
+   * (Review/Return/Reject, default) or the processed `status` outcome.
+   */
+  statusField?: "decision" | "status"
 }
 
-const ActivityRow = memo(function ActivityRow({ activity, onSelect }: ActivityRowProps) {
+const ActivityRow = memo(function ActivityRow({ activity, onSelect, statusField = "decision" }: ActivityRowProps) {
   const handleClick = useCallback(() => onSelect(activity), [activity, onSelect])
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -79,9 +109,11 @@ const ActivityRow = memo(function ActivityRow({ activity, onSelect }: ActivityRo
         </div>
       </TableCell>
 
-      {/* 7. DECISION (Review, Return, Reject) */}
+      {/* 7. DECISION (Review, Return, Reject) or processed STATUS outcome */}
       <TableCell className="py-4.5 px-6 text-right">
-        {activity.decision === "Review" ? (
+        {statusField === "status" ? (
+          <StatusBadge status={activity.status} />
+        ) : activity.decision === "Review" ? (
           <span className="inline-flex items-center text-xs font-semibold text-neutral-800 group-hover:text-black py-1 px-3 rounded-lg hover:bg-neutral-200/60 transition-colors">
             Review
           </span>

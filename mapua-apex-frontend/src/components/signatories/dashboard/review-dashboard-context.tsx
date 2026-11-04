@@ -53,6 +53,7 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
         hasActivities: dashboard.hasActivities,
         isLoading: dashboard.isLoading,
         isHistoryLoading: dashboard.isHistoryLoading,
+        isHistoryError: dashboard.isHistoryError,
         isActing: dashboard.isActing,
         isOsaar: dashboard.isOsaar,
         isCdm: dashboard.isCdm,

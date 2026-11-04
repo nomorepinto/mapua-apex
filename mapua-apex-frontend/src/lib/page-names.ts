@@ -25,8 +25,7 @@ export function getPageName(path: string): string {
   if (cleanPath === "/adviser/dashboard") return "Adviser Dashboard";
 
   if (cleanPath === "/osaar/dashboard/review") return "Review";
-  if (cleanPath === "/osaar/dashboard/calendar") return "All submissions calendar";
-  if (cleanPath === "/osaar/dashboard/submissions") return "All submissions";
+  if (cleanPath === "/osaar/dashboard/submissions") return "Submissions";
   if (cleanPath === "/osaar/dashboard/announcements") return "Announcements";
   if (cleanPath === "/osaar/dashboard") return "OSAAR Dashboard";
   if (cleanPath === "/osaar/setup/organizations") return "Organizations";

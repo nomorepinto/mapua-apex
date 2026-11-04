@@ -18,6 +18,10 @@ import {
 
 import { useReviewDashboardContext } from "@/components/signatories/dashboard/review-dashboard-context"
 import type { Activity } from "@/components/ui/activity.types"
+import {
+  dedupeBySubmission,
+  getSubmissionCalendarStatus,
+} from "@/lib/submission-calendar-status"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,19 +38,6 @@ import {
 import { getDateKey, parseDateKey } from "@/lib/date-key"
 import { formatClockText } from "@/lib/time-format"
 import { cn } from "@/lib/utils"
-
-/**
- * Normalizes activity status into calendar category for CDM:
- * Approved (green), Under Review (yellow), Denied (red), or Returned (orange).
- */
-export function getCdmActivityCalendarStatus(
-  activity: Activity
-): "approved" | "under_review" | "denied" | "returned" {
-  if (activity.status === "Accepted") return "approved"
-  if (activity.status === "Rejected" || activity.decision === "Reject") return "denied"
-  if (activity.status === "Returned" || activity.decision === "Return") return "returned"
-  return "under_review"
-}
 
 /**
  * Check if the activity has a venue/facility reservation requested.
@@ -78,16 +69,14 @@ export function CdmCalendarSection() {
   const [dayViewMode, setDayViewMode] = useState<"rooms" | "proposals">("rooms")
 
   // Combined proposals filtered strictly to only those with a reservation
-  const reservationProposals = useMemo(() => {
-    const combined = [...reviewActivities, ...historyActivities]
-    const seen = new Set<string>()
-    return combined.filter((act) => {
-      const key = `${act.eventId}:${act.submissionId}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return activityHasReservation(act)
-    })
-  }, [reviewActivities, historyActivities])
+  const reservationProposals = useMemo(
+    () =>
+      dedupeBySubmission([
+        ...reviewActivities,
+        ...historyActivities,
+      ]).filter(activityHasReservation),
+    [reviewActivities, historyActivities]
+  )
 
   // Map proposals to date keys
   const dateProposalsMap = useMemo(() => {
@@ -138,7 +127,7 @@ export function CdmCalendarSection() {
   // Filter proposals by search and status filter
   const filterProposal = useMemo(
     () => (act: Activity) => {
-      const status = getCdmActivityCalendarStatus(act)
+      const status = getSubmissionCalendarStatus(act)
       if (statusFilter !== "all") {
         if (statusFilter === "approved" && status !== "approved") return false
         if (statusFilter === "under_review" && status !== "under_review") return false
@@ -221,7 +210,7 @@ export function CdmCalendarSection() {
 
       if (isInCurrentMonth) {
         total++
-        const status = getCdmActivityCalendarStatus(act)
+        const status = getSubmissionCalendarStatus(act)
         if (status === "approved") approved++
         else if (status === "denied") denied++
         else if (status === "returned") returned++
@@ -269,16 +258,16 @@ export function CdmCalendarSection() {
       const dayProposals = (dateProposalsMap.get(dateKey) || []).filter(filterProposal)
 
       const hasApproved = dayProposals.some(
-        (a) => getCdmActivityCalendarStatus(a) === "approved"
+        (a) => getSubmissionCalendarStatus(a) === "approved"
       )
       const hasUnderReview = dayProposals.some(
-        (a) => getCdmActivityCalendarStatus(a) === "under_review"
+        (a) => getSubmissionCalendarStatus(a) === "under_review"
       )
       const hasDenied = dayProposals.some(
-        (a) => getCdmActivityCalendarStatus(a) === "denied"
+        (a) => getSubmissionCalendarStatus(a) === "denied"
       )
       const hasReturned = dayProposals.some(
-        (a) => getCdmActivityCalendarStatus(a) === "returned"
+        (a) => getSubmissionCalendarStatus(a) === "returned"
       )
 
       cells.push({
@@ -327,7 +316,7 @@ export function CdmCalendarSection() {
     }> = []
 
     selectedDateProposals.forEach((act) => {
-      const status = getCdmActivityCalendarStatus(act)
+      const status = getSubmissionCalendarStatus(act)
       let roomMatched = false
 
       if (act.roomsRequested && act.roomsRequested.length > 0) {
@@ -1057,7 +1046,7 @@ export function CdmCalendarSection() {
                     </div>
                   ) : (
                     selectedDateProposals.map((act) => {
-                      const status = getCdmActivityCalendarStatus(act)
+                      const status = getSubmissionCalendarStatus(act)
                       const dayRooms = (act.roomsRequested || []).filter((r) => {
                         if (!r.dateNeeded) return true
                         const startKey = toLocalDateKey(r.dateNeeded)
