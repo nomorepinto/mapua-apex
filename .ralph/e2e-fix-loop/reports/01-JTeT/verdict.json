@@ -1,0 +1,4 @@
+{
+  "kind": "test",
+  "summary": "Not a product bug: arcus.spec.ts:16 needs an attendance window open today, but the JTeT run created its submissions for a different event date (the state/run.json left behind by JTeT still targets 2026-11-04) while this check ran on 2026-11-05, so the backend's /api/v2/arcus/events?window=attendance correctly returned no open events and the scanner dropdown was empty. The suite already documents this: Arcus and post-eval specs skip when the event date is not today (skipDayOf), and run_e2e.py defaults to date.today(). No harness or app change; the refresh re-creates the submissions dated the current day and the events then list."
+}

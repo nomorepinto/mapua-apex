@@ -1,0 +1,37 @@
+{
+  "tag": "pHVL",
+  "passed": false,
+  "cleanup_before": 0,
+  "cleanup_after": 428,
+  "leftovers": 0,
+  "steps": [
+    {
+      "name": "preflight",
+      "status": "pass",
+      "detail": "event date 2026-11-05",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "playwright",
+      "status": "fail",
+      "detail": "npx playwright test exited 1; failed: arcus.spec.ts:16 @ students register and the officer scans their codes @ TimeoutError: locator.click: Timeout 20000ms exceeded. @ attendance.page.ts:47",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "finished paper badge",
+      "status": "gap",
+      "detail": "The API stores finished. The student badge maps that status to Pending.",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "cleanup after",
+      "status": "pass",
+      "detail": "deleted 428, left 0",
+      "http": null,
+      "gap": false
+    }
+  ]
+}

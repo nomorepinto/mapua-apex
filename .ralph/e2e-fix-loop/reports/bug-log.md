@@ -77,3 +77,21 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 - Verdict: product
 - Summary: The Arcus authorize URL omitted prompt=login, so Cognito's retained hosted-UI session skipped the login form and the password field never appeared; both Arcus apps now force the sign-in form.
 - Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-bcjj
+- Commit: mapua-apex 6a1eadb, arcus-attendance-system f2eef26, arcus-evaluation-system 0728411 fixed arcus sign-in skipping the login form
+
+
+## Iteration 2 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1; failed: arcus.spec.ts:16 @ students register and the officer scans their codes @ TimeoutError: locator.click: Timeout 20000ms exceeded. @ attendance.page.ts:47
+- Verdict: unknown
+- Summary: Agent exited with code 1 before writing verdict
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\02-pHVL
+
+## Iteration 1 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1; failed: arcus.spec.ts:16 @ students register and the officer scans their codes @ TimeoutError: locator.click: Timeout 20000ms exceeded. @ attendance.page.ts:47
+- Verdict: test
+- Summary: Not a product bug: arcus.spec.ts:16 needs an attendance window open today, but the JTeT run created its submissions for a different event date (the state/run.json left behind by JTeT still targets 2026-11-04) while this check ran on 2026-11-05, so the backend's /api/v2/arcus/events?window=attendance correctly returned no open events and the scanner dropdown was empty. The suite already documents this: Arcus and post-eval specs skip when the event date is not today (skipDayOf), and run_e2e.py defaults to date.today(). No harness or app change; the refresh re-creates the submissions dated the current day and the events then list.
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-JTeT
+- Agent stopped without a product fix (exit 1, likely max-turns). Operator input needed: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-JTeT\agent.txt
+
