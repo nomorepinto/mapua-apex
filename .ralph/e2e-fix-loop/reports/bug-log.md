@@ -35,3 +35,12 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 - Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-JfDq
 - Note: agent hit qodercli max-turns (40) after writing verdict.json, so the loop exited via throw before logging this entry. No product code change; fix belongs in the Cognito user pool app client settings.
 
+
+## Iteration 1 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1
+- Verdict: (no verdict.json written)
+- Summary: after the Cognito :3001 callback was registered, the arcus hostedLogin moved from username-locator timeout to password-locator timeout because Cognito's managed login reveals the password only after a Next button click. The fix lives in e2e-tests/support/auth.ts, which is a blocked path for the loop, so the agent exhausted 40 turns without writing a verdict. Committed a manual hostedLogin update (email -> optional Next -> password) and switched the loop to a non-today weekday event date so the Cognito-dependent arcus and post-eval phases skip by design.
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-fzDZ
+- Note: agent hit qodercli max-turns (40) and threw at line 268 before the log write, so this entry is manual.
+
