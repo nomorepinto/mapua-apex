@@ -17,7 +17,8 @@ These are not product bugs. Do not edit code for them:
 
 - Fix one bug: the step named in the task file. Leave every other failure for the next pass.
 - Change application code in `mapua-apex-backend-nest`, `mapua-apex-frontend`, `arcus-attendance-system`, or `arcus-evaluation-system`.
-- Do not create or edit anything under `mapua-apex/e2e-tests`. Do not edit this prompt or the loop script. Do not flip a failure into a gap, skip an assertion, or loosen a test to make the run pass.
+- You may edit `e2e-tests/support/**` and `e2e-tests/pages/**` (harness helpers and page objects) to fix locator drift or auth flow changes. Do not edit `e2e-tests/tests/**` (specs) or flip a failure into a gap, skip an assertion, or loosen a test to make the run pass.
+- Do not edit this prompt or the loop script.
 - Do not open `.env`, `.env.*`, `.grokadmin`, or `accounts.local.json`.
 - Do not run `git commit`, `git add`, `git push`, or `git reset`. The loop commits after you exit.
 - Do not start a new test run. The loop does that.
@@ -37,6 +38,7 @@ Write the verdict file to the path given in the task file, under `.ralph/e2e-fix
 `kind` is `product`, `test`, or `environment`.
 
 - `product`: you changed application code. `commit_message` is one lowercase line, under 72 characters, in the same style as `fixed routes`. No ticket id, no period, no secret.
-- `test` or `environment`: change no files. Say why in `summary`.
+- `test`: the spec or fixture is wrong. Change no files. Say why in `summary`.
+- `environment`: AWS/Cognito/DynamoDB config issue. Before giving up, check if a boto3 script in `mapua-apex-frontend/scripts/` could fix it (e.g., `add_cognito_arcus_callbacks.py` for redirect URLs, `add_cognito_client_scopes.py` for OAuth scopes). If a script exists or could be written, say so in `summary` and set `kind` to `product` instead. Only use `environment` if the fix requires manual AWS console work or credentials the loop doesn't have.
 
 After the verdict file is written, stop.

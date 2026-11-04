@@ -48,3 +48,10 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 Suite passed on iteration 1 (2026-11-06).
 Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-ULfO
 
+
+## Iteration 1 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1
+- Verdict: test
+- Summary: Arcus added a deliberate non-dismissable 'Before you continue' instructions dialog on the registration page; its focus trap blocks the form, so the AttendancePage.register page object now acknowledges it before filling the fields. No application change.
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-AQDF

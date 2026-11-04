@@ -59,6 +59,9 @@ trap {
 
 function Test-BlockedPath([string]$Path) {
   $norm = ($Path -replace '\\', '/').TrimStart("./")
+  # Block e2e-tests/tests (specs) but allow e2e-tests/support and e2e-tests/pages (harness)
+  if ($norm -match '(?i)^e2e-tests/tests/') { return $true }
+  if ($norm -match '(?i)^e2e-tests/(support|pages)/') { return $false }
   if ($norm -match '(?i)^e2e-tests/') { return $true }
   if ($norm -match '(?i)^\.ralph/') { return $true }
   if ($norm -match '(?i)(^|/)\.env($|\.)') { return $true }
@@ -187,6 +190,14 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
   $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
 
   if ($report.passed -and $code -eq 0) {
+    # Check if event-date is not today, which means arcus/postevals were skipped
+    $today = (Get-Date).ToString("yyyy-MM-dd")
+    if ($EventDate -ne $today) {
+      Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`n## Iteration $i`r`nSuite passed but event-date $EventDate is not today ($today). Arcus and post-eval specs were skipped.`r`nRe-run with today's date to validate the full chain.`r`nSaved: $iterDir`r`n"
+      Write-Host "WARNING: Suite passed but arcus/postevals were skipped because event-date $EventDate is not today ($today)."
+      Write-Host "Re-run with today's date to validate the full chain."
+      Stop-Loop 6
+    }
     Add-Content -LiteralPath $BugLog -Encoding utf8 -Value "`r`nSuite passed on iteration $i ($EventDate).`r`nSaved: $iterDir`r`n"
     Write-Host "Suite passed. Loop finished."
     Stop-Loop 0
@@ -253,18 +264,45 @@ $others
 Write the verdict to:
 $VerdictPath
 
-Do not write any file under mapua-apex/e2e-tests.
+You may edit e2e-tests/support/** and e2e-tests/pages/** (harness). Do not edit e2e-tests/tests/** (specs).
 "@ | Set-Content -LiteralPath $TaskPath -Encoding utf8
 
   Write-Host "Product bug: $($bug.name)"
+  $agentOutput = @()
   & $Agent -p --output-format text --permission-mode bypass_permissions --no-session-persistence --max-turns 40 --cwd $Workspace "Follow the task file exactly: $TaskPath" 2>&1 |
     ForEach-Object {
       $line = "$_"
+      $agentOutput += $line
       Add-Content -LiteralPath $AgentLog -Encoding utf8 -Value $line
       Write-Host $line
     }
   $agentExit = $LASTEXITCODE
+  
+  # Write bug-log entry BEFORE checking agent exit, so max-turns exits are logged
+  $verdictKind = "unknown"
+  $verdictSummary = "Agent exited with code $agentExit before writing verdict"
+  if (Test-Path -LiteralPath $VerdictPath) {
+    try {
+      $verdict = Get-Content -LiteralPath $VerdictPath -Raw | ConvertFrom-Json
+      $verdictKind = $verdict.kind
+      $verdictSummary = $verdict.summary
+    } catch {
+      $verdictSummary = "Verdict file exists but could not be parsed: $_"
+    }
+  }
+  
+  Add-Content -LiteralPath $BugLog -Encoding utf8 -Value @"
+
+## Iteration $i - $($bug.name)
+- HTTP: $($bug.http)
+- Detail: $($bug.detail)
+- Verdict: $verdictKind
+- Summary: $verdictSummary
+- Saved: $iterDir
+"@
+
   if ($agentExit -ne 0) {
+    Write-Host "Agent exited with code $agentExit. Bug-log entry written."
     throw "agent exited with code $agentExit. Output: $AgentLog"
   }
 
@@ -279,16 +317,6 @@ Do not write any file under mapua-apex/e2e-tests.
     throw "The agent did not write $VerdictPath"
   }
   $verdict = Get-Content -LiteralPath $VerdictPath -Raw | ConvertFrom-Json
-
-  Add-Content -LiteralPath $BugLog -Encoding utf8 -Value @"
-
-## Iteration $i - $($bug.name)
-- HTTP: $($bug.http)
-- Detail: $($bug.detail)
-- Verdict: $($verdict.kind)
-- Summary: $($verdict.summary)
-- Saved: $iterDir
-"@
 
   if ($verdict.kind -ne "product") {
     Write-Host "Stopped. Verdict is '$($verdict.kind)': $($verdict.summary)"

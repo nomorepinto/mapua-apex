@@ -1,0 +1,5 @@
+{
+  "kind": "test",
+  "summary": "Arcus added a deliberate non-dismissable 'Before you continue' instructions dialog on the registration page; its focus trap blocks the form, so the AttendancePage.register page object now acknowledges it before filling the fields. No application change.",
+  "commit_message": ""
+}
