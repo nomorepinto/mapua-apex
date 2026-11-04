@@ -1,0 +1,3 @@
+﻿The failure was harness locator drift, not a backend issue. Playwright's log (`error-context.md`) showed it hit the correct radio (`Excellent (5) for item 1`), but the `<span>5</span>` inside the label intercepted the pointer because the input is `sr-only` (`RatingRow.tsx:78-87`).
+
+Fix in `e2e-tests/pages/attendance.page.ts`: `EvaluationPage.file` now clicks the visible "5" label text within each satisfaction radiogroup and asserts the input becomes checked, instead of calling `check()` on the hidden input. Verdict written as `product` with commit message `fixed evaluation rating selection in page object`.

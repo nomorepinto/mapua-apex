@@ -99,9 +99,15 @@ export class EvaluationPage {
     await this.page.getByRole("radio", { name: "Yes", exact: true }).check()
     await this.page.getByLabel(/What activity or program/).fill("General assembly planning session")
     await this.page.getByRole("checkbox", { name: "Classmate / schoolmate" }).check()
-    const ratings = this.page.getByRole("radio", { name: /\(5\) for item/ })
-    const count = await ratings.count()
-    for (let index = 0; index < count; index += 1) await ratings.nth(index).check()
+    // The rating inputs are `sr-only` inside a label, so checking the input
+    // clicks its own clipped box and the label's visible "5" span intercepts
+    // the pointer. Click the label's visible text instead.
+    const scale = this.page.getByRole("radiogroup", { name: /Satisfaction rating for item/ })
+    const count = await scale.count()
+    for (let index = 0; index < count; index += 1) {
+      await scale.nth(index).getByText("5", { exact: true }).click()
+      await expect(scale.nth(index).locator("input[value='5']")).toBeChecked()
+    }
     await this.page.getByRole("button", { name: "Review PDF" }).click()
     await this.page.getByRole("button", { name: "Submit evaluation" }).click()
     await expect(this.page.getByRole("heading", { name: /Submitted/ })).toBeVisible()

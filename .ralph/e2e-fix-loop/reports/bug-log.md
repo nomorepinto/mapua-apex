@@ -129,3 +129,10 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 - Verdict: product
 - Summary: EvaluationPage.file used an anchored name regex on the AES event card link, whose accessible name is the whole card text (title, org, date, venue, Complete evaluation), so the click never matched; the pattern now accepts the trailing card text.
 - Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\02-XZNe
+
+## Iteration 5 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1; failed: arcus.spec.ts:58 @ a checked-in student files an evaluation @ TimeoutError: locator.check: Timeout 20000ms exceeded. @ attendance.page.ts:104
+- Verdict: product
+- Summary: Rating radios in RatingRow.tsx are sr-only inside their label, so Playwright's check() clicked the clipped input box and the label's visible '5' span intercepted the pointer; EvaluationPage.file now clicks the label text per radiogroup and asserts the input becomes checked.
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\05-HjBi

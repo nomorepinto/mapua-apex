@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "Rating radios in RatingRow.tsx are sr-only inside their label, so Playwright's check() clicked the clipped input box and the label's visible '5' span intercepted the pointer; EvaluationPage.file now clicks the label text per radiogroup and asserts the input becomes checked.",
+  "commit_message": "fixed evaluation rating selection in page object"
+}
