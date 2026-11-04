@@ -1,0 +1,3 @@
+﻿repo: F:\CareerStuff\myPrograms\Project Apex\mapua-apex
+commit: de7a203
+message: fixed arcus pages loading on the apex origin

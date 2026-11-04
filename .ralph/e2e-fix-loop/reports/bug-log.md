@@ -62,3 +62,11 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 - Verdict: product
 - Summary: Arcus page objects navigated with baseURL-relative paths, so the A2S pages loaded on the APEX frontend origin (or on 127.0.0.1, where the host-only localhost session cookies are not sent) and showed the APEX landing page; they now open absolute URLs built from the Arcus bases, with env normalizing 127.0.0.1 to localhost to match APP_BASE_URL.
 - Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-DqKb
+- Commit: mapua-apex de7a203 fixed arcus pages loading on the apex origin
+
+
+## Iteration 2
+Same failure as the previous run. Loop stopped.
+- playwright: npx playwright test exited 1
+Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\02-VHsq
+
