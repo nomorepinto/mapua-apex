@@ -1,0 +1,9 @@
+﻿I fixed the reported `playwright` failure and wrote the verdict as `product`.
+
+**Cause:** The arcus spec's page objects navigated with `page.goto("/")`, which Playwright resolves against the APEX frontend `baseURL`, not the Arcus apps. The failure screenshots show the A2S registration and scanner pages, then the APEX landing page. Even with absolute URLs, the harness used `127.0.0.1` while A2S sets host-only session cookies for `localhost` (its `APP_BASE_URL`), so the cookie jar wouldn't match.
+
+**Fix (harness only):**
+- `e2e-tests/pages/attendance.page.ts`: `AttendancePage` and `EvaluationPage` now navigate via `open()` using absolute URLs from `attendanceBase`/`evaluationBase`.
+- `e2e-tests/support/env.ts`: Arcus bases now default to `localhost` and normalize `127.0.0.1` to `localhost`.
+
+No application code or specs were changed; `tsc --noEmit` on the harness is clean.

@@ -4,10 +4,14 @@ import path from "node:path"
 import QRCode from "qrcode"
 import { expect, type Page } from "@playwright/test"
 
-import { root } from "../support/env"
+import { attendanceBase, evaluationBase, root } from "../support/env"
 
 export class AttendancePage {
   constructor(private readonly page: Page) {}
+
+  async open(pathname = "/") {
+    await this.page.goto(new URL(pathname, attendanceBase).toString())
+  }
 
   async dismissInstructions() {
     const dialog = this.page.getByRole("dialog", { name: "Before you continue" })
@@ -17,7 +21,7 @@ export class AttendancePage {
   }
 
   async register(first: string, last: string, studentNumber: string) {
-    await this.page.goto("/")
+    await this.open("/")
     await this.dismissInstructions()
     await this.page.getByLabel("First Name").fill(first)
     await this.page.getByLabel("Last Name").fill(last)
@@ -36,7 +40,7 @@ export class AttendancePage {
     const file = path.join(root, "state", `qr-${studentNumber}.png`)
     fs.mkdirSync(path.dirname(file), { recursive: true })
     await QRCode.toFile(file, studentNumber)
-    await this.page.goto("/scanner")
+    await this.open("/scanner")
     await this.page.getByLabel("Event").click().catch(async () => {
       await this.page.getByRole("combobox").first().click()
     })
@@ -58,8 +62,12 @@ export class AttendancePage {
 export class EvaluationPage {
   constructor(private readonly page: Page) {}
 
+  async open(pathname = "/") {
+    await this.page.goto(new URL(pathname, evaluationBase).toString())
+  }
+
   async file(eventTitle: string) {
-    await this.page.goto("/")
+    await this.open("/")
     await this.page.getByRole("link", { name: new RegExp(eventTitle) }).click()
     await this.page.getByLabel("Department").click()
     await this.page.getByRole("option", { name: /Information Technology/ }).first().click()
@@ -75,14 +83,14 @@ export class EvaluationPage {
   }
 
   async expectAttendance(eventTitle: string) {
-    await this.page.goto("/officer")
+    await this.open("/officer")
     await this.page.getByLabel("Event").click()
     await this.page.getByRole("option", { name: new RegExp(eventTitle) }).click()
     await expect(this.page.getByText(/([2-9]|\d{2,}) attendance records/)).toBeVisible()
   }
 
   async expectEventAbsent(eventTitle: string) {
-    await this.page.goto("/")
+    await this.open("/")
     await expect(this.page.getByRole("link", { name: new RegExp(eventTitle) })).toHaveCount(0)
   }
 }

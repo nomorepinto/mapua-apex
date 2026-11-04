@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "Arcus page objects navigated with baseURL-relative paths, so the A2S pages loaded on the APEX frontend origin (or on 127.0.0.1, where the host-only localhost session cookies are not sent) and showed the APEX landing page; they now open absolute URLs built from the Arcus bases, with env normalizing 127.0.0.1 to localhost to match APP_BASE_URL.",
+  "commit_message": "fixed arcus pages loading on the apex origin"
+}

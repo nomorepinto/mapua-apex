@@ -4,8 +4,13 @@ import path from "node:path"
 export const root = process.cwd()
 
 export const frontendBase = (process.env.E2E_FRONTEND_BASE ?? "http://127.0.0.1:5176").replace(/\/$/, "")
-export const attendanceBase = (process.env.E2E_ATTENDANCE_BASE ?? "http://127.0.0.1:3001").replace(/\/$/, "")
-export const evaluationBase = (process.env.E2E_EVALUATION_BASE ?? "http://127.0.0.1:3002").replace(/\/$/, "")
+// The Arcus apps set host-only session cookies for APP_BASE_URL's host, so the
+// page must use that same host. localhost and 127.0.0.1 are different cookie jars.
+const arcusBase = (value: string | undefined, port: number) =>
+  (value ?? `http://localhost:${port}`).replace("127.0.0.1", "localhost").replace(/\/$/, "")
+
+export const attendanceBase = arcusBase(process.env.E2E_ATTENDANCE_BASE, 3001)
+export const evaluationBase = arcusBase(process.env.E2E_EVALUATION_BASE, 3002)
 
 export const tag = process.env.E2E_TAG ?? "local"
 export const eventDate = process.env.E2E_EVENT_DATE ?? new Date().toISOString().slice(0, 10)

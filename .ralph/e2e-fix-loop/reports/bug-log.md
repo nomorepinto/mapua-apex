@@ -55,3 +55,10 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 - Verdict: test
 - Summary: Arcus added a deliberate non-dismissable 'Before you continue' instructions dialog on the registration page; its focus trap blocks the form, so the AttendancePage.register page object now acknowledges it before filling the fields. No application change.
 - Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-AQDF
+
+## Iteration 1 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1
+- Verdict: product
+- Summary: Arcus page objects navigated with baseURL-relative paths, so the A2S pages loaded on the APEX frontend origin (or on 127.0.0.1, where the host-only localhost session cookies are not sent) and showed the APEX landing page; they now open absolute URLs built from the Arcus bases, with env normalizing 127.0.0.1 to localhost to match APP_BASE_URL.
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-DqKb
