@@ -1,0 +1,37 @@
+{
+  "tag": "XZNe",
+  "passed": false,
+  "cleanup_before": 0,
+  "cleanup_after": 433,
+  "leftovers": 0,
+  "steps": [
+    {
+      "name": "preflight",
+      "status": "pass",
+      "detail": "event date 2026-11-05",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "playwright",
+      "status": "fail",
+      "detail": "npx playwright test exited 1; failed: arcus.spec.ts:58 @ a checked-in student files an evaluation @ TimeoutError: locator.click: Timeout 20000ms exceeded. @ attendance.page.ts:95",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "finished paper badge",
+      "status": "gap",
+      "detail": "The API stores finished. The student badge maps that status to Pending.",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "cleanup after",
+      "status": "pass",
+      "detail": "deleted 433, left 0",
+      "http": null,
+      "gap": false
+    }
+  ]
+}

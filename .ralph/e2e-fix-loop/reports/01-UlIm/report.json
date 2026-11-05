@@ -1,0 +1,44 @@
+{
+  "tag": "UlIm",
+  "passed": false,
+  "cleanup_before": 398,
+  "cleanup_after": 427,
+  "leftovers": 0,
+  "steps": [
+    {
+      "name": "cleanup before",
+      "status": "pass",
+      "detail": "deleted 398, left 0",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "preflight",
+      "status": "pass",
+      "detail": "event date 2026-11-05",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "playwright",
+      "status": "fail",
+      "detail": "npx playwright test exited 1; failed: arcus.spec.ts:16 @ students register and the officer scans their codes @ Error: expect(received).toBe(expected) // Object.is equality @ auth.ts:96",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "finished paper badge",
+      "status": "gap",
+      "detail": "The API stores finished. The student badge maps that status to Pending.",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "cleanup after",
+      "status": "pass",
+      "detail": "deleted 427, left 0",
+      "http": null,
+      "gap": false
+    }
+  ]
+}

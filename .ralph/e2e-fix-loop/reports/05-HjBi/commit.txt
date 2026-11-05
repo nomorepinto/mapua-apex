@@ -1,0 +1,3 @@
+﻿repo: F:\CareerStuff\myPrograms\Project Apex\mapua-apex
+commit: c4dcf9c
+message: fixed evaluation rating selection in page object

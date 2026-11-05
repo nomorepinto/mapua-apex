@@ -1,0 +1,37 @@
+{
+  "tag": "bKKS",
+  "passed": false,
+  "cleanup_before": 0,
+  "cleanup_after": 434,
+  "leftovers": 0,
+  "steps": [
+    {
+      "name": "preflight",
+      "status": "pass",
+      "detail": "event date 2026-11-05",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "playwright",
+      "status": "fail",
+      "detail": "npx playwright test exited 1; failed: postevals.spec.ts:33 @ OSAAR approves P2 and the student badge stays pending @ Error: expect(locator).toContainText(expected) failed @ dashboard.page.ts:37",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "finished paper badge",
+      "status": "gap",
+      "detail": "The API stores finished. The student badge maps that status to Pending.",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "cleanup after",
+      "status": "pass",
+      "detail": "deleted 434, left 0",
+      "http": null,
+      "gap": false
+    }
+  ]
+}

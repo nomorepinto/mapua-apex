@@ -1,0 +1,1 @@
+﻿Reached maximum number of turns (40)

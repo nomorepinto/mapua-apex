@@ -136,3 +136,13 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 - Verdict: product
 - Summary: Rating radios in RatingRow.tsx are sr-only inside their label, so Playwright's check() clicked the clipped input box and the label's visible '5' span intercepted the pointer; EvaluationPage.file now clicks the label text per radiogroup and asserts the input becomes checked.
 - Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\05-HjBi
+
+## Iteration 4
+Same failure returned after a no-fix re-run. Loop stopped for operator input.
+- playwright: npx playwright test exited 1; failed: postevals.spec.ts:72 @ a no-budget submission files a post-eval without the financial step @ Error: expect(locator).toBeVisible() failed @ posteval.page.ts:20
+Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\04-dKaq
+
+
+Suite passed on iteration 1 (2026-11-05).
+Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-lJxs
+

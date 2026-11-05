@@ -1,0 +1,37 @@
+{
+  "tag": "Sqns",
+  "passed": false,
+  "cleanup_before": 0,
+  "cleanup_after": 439,
+  "leftovers": 0,
+  "steps": [
+    {
+      "name": "preflight",
+      "status": "pass",
+      "detail": "event date 2026-11-05",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "playwright",
+      "status": "fail",
+      "detail": "npx playwright test exited 1; failed: postevals.spec.ts:72 @ a no-budget submission files a post-eval without the financial step @ Error: expect(locator).toBeVisible() failed @ posteval.page.ts:20",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "finished paper badge",
+      "status": "gap",
+      "detail": "The API stores finished. The student badge maps that status to Pending.",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "cleanup after",
+      "status": "pass",
+      "detail": "deleted 439, left 0",
+      "http": null,
+      "gap": false
+    }
+  ]
+}
