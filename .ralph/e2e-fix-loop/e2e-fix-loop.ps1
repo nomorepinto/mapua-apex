@@ -19,6 +19,7 @@ $ErrorActionPreference = "Stop"
 $ApexRepo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $Workspace = (Resolve-Path (Join-Path $ApexRepo "..")).Path
 $E2E = Join-Path $ApexRepo "e2e-tests"
+$Backend = Join-Path $ApexRepo "mapua-apex-backend-nest"
 $SuiteReports = Join-Path $E2E "reports"
 $LoopReports = Join-Path $PSScriptRoot "reports"
 $PromptPath = Join-Path $PSScriptRoot "e2e-fix-prompt.md"
@@ -128,6 +129,79 @@ function Save-SuiteReport([string]$SourceDir, [string]$DestDir) {
   }
 }
 
+function Test-BackendWatchRunning {
+  # True when a `nest start --watch` / `npm run start:dev` node process is alive. Used
+  # to avoid killing a healthy watch backend that is merely mid-recompile or holding
+  # the last good build after a source compile error.
+  try {
+    $procs = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue
+    foreach ($proc in $procs) {
+      $line = $proc.CommandLine
+      if ($line -and ($line -match 'start:dev' -or $line -match 'start --watch' -or $line -match 'nest.*--watch')) {
+        return $true
+      }
+    }
+  }
+  catch { }
+  return $false
+}
+
+function Restart-BackendWatch {
+  # Kill any static backend on :3000 and relaunch it in watch mode, detached, so the
+  # recompiled dist reloads on its own. Polls /api/v2/ping until the app answers.
+  $logDir = Join-Path $E2E "state\logs"
+  New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+  $log = Join-Path $logDir "3000.log"
+  $errLog = Join-Path $logDir "3000.err.log"
+  foreach ($listener in @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)) {
+    taskkill /F /T /PID $listener.OwningProcess 2>&1 | Out-Null
+  }
+  Start-Sleep -Seconds 2
+  Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm run start:dev" -WorkingDirectory $Backend -RedirectStandardOutput $log -RedirectStandardError $errLog -WindowStyle Hidden
+  $deadline = (Get-Date).AddSeconds(120)
+  while ((Get-Date) -lt $deadline) {
+    try {
+      $response = Invoke-WebRequest "http://127.0.0.1:3000/api/v2/ping" -UseBasicParsing -TimeoutSec 3
+      if ($response.StatusCode -lt 500) {
+        Write-Host "Backend restarted in watch mode; ping answered $($response.StatusCode)."
+        return
+      }
+    }
+    catch { }
+    Start-Sleep -Seconds 2
+  }
+  Write-Host "Backend did not answer ping within 120s of the watch-mode restart. Continuing; preflight gates the run."
+}
+
+function Confirm-BackendFresh {
+  # The loop runs run_e2e.py --no-servers, so it never rebuilds the backend. A static
+  # `node dist/main` never picks up a committed source fix: the same failure returns
+  # and the same-signature guard halts the loop (Stop-Loop 3). Detect a stale build
+  # (src newer than dist) with no watch mode running and relaunch in watch mode so the
+  # fix is compiled and loaded before the suite runs. Never throws; preflight remains
+  # the backstop when the backend is genuinely down.
+  try {
+    $distMain = Join-Path $Backend "dist\main.js"
+    $stale = -not (Test-Path -LiteralPath $distMain)
+    if (-not $stale) {
+      $distTime = (Get-Item -LiteralPath $distMain).LastWriteTime
+      $srcTime = (Get-ChildItem -LiteralPath (Join-Path $Backend "src") -Recurse -Filter *.ts -File -ErrorAction SilentlyContinue |
+        Measure-Object -Property LastWriteTime -Maximum).Maximum
+      $stale = ($null -ne $srcTime -and $srcTime -gt $distTime)
+    }
+    if (-not $stale) { return }
+    if (Test-BackendWatchRunning) {
+      Write-Host "Backend build lags source but watch mode is running; leaving it to reload on its own."
+      return
+    }
+    Write-Host "Backend is a stale static build (src newer than dist, no watch mode). Restarting it in watch mode so committed fixes go live."
+    Restart-BackendWatch
+  }
+  catch {
+    Write-Host "Confirm-BackendFresh could not verify the backend build: $($_.Exception.Message)"
+  }
+}
+
 $Agent = Resolve-Agent
 
 if (-not (Test-Path -LiteralPath (Join-Path $E2E "run_e2e.py"))) {
@@ -161,6 +235,7 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
   }
 
   Write-Host "=== Iteration $i : python run_e2e.py --event-date $EventDate --no-servers ==="
+  Confirm-BackendFresh
   $beforeDirs = @()
   if (Test-Path -LiteralPath $SuiteReports) {
     $beforeDirs = @(Get-ChildItem -LiteralPath $SuiteReports -Directory | Select-Object -ExpandProperty Name)

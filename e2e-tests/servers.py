@@ -25,7 +25,10 @@ class AppServer:
 
 
 SERVERS = (
-    AppServer("Nest", ROOT / "mapua-apex-backend-nest", "start", 3000, "http://127.0.0.1:3000/api/v2/ping"),
+    # start:dev (nest start --watch) so a backend source fix the loop commits is
+    # recompiled and reloaded automatically. Plain `start` runs a static dist that
+    # never picks up committed fixes, so the same failure returns and the loop halts.
+    AppServer("Nest", ROOT / "mapua-apex-backend-nest", "start:dev", 3000, "http://127.0.0.1:3000/api/v2/ping"),
     AppServer("Vite", ROOT / "mapua-apex-frontend", "dev", 5176, "http://127.0.0.1:5176"),
     AppServer("Arcus Attendance", WORKSPACE / "arcus-attendance-system", "dev", 3001, "http://127.0.0.1:3001"),
     AppServer("Arcus Evaluation", WORKSPACE / "arcus-evaluation-system", "dev", 3002, "http://127.0.0.1:3002"),

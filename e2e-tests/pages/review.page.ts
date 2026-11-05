@@ -19,7 +19,13 @@ export class ReviewPage {
 
   async open(desk: string, title: string) {
     await this.page.goto(PATHS[desk])
-    await this.page.getByLabel("Search review queue").fill(title)
+    // The desk mounts its review-queue section asynchronously: the search box
+    // renders unconditionally, but the section itself can lag on a cold route
+    // compile or a slow queue fetch. A one-shot fill right after goto raced that
+    // mount and flaked with a 20s timeout, so wait for the box to be visible.
+    const search = this.page.getByLabel("Search review queue")
+    await expect(search).toBeVisible({ timeout: 60_000 })
+    await search.fill(title)
     await this.page.getByRole("button", { name: `View details for ${title}` }).click()
     const dialog = this.page.getByRole("dialog", { name: `${title} Proposal` })
     await expect(dialog).toBeVisible()
