@@ -44,6 +44,13 @@ export interface ApiSubmission {
    * ambiguous duplicate roles. Absent on list endpoints.
    */
   signatory_chain?: ApiSignatoryChainLink[]
+  /**
+   * Detail-only, proponent-only: the desks the proponent may still write to,
+   * in approval order, with each desk's contact details. An open proposal
+   * starts at the desk it sits on now; a decided one lists the OSAAR desk.
+   * Never present on list, reviewer, or admin endpoints.
+   */
+  approval_chain_contacts?: ApiApprovalChainContact[]
   /** Whether the caller's org is the proponent or a collaboration dependent. */
   role?: "proponent" | "dependent"
   /** Collaboration dependents chosen by the proponent (plain ids, no prefix). */
@@ -207,6 +214,23 @@ export interface ApiSignatoryChainLink {
   stage_key?: string | null
 }
 
+/**
+ * One desk on the proponent's remaining approval path, with the contact details
+ * an admin recorded for it. Every contact field is optional: a desk may have
+ * none on file, and the tab then shows only its name and role.
+ */
+export interface ApiApprovalChainContact {
+  signatory_id: string
+  name: string
+  role?: string | null
+  organization_name?: string | null
+  contact_email?: string | null
+  office?: string | null
+  contact_number?: string | null
+  /** Whether the proposal is sitting on this desk right now. */
+  is_current: boolean
+}
+
 export interface ApiOsaarStage {
   key: string
   order: number
@@ -266,6 +290,11 @@ export interface ApiSignatory {
   campus_id?: string | null
   all_campuses?: boolean
   osaar_order?: number | null
+  /** Desk e-mail a proponent may write to. May differ from the login e-mail. */
+  contact_email?: string | null
+  /** Office or room where the desk can be found in person. */
+  office?: string | null
+  contact_number?: string | null
 }
 
 export interface ApiCognitoAccount {
@@ -300,6 +329,16 @@ export type CreateSignatoryPayload = {
   department?: string
   campus_id?: string
   all_campuses?: boolean
+  contact_email?: string
+  office?: string
+  contact_number?: string
+}
+
+/** Desk contact details as typed into the admin signatory form. */
+export type SignatoryContactInput = {
+  contactEmail?: string | null
+  office?: string | null
+  contactNumber?: string | null
 }
 
 export interface ApiMember {
@@ -318,7 +357,8 @@ export function buildSignatoryPayload(
   name: string,
   role: ApiSignatoryRole,
   department?: string | null,
-  campus?: { campusId?: string | null; allCampuses?: boolean } | null
+  campus?: { campusId?: string | null; allCampuses?: boolean } | null,
+  contact?: SignatoryContactInput | null
 ): CreateSignatoryPayload {
   const payload: CreateSignatoryPayload = { name, role }
   if (role === "dean") {
@@ -333,6 +373,20 @@ export function buildSignatoryPayload(
     } else if (campus?.campusId) {
       payload.campus_id = campus.campusId
     }
+  }
+  // A blank field is omitted rather than sent, so the backend drops it and the
+  // stored desk loses the detail an admin just cleared.
+  const email = contact?.contactEmail?.trim()
+  if (email) {
+    payload.contact_email = email
+  }
+  const office = contact?.office?.trim()
+  if (office) {
+    payload.office = office
+  }
+  const number = contact?.contactNumber?.trim()
+  if (number) {
+    payload.contact_number = number
   }
   return payload
 }

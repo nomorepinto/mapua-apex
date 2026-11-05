@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test"
 
 import { SetupPages } from "../pages/setup.page"
 import { openApex, signInAndSaveApex } from "../support/auth"
-import { campusName, orgName, personName } from "../support/data"
+import { campusName, DESK_CONTACT, orgName, personName } from "../support/data"
 import { tag } from "../support/env"
 import { rememberPreexistingCdm } from "../support/manifest"
 import { writeRun } from "../support/run-state"
@@ -70,8 +70,12 @@ test("admin builds the campus, desks, organizations, and account links", async (
     await setup.rejectCampusWithoutDigits(`Half Campus ${tag}`)
 
     await page.goto("/osaar/setup/signatories")
+    // The first adviser carries desk contact details, so the proponent's
+    // Signatories tab has a real desk to write to later in the run.
+    await captureJson(page, "/admins/signatories", "POST", () =>
+      setup.addSignatory(people.adv1, "Adviser", undefined, undefined, DESK_CONTACT),
+    )
     for (const [key, role, department] of [
-      ["adv1", "Adviser"],
       ["adv2", "Adviser"],
       ["adv3", "Adviser"],
       ["dean1", "Dean", "SOIT"],
@@ -90,6 +94,7 @@ test("admin builds the campus, desks, organizations, and account links", async (
     if (!preexisting) {
       await captureJson(page, "/admins/signatories", "POST", () => setup.addSignatory(people.cdm1, "CDM"))
     }
+    await setup.expectSignatoryContact(people.adv1, DESK_CONTACT)
 
     await page.goto("/osaar/setup/organizations")
     await captureJson(page, "/admins/organizations", "POST", () =>

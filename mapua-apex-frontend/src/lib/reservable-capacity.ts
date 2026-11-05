@@ -79,3 +79,94 @@ export function capacityIssue(
 
   return `"${name}" does not fit the expected number of participants.`
 }
+
+/** A reservable that carries the room participant bounds. */
+export type CapacityReservable = Pick<
+  ApiReservable,
+  "type" | "name" | "min_participants" | "max_participants"
+>
+
+/** One suggested room, and how well it matches the expected headcount. */
+export interface RoomSuggestion<T extends CapacityReservable> {
+  reservable: T
+  /** Whether the room's stated bounds accept the headcount outright. */
+  fits: boolean
+  /**
+   * Seats short of the ceiling, or seats over the floor. Zero exactly when the
+   * room fits, so the closest rooms sort first when nothing does.
+   */
+  shortfall: number
+}
+
+/** How far a headcount is outside a room's bounds. Zero when it is inside. */
+function shortfallFor(bounds: CapacityBounds, headcount: number): number {
+  const min = bound(bounds.min)
+  const max = bound(bounds.max)
+  const tooFew = min !== null && headcount < min ? min - headcount : 0
+  const tooMany = max !== null && headcount > max ? headcount - max : 0
+  return tooFew + tooMany
+}
+
+/**
+ * Rooms to offer for an expected headcount, best match first.
+ *
+ * When at least one room fits, the fits are ranked best-fit — the smallest
+ * sufficient ceiling first, so a 300-pax hall is not offered for 40 people.
+ * When none fits, the closest rooms are ranked instead, which reads as the
+ * largest rooms for an oversized headcount and the smallest for an undersized
+ * one; the existing under-capacity warning still tells the student to add
+ * another room.
+ *
+ * Rooms that state no bounds at all are left out: there is no capacity to match
+ * on, and the room dropdown already lists every candidate.
+ */
+export function suggestRooms<T extends CapacityReservable>(
+  candidates: readonly T[],
+  headcount: number | null,
+  limit = 3
+): Array<RoomSuggestion<T>> {
+  if (headcount === null || !Number.isFinite(headcount) || headcount <= 0) {
+    return []
+  }
+
+  const scored = candidates
+    .filter((reservable) => reservable.type === "room")
+    .map((reservable) => {
+      const bounds = reservableCapacity(reservable)
+      return {
+        reservable,
+        bounds,
+        shortfall: shortfallFor(bounds, headcount),
+      }
+    })
+    .filter(
+      (entry) =>
+        bound(entry.bounds.min) !== null || bound(entry.bounds.max) !== null
+    )
+
+  if (scored.length === 0) return []
+
+  const fits = scored.filter((entry) => entry.shortfall === 0)
+  const ceilingOf = (entry: (typeof scored)[number]): number =>
+    bound(entry.bounds.max) ?? Number.POSITIVE_INFINITY
+
+  const ranked =
+    fits.length > 0
+      ? fits.sort(
+          (left, right) =>
+            ceilingOf(left) - ceilingOf(right) ||
+            left.reservable.name.localeCompare(right.reservable.name)
+        )
+      : scored.sort(
+          (left, right) =>
+            left.shortfall - right.shortfall ||
+            ceilingOf(right) - ceilingOf(left) ||
+            left.reservable.name.localeCompare(right.reservable.name)
+        )
+
+  return ranked.slice(0, limit).map((entry) => ({
+    reservable: entry.reservable,
+    fits: entry.shortfall === 0,
+    shortfall: entry.shortfall,
+  }))
+}

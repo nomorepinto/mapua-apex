@@ -47,7 +47,16 @@ import {
   useCognitoAccountsQuery,
 } from "@/hooks/use-admin"
 import { formatDocumentId } from "@/lib/dynamodb-adapters"
+import type { ApiSignatory } from "@/lib/dynamodb-adapters"
 import { cn } from "@/lib/utils"
+
+/** Office and phone on one line, or null when neither is on file. */
+function contactLine(person: ApiSignatory): string | null {
+  const line = [person.office, person.contact_number]
+    .filter(Boolean)
+    .join(" · ")
+  return line === "" ? null : line
+}
 
 export function SignatoriesTableCard() {
   const { state, actions } = useSignatoriesPage()
@@ -111,6 +120,7 @@ export function SignatoriesTableCard() {
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Department</TableHead>
+                  <TableHead>Contact</TableHead>
                   <TableHead>Account</TableHead>
                   <TableHead className="w-28 text-right">
                     <span className="sr-only">Actions</span>
@@ -120,7 +130,7 @@ export function SignatoriesTableCard() {
               <TableBody>
                 {state.filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell className="text-muted-foreground" colSpan={6}>
+                    <TableCell className="text-muted-foreground" colSpan={7}>
                       No signatories match “{state.search}”.
                     </TableCell>
                   </TableRow>
@@ -158,6 +168,30 @@ export function SignatoriesTableCard() {
                           <Badge variant="outline">
                             {osaarCampusLabel(person, state.campuses)}
                           </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-56 whitespace-normal">
+                        {person.contact_email ||
+                        person.office ||
+                        person.contact_number ? (
+                          <span className="flex flex-col gap-0.5">
+                            {person.contact_email ? (
+                              <a
+                                className="text-xs underline-offset-2 hover:underline"
+                                href={`mailto:${person.contact_email}`}
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                {person.contact_email}
+                              </a>
+                            ) : null}
+                            {contactLine(person) ? (
+                              <span className="text-xs text-muted-foreground">
+                                {contactLine(person)}
+                              </span>
+                            ) : null}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}

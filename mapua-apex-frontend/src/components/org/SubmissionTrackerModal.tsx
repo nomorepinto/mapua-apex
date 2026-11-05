@@ -8,8 +8,10 @@ import {
   FileText,
   Loader2,
   MessageSquare,
+  Stamp,
 } from "lucide-react"
 
+import { SubmissionSignatoriesTab } from "@/components/org/submission-signatories-tab"
 import {
   useCurrentOrganizationQuery,
   useSubmissionDetailQuery,
@@ -57,7 +59,9 @@ export function SubmissionTrackerModal({
   onRequestReservationChange,
 }: SubmissionTrackerModalProps) {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<"details" | "progress">("details")
+  const [activeTab, setActiveTab] = useState<
+    "details" | "progress" | "signatories"
+  >("details")
   const [isSavingPdf, setIsSavingPdf] = useState(false)
 
   const orgQuery = useCurrentOrganizationQuery()
@@ -242,6 +246,19 @@ export function SubmissionTrackerModal({
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   <span>Milestone & Progress</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("signatories")}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all",
+                    activeTab === "signatories"
+                      ? "bg-white text-[#8B0000] shadow-xs"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
+                  )}
+                >
+                  <Stamp className="h-3.5 w-3.5" />
+                  <span>Signatories</span>
                 </button>
               </div>
             </div>
@@ -831,6 +848,12 @@ export function SubmissionTrackerModal({
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === "signatories" && (
+            <SubmissionSignatoriesTab
+              contacts={detailQuery.data?.approval_chain_contacts ?? []}
+            />
           )}
         </DialogPanel>
 

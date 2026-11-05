@@ -11,6 +11,7 @@ import {
 import { slotStatus } from "@/components/admin/reservables/schedule-grid"
 import { FieldWarning } from "@/components/forms/field-warning"
 import { useReservationFormContext } from "@/components/students/reservations/reservation-context"
+import { RoomSuggestions } from "@/components/students/reservations/room-suggestions"
 import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -403,17 +404,41 @@ export function ReservationFields() {
     }
   }, [startDate, endDate, saafDraft.dateOfEvent, saafDraft.endDateOfEvent, saafActions])
 
-  const handleConfirmAddRoom = () => {
-    if (!selectedRoomToAdd) return
-    const targetRoom = availableRooms.find((r) => r.reservable_id === selectedRoomToAdd)
+  /** Adds a room the dropdown or the suggestion panel points at. */
+  const addRoomById = (reservableId: string) => {
+    const targetRoom = availableRooms.find((r) => r.reservable_id === reservableId)
     if (!targetRoom) return
     const defaultPurpose =
       roomPicks[0]?.remarks && roomPicks[0].remarks.trim().length >= 20
         ? roomPicks[0].remarks
         : ""
     actions.handleAddRoom(targetRoom, activeScheduleSelections, defaultPurpose)
+  }
+
+  const handleConfirmAddRoom = () => {
+    if (!selectedRoomToAdd) return
+    addRoomById(selectedRoomToAdd)
     setSelectedRoomToAdd("")
   }
+
+  /**
+   * Rooms the suggestion panel may offer: still unpicked and free during the
+   * event time. Booked and closed rooms stay in the dropdown, where they are
+   * already disabled, but must not be offered as a one-click add.
+   */
+  const suggestableRooms = useMemo(
+    () =>
+      isHeadcountValid
+        ? availableRooms.filter((room) => {
+            const roomAvail = roomAvailabilityMap.get(room.reservable_id)
+            return (
+              !isRoomBookedDuring(roomAvail, activeScheduleSelections) &&
+              !isRoomUnavailableDuring(roomAvail, activeScheduleSelections)
+            )
+          })
+        : [],
+    [activeScheduleSelections, availableRooms, isHeadcountValid, roomAvailabilityMap]
+  )
 
   return (
     <div className="space-y-6">
@@ -793,6 +818,14 @@ export function ReservationFields() {
                 <span className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wide">
                   {roomPicks.length === 0 ? "Select Room" : "Add Another Room"}
                 </span>
+
+                {suggestableRooms.length > 0 ? (
+                  <RoomSuggestions
+                    headcount={headcount}
+                    onAdd={addRoomById}
+                    rooms={suggestableRooms}
+                  />
+                ) : null}
 
                 {availableRooms.length === 0 ? (
                   <p className="text-xs text-neutral-400">

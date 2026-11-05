@@ -2,6 +2,13 @@ import { expect, type Page } from "@playwright/test"
 
 import { choose, pickIsoDate } from "../support/ui"
 
+/** Desk contact details an admin records for a signatory. */
+export type SignatoryContact = {
+  email?: string
+  office?: string
+  number?: string
+}
+
 export class SetupPages {
   constructor(private readonly page: Page) {}
 
@@ -66,6 +73,7 @@ export class SetupPages {
     role: "Adviser" | "Dean" | "OSAAR" | "CDM",
     department?: string,
     campus?: string,
+    contact?: SignatoryContact,
   ) {
     await this.page.getByRole("tab", { name: "Signatories" }).click()
     await this.page.getByLabel("Name").fill(name)
@@ -76,9 +84,19 @@ export class SetupPages {
     if (role === "OSAAR") {
       await choose(this.page, this.page.getByRole("combobox", { name: "Campus" }), campus ?? "All campuses")
     }
+    if (contact?.email) await this.page.getByLabel("Contact email").fill(contact.email)
+    if (contact?.office) await this.page.getByLabel("Office").fill(contact.office)
+    if (contact?.number) await this.page.getByLabel("Contact number").fill(contact.number)
     await this.page.getByRole("button", { name: "Add signatory" }).click()
     await expect(this.page.getByRole("dialog", { name: "Signatory added" }).filter({ hasText: name })).toBeVisible()
     await expect(this.page.getByRole("row", { name })).toBeVisible()
+  }
+
+  /** The desk table reads the contact details back on the row's own Contact cell. */
+  async expectSignatoryContact(name: string, contact: Required<SignatoryContact>) {
+    const row = this.page.getByRole("row", { name })
+    await expect(row.getByRole("link", { name: contact.email })).toBeVisible()
+    await expect(row.getByText(`${contact.office} · ${contact.number}`, { exact: true })).toBeVisible()
   }
 
   async addOrganization(name: string, adviser: string, dean?: string) {

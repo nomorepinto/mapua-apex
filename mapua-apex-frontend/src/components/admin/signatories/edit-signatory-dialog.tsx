@@ -1,6 +1,7 @@
 import { CircleAlertIcon } from "lucide-react"
 
 import { takenSingletonRoles } from "@/components/admin-osa/signatory-roles"
+import { SignatoryContactFields } from "@/components/admin/signatories/contact-fields"
 import { DepartmentSelect } from "@/components/admin/signatories/department-select"
 import {
   SIGNATORY_NAME_MAX,
@@ -155,6 +156,11 @@ export function EditSignatoryDialog() {
                 value={state.editDepartment}
               />
             ) : null}
+            <SignatoryContactFields
+              idPrefix="edit-signatory"
+              onChange={actions.changeEditContact}
+              values={state.editContact}
+            />
             {state.editError &&
             !state.editError.toLowerCase().includes("name") ? (
               <Alert variant="error">
