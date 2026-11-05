@@ -1,0 +1,37 @@
+{
+  "tag": "iYtd",
+  "passed": false,
+  "cleanup_before": 0,
+  "cleanup_after": 467,
+  "leftovers": 0,
+  "steps": [
+    {
+      "name": "preflight",
+      "status": "pass",
+      "detail": "event date 2026-11-06",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "playwright",
+      "status": "fail",
+      "detail": "npx playwright test exited 1; failed: cancel-watch.spec.ts:30 @ lapses an approved event with no post-eval into Cancelled @ TypeError: rows.find is not a function @ cancel-watch.page.ts:68",
+      "http": null,
+      "gap": false
+    },
+    {
+      "name": "finished paper badge",
+      "status": "gap",
+      "detail": "The API stores finished. The student badge maps that status to Pending.",
+      "http": null,
+      "gap": true
+    },
+    {
+      "name": "cleanup after",
+      "status": "pass",
+      "detail": "deleted 467, left 0",
+      "http": null,
+      "gap": false
+    }
+  ]
+}

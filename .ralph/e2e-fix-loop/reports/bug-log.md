@@ -153,3 +153,18 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 - Verdict: product
 - Summary: GET /admins/submissions is wrapped in { data } by the backend's DataEnvelopeInterceptor, but CancelWatchPage.findIds assumed a bare array; it now unwraps the envelope before calling rows.find.
 - Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-iYtd
+- Commit: mapua-apex 0817d26 fixed cancel-watch page object to unwrap the data envelope
+
+
+## Iteration 2 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1; failed: cancel-watch.spec.ts:30 @ lapses an approved event with no post-eval into Cancelled @ Error: expect(received).toBe(expected) // Object.is equality @ cancel-watch.spec.ts:33
+- Verdict: product
+- Summary: POST /admins/cancel-watch/expire is wrapped in { data } by DataEnvelopeInterceptor (the controller has no @NoEnvelope), so CancelWatchPage.expire read an undefined status; it now unwraps the envelope like findIds.
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\02-NaBL
+- Commit: mapua-apex 38c18d7 fixed cancel-watch expire status unwrapping the data envelope
+
+
+Suite passed on iteration 3 (2026-11-06).
+Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\03-OuEH
+
