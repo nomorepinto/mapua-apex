@@ -50,8 +50,13 @@ export class OsaarPostevalPage {
 
   async open(title: string) {
     await this.page.goto("/osaar/postevals")
-    await this.page.getByLabel("Search post-evaluations").fill(title)
-    await this.page.getByRole("button", { name: title }).first().click()
+    const search = this.page.getByRole("textbox", { name: "Search records" })
+    await search.fill(title)
+    await this.page
+      .getByRole("button")
+      .filter({ hasText: title })
+      .first()
+      .click()
   }
 
   async approve() {

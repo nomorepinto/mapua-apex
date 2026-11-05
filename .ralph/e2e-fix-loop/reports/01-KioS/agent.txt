@@ -1,0 +1,1 @@
+﻿The failure was locator drift in the OSAAAR post-eval page object: the search input is now labeled "Search records" (`report-filters.tsx:84`), not "Search post-evaluations". I updated `OsaarPostevalPage.open` in `e2e-tests/pages/posteval.page.ts` to fill the current textbox and click the row by its title. Verdict written as `product`.

@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "The OSAAR post-eval search input's accessible name changed to 'Search records' in report-filters.tsx, so OsaarPostevalPage.open timed out on getByLabel('Search post-evaluations'); the page object now fills that textbox and clicks the row button by title.",
+  "commit_message": "fixed osaar posteval search locator"
+}
