@@ -146,3 +146,10 @@ Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\rep
 Suite passed on iteration 1 (2026-11-05).
 Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-lJxs
 
+
+## Iteration 1 - playwright
+- HTTP: 
+- Detail: npx playwright test exited 1; failed: cancel-watch.spec.ts:30 @ lapses an approved event with no post-eval into Cancelled @ TypeError: rows.find is not a function @ cancel-watch.page.ts:68
+- Verdict: product
+- Summary: GET /admins/submissions is wrapped in { data } by the backend's DataEnvelopeInterceptor, but CancelWatchPage.findIds assumed a bare array; it now unwraps the envelope before calling rows.find.
+- Saved: F:\CareerStuff\myPrograms\Project Apex\mapua-apex\.ralph\e2e-fix-loop\reports\01-iYtd

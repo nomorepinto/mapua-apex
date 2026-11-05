@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "GET /admins/submissions is wrapped in { data } by the backend's DataEnvelopeInterceptor, but CancelWatchPage.findIds assumed a bare array; it now unwraps the envelope before calling rows.find.",
+  "commit_message": "fixed cancel-watch page object to unwrap the data envelope"
+}

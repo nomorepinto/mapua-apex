@@ -64,7 +64,11 @@ export class CancelWatchPage {
       headers: await this.headers(),
     });
     expect(response.ok(), `admin submissions list failed: ${response.status()}`).toBeTruthy();
-    const rows = (await response.json()) as AdminSubmissionRow[];
+    // The global envelope interceptor wraps collections in `{ data }`.
+    const body = (await response.json()) as
+      | AdminSubmissionRow[]
+      | { data: AdminSubmissionRow[] }
+    const rows = Array.isArray(body) ? body : body.data;
     const row = rows.find((r) => (r.activity_details?.title_and_nature ?? "").includes(title));
     expect(row, `no admin submission found for "${title}"`).toBeTruthy();
     return { eventId: row!.event_id, submissionId: row!.submission_id };

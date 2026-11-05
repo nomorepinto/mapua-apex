@@ -1,0 +1,3 @@
+﻿The failure was harness drift, not an app bug: the backend's `DataEnvelopeInterceptor` wraps `GET /admins/submissions` in `{ data: [...] }` (confirmed in `src/common/data-envelope.interceptor.ts`, with no `@NoEnvelope`, and the frontend hook `useAdminSubmissionsQuery` reads `{ data }`), but `CancelWatchPage.findIds` treated the response as a bare array, so `rows.find` threw.
+
+Fix: `e2e-tests/pages/cancel-watch.page.ts:67` now accepts either shape and unwraps `data` before searching. No spec or backend changes; verdict written as `product` with the commit message `fixed cancel-watch page object to unwrap the data envelope`.
