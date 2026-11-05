@@ -469,9 +469,11 @@ export function buildSaafApiPayload(
 export function getSubmissionStatusMeta(status: string) {
   switch (status.toLowerCase()) {
     case "finished":
+      // A filed post-evaluation is still awaiting OSAAR review, so the student
+      // sees the same pending state until it is approved.
       return {
-        label: "Finished",
-        color: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
+        label: "Pending",
+        color: "bg-amber-500/10 text-amber-600 border-amber-200",
       }
     case "approved":
       return {

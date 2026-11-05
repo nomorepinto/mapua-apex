@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "After OSAAR approves a post-evaluation the backend stores the submission as finished, and the student dashboard badge mapped finished to a green \"Finished\" label; getSubmissionStatusMeta now renders finished as the pending (amber) badge.",
+  "commit_message": "fixed finished submissions showing as pending on student dashboard"
+}
