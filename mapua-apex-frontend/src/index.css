@@ -170,6 +170,7 @@
 }
 
 :root {
+  --site-footer-h: 1.75rem;
   --destructive-foreground: var(--color-red-700);
   --info: var(--color-blue-500);
   --info-foreground: var(--color-blue-700);
@@ -286,6 +287,7 @@
 
   #root {
     min-height: 100dvh;
+    padding-bottom: var(--site-footer-h);
   }
 
   code,

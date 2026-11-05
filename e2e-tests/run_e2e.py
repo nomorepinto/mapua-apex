@@ -39,6 +39,7 @@ PROJECTS = {
     "reviews": "reviews",
     "arcus": "arcus",
     "postevals": "postevals",
+    "cancel_watch": "cancel-watch",
     "reservation_changes": "reservation-changes",
     "members": "members",
     "announcements": "announcements",

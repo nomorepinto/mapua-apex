@@ -88,6 +88,7 @@ describe('PostEvalService no-budget submissions', () => {
           },
         };
       },
+      async deleteCancelWatch() {},
     } as never,
     {
       async get() {
@@ -142,6 +143,7 @@ describe('PostEvalService stored shape', () => {
       constructor(readonly budget_items: BudgetLine[]) {}
     }
     const putted: { financial_report?: object }[] = [];
+    const deleted: { event_id: string; submission_id: string }[] = [];
     const service = new PostEvalService(
       {
         async getSubmission() {
@@ -168,6 +170,9 @@ describe('PostEvalService stored shape', () => {
             activity_details: { date_of_event: manilaDate() },
           };
         },
+        async deleteCancelWatch(eventId: string, submissionId: string) {
+          deleted.push({ event_id: eventId, submission_id: submissionId });
+        },
       } as never,
       {
         async get() {
@@ -190,5 +195,8 @@ describe('PostEvalService stored shape', () => {
     expect(putted[0].financial_report).toEqual({
       budget_items: [{ item: 'Tarp', actual_amount: 100 }],
     });
+    expect(deleted).toEqual([
+      { event_id: 'event-1', submission_id: 'submission-1' },
+    ]);
   });
 });

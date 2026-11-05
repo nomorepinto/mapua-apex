@@ -62,6 +62,8 @@ Index summary:
 | 37 | Arcus student: file full response | TransactWriteItems | Full detail `PK = SK = EVALUATION#id`; full list `PK = EVALUATION`, `SK = filedAt#id`; slim `EVENT#id/EVALUATION#id` child, all conditional puts | Base |
 | 38 | Arcus officer: event-scoped export | Query → BatchGetItem | Query `EVENT#id`, `SK` begins `EVALUATION#`, then batch-read full `EVALUATION#id` detail records; filter/sort, return up to 100; PDF generation stays in browser | Base |
 | 39 | CDM approval of a paper's holds | GetItem → UpdateItem | on the last (CDM) approve, GetItem each `booking_refs[]` hold + its RESERVABLE, re-check against approved bookings (**409**, nothing written, on conflict), then UpdateItem `approval_status = approved`, `approved_at`, `approved_by`; the same check (no writes) backs `GET …/booking-conflicts` | Base |
+| 40 | Create / delete the auto-cancel sentinel | PutItem / DeleteItem | final approve (non-`skip_post_eval` org) PutItem `PK = EVENT#id`, `SK = CANCELWATCH#id` with `TTL` = window close; filing a post-eval DeleteItem the same key. Gated by `ARCUS_AUTO_CANCEL_ENABLED` (default on) | Base |
+| 41 | Auto-cancel on window lapse (stream consumer) | Query → UpdateItem → PutItem | the sentinel's TTL expiry emits a Streams `REMOVE`; re-Query `PK = EVENT#id`, `SK` begins `POSTEVAL#` (a filed post-eval no-ops), then UpdateItem the SUBMISSION `approved → cancelled` + `cancelled_at` guarded on `status = approved` (a finished/denied/cancelled paper or replayed `REMOVE` no-ops), PutItem an `event auto-cancelled` NOTIFICATION, and email the student | Base |
 
 ---
 
@@ -93,5 +95,6 @@ Index summary:
 | Student → Post-evals (entry + wizard) | SUBMISSION, POSTEVAL, EVENT children (MEMBER#/EVALUATION#) | 28, 31, 32, 33 |
 | Student dashboard → Post-eval panel | POSTEVAL | 29 |
 | OSAAR → Post-evals (queue + review) | POSTEVAL, SUBMISSION (finish on approve) | 30, 31, 32, 34 |
+| Auto-cancel on window lapse (Streams consumer, not a page) | CANCELWATCH (sentinel create/delete), SUBMISSION, POSTEVAL (re-check), NOTIFICATION | 40, 41 |
 | Arcus student → My events / form | SUBMISSION, attendance child, STUDENT profile, full/slim EVALUATION records | 35, 37 |
 | Arcus officer → Event workspace / export | SUBMISSION, POSTEVAL, attendance/evaluation children, full EVALUATION records | 32, 36, 38 |

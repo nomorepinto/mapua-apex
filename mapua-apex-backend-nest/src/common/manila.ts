@@ -53,3 +53,24 @@ export function eventWindow(
 export function manilaDate(now = new Date()): string {
   return new Date(now.getTime() + OFFSET_MS).toISOString().slice(0, 10);
 }
+
+/**
+ * Unix epoch seconds at which the post-evaluation window closes, for use as a
+ * DynamoDB `TTL` on the auto-cancel sentinel. Returns null when `dateOfEvent` is
+ * not a `YYYY-MM-DD` date (the sentinel is then skipped).
+ */
+export function evaluationWindowTtl(
+  dateOfEvent: string | null,
+  windowDays: number,
+  now = new Date(),
+): number | null {
+  if (!dateOfEvent || !/^\d{4}-\d{2}-\d{2}$/.test(dateOfEvent)) {
+    return null;
+  }
+  const closes = eventWindow(dateOfEvent, 'evaluation', windowDays, now).closes_at;
+  if (!closes) {
+    return null;
+  }
+  const millis = Date.parse(closes);
+  return Number.isFinite(millis) ? Math.floor(millis / 1000) : null;
+}

@@ -31,6 +31,8 @@ graph TD
 
     POSTEVAL["<b>POSTEVAL</b><br/>PK = EVENT#uuid<br/>SK = POSTEVAL#uuid<br/>------------------<br/>entity_type : posteval<br/>status : submitted / approved / denied<br/>submission_id<br/>section_summary (100-500)<br/>financial_report<br/>participation_snapshot<br/>GSI1PK = ORGANIZATION#uuid<br/>GSI1SK = POSTEVAL#uuid"]
 
+    CANCELWATCH["<b>CANCELWATCH</b><br/>PK = EVENT#uuid<br/>SK = CANCELWATCH#submissionId<br/>------------------<br/>entity_type : cancelwatch<br/>event_id / submission_id<br/>organization_id / created_at<br/>TTL (epoch secs = window close)<br/>created on final approve,<br/>&nbsp;&nbsp;deleted when a post-eval is filed"]
+
     ARCUS_CHILD["<b>EVENT children (arcus-written)</b><br/>PK = EVENT#uuid<br/>SK = MEMBER#studentId / EVALUATION#id<br/>------------------<br/>check-in: member_organization, scannedAt, leftAt<br/>evaluation: studentId, fullName,<br/>&nbsp;&nbsp;participated (yes/no), filedAt<br/>read-only for apex"]
 
     STUDENT["<b>STUDENT</b> (arcus profile)<br/>PK = STUDENT#studentId<br/>SK = STUDENT#studentId<br/>------------------<br/>full_name / student_id<br/>course / department<br/>(arcus-owned identity)"]
@@ -49,6 +51,8 @@ graph TD
     SUBMISSION -.->|"references holds (booking_refs)"| BOOKING
     ORGANIZATION -.->|"1 : N &nbsp;org booking list (BOOKING.GSI5PK)"| BOOKING
     EVENT -->|"1 : N &nbsp;(children share PK = EVENT#id)"| POSTEVAL
+    EVENT -->|"1 : N &nbsp;auto-cancel sentinel (SK = CANCELWATCH#)"| CANCELWATCH
+    CANCELWATCH -.->|"TTL lapse &rarr; Streams REMOVE &rarr; cancel (no POSTEVAL)"| SUBMISSION
     EVENT -->|"1 : N &nbsp;(arcus writes MEMBER# / EVALUATION#)"| ARCUS_CHILD
     POSTEVAL -.->|"OSAAR approve finishes linked submission"| SUBMISSION
     ARCUS_CHILD -.->|"aggregated into participation_snapshot"| POSTEVAL
@@ -56,4 +60,4 @@ graph TD
     ARCUS_CHILD -.->|"members-only gate reads roster"| ORG_MEMBER
 
     classDef entity fill:#eef4ff,stroke:#3b5bdb,stroke-width:1px,color:#111111,text-align:left;
-    class ORGANIZATION,ORG_MEMBER,EVENT,SUBMISSION,NOTIFICATION,SIGNATORY,COLLAB,ANNOUNCEMENT,CAMPUS,RESERVABLE,BOOKING,POSTEVAL,ARCUS_CHILD,STUDENT entity;
+    class ORGANIZATION,ORG_MEMBER,EVENT,SUBMISSION,NOTIFICATION,SIGNATORY,COLLAB,ANNOUNCEMENT,CAMPUS,RESERVABLE,BOOKING,POSTEVAL,CANCELWATCH,ARCUS_CHILD,STUDENT entity;

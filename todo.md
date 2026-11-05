@@ -3,13 +3,21 @@
 Items intentionally deferred out of the post-evaluation overhaul. They are
 tracked here so they are not lost, but are **not** part of the current change.
 
-## 1. TTL sentinel + Streams → auto-`cancelled` status
+## ~~1. TTL sentinel + Streams → auto-`cancelled` status~~
 
-**Status:** Deferred — not wired in the current change. Replaces the earlier
-EventBridge Scheduler idea; a TTL expiry is a better fit because the 3-day
-window has no minute-precision SLA, the sentinel self-deletes (no per-event
-schedule rules to create/clean up), and the "was a post-eval submitted?"
-check is needed in the handler either way.
+**Status:** Closed — implemented as a `CANCELWATCH#<submissionId>` sentinel with
+the table's `TTL` attribute (uppercase, epoch seconds) written at final approval
+and deleted on post-eval submit; a DynamoDB Streams (KEYS_ONLY) consumer Lambda
+handles the resulting `REMOVE`, re-checks for a `POSTEVAL#` child, and
+conditionally cancels the SUBMISSION (`status = cancelled` + `cancelled_at`)
+when the window lapsed with no post-eval. Adds a timeline notice
+(`notif_type "event auto-cancelled"`) + student email, the frontend notif-type
+wiring (`ReviewNoticeModal` / `reminders-panel` / `dynamodb-adapters`), an
+`ARCUS_AUTO_CANCEL_ENABLED` kill-switch (default on), a boto3 provisioning
+script (`mapua-apex-frontend/scripts/deploy_cancelwatch_lambda.py`), and a
+Playwright `cancel-watch` phase. (Historical note: this text still refers to a
+lowercase `ttl` and a PHP window helper; the shipped code uses `TTL` and
+`src/common/manila.ts`.) Original status below.
 
 **Goal:** When an event's 3-day post-evaluation window lapses with **no**
 submitted post-eval, automatically set the linked SUBMISSION
@@ -57,9 +65,16 @@ submitted post-eval, automatically set the linked SUBMISSION
 spelling. The same check applies to every field that should be a known value,
 not only position.
 
-## 4. e2e-tests coverage for the Reports & Export restructure
+## ~~4. e2e-tests coverage for the Reports & Export restructure~~
 
-**Status:** Deferred — not wired into the `e2e-tests/` suite yet.
+**Status:** Closed — already wired into the `e2e-tests/` suite (committed in
+`fb17f19`): `tests/reports.spec.ts` + `pages/reports.page.ts` (admin builds and
+exports every report type, OSAAR loses the Session log — the
+`REPORT_EXPORT_GROUPS` / `session_admin` gating — and CSV download is asserted),
+`tests/monitor.spec.ts` + `pages/monitor.page.ts` (in-place log monitors and
+group gating), the `reports` project in `playwright.config.ts` (depends on
+`monitor`), and the `reports` phase in `run_e2e.py`. This item's Status line was
+simply stale.
 
 **Goal:** Per the AGENTS.md "E2E Suite" rule (added on `origin/master`), the
 user-visible reporting restructure should be covered by the `e2e-tests/`
@@ -243,7 +258,16 @@ e-mailing OSAAR blindly.
 
 ## 8. Ever-present footer with bug reporting
 
-**Status:** Not started.
+**Status:** Partially done — the ever-present footer shipped; the in-product
+capture pipeline is still deferred. A small footer bar fixed to the bottom of
+the viewport (never scrolls away) now renders on every screen of all three apps
+(`mapua-apex-frontend` `SiteFooter` mounted in `main.tsx`, with `--site-footer-h`
+reserving space in `#root` and `layout.frame`; arcus-attendance `AppFooter` and
+arcus-evaluation `SiteFooter` mounted in their root `layout.tsx`), carrying the
+single line "Email mapuaapex@gmail.com for bug reports" as a `mailto:` link.
+Still open: the in-product capture below (DynamoDB `BUG#` partition,
+`POST /api/v1/bug-reports`, admin `GET/PATCH` review list, and the report dialog)
+so issues are stored in-product instead of by e-mail.
 
 **Goal:** A persistent footer on every screen (public, student, OSAAR, and
 arcus app surfaces) that carries a "Report a bug" entry point, so issues are

@@ -61,6 +61,13 @@ const VARIANTS: Record<ReviewNotice["notifType"], NoticeVariant> = {
     heading: "Event details",
     fallback: "Your proposal was fully approved and the event is now scheduled.",
   },
+  "event auto-cancelled": {
+    badge: "Event Cancelled",
+    badgeClass: "bg-red-50 text-[#D9291C]",
+    heading: "Cancellation note",
+    fallback:
+      "The post-evaluation window closed with no post-evaluation filed, so this event was automatically cancelled.",
+  },
   "reservation change requested": {
     badge: "Change Requested",
     badgeClass: "bg-amber-50 text-amber-800",

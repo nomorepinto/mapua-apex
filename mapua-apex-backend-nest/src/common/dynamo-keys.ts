@@ -45,6 +45,10 @@ export function deadlineKey(id: string): string {
   return `DEADLINE#${stripPrefix(id, 'DEADLINE#')}`;
 }
 
+export function cancelWatchKey(submissionId: string): string {
+  return `CANCELWATCH#${stripPrefix(submissionId, 'SUBMISSION#')}`;
+}
+
 export function campusKey(id: string): string {
   return `CAMPUS#${stripPrefix(id, 'CAMPUS#')}`;
 }

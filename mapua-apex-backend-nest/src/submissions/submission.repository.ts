@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DynamoTable } from '../aws/dynamo-table.js';
 import {
+  cancelWatchKey,
   collaborationKey,
   eventKey,
   notificationKey,
@@ -180,6 +181,37 @@ export class SubmissionRepository {
     return this.table.query({
       keyCondition: 'PK = :pk AND begins_with(SK, :sk)',
       values: { ':pk': organizationKey(organizationId), ':sk': 'COLLAB#' },
+    });
+  }
+
+  /** Overwrite (or refresh) the CANCELWATCH# sentinel for a submission. */
+  putCancelWatch(item: Item): Promise<void> {
+    return this.table.put(item);
+  }
+
+  deleteCancelWatch(eventId: string, submissionId: string): Promise<void> {
+    return this.table.delete(
+      eventKey(eventId),
+      cancelWatchKey(submissionId),
+    );
+  }
+
+  /**
+   * Move an `approved` submission to `cancelled` only if it is still approved.
+   * Returns the ALL_NEW item; throws ConditionalCheckFailedException when the
+   * submission is finished/denied/already-cancelled or missing (replay-safe).
+   */
+  cancelIfApproved(
+    eventId: string,
+    submissionId: string,
+    cancelledAt: string,
+  ): Promise<Item> {
+    return this.table.update({
+      key: { PK: eventKey(eventId), SK: submissionKey(submissionId) },
+      set: { status: 'cancelled', cancelled_at: cancelledAt },
+      condition: 'attribute_exists(PK) AND #status = :expected',
+      names: { '#status': 'status' },
+      values: { ':expected': 'approved' },
     });
   }
 }

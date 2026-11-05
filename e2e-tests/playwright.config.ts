@@ -30,6 +30,13 @@ export default defineConfig({
     { name: "arcus", testMatch: /arcus\.spec\.ts/, dependencies: ["reviews"] },
     { name: "postevals", testMatch: /postevals\.spec\.ts/, dependencies: ["arcus"] },
     {
+      name: "cancel-watch",
+      testMatch: /cancel-watch\.spec\.ts/,
+      // Needs an approved, non-skip-post-eval event with the postevals project's
+      // filed post-evals still in place (the negative case).
+      dependencies: ["postevals"],
+    },
+    {
       name: "reservation-changes",
       testMatch: /reservation-changes\.spec\.ts/,
       dependencies: ["postevals"],

@@ -183,6 +183,7 @@ export interface ApiNotification {
     | "denied"
     | "returned"
     | "event scheduled"
+    | "event auto-cancelled"
     | ReservationNotifType
   comment?: string
 }
@@ -586,6 +587,7 @@ export interface ReviewNotice {
     | "approved"
     | "fully approved"
     | "event scheduled"
+    | "event auto-cancelled"
     | ReservationNotifType
   comment: string
   signatoryLabel: string

@@ -173,6 +173,15 @@ export class AppConfigService implements OnModuleInit {
     return this.integer('ARCUS_POST_EVALUATION_WINDOW_DAYS', 3);
   }
 
+  /**
+   * Kill-switch for the TTL auto-cancel feature (default on). When off, the
+   * final-approval sentinel is never written and the cancel path no-ops, so a
+   * stale sentinel cannot fire. Set `ARCUS_AUTO_CANCEL_ENABLED=false` to disable.
+   */
+  autoCancelEnabled(): boolean {
+    return this.flagOr('ARCUS_AUTO_CANCEL_ENABLED', true);
+  }
+
   emailDetectiveBaseUrl(): string {
     return (
       this.optional('EMAILDETECTIVE_BASE_URL') ??
@@ -245,7 +254,15 @@ export class AppConfigService implements OnModuleInit {
   }
 
   private flag(key: string): boolean {
+    return this.flagOr(key, false);
+  }
+
+  /** Truthy test with an explicit default when the variable is unset or empty. */
+  private flagOr(key: string, fallback: boolean): boolean {
     const value = (this.optional(key) ?? '').toLowerCase();
+    if (value === '') {
+      return fallback;
+    }
     return (
       value === '1' || value === 'true' || value === 'yes' || value === 'on'
     );

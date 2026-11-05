@@ -20,6 +20,7 @@ test("administrators build and export every report; OSAAR loses the session log"
   const adminReports = new ReportsPage(admin.page)
   try {
     await adminReports.open("/admin/reports")
+    await adminReports.expectBugReportFooter()
     const offered = await adminReports.availableReportTitles()
     for (const title of ADMIN_TITLES) await expect(offered).toContain(title)
 

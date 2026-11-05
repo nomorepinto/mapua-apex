@@ -23,8 +23,9 @@ export const brand = {
 export const layout = {
   /** Full-page grey canvas. */
   page: "min-h-full w-full min-w-0 overflow-x-clip bg-page p-4 text-neutral-900 sm:p-6 lg:p-8",
-  /** Sidebar shell behind <main>. */
-  frame: "flex h-dvh w-full flex-col overflow-hidden bg-page lg:flex-row",
+  /** Sidebar shell behind <main>. Leaves room for the fixed site footer. */
+  frame:
+    "flex h-[calc(100dvh-var(--site-footer-h))] w-full flex-col overflow-hidden bg-page lg:flex-row",
   /** Scrollable main column next to the sidebar. */
   main: "min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto",
   fallback:

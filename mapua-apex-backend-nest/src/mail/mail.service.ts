@@ -95,6 +95,12 @@ export class MailService {
             : 'Your event is approved — attendance',
           `${comment}\n${links}`.trim(),
         );
+      } else if (kind === 'event auto-cancelled') {
+        await this.send(
+          student,
+          `${title} was cancelled — no post-evaluation filed`,
+          comment,
+        );
       } else if (kind === 'denied' || kind === 'returned') {
         await this.send(
           student,

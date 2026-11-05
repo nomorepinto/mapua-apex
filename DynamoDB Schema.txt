@@ -115,10 +115,12 @@ first_submitted_at: timestamp (optional legacy; server-owned immutable first fil
 first_submitted_at_source: "recorded" | "linked_creation_evidence" (optional legacy)
 fully_approved_at: timestamp (optional; server-owned first final approval)
 status: "pending" | "approved" | "denied" | "returned" | "finished" | "cancelled"
-  ("cancelled" is RESERVED for the deferred EventBridge auto-cancel — when an
-  event's 3-day post-evaluation window lapses with no filed post-eval the linked
-  submission becomes "cancelled" (+ cancelled_at). No code path writes it yet;
-  see mapua-apex/todo.md item 2.)
+  ("cancelled" is a terminal, post-approval status with two writers: the CDM
+  reservation-cancel resolution of a RESERVATION_CHANGE (see below), and the
+  DynamoDB Streams auto-cancel consumer when an approved event's post-evaluation
+  window lapses with nothing filed (see CANCELWATCH). The auto-cancel path also
+  stamps cancelled_at; the CDM cancel path does not.)
+cancelled_at: timestamp   (sparse; set only by the auto-cancel consumer)
 current_signatory: SIGNATORY#uuid
 signatory_sequence: [ SIGNATORY#uuid ]   (ordered routing snapshot, written at submit time)
 signatory_steps: [                         (same snapshot, with stable keys; absent on items sent before stages were stored — those items are not backfilled)
@@ -223,16 +225,45 @@ and keeps current_signatory / GSI2 on that desk. Deny sets status
 on the last approve (status stays "approved" / "denied", current_signatory
 is left as the last desk).
 
-"cancelled" is a terminal, post-approval status set ONLY by a CDM cancel
-resolution of a RESERVATION_CHANGE (see below) — never by the student edit path
-(WriteSubmission treats it like approved/denied/finished and refuses to edit
-it). Cancelling releases every linked BOOKING and removes booking_refs in the
+"cancelled" is a terminal, post-approval status set by a CDM cancel
+resolution of a RESERVATION_CHANGE (see below) or by the auto-cancel stream
+consumer on post-evaluation window lapse (see CANCELWATCH) — never by the student
+edit path (WriteSubmission treats it like approved/denied/finished and refuses to
+edit it). Cancelling releases every linked BOOKING and removes booking_refs in the
 same write as the status flip; the paper is kept (never deleted), stays listed
 everywhere, and is excluded from the arcus GET /api/v1/arcus/events list. A
 reschedule resolution keeps status "approved" and rewrites
 activity_details.date_of_event / day_of_event / time_of_event plus
 venue_reservation.reservations[] and booking_refs in lockstep with the edited
 holds.
+
+CANCELWATCH (apex-owned auto-cancel sentinel; one EVENT-partition child per approved paper)
+PK: EVENT#uuid
+SK: CANCELWATCH#uuid   (the linked SUBMISSION uuid, bare)
+entity_type: "cancelwatch"
+event_id: string          (bare EVENT uuid)
+submission_id: string     (bare SUBMISSION uuid)
+organization_id: string   (bare ORGANIZATION uuid)
+created_at: timestamp
+TTL: number   (unix epoch seconds = the evaluation window close)
+
+The time-to-live sentinel behind the post-eval auto-cancel. Written on the final
+approve of a paper whose organization does NOT skip_post_eval (skip_post_eval orgs
+file nothing, so they must never auto-cancel), with TTL = the closes_at of
+EventWindow::EVALUATION for activity_details.date_of_event
+(ARCUS_POST_EVALUATION_WINDOW_DAYS, default 3, Asia/Manila). The TTL attribute is
+the table's single uppercase `TTL` (already enabled for session/activity-log rows);
+a paper with an unparseable date_of_event gets no sentinel. When the window lapses
+DynamoDB expires the item and emits a Streams REMOVE that a consumer Lambda
+handles: it re-queries the EVENT partition for a POSTEVAL# child (never trusting
+cross-key ordering) and, finding none, cancels the SUBMISSION via a conditional
+update guarded on status = "approved" (a finished/denied/already-cancelled paper
+or a replayed REMOVE no-ops), writes an "event auto-cancelled" NOTIFICATION, and
+emails the student. The sentinel is also DELETED the moment a post-eval is filed
+(the belt), so the stream re-check is only the suspenders. TTL expiry is
+best-effort and can lag by hours — harmless against a 3-day deadline. The whole
+feature is behind ARCUS_AUTO_CANCEL_ENABLED (default on): when off, approve writes
+no sentinel and evaluateAndCancel no-ops, so a stale sentinel cannot fire.
 
 COLLABORATION POINTER (index-only, one per dependent organization)
 PK: ORGANIZATION#uuid   (the dependent org, not the proponent)
@@ -366,7 +397,7 @@ NOTIFICATION
 PK: SUBMISSION#uuid
 SK: NOTIFICATION#timestamp
 signatory: SIGNATORY#uuid
-notif_type: "approved" | "fully approved" | "denied" | "returned" | "event scheduled" | "reservation change requested" | "reservation cancelled" | "reservation rescheduled" | "reservation change denied"
+notif_type: "approved" | "fully approved" | "denied" | "returned" | "event scheduled" | "event auto-cancelled" | "reservation change requested" | "reservation cancelled" | "reservation rescheduled" | "reservation change denied"
 comment: string (mandatory if denied or returned)
 
 Students GET / POST / PUT the timeline for their org's paper.
@@ -381,6 +412,12 @@ by RequestReservationChange / ResolveReservationChange, never client-postable vi
 StoreNotificationRequest): "reservation change requested" carries an empty
 signatory (student-initiated, timeline row only); the other three carry the
 resolving CDM signatory and each also triggers an SES email to the student.
+
+"event auto-cancelled" is system-only too — written by the auto-cancel stream
+consumer (see CANCELWATCH) with an empty signatory (a system notice) whenever it
+cancels a paper whose post-evaluation window lapsed, and it triggers an SES email
+to the student. It is a distinct type from "reservation cancelled" so the student
+dashboard buckets it as a review notice, not a reservation change.
 
 SIGNATORY
 PK: SIGNATORY#uuid

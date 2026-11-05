@@ -34,10 +34,10 @@ export function RemindersPanel() {
 
     // 1. Add review notices from real submissions
     reviewNotices.forEach((notice) => {
-      let mappedStatus: ProposalDashboardStatus = "Pending"
+      let mappedStatus: ProposalDashboardStatus
       if (notice.notifType === "approved" || notice.notifType === "fully approved") {
         mappedStatus = "Approved"
-      } else if (notice.notifType === "denied") {
+      } else if (notice.notifType === "denied" || notice.notifType === "event auto-cancelled") {
         mappedStatus = "Cancelled"
       } else {
         mappedStatus = "Pending"

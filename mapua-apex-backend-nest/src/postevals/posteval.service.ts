@@ -207,6 +207,9 @@ export class PostEvalService {
       participation_snapshot: await this.participants(body.event_id),
     };
     await this.postevals.put(item);
+    // Belt: a filed post-eval cancels the pending auto-cancel watch. The stream
+    // re-check (suspenders) would also no-op once the POSTEVAL# child exists.
+    await this.submissions.deleteCancelWatch(body.event_id, body.submission_id);
     return this.view(item);
   }
 

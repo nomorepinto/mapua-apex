@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { AwsModule } from './aws/aws.module.js';
 import { BookingsModule } from './bookings/bookings.module.js';
 import { CampusesModule } from './campuses/campuses.module.js';
+import { CancelWatchModule } from './cancel-watch/cancel-watch.module.js';
 import { AppConfigModule } from './config/app-config.module.js';
 import { existingRootEnv } from './config/root-env.js';
 import { DeadlinesModule } from './deadlines/deadlines.module.js';
@@ -54,6 +55,7 @@ const envFile = existingRootEnv();
     SessionsModule,
     ActivityModule,
     MonitorModule,
+    CancelWatchModule,
   ],
 })
 export class AppModule {}

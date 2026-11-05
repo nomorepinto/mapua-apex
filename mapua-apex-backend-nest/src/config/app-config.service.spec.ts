@@ -33,3 +33,21 @@ describe('AppConfigService.clientOptions', () => {
     expect(options.region).toBe('ap-southeast-1');
   });
 });
+
+describe('AppConfigService.autoCancelEnabled', () => {
+  it('defaults to on when the variable is unset', () => {
+    expect(service({}).autoCancelEnabled()).toBe(true);
+  });
+
+  it('turns off on an explicit false value', () => {
+    expect(
+      service({ ARCUS_AUTO_CANCEL_ENABLED: 'false' }).autoCancelEnabled(),
+    ).toBe(false);
+  });
+
+  it('stays on for a truthy value', () => {
+    expect(
+      service({ ARCUS_AUTO_CANCEL_ENABLED: 'true' }).autoCancelEnabled(),
+    ).toBe(true);
+  });
+});

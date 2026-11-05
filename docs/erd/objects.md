@@ -93,7 +93,8 @@ submission, including any collaboration.
 | `first_submitted_at` | timestamp, optional | Server-owned immutable first filing; absent legacy values remain unknown |
 | `first_submitted_at_source` | string, optional | `recorded` on new submissions or `linked_creation_evidence` from conservative backfill |
 | `fully_approved_at` | timestamp, optional | First successful final approval, set once and preserved through completion/cancellation |
-| `status` | string | `pending / approved / denied / returned / finished`. `finished` is terminal and set only when OSAAR approves the event's POSTEVAL (see below). `cancelled` is **reserved** for the deferred EventBridge auto-cancel — not written by any code path yet |
+| `status` | string | `pending / approved / denied / returned / finished / cancelled`. `finished` is terminal and set only when OSAAR approves the event's POSTEVAL (see below). `cancelled` is terminal and has two writers: a CDM `cancel` resolution of a RESERVATION_CHANGE, and the auto-cancel DynamoDB Streams consumer when a `CANCELWATCH` sentinel's TTL lapses with nothing filed (see below) |
+| `cancelled_at` | timestamp | Optional — set only by the auto-cancel stream consumer (the CDM cancel path does not stamp it) |
 | `current_signatory` | string | `SIGNATORY#uuid` holding the paper now |
 | `signatory_sequence` | list | Ordered `SIGNATORY#uuid` routing snapshot, written at submit time |
 | `signatory_steps` | list | Same snapshot with `{ key, role, signatory_id, organization_id }`. Keys: `adviser:ORG#id`, `dean:ORG#id`, `osaar_1`..`n`, `cdm`. Absent on items sent before stages were stored; those items are not backfilled |
@@ -171,7 +172,7 @@ keyed by the submission id (a separate partition from the event).
 | `PK` | string | `SUBMISSION#uuid` |
 | `SK` | string | `NOTIFICATION#timestamp` (identity; UTC second precision) |
 | `signatory` | string | `SIGNATORY#uuid` author (snapshot) |
-| `notif_type` | string | `approved / fully approved / denied / returned / event scheduled / reservation change requested / reservation cancelled / reservation rescheduled / reservation change denied` — the four `reservation ...` types are system-only (written by RequestReservationChange / ResolveReservationChange, never client-postable) |
+| `notif_type` | string | `approved / fully approved / denied / returned / event scheduled / event auto-cancelled / reservation change requested / reservation cancelled / reservation rescheduled / reservation change denied` — the four `reservation ...` types are system-only (written by RequestReservationChange / ResolveReservationChange, never client-postable); `event scheduled` (final approval) and `event auto-cancelled` (stream consumer) are also system-only with an empty signatory |
 | `comment` | string | Mandatory when `denied` or `returned` |
 
 Approve / return / deny insert a NOTIFICATION row as a side effect. A PUT
@@ -286,6 +287,38 @@ idempotent, and the window is **not** re-checked (approval may follow the window
 closing). `DenyPostEval` sets `status = denied` + `denied_at` and leaves the
 submission `approved`. Approving a denied post-eval (or denying an approved one)
 aborts **422**.
+
+---
+
+## CANCELWATCH
+
+The time-to-live sentinel behind the post-evaluation **auto-cancel**. One item
+lives in the **event's** partition per approved paper (alongside its SUBMISSION
+and POSTEVAL children). Its expiry is what fires the auto-cancel.
+
+| Property | Type | Notes |
+|---|---|---|
+| `PK` | string | `EVENT#uuid` (parent event partition) |
+| `SK` | string | `CANCELWATCH#uuid` (the linked bare SUBMISSION uuid) |
+| `entity_type` | string | `cancelwatch` |
+| `event_id` | string | Bare event uuid |
+| `submission_id` | string | Bare uuid of the linked approved paper |
+| `organization_id` | string | Bare org uuid |
+| `created_at` | timestamp | Final approval time (UTC) |
+| `TTL` | number | Unix epoch seconds = the evaluation window close (`EventWindow::EVALUATION` for `activity_details.date_of_event`, `ARCUS_POST_EVALUATION_WINDOW_DAYS`, Asia/Manila). The table's single uppercase `TTL` attribute |
+
+**Created** on the final approve of a paper whose org does **not** `skip_post_eval`
+(a `skip_post_eval` org files nothing, so it must never auto-cancel; a paper with
+an unparseable `date_of_event` gets no sentinel). **Deleted** immediately when a
+post-eval is filed (the belt). When the TTL lapses DynamoDB expires the item and
+emits a **Streams `REMOVE`** that a consumer Lambda handles: it re-queries the
+partition for a `POSTEVAL#` child (never trusting cross-key ordering) and, finding
+none, cancels the SUBMISSION through a conditional update guarded on
+`status = approved` (a finished/denied/already-cancelled paper or a replayed
+`REMOVE` no-ops), then writes an `event auto-cancelled` NOTIFICATION and emails
+the student. TTL expiry is best-effort and can lag by hours — harmless against a
+3-day deadline. The whole feature is behind `ARCUS_AUTO_CANCEL_ENABLED` (default
+on): when off, approve writes no sentinel and `evaluateAndCancel` no-ops.
 
 ---
 

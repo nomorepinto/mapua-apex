@@ -4,8 +4,15 @@ import {
   type BookingConflict,
 } from '../bookings/booking.service.js';
 import { AppConfigService } from '../config/app-config.service.js';
-import { nowIso, signatoryKey, stripPrefix } from '../common/dynamo-keys.js';
+import {
+  eventKey,
+  cancelWatchKey,
+  nowIso,
+  signatoryKey,
+  stripPrefix,
+} from '../common/dynamo-keys.js';
 import { abort } from '../common/http.js';
+import { evaluationWindowTtl } from '../common/manila.js';
 import { num, record, str, type Item } from '../common/records.js';
 import { MailService } from '../mail/mail.service.js';
 import { OrganizationRepository } from '../organizations/organization.repository.js';
@@ -151,6 +158,22 @@ export class SubmissionReviewService {
       comment,
       null,
     );
+    if (!skipsPostEval && this.config.autoCancelEnabled()) {
+      const rawDate = str(record(item.activity_details) ?? {}, 'date_of_event');
+      const ttl = evaluationWindowTtl(rawDate, days);
+      if (ttl !== null) {
+        await this.submissions.putCancelWatch({
+          PK: eventKey(eventId),
+          SK: cancelWatchKey(submissionId),
+          entity_type: 'cancelwatch',
+          event_id: eventId,
+          submission_id: submissionId,
+          organization_id: orgId,
+          created_at: sentAt,
+          TTL: ttl,
+        });
+      }
+    }
     return updated;
   }
 

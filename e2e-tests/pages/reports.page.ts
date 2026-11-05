@@ -17,6 +17,13 @@ export class ReportsPage {
     await expect(this.page.getByRole("heading", { name: /Reports & Export/ })).toBeVisible()
   }
 
+  /** The ever-present site footer carries the bug-report mailto entry point. */
+  async expectBugReportFooter() {
+    const link = this.page.getByRole("link", { name: "mapuaapex@gmail.com" })
+    await expect(link).toBeVisible()
+    await expect(link).toHaveAttribute("href", "mailto:mapuaapex@gmail.com")
+  }
+
   /** Titles of the report types offered by the "Report type" selector. */
   async availableReportTitles(): Promise<string[]> {
     const trigger = this.page.getByRole("combobox", { name: "Report type" })
