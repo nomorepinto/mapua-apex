@@ -57,14 +57,7 @@ submitted post-eval, automatically set the linked SUBMISSION
 spelling. The same check applies to every field that should be a known value,
 not only position.
 
-## 4. Validation feedback while typing
-
-**Status:** Not started.
-
-**Goal:** Show field errors while the user is still filling in the form, not
-only after they submit or leave the page.
-
-## 5. e2e-tests coverage for the Reports & Export restructure
+## 4. e2e-tests coverage for the Reports & Export restructure
 
 **Status:** Deferred — not wired into the `e2e-tests/` suite yet.
 
@@ -87,7 +80,7 @@ filter-only; report endpoints gated to `report_admin` (sessions stay
   live backend + frontend servers, and Cognito test users — deferred until that
   environment is available.
 
-## 6. Cognito API login for the arcus apps (replace hosted UI)
+## 5. Cognito API login for the arcus apps (replace hosted UI)
 
 **Status:** Not started.
 
@@ -95,9 +88,11 @@ filter-only; report endpoints gated to `report_admin` (sessions stay
 in-app login form, instead of redirecting to the Cognito-hosted login pages,
 so the arcus companion apps (`arcus-attendance-system`,
 `arcus-evaluation-system`) keep the user inside their own UI for the whole
-session.
+session. The direct-API access is also the point of the change: it lets the
+backend provision accounts through an SQS-buffered writer instead of hitting
+Cognito synchronously, which throttles during event-day sign-up bursts.
 
-**Design:**
+**Design — login flow:**
 - Use the Cognito **`AUTHORIZE_API` flow** (`POST /v2/authorize` with the
   `SRP_*` secure-password steps) called from the Next.js server actions, not
   the browser. Tokens are obtained server-side and stored in an HttpOnly,
@@ -118,6 +113,65 @@ session.
   claim → `/`). Migration is additive — the hosted UI can stay enabled during
   rollout and be disabled once the form is proven.
 
+**Design — SQS-buffered Cognito account creation:**
+- **Problem:** during an event, hundreds of near-simultaneous account
+  creations blow through **two** shared, region-wide Cognito write quotas,
+  each breach surfacing as a dead form (or a silently mis-provisioned
+  account) at the worst moment. The **binding** one is `UserUpdate` at
+  **25 RPS — not adjustable via Service Quotas** (only a Support case):
+  the current orgassign `PostConfirmation` trigger fires *two* `UserUpdate`
+  calls per student (`AdminUpdateUserAttributes` for `custom:organization_id`,
+  then `AdminAddUserToGroup`), so a registration burst caps at roughly
+  **12 students/sec** — well before the `UserCreation` quota
+  (`SignUp` / `ConfirmSignUp` / `AdminCreateUser`, **50 RPS**, adjustable) is
+  reached. Buffering only `AdminCreateUser` leaves the tighter limit in place;
+  the consumer must absorb the `UserUpdate` ops too.
+- **Producer:** the account-request endpoint never calls Cognito inline. It
+  validates the payload, writes a status item
+  `PK = SK = PROCOG#<studentId>` (`status = pending`, `requested_at`), and
+  enqueues `{studentId, name, email, organizationId}` to a
+  standard SQS queue (response time ≈ one DynamoDB put + one `SendMessage`).
+- **Consumer:** a Lambda polls the queue with `BatchSize` ≈ 10 and
+  `ReportBatchItemFailures` so one poisoned message doesn't redrive the
+  whole batch. Per record it calls `AdminCreateUser`, then
+  `AdminSetUserSettings` (MFA), `AdminUpdateUserAttributes`
+  (`custom:organization_id`), and `AdminAddUserToGroup` — the same writes the
+  current `PreSignUp_SignUp` / `PostConfirmation` trigger chain performs,
+  moved inline (which is exactly what lets the tight `UserUpdate` quota be
+  paced in one place instead of smeared across a synchronous trigger; the
+  orgassign trigger is then retired for these two calls). Size the drain rate
+  against the binding `UserUpdate` 25 RPS, **not** `UserCreation`: with the
+  two `UserUpdate` ops per record, `ReservedConcurrentExecutions` must keep
+  the consumer at **≤ ~12 registrations/sec (≤ 25 `UserUpdate` ops/sec)** so
+  Cognito never sees the burst. `ApproximateAgeOfOldestMessage` on the queue
+  is the burst alarm.
+- **Drain semantics:** queue + consumer absorb the spike; Cognito is written
+  at a steady, quota-compliant rate; nothing is lost and no caller retries
+  are needed. The queue is the buffer, the consumer is the rate limiter.
+- **Status path for UX:** the client polls
+  `GET /api/v1/auth/provision-status/{studentId}`, which reads the
+  `PROCOG#` item the consumer patches to `ready` / `failed(code)`;
+  sign-in is offered once `ready`. Give the item a TTL (e.g. 7 days) so
+  the partition self-cleans. Alternatively, if auto-verifying e-mail is
+  acceptable, the consumer can `AdminConfirmSignUp` so the user is usable
+  without a confirmation hop — decide at implementation time.
+- **Failure handling:** DLQ redrive (maxReceiveCount 5). Classify
+  `UsernameExistsException` as *already provisioned* → mark `ready`, never
+  retry; classify invalid-input faults (`InvalidParameterException`,
+  `InvalidPasswordException`) as permanent → mark `failed` and drop;
+  everything else retries with backoff. Idempotency check
+  (`AdminGetUser` first) makes message replay safe.
+- **Login side:** `AUTHORIZE_API` must surface `UserNotFoundException` /
+  `NotConfirmedException` as "account still being created — try again in a
+  few minutes" rather than a generic auth error.
+- **IAM:** the consumer role gets `sqs:ReceiveMessage/DeleteMessage` on the
+  queue and `cognito-idp:AdminCreateUser,AdminSetUserSettings,
+  AdminUpdateUserAttributes,AdminAddUserToGroup,AdminGetUser` scoped to this
+  pool ARN only (and `cognito-idp:GetGroup` on the target group ARN).
+  `AdminAddUserToGroup` is new here — it lives in the `UserUpdate` category,
+  the 25 RPS ceiling the drain rate is tuned against. No
+  Lambda is allowed to call `SignUp` unauthenticated.
+
 **Notes / risks:**
 - The hosted UI keeps credentials provably outside the app; a self-built form
   moves that burden here — compensate with Cognito password policies,
@@ -127,7 +181,7 @@ session.
   carries the full hosted-UI stack, so treat this as a replacement of that
   flow, not an additional one.
 
-## 7. OSAAR term start / term end settings
+## 6. OSAAR term start / term end settings
 
 **Status:** Not started.
 
@@ -162,7 +216,7 @@ date ranges** during which no events may be scheduled at all.
   *rescheduling* of already-approved events; the validator placement above
   covers both if applied on every date write.
 
-## 8. Signatory contact information on the student side
+## 7. Signatory contact information on the student side
 
 **Status:** Not started.
 
@@ -187,7 +241,7 @@ e-mailing OSAAR blindly.
 - Gate the contact fields to authenticated students viewing **their own**
   proposal only; the list endpoints must not serialize them.
 
-## 9. Ever-present footer with bug reporting
+## 8. Ever-present footer with bug reporting
 
 **Status:** Not started.
 
@@ -211,7 +265,7 @@ captured in-product instead of by e-mail.
 - Optional later: e-mail or activity-log notification to admins on new
   reports, reusing the existing notification pipeline.
 
-## 10. Penetration test using agent skills
+## 9. Penetration test using agent skills
 
 **Status:** Not started.
 
@@ -230,7 +284,7 @@ fixes before the next release.
   auth/authorization matrix (role gates on report/session endpoints,
   `ARCUS_SERVICE_TOKEN` endpoints, the `PATCH /api/member` open passthrough
   on the arcus scanee flow), IDOR on submission/proposal IDs, token handling
-  after the item-6 login change, upload/CSV import paths, and rate limiting
+  after the item-5 login change, upload/CSV import paths, and rate limiting
   on login and bug-report endpoints.
 - **Reporting:** findings written to `docs/` with OWASP ASVS categories,
   severity (P0–P3), repro steps, and affected files; P0/P1 fixes gated before
