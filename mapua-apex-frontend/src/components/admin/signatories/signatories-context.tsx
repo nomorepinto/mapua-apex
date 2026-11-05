@@ -22,6 +22,11 @@ import {
   type RoleOption,
 } from "@/components/admin/signatories/signatory-options"
 import {
+  EMPTY_SIGNATORY_CONTACT,
+  signatoryContactOf,
+  type SignatoryContactValues,
+} from "@/components/admin/signatories/signatory-contact"
+import {
   accountSearchText,
   EMPTY_ACCOUNTS,
 } from "@/components/admin/accounts/account-assignment"
@@ -91,6 +96,7 @@ interface SignatoriesState {
   role: SignatoryRoleValue | null
   department: DepartmentOption | null
   campusId: string | null
+  contact: SignatoryContactValues
   campuses: ApiCampus[]
   campusItems: OsaarCampusOption[]
   selectedCampus: OsaarCampusOption | null
@@ -125,6 +131,7 @@ interface SignatoriesState {
   editRole: SignatoryRoleValue | null
   editDepartment: DepartmentOption | null
   editCampusId: string | null
+  editContact: SignatoryContactValues
   editError: string
   deleteOpen: boolean
   deleteError: string
@@ -136,6 +143,7 @@ interface SignatoriesActions {
   changeRole: (role: SignatoryRoleValue | null) => void
   setDepartment: (value: DepartmentOption | null) => void
   setCampus: (campusId: string | null) => void
+  changeContact: (field: keyof SignatoryContactValues, value: string) => void
   handleAddOne: (event: FormEvent<HTMLFormElement>) => Promise<void>
   chooseCsv: (file: File | null, text: string) => void
   handleCsvImport: () => Promise<void>
@@ -146,6 +154,10 @@ interface SignatoriesActions {
   changeEditRole: (role: SignatoryRoleValue | null) => void
   setEditDepartment: (value: DepartmentOption | null) => void
   setEditCampus: (campusId: string | null) => void
+  changeEditContact: (
+    field: keyof SignatoryContactValues,
+    value: string
+  ) => void
   handleEditSave: (event: FormEvent<HTMLFormElement>) => Promise<void>
   setDeleteOpen: (open: boolean) => void
   openDelete: () => void
@@ -182,6 +194,9 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<SignatoryRoleValue | null>(null)
   const [department, setDepartment] = useState<DepartmentOption | null>(null)
   const [campusId, setCampusId] = useState<string | null>(null)
+  const [contact, setContact] = useState<SignatoryContactValues>(
+    EMPTY_SIGNATORY_CONTACT
+  )
   const [formError, setFormError] = useState("")
   const [csvError, setCsvError] = useState("")
   const [csvFileName, setCsvFileName] = useState("")
@@ -195,6 +210,9 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
     null
   )
   const [editCampusId, setEditCampusId] = useState<string | null>(null)
+  const [editContact, setEditContact] = useState<SignatoryContactValues>(
+    EMPTY_SIGNATORY_CONTACT
+  )
   const [editError, setEditError] = useState("")
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteError, setDeleteError] = useState("")
@@ -274,6 +292,9 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
         person.department ?? "",
         person.department ? departmentLabel(person.department) : "",
         osaarCampusLabel(person, campuses),
+        person.contact_email ?? "",
+        person.office ?? "",
+        person.contact_number ?? "",
         accountSearchText(accounts, "signatory", person.signatory_id),
       ]
         .join(" ")
@@ -351,6 +372,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
           : (person.campus_id ?? null)
         : null
     )
+    setEditContact(signatoryContactOf(person))
     setEditError("")
   }
 
@@ -383,7 +405,8 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
           name.trim(),
           role,
           department?.value,
-          assignmentFrom(campusId)
+          assignmentFrom(campusId),
+          contact
         )
       )
       const addedName = name.trim()
@@ -392,6 +415,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       setRole(null)
       setDepartment(null)
       setCampusId(null)
+      setContact(EMPTY_SIGNATORY_CONTACT)
       setFormError("")
       toastManager.add({
         title: "Signatory added",
@@ -484,7 +508,8 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
           editName.trim(),
           editRole,
           editDepartment?.value,
-          assignmentFrom(editCampusId)
+          assignmentFrom(editCampusId),
+          editContact
         ),
       })
       setEditing(null)
@@ -535,6 +560,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       role,
       department,
       campusId,
+      contact,
       campuses,
       campusItems,
       selectedCampus,
@@ -576,6 +602,7 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       editRole,
       editDepartment,
       editCampusId,
+      editContact,
       editError,
       deleteOpen,
       deleteError,
@@ -596,6 +623,9 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       setCampus: (next) => {
         setCampusId(next)
         if (formError) setFormError("")
+      },
+      changeContact: (field, next) => {
+        setContact((current) => ({ ...current, [field]: next }))
       },
       handleAddOne,
       chooseCsv: (file, text) => {
@@ -635,6 +665,9 @@ export function SignatoriesProvider({ children }: { children: ReactNode }) {
       setEditCampus: (next) => {
         setEditCampusId(next)
         if (editError) setEditError("")
+      },
+      changeEditContact: (field, next) => {
+        setEditContact((current) => ({ ...current, [field]: next }))
       },
       handleEditSave,
       setDeleteOpen: (open) => {

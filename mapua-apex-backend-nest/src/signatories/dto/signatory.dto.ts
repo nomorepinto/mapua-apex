@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsEmail,
   IsIn,
   IsOptional,
   IsString,
@@ -35,4 +36,21 @@ export class SignatoryDto {
   @IsOptional()
   @IsBoolean()
   all_campuses?: boolean;
+
+  /** Desk e-mail the proponent may write to. Optional, and may differ from the login. */
+  @IsOptional()
+  @IsEmail({}, { message: 'The contact email is not a valid email address.' })
+  @MaxLength(254)
+  contact_email?: string | null;
+
+  /** Office or room where this desk can be found in person. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  office?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  contact_number?: string | null;
 }

@@ -14,6 +14,16 @@ import { CurrentCaller, Roles } from '../common/decorators.js';
 import type { AuthenticatedCaller } from '../common/caller.js';
 import { SignatoryDto } from './dto/signatory.dto.js';
 import { SignatoryService, type SignatoryView } from './signatory.service.js';
+import type { SignatoryContact } from './signatory.repository.js';
+
+/** Desk contact details from the request body, if any were supplied. */
+function contactOf(body: SignatoryDto): SignatoryContact {
+  return {
+    email: body.contact_email ?? null,
+    office: body.office ?? null,
+    number: body.contact_number ?? null,
+  };
+}
 
 @Controller('admins/signatories')
 @Roles('admin')
@@ -34,6 +44,7 @@ export class AdminSignatoriesController {
       body.department,
       body.campus_id,
       body.all_campuses,
+      contactOf(body),
     );
   }
 
@@ -58,6 +69,7 @@ export class AdminSignatoriesController {
       body.department,
       body.campus_id,
       body.all_campuses,
+      contactOf(body),
     );
   }
 

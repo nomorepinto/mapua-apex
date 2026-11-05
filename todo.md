@@ -51,9 +51,9 @@ submitted post-eval, automatically set the linked SUBMISSION
 - Accepted caveat: TTL deletion is best-effort with no SLA — AWS docs note
   occasional multi-hour lag. Harmless for this deadline; document it.
 
-## 2. Room suggestion by participant count
+## ~~2. Room suggestion by participant count~~
 
-**Status:** Not started.
+**Status:** Closed — `suggestRooms()` in `mapua-apex-frontend/src/lib/reservable-capacity.ts` ranks the campus rooms for the SAAF headcount (best fit first, smallest sufficient ceiling wins; when nothing fits, the closest rooms, largest first) and `components/students/reservations/room-suggestions.tsx` renders them as an advisory "Suggested for N participants" panel with a one-click Add above the room dropdown in `reservation-form.tsx`. Advisory only — the dropdown, the picks, and the existing capacity warnings are untouched, and booked or closed rooms are never offered.
 
 **Goal:** Suggest a room from the number of participants.
 
@@ -231,9 +231,9 @@ date ranges** during which no events may be scheduled at all.
   *rescheduling* of already-approved events; the validator placement above
   covers both if applied on every date write.
 
-## 7. Signatory contact information on the student side
+## ~~7. Signatory contact information on the student side~~
 
-**Status:** Not started.
+**Status:** Closed — SIGNATORY items carry `contact_email` / `office` / `contact_number`, maintained on the admin signatory screen (add card, edit dialog, and a new Contact column); `GET /api/v2/students/events/{event}/submissions/{submission}` alone derives `approval_chain_contacts` from the desk holding the paper onward (OSAAR links stand in once the paper is decided), and a new "Signatories" tab in `SubmissionTrackerModal.tsx` renders it in approval order with the current desk highlighted and plain `mailto:` / `tel:` links. Deviation from the design below: the chain comes from the submission's own frozen `signatory_steps` rather than the organization's `signatories[]` map, so a paper keeps the desks it was filed with, and each entry also carries `signatory_id`, `organization_name`, `contact_number`, and `is_current`.
 
 **Goal:** Show the approving signatories' contact information — e-mail, and
 office/phone where available — in a dedicated tab inside the proposal modal

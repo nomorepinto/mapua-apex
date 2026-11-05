@@ -11,6 +11,38 @@ export interface OsaarPlacement {
   osaarOrder: number | null;
 }
 
+/** Desk contact details a proponent may use to follow up. All optional. */
+export interface SignatoryContact {
+  email: string | null;
+  office: string | null;
+  number: string | null;
+}
+
+export const NO_CONTACT: SignatoryContact = {
+  email: null,
+  office: null,
+  number: null,
+};
+
+/** Trims each field and drops blanks so a cleared field is removed on write. */
+export function normalizeContact(
+  contact?: SignatoryContact | null,
+): SignatoryContact {
+  return {
+    email: text(contact?.email),
+    office: text(contact?.office),
+    number: text(contact?.number),
+  };
+}
+
+function text(value?: string | null): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
 @Injectable()
 export class SignatoryRepository {
   constructor(private readonly table: DynamoTable) {}
@@ -29,6 +61,25 @@ export class SignatoryRepository {
   get(id: string): Promise<Item | undefined> {
     const key = signatoryKey(id);
     return this.table.get(key, key);
+  }
+
+  /**
+   * Signatory rows for a list of bare ids in one `BatchGetItem`. Missing desks
+   * are simply absent from the result.
+   */
+  listByIds(ids: string[]): Promise<Item[]> {
+    const keys = [
+      ...new Set(
+        ids
+          .map((id) => text(id))
+          .filter((id): id is string => id !== null)
+          .map((id) => signatoryKey(id)),
+      ),
+    ].map((key) => ({ PK: key, SK: key }));
+    if (keys.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.table.batchGet(keys);
   }
 
   async findIdByRole(role: string): Promise<string | null> {
@@ -63,8 +114,9 @@ export class SignatoryRepository {
     role: string,
     department?: string | null,
     placement?: OsaarPlacement | null,
+    contact?: SignatoryContact | null,
   ): Promise<Item> {
-    return this.write(randomUUID(), name, role, department, placement);
+    return this.write(randomUUID(), name, role, department, placement, contact);
   }
 
   async update(
@@ -73,6 +125,7 @@ export class SignatoryRepository {
     role: string,
     department?: string | null,
     placement?: OsaarPlacement | null,
+    contact?: SignatoryContact | null,
   ): Promise<Item> {
     return this.write(
       stripPrefix(id, 'SIGNATORY#') ?? id,
@@ -80,6 +133,7 @@ export class SignatoryRepository {
       role,
       department,
       placement,
+      contact,
     );
   }
 
@@ -124,6 +178,7 @@ export class SignatoryRepository {
     role: string,
     department?: string | null,
     placement?: OsaarPlacement | null,
+    contact?: SignatoryContact | null,
   ): Promise<Item> {
     const normalized = role.toLowerCase();
     const dept =
@@ -142,6 +197,17 @@ export class SignatoryRepository {
       GSI4SK: key,
       ...(dept ? { department: dept } : {}),
     };
+    // `put` replaces the row, so a blank field is dropped rather than stored.
+    const details = normalizeContact(contact);
+    if (details.email !== null) {
+      item.contact_email = details.email;
+    }
+    if (details.office !== null) {
+      item.office = details.office;
+    }
+    if (details.number !== null) {
+      item.contact_number = details.number;
+    }
     if (normalized === 'osaar' && placement?.allCampuses) {
       item.all_campuses = true;
     } else if (normalized === 'osaar' && placement?.campusId) {

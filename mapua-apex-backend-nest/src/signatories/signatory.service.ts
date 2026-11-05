@@ -8,6 +8,7 @@ import { bool, list, num, str, type Item } from '../common/records.js';
 import {
   SignatoryRepository,
   type OsaarPlacement,
+  type SignatoryContact,
 } from './signatory.repository.js';
 
 export interface SignatoryView {
@@ -19,6 +20,9 @@ export interface SignatoryView {
   campus_id: string | null;
   all_campuses: boolean;
   osaar_order: number | null;
+  contact_email: string | null;
+  office: string | null;
+  contact_number: string | null;
 }
 
 @Injectable()
@@ -49,10 +53,11 @@ export class SignatoryService {
     department?: string | null,
     campusId?: string | null,
     allCampuses?: boolean,
+    contact?: SignatoryContact | null,
   ): Promise<SignatoryView> {
     const placement = await this.placementFor(role, campusId, allCampuses);
     return this.toView(
-      await this.signatories.create(name, role, department, placement),
+      await this.signatories.create(name, role, department, placement, contact),
     );
   }
 
@@ -63,6 +68,7 @@ export class SignatoryService {
     department?: string | null,
     campusId?: string | null,
     allCampuses?: boolean,
+    contact?: SignatoryContact | null,
   ): Promise<SignatoryView> {
     const existing = await this.signatories.get(id);
     if (!existing) {
@@ -81,6 +87,7 @@ export class SignatoryService {
       role,
       department,
       placement,
+      contact,
     );
     const bare = stripPrefix(id, 'SIGNATORY#') ?? id;
     if (previousRole.toLowerCase() !== role.toLowerCase()) {
@@ -170,6 +177,9 @@ export class SignatoryService {
       campus_id: str(item, 'campus_id'),
       all_campuses: bool(item, 'all_campuses'),
       osaar_order: num(item, 'osaar_order'),
+      contact_email: str(item, 'contact_email'),
+      office: str(item, 'office'),
+      contact_number: str(item, 'contact_number'),
     };
   }
 

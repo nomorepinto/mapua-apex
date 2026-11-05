@@ -17,7 +17,7 @@ graph TD
 
     NOTIFICATION["<b>NOTIFICATION</b><br/>PK = SUBMISSION#uuid<br/>SK = NOTIFICATION#timestamp<br/>------------------<br/>signatory<br/>notif_type<br/>comment"]
 
-    SIGNATORY["<b>SIGNATORY</b><br/>PK = SIGNATORY#uuid<br/>SK = SIGNATORY#uuid<br/>------------------<br/>name / role / department<br/>GSI4PK = ROLE#...<br/>GSI4SK = SIGNATORY#uuid"]
+    SIGNATORY["<b>SIGNATORY</b><br/>PK = SIGNATORY#uuid<br/>SK = SIGNATORY#uuid<br/>------------------<br/>name / role / department<br/>contact_email / office / contact_number (sparse)<br/>GSI4PK = ROLE#...<br/>GSI4SK = SIGNATORY#uuid"]
 
     COLLAB["<b>COLLABORATION POINTER</b><br/>PK = ORGANIZATION#uuid (dependent)<br/>SK = COLLAB#EVENT#id#SUBMISSION#id<br/>------------------<br/>event_id / submission_id / sent_at<br/>index-only, carries no form content"]
 

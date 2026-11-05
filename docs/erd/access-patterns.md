@@ -26,7 +26,7 @@ Index summary:
 | 2 | Event children (its deadlines) | Query | `PK = EVENT#id`, `SK` begins `DEADLINE#` | Base |
 | 3 | Student's own submissions | Query | `GSI1PK = ORGANIZATION#id`, `GSI1SK` begins `SUBMISSION#` (all papers, paginated) | GSI1 |
 | 4 | Collaboration submissions (dependent view) | Query | `PK = ORGANIZATION#<dep>`, `SK` begins `COLLAB#`, then resolve each pointer to its master SUBMISSION | Base |
-| 5 | Single submission detail | GetItem | `PK = EVENT#id`, `SK = SUBMISSION#id` | Base |
+| 5 | Single submission detail | GetItem → BatchGetItem | `PK = EVENT#id`, `SK = SUBMISSION#id`; the student detail then batch-reads the chain's `SIGNATORY#id` rows to derive `approval_chain_contacts` | Base |
 | 6 | Submission timeline / audit | Query | `PK = SUBMISSION#id`, `SK` begins `NOTIFICATION#` | Base |
 | 7 | Signatory inbox (desk queue) | Query | `GSI2PK = SIGNATORY#id`, `GSI2SK` by time (sparse) | GSI2 |
 | 8 | Signatory directory by role | Query | `GSI4PK = ROLE#...`, `GSI4SK` begins `SIGNATORY#` | GSI4 |

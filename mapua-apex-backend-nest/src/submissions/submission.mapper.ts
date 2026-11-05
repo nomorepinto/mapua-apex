@@ -54,6 +54,9 @@ export function toSubmission(item: Item, extras: Item = {}): Item {
   if (extras.signatory_chain) {
     view.signatory_chain = extras.signatory_chain;
   }
+  if (extras.approval_chain_contacts) {
+    view.approval_chain_contacts = extras.approval_chain_contacts;
+  }
   if (extras.role) {
     view.role = extras.role;
   }

@@ -10,6 +10,10 @@ import { OrganizationRepository } from '../organizations/organization.repository
 import { SignatoryRepository } from '../signatories/signatory.repository.js';
 import { desksOf } from '../organizations/organization.repository.js';
 import { dependentIds, RoutingService } from './routing.service.js';
+import {
+  approvalChainContacts,
+  type ApprovalChainContact,
+} from './approval-contacts.js';
 import { toNotification, toSubmission } from './submission.mapper.js';
 import { SubmissionRepository } from './submission.repository.js';
 
@@ -107,9 +111,32 @@ export class SubmissionQueryService {
     if (role === 'proponent' && proponent !== organizationId) {
       throw new NotFoundException('Not Found');
     }
+    const chain = await this.routing.chain(item);
     return toSubmission(item, {
       role,
-      signatory_chain: await this.routing.chain(item),
+      signatory_chain: chain,
+      approval_chain_contacts: await this.approvalContacts(item, chain),
+    });
+  }
+
+  /**
+   * Desk contact details for the proponent's own proposal. Only this read
+   * produces them: the fields belong to the desk rather than the paper, so the
+   * list, reviewer, and admin surfaces must not serialize them.
+   */
+  private async approvalContacts(
+    item: Item,
+    chain: Item[],
+  ): Promise<ApprovalChainContact[]> {
+    const ids = chain.flatMap((link) => {
+      const id = str(link, 'signatory_id');
+      return id ? [id] : [];
+    });
+    return approvalChainContacts({
+      chain,
+      people: await this.signatories.listByIds(ids),
+      status: str(item, 'status'),
+      currentSignatoryId: str(item, 'current_signatory'),
     });
   }
 

@@ -2,6 +2,7 @@ import { CircleAlertIcon, DownloadIcon, PlusIcon } from "lucide-react"
 
 import { CsvFileField } from "@/components/admin-osa/csv-file-field"
 import { signatoryRoleLabel } from "@/components/admin-osa/signatory-roles"
+import { SignatoryContactFields } from "@/components/admin/signatories/contact-fields"
 import { DepartmentSelect } from "@/components/admin/signatories/department-select"
 import {
   SIGNATORY_NAME_MAX,
@@ -70,7 +71,8 @@ function AddSignatoryForm() {
         <CardTitle>Add signatory</CardTitle>
         <CardDescription>
           Required fields: <code>name</code> and <code>role</code>. Department
-          is optional for deans.
+          is optional for deans, and the contact details are optional for every
+          role.
         </CardDescription>
       </CardHeader>
       <Form className="contents" onSubmit={actions.handleAddOne}>
@@ -163,6 +165,12 @@ function AddSignatoryForm() {
               value={state.department}
             />
           ) : null}
+
+          <SignatoryContactFields
+            idPrefix="signatory"
+            onChange={actions.changeContact}
+            values={state.contact}
+          />
 
           {state.takenRoles.size > 0 ? (
             <Alert variant="info">

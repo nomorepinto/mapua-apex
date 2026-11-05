@@ -1,7 +1,14 @@
-import { test } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 
-import { SaafPage, rolesMatch, trackerRoles, type ReservationPick } from "../pages/saaf.page"
+import {
+  SaafPage,
+  rolesMatch,
+  trackerRoles,
+  trackerSignatories,
+  type ReservationPick,
+} from "../pages/saaf.page"
 import { openApex } from "../support/auth"
+import { DESK_CONTACT } from "../support/data"
 import { account } from "../support/env"
 import { readRun, writeRun, type PaperRecord } from "../support/run-state"
 import { captureJson } from "../support/ui"
@@ -123,6 +130,51 @@ test.describe("submissions", () => {
       await saaf.classification("extra-curricular")
       await saaf.people(account("admin").email, { chooseDepartment: false })
       await saaf.expectEquipmentBlocked(run.campus, 5)
+    } finally {
+      await session.close()
+    }
+  })
+
+  test("suggests a room for the expected headcount", async ({ browser }) => {
+    const run = readRun()
+    const session = await openApex(browser, "orgA")
+    const saaf = new SaafPage(session.page)
+    try {
+      await saaf.start(`Room Suggestion ${run.tag}`, true)
+      await saaf.classification("extra-curricular")
+      await saaf.people(account("admin").email, { chooseDepartment: false })
+      // Slot 7 is left free by the filed papers, so both rooms are still offerable.
+      await saaf.schedule(run.campus, 7)
+      // R101 holds 10–80 and the Auditorium 20–200, so 40 ranks the tighter room first.
+      await saaf.expectSuggestedRooms(40, ["R101", "Auditorium"])
+      // Nothing holds 500, so the closest rooms are offered largest first, with the reason.
+      await saaf.expectSuggestedRooms(500, ["Auditorium", "R101"], false)
+      await saaf.expectSuggestedRooms(40, ["R101", "Auditorium"])
+      await saaf.addSuggestedRoom("R101")
+      // The one-click add is the dropdown's own path, so the picked room leaves the panel.
+      await saaf.expectSuggestedRooms(40, ["Auditorium"])
+    } finally {
+      await session.close()
+    }
+  })
+
+  test("shows the proponent the desks still to come and their contacts", async ({ browser }) => {
+    const run = readRun()
+    const paper = run.papers.P1
+    if (!paper) throw new Error("P1")
+    const session = await openApex(browser, "orgA")
+    try {
+      // P1 still sits on its adviser desk, so the tab lists that desk plus the three OSAAR stages.
+      const desks = await trackerSignatories(session.page, paper.title, 4)
+      expect(desks.map((desk) => desk.awaiting)).toEqual([true, false, false, false])
+      expect(desks[0].text).toContain(run.people.adv1)
+      expect(desks[0].email).toBe(`mailto:${DESK_CONTACT.email}`)
+      expect(desks[0].text).toContain(DESK_CONTACT.office)
+      expect(desks[0].text).toContain(DESK_CONTACT.number)
+      for (const desk of desks.slice(1)) {
+        expect(desk.email).toBe("")
+        expect(desk.text).toContain("No contact details are on file for this desk.")
+      }
     } finally {
       await session.close()
     }

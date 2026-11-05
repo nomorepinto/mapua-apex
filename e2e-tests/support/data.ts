@@ -7,6 +7,17 @@ export const DENY_COMMENT = "This proposal is denied after review of the activit
 export const ROOM_PURPOSE = "Room purpose for the end to end reservation check."
 export const EQUIPMENT_REMARK = "Projector for the plenary session."
 
+/**
+ * Desk contact details recorded for the first adviser. The proponent's
+ * Signatories tab reads them back off the desk holding the paper, so one desk in
+ * the run carries them and the rest prove the empty state.
+ */
+export const DESK_CONTACT = {
+  email: "adviser.alpha@mapua.edu.ph",
+  office: "Room 204, YC Building",
+  number: "(02) 8888 0001",
+} as const
+
 export const SLOT_START = [
   "7:00 AM",
   "8:10 AM",

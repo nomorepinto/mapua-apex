@@ -198,8 +198,18 @@ account uses `custom:organization_id` the same way.
 | `campus_id` | string | OSAAR only. Bare campus uuid. Many OSAAR accounts may share one campus |
 | `all_campuses` | boolean | OSAAR only. True for the single account that approves every plan. No `campus_id` |
 | `osaar_order` | number | OSAAR only. 1-based order among that campus's accounts |
+| `contact_email` | string | Sparse. Desk email a proponent may write to; may differ from the Cognito login |
+| `office` | string | Sparse. Room or desk where this person can be found in person |
+| `contact_number` | string | Sparse. Desk phone |
 | `GSI4PK` | string | `ROLE#ADVISER / ROLE#CDM / ROLE#DEAN / ROLE#DEAN#{DEPARTMENT} / ROLE#OSAAR / ROLE#ADMIN` |
 | `GSI4SK` | string | `SIGNATORY#uuid` |
+
+The three contact attributes are written only when non-blank after trimming, so
+clearing one on `PUT /admins/signatories/{id}` removes the attribute instead of
+storing an empty string. They reach a proponent solely through the derived
+`approval_chain_contacts` array on `GET /students/events/{id}/submissions/{id}`
+(one `BatchGetItem` over the chain's SIGNATORY rows); no submission list,
+reviewer detail, or admin detail carries them.
 
 Other items copy the signatory id rather than join back to SIGNATORY:
 `ORGANIZATION.signatories[].signatory_id`, `SUBMISSION.current_signatory` /

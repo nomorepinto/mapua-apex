@@ -132,6 +132,8 @@ signatory_steps: [                         (same snapshot, with stable keys; abs
   }
 ]
 signatory_chain is derived at read time, never persisted.
+approval_chain_contacts is derived at read time on the student detail only,
+never persisted (see the SIGNATORY contact attributes below).
 collaboration: {
   dependent_organization_ids: [ ORGANIZATION#uuid ]   (index-only collaboration dependents; empty/absent = no collaboration)
 }
@@ -428,6 +430,9 @@ department: string (deans only, e.g. SOIT)
 campus_id: string (OSAAR only; bare campus uuid)
 all_campuses: boolean (OSAAR only; true for the one account that approves every plan)
 osaar_order: number (OSAAR only; 1-based order among that campus's accounts)
+contact_email: string (sparse; desk email a proponent may write to, may differ from the login)
+office: string (sparse; room or desk where this person can be found in person)
+contact_number: string (sparse; desk phone)
 GSI4PK: ROLE#ADVISER | ROLE#CDM | ROLE#DEAN | ROLE#DEAN#{DEPARTMENT} | ROLE#OSAAR | ROLE#ADMIN
 GSI4SK: SIGNATORY#uuid
 
@@ -436,6 +441,15 @@ GET /signatories/me and admin list/show read this item.
 Who occupies a desk for an org is ORGANIZATION.signatories.
 GSI4 is the role index, not an org assignment. ROLE#{ROLE} for adviser, cdm, osaar, admin.
 Deans may add a department suffix: ROLE#DEAN#SOIT.
+
+The three contact attributes are sparse by design: POST /admins/signatories and
+PUT /admins/signatories/{id} write each one only when it is non-blank after
+trimming, so clearing a detail removes the attribute instead of storing an empty
+string. They reach a proponent only through approval_chain_contacts on
+GET /students/events/{event}/submissions/{submission}; no submission list, no
+reviewer detail, and no admin detail carries them. GET /signatories/me returns
+the caller's own three attributes, and the admin signatory list returns them for
+every person.
 
 Other items copy the signatory id; they do not join back to SIGNATORY:
   ORGANIZATION.signatories[].signatory_id
@@ -857,6 +871,17 @@ on read for the single-record GET endpoints (student / signatory / admin
 detail) and is NOT written to the item and NOT returned by list endpoints.
 signatory_steps is stored and is returned wherever the submission item is.
 
+The student detail read projects one more derived array, approval_chain_contacts:
+the desks the proponent may still write to, in approval order, each as
+{ signatory_id, name, role, organization_name, contact_email, office,
+contact_number, is_current }. It starts at current_signatory when status is
+pending or returned and runs to the end of the chain, so desks that already
+signed off are left out; a decided paper (approved, denied, finished, cancelled)
+has no open desk, so its OSAAR links stand in, and the whole chain is the last
+resort so the array is never empty. name and the three contact fields come from
+one BatchGetItem over the chain's SIGNATORY rows, and are null when that desk
+recorded none. This projection is student-detail-only and is never persisted.
+
 NOTIFICATION
 json
 {
@@ -873,6 +898,9 @@ json
   "SK": "SIGNATORY#adv001",
   "name": "Prof. Juan Dela Cruz",
   "role": "adviser",
+  "contact_email": "jdelacruz@mapua.edu.ph",
+  "office": "Room 204, YC Building",
+  "contact_number": "(02) 8888 0001",
   "GSI4PK": "ROLE#ADVISER",
   "GSI4SK": "SIGNATORY#adv001"
 }

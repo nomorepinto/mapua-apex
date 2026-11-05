@@ -78,13 +78,51 @@ export class SaafPage {
     await expect(box).toContainText(org)
   }
 
-  async reservation(pick: ReservationPick) {
+  /** Pick the campus, the event date, and one free slot on the reservation step. */
+  async schedule(campus: string, slot: number) {
     const panel = stepPanel(this.page)
     await panel.locator("[name='expectedParticipants']").fill("40")
-    await choose(this.page, panel.getByRole("combobox", { name: "Venue Campus" }), pick.campus)
+    await choose(this.page, panel.getByRole("combobox", { name: "Venue Campus" }), campus)
     await pickIsoDate(this.page, panel.getByRole("button", { name: "Start date of event" }), eventDate)
-    await choose(this.page, panel.getByRole("combobox", { name: /Start time for / }), SLOT_START[pick.slot])
-    await choose(this.page, panel.getByRole("combobox", { name: /End time for / }), SLOT_END[pick.slot])
+    await choose(this.page, panel.getByRole("combobox", { name: /Start time for / }), SLOT_START[slot])
+    await choose(this.page, panel.getByRole("combobox", { name: /End time for / }), SLOT_END[slot])
+  }
+
+  /**
+   * Rank the room suggestion panel for a headcount, by the Add buttons it offers.
+   *
+   * `fits` false means no single room holds the count, so the panel falls back to
+   * the closest rooms — largest first for an oversized count — and says so.
+   */
+  async expectSuggestedRooms(headcount: number, ranked: string[], fits = true) {
+    const panel = stepPanel(this.page)
+    await panel.locator("[name='expectedParticipants']").fill(String(headcount))
+    const box = panel.locator(`[aria-label='Suggested rooms for ${headcount} participants']`)
+    await expect(box).toBeVisible()
+    if (fits) {
+      await expect(box).not.toContainText("No single room holds")
+    } else {
+      await expect(box).toContainText(`No single room holds ${headcount} participants.`)
+    }
+    const adds = box.getByRole("button", { name: /^Add / })
+    const offered: string[] = []
+    const total = await adds.count()
+    for (let index = 0; index < total; index += 1) {
+      offered.push(((await adds.nth(index).getAttribute("aria-label")) ?? "").replace(/^Add /, ""))
+    }
+    expect(offered).toEqual(ranked)
+  }
+
+  /** Add a suggested room through the panel, the shortcut for the room dropdown. */
+  async addSuggestedRoom(room: string) {
+    const panel = stepPanel(this.page)
+    await panel.getByRole("button", { name: `Add ${room}`, exact: true }).click()
+    await expect(panel.getByPlaceholder(/State purpose of reservation/)).toBeVisible()
+  }
+
+  async reservation(pick: ReservationPick) {
+    await this.schedule(pick.campus, pick.slot)
+    const panel = stepPanel(this.page)
     if (pick.room) {
       await choose(this.page, panel.getByRole("combobox", { name: "Select room to add" }), new RegExp(pick.room))
       await panel.getByRole("button", { name: "Add Room" }).click()
@@ -99,13 +137,8 @@ export class SaafPage {
   }
 
   async expectEquipmentBlocked(campus: string, slot: number) {
-    const panel = stepPanel(this.page)
-    await panel.locator("[name='expectedParticipants']").fill("40")
-    await choose(this.page, panel.getByRole("combobox", { name: "Venue Campus" }), campus)
-    await pickIsoDate(this.page, panel.getByRole("button", { name: "Start date of event" }), eventDate)
-    await choose(this.page, panel.getByRole("combobox", { name: /Start time for / }), SLOT_START[slot])
-    await choose(this.page, panel.getByRole("combobox", { name: /End time for / }), SLOT_END[slot])
-    await expect(panel.getByText("Reserve at least one room on the left first.")).toBeVisible()
+    await this.schedule(campus, slot)
+    await expect(stepPanel(this.page).getByText("Reserve at least one room on the left first.")).toBeVisible()
   }
 
   async activityOnline(campusOnline = "Online", budget = true) {
@@ -211,6 +244,48 @@ export async function trackerRoles(page: Page, title: string): Promise<string[]>
   const labels = await reviewers.locator("span.font-bold").allTextContents()
   await dialog.getByRole("button", { name: "Close", exact: true }).filter({ hasText: "Close" }).click()
   return labels.map((label) => label.trim()).filter((label) => /Adviser|Dean|OSAAR|CDM/.test(label))
+}
+
+export type SignatoryDesk = {
+  /** Everything the desk row shows, whitespace collapsed. */
+  text: string
+  /** Whether the proposal is sitting on this desk right now. */
+  awaiting: boolean
+  /** The `mailto:` the row offers, or "" when no email is on file. */
+  email: string
+}
+
+/**
+ * Open a filed paper's tracker and read its Signatories tab: the desks the
+ * proponent may still write to, in approval order. `expected` is asserted before
+ * the rows are read, so a still-loading detail cannot pass as an empty chain.
+ */
+export async function trackerSignatories(
+  page: Page,
+  title: string,
+  expected: number,
+): Promise<SignatoryDesk[]> {
+  await page.goto("/students/dashboard")
+  await page.getByRole("region", { name: "Proposal statistics filters" }).getByLabel("Search records").fill(title)
+  await page.locator("tr").filter({ hasText: title }).first().click()
+  const dialog = page.getByRole("dialog", { name: `${title} Proposal` })
+  await dialog.getByRole("button", { name: "Signatories", exact: true }).click()
+  const card = dialog.getByRole("heading", { name: "Signatory Contacts" }).locator("xpath=../..")
+  await expect(card).toBeVisible()
+  const rows = card.locator("ol > li")
+  await expect(rows).toHaveCount(expected)
+  const desks: SignatoryDesk[] = []
+  for (let index = 0; index < expected; index += 1) {
+    const row = rows.nth(index)
+    const mailto = row.locator("a[href^='mailto:']").first()
+    desks.push({
+      text: (await row.innerText()).replace(/\s+/g, " ").trim(),
+      awaiting: (await row.getByText("Awaiting this desk", { exact: true }).count()) > 0,
+      email: (await mailto.count()) > 0 ? ((await mailto.getAttribute("href")) ?? "") : "",
+    })
+  }
+  await dialog.getByRole("button", { name: "Close", exact: true }).filter({ hasText: "Close" }).click()
+  return desks
 }
 
 export function rolesMatch(actual: string[], expected: string[]) {
