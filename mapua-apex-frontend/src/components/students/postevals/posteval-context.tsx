@@ -125,7 +125,15 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
   // channel as other submit errors (the summary lives on step 0, so we jump back).
   const [gibberishError, setGibberishError] = useState<string | null>(null)
 
-  const step = requestedStep
+  // A Continue clicked before the linked submission loads advances onto the
+  // financial page (index 1). Once the submission reports no budget that page is
+  // dropped from the rail, which would strand the wizard on a now-hidden step:
+  // every panel keys off a different index so the body renders blank and the rail
+  // falls back to "Step 1 of 2". Snap the rendered step forward to attendance so
+  // the rail, panel, and actions stay in sync with the collapsed two-step flow.
+  const step = (includeFinancial || requestedStep !== 1
+    ? requestedStep
+    : 2) as PostEvalStepIndex
   const farthestStep = Math.min(
     Math.max(advancedStep, earnedStepFromDraft(draft, includeFinancial)),
     FINAL_STEP
@@ -194,7 +202,12 @@ export function PostEvalProvider({ children }: { children: ReactNode }) {
 
   const goBack = () => {
     if (step === 0) return
-    goToStep((step - 1) as PostEvalStepIndex)
+    // In the collapsed two-step flow the financial page (index 1) is hidden, so
+    // stepping back from attendance must skip it and land on the summary.
+    const previous = (!includeFinancial && step === 2
+      ? 0
+      : step - 1) as PostEvalStepIndex
+    goToStep(previous)
   }
 
   const currentStepComplete = isPostEvalStepComplete(step, draft, includeFinancial)
