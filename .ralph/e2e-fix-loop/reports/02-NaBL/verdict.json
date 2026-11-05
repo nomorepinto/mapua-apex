@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "POST /admins/cancel-watch/expire is wrapped in { data } by DataEnvelopeInterceptor (the controller has no @NoEnvelope), so CancelWatchPage.expire read an undefined status; it now unwraps the envelope like findIds.",
+  "commit_message": "fixed cancel-watch expire status unwrapping the data envelope"
+}

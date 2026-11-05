@@ -1,0 +1,7 @@
+﻿Fixed and verdict written.
+
+**Cause:** The log showed `Received: undefined` at `cancel-watch.spec.ts:33`. `POST /admins/cancel-watch/expire` returns through `DataEnvelopeInterceptor` (`common/data-envelope.interceptor.ts`), which wraps every result in `{ data }` ΓÇö `CancelWatchController` has no `@NoEnvelope()`. `CancelWatchPage.expire` read `body.status` from the wrapper, so it was always `undefined`. Same interceptor that broke `findIds` in the previous pass.
+
+**Fix:** `e2e-tests/pages/cancel-watch.page.ts:84-88` now unwraps `{ data: { status } }` (tolerating a bare shape too); `npx tsc --noEmit` passes. No spec or backend changes.
+
+Verdict: `product`, commit message `fixed cancel-watch expire status unwrapping the data envelope`. The next loop run will confirm.

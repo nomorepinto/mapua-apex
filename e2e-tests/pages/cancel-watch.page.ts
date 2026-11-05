@@ -81,8 +81,11 @@ export class CancelWatchPage {
       data: { event_id: eventId, submission_id: submissionId },
     });
     expect(response.ok(), `cancel-watch expire failed: ${response.status()}`).toBeTruthy();
-    const body = (await response.json()) as { status: ExpireStatus };
-    return body.status;
+    // The global envelope interceptor wraps the result in `{ data }`.
+    const body = (await response.json()) as
+      | { status: ExpireStatus }
+      | { data: { status: ExpireStatus } }
+    return "data" in body ? body.data.status : body.status;
   }
 
   /** Locate by title, then expire — the common two-step used by the specs. */
