@@ -202,7 +202,8 @@ export class PostEvalService {
         str(record(submission.activity_details) ?? {}, 'title_and_nature') ??
         '',
       section_summary: body.section_summary,
-      financial_report: body.financial_report,
+      // DynamoDB rejects class-validator instances. Store the report as plain data.
+      financial_report: JSON.parse(JSON.stringify(body.financial_report)),
       participation_snapshot: await this.participants(body.event_id),
     };
     await this.postevals.put(item);

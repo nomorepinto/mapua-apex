@@ -1,0 +1,5 @@
+{
+  "kind": "product",
+  "summary": "POST /students/postevals returned 500 because the validated StorePostEvalDto (a class instance, including nested FinancialReportDto lines) was written straight into DynamoDB, so marshalling failed with \"Unsupported type passed\"; the service now deep-copies financial_report to plain JSON before the put, with a regression unit test.",
+  "commit_message": "fixed filing a post-eval with a budget"
+}

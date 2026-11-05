@@ -1,0 +1,9 @@
+﻿The failure was a product bug. The student post-eval submit returned 500, which is why `captureJson` never saw a successful response.
+
+**Cause:** The Nest log (`e2e-tests/state/logs/3000.log.err`) shows `Unsupported type passed: [object Object]` from the DynamoDB marshaller. The validation pipe transforms the body into `StorePostEvalDto` instances (with nested `FinancialReportDto` lines), and `PostEvalService.create` wrote `financial_report` as-is. `POSTEVAL` was never persisted, so the wizard showed "Submission failed ΓÇö Server Error" (visible in the failure screenshot).
+
+**Fix:**
+- `mapua-apex-backend-nest/src/postevals/posteval.service.ts:205` ΓÇö store a plain-JSON copy of `financial_report`, the same way `submission-writer.service.ts` already handles its DTOs.
+- Added a regression test in `posteval.service.spec.ts` that files with a class-instance report and checks what gets put. All 5 posteval tests pass; no new type errors.
+
+Verdict written as `product` to `.ralph/e2e-fix-loop/reports/06-CBoJ/verdict.json`.

@@ -129,3 +129,66 @@ describe('PostEvalService no-budget submissions', () => {
     expect(putted).toHaveLength(1);
   });
 });
+
+describe('PostEvalService stored shape', () => {
+  it('stores the financial report as plain data, not DTO instances', async () => {
+    class BudgetLine {
+      constructor(
+        readonly item: string,
+        readonly actual_amount: number,
+      ) {}
+    }
+    class FinancialReport {
+      constructor(readonly budget_items: BudgetLine[]) {}
+    }
+    const putted: { financial_report?: object }[] = [];
+    const service = new PostEvalService(
+      {
+        async getSubmission() {
+          return null;
+        },
+        async listOrg() {
+          return [];
+        },
+        async listForEvent() {
+          return [];
+        },
+        async profiles() {
+          return [];
+        },
+        async put(item: { financial_report?: object }) {
+          putted.push(item);
+        },
+      } as never,
+      {
+        async getSubmission() {
+          return {
+            GSI1PK: 'ORGANIZATION#orgA',
+            status: 'approved',
+            activity_details: { date_of_event: manilaDate() },
+          };
+        },
+      } as never,
+      {
+        async get() {
+          return { name: 'orgA' };
+        },
+      } as never,
+      { postEvaluationWindowDays: () => 3 } as never,
+    );
+
+    await service.create('orgA', {
+      event_id: 'event-1',
+      submission_id: 'submission-1',
+      section_summary: 'The event ran as planned.',
+      financial_report: new FinancialReport([
+        new BudgetLine('Tarp', 100),
+      ]) as never,
+    });
+
+    expect(putted).toHaveLength(1);
+    expect(putted[0].financial_report).toEqual({
+      budget_items: [{ item: 'Tarp', actual_amount: 100 }],
+    });
+  });
+});
