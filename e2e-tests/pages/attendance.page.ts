@@ -80,6 +80,13 @@ export class AttendancePage {
   async membersOnly() {
     await this.page.getByRole("switch", { name: "Allow members only" }).click()
   }
+
+  /** The ever-present footer carries the bug-report mailto on every arcus screen. */
+  async expectBugReportFooter() {
+    const link = this.page.getByRole("link", { name: "mapuaapex@gmail.com" })
+    await expect(link).toBeVisible()
+    await expect(link).toHaveAttribute("href", "mailto:mapuaapex@gmail.com")
+  }
 }
 
 export class EvaluationPage {
@@ -122,5 +129,12 @@ export class EvaluationPage {
   async expectEventAbsent(eventTitle: string) {
     await this.open("/")
     await expect(this.page.getByRole("link", { name: new RegExp(eventTitle) })).toHaveCount(0)
+  }
+
+  /** The ever-present footer carries the bug-report mailto on every arcus screen. */
+  async expectBugReportFooter() {
+    const link = this.page.getByRole("link", { name: "mapuaapex@gmail.com" })
+    await expect(link).toBeVisible()
+    await expect(link).toHaveAttribute("href", "mailto:mapuaapex@gmail.com")
   }
 }

@@ -50,6 +50,7 @@ test("students register and the officer scans their codes", async ({ browser }) 
     await attendance.membersOnly()
     await attendance.scanFile(STUDENT_NUMBERS.stu2, paper.title)
     await attendance.expectAlert(/Already checked in|not a member/i)
+    await attendance.expectBugReportFooter()
   } finally {
     await officer.close()
   }
@@ -64,6 +65,7 @@ test("a checked-in student files an evaluation", async ({ browser }) => {
   try {
     await new EvaluationPage(student.page).file(paper.title)
     await new EvaluationPage(student.page).expectEventAbsent(council.title)
+    await new EvaluationPage(student.page).expectBugReportFooter()
   } finally {
     await student.close()
   }
