@@ -100,4 +100,15 @@ export class ReviewPage {
     )
     await expect(this.page.getByText("This reservation can't be approved as filed.")).toBeVisible()
   }
+
+  /**
+   * Assert the already-open desk modal shows the "Funding sources" row for a
+   * with-budget paper. The caller opens the modal first via open().
+   */
+  async expectFundingSources(title: string, labels: string[]) {
+    const dialog = this.page.getByRole("dialog", { name: `${title} Proposal` })
+    const row = dialog.getByText("Funding sources", { exact: true }).locator("xpath=..")
+    await expect(row).toBeVisible()
+    await expect(row).toContainText(labels.join(", "))
+  }
 }

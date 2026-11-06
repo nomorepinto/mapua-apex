@@ -105,6 +105,8 @@ export interface ApiSubmission {
   detailed_budget_proposal?: {
     /** False when the activity operates without a budget; absent = legacy (true). */
     has_budget?: boolean
+    /** Funding-source slugs picked on the setup step; absent = paper filed before the field existed. */
+    funding_sources?: string[]
     items?: Array<{
       item_no: string
       /** Free-text measuring unit ("pc", "box", …); legacy rows stored a number. */
@@ -411,7 +413,8 @@ export function buildSaafApiPayload(
   saafDraft: SaafDraft,
   reservationDraft?: ReservationDraft | null,
   existingEventId?: string,
-  hasBudget = true
+  hasBudget = true,
+  fundingSources: string[] = []
 ) {
   const event_id = existingEventId || crypto.randomUUID()
   // Proposed budget is locked to the itemized Detailed Budget grand total so the
@@ -483,6 +486,9 @@ export function buildSaafApiPayload(
     },
     detailed_budget_proposal: {
       has_budget: hasBudget,
+      // The funding sources only mean something for a budgeted activity; a
+      // no-budget paper stores an empty list, mirroring how `items` is emptied.
+      funding_sources: hasBudget ? fundingSources : [],
       // A no-budget paper carries no line items at all, so nothing budget-related
       // can surface in a reviewer view or the saved proposal PDF.
       items: hasBudget
@@ -1189,6 +1195,11 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     ),
     hasReservation: Boolean(submission.venue_reservation?.has_reservation),
     hasBudget: submissionHasBudget(submission),
+    // Only a budgeted paper carries funding sources; a no-budget or legacy paper
+    // reads as an empty list so the detail modal renders no funding row.
+    fundingSources: submissionHasBudget(submission)
+      ? (submission.detailed_budget_proposal?.funding_sources ?? [])
+      : [],
     dateOfEvent: submission.activity_details?.date_of_event,
     endDateOfEvent: submission.activity_details?.end_date_of_event,
     budgetGrandTotal:
@@ -1465,6 +1476,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
   reservation: ReservationDraft
   hasReservation: boolean
   hasBudget: boolean
+  fundingSources: string[]
 } {
   const proponents = (submission.proponents || []).map((proponent, index) => ({
     id: proponent.id || String(index + 1),
@@ -1573,6 +1585,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
     reservation,
     hasReservation: Boolean(submission.venue_reservation?.has_reservation),
     hasBudget: submissionHasBudget(submission),
+    fundingSources: submission.detailed_budget_proposal?.funding_sources ?? [],
   }
 }
 

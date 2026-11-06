@@ -19,6 +19,7 @@ import type { Activity } from "./activity.types"
 import { useActivityDetail } from "@/hooks/use-activity-detail"
 import { saveActivityAsPdf } from "@/lib/save-proposal-pdf"
 import { brand, modal } from "@/config"
+import { fundingSourceLabels } from "@/constants/funding-sources"
 import { cn } from "@/lib/utils"
 import type { BookingConflict } from "@/lib/types"
 
@@ -249,6 +250,19 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
                     <span className="font-medium text-neutral-600 sm:text-right">{displayActivity.proposedBudget}</span>
                   </div>
                 )}
+
+                {displayActivity.hasBudget !== false &&
+                  fundingSourceLabels(displayActivity.fundingSources ?? [])
+                    .length > 0 && (
+                    <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="font-bold text-neutral-900">Funding sources</span>
+                      <span className="font-medium text-neutral-600 sm:text-right">
+                        {fundingSourceLabels(
+                          displayActivity.fundingSources ?? []
+                        ).join(", ")}
+                      </span>
+                    </div>
+                  )}
 
                 <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
                   <span className="font-bold text-neutral-900">Number of Participants</span>

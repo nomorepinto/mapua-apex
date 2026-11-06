@@ -85,6 +85,14 @@ test("admin edit keeps the current desk", async ({ browser }) => {
   })
 })
 
+test("shows the funding sources on a with-budget paper", async ({ browser }) => {
+  const paper = readRun().papers.P1
+  await asUser(browser, "adv1", async (page) => {
+    const review = new ReviewPage(page)
+    await review.open("adv1", paper.title)
+    await review.expectFundingSources(paper.title, ["Sponsors", "Organization"])
+  })
+})
 test("approves the straight-through papers", async ({ browser }) => {
   const papers = readRun().papers
   // P15 is the no-budget paper; approving it makes it eligible for a post-eval.

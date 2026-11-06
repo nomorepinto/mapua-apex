@@ -24,6 +24,7 @@ export async function action({
   const saafDraft = useOrgStore.getState().saafDraft
   const reservationDraft = useOrgStore.getState().reservationDraft
   const hasBudget = useOrgStore.getState().withBudget === "yes"
+  const fundingSources = useOrgStore.getState().fundingSources
   // The edit ids live in the store once hydration loads a returned paper, but
   // the route's `?event=&submission=` params are the authoritative fallback so a
   // resubmit still PUTs (never POSTs a duplicate) if hydration has not run yet.
@@ -47,7 +48,8 @@ export async function action({
       saafDraft,
       reservationDraft,
       editingEventId ?? undefined,
-      hasBudget
+      hasBudget,
+      fundingSources
     )
 
     if (editingEventId && editingSubmissionId) {

@@ -9,7 +9,7 @@ import {
   normalizeDesk,
 } from "../support/data"
 import { eventDate } from "../support/env"
-import { choose, pickIsoDate, stepPanel } from "../support/ui"
+import { checkMulti, choose, pickIsoDate, stepPanel } from "../support/ui"
 
 export type ReservationPick = {
   campus: string
@@ -21,7 +21,12 @@ export type ReservationPick = {
 export class SaafPage {
   constructor(private readonly page: Page) {}
 
-  async start(title: string, reserve: boolean, budget = true) {
+  async start(
+    title: string,
+    reserve: boolean,
+    budget = true,
+    funding = ["Sponsors", "Organization"],
+  ) {
     await this.page.goto("/students/submissions")
     await this.page.getByLabel("Event name").fill(title)
     await choose(
@@ -34,8 +39,24 @@ export class SaafPage {
       this.page.getByLabel("Will you be operating with a budget?"),
       budget ? "Yes, we will operate with a budget" : "No, this activity has no budget",
     )
+    if (budget) {
+      // A with-budget paper must name at least one funding source before it can
+      // leave the setup step: assert the gate blocks Continue, then satisfy it.
+      const fundingBox = this.page.getByLabel("How will this activity be funded?")
+      await expect(fundingBox).toBeVisible()
+      await this.page.getByRole("button", { name: "Continue" }).click()
+      await expect(this.page.getByText("Choose at least one funding source.")).toBeVisible()
+      await checkMulti(this.page, fundingBox, funding)
+    } else {
+      await this.expectFundingSourcesAbsent()
+    }
     await this.page.getByRole("button", { name: "Continue" }).click()
     await expect(this.page.getByRole("heading", { name: "Student Activity Application Form" })).toBeVisible()
+  }
+
+  /** A no-budget paper never renders the funding-source multi-select. */
+  async expectFundingSourcesAbsent() {
+    await expect(this.page.getByLabel("How will this activity be funded?")).toHaveCount(0)
   }
 
   async classification(activity: "extra-curricular" | "co-curricular") {

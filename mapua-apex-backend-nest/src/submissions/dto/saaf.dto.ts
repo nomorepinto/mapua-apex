@@ -183,11 +183,24 @@ export class BudgetItemDto {
   total!: number;
 }
 
+export const FUNDING_SOURCES = [
+  'sponsors',
+  'concessionaires',
+  'department',
+  'organization',
+] as const;
+
 export class BudgetDto {
   /** False for a no-budget submission; a missing key means an older paper that always had a budget. */
   @IsOptional()
   @IsBoolean()
   has_budget?: boolean;
+
+  /** Funding sources picked on the proposal setup step; optional so legacy and API-shaped payloads keep filing. */
+  @IsOptional()
+  @IsArray()
+  @IsIn(FUNDING_SOURCES, { each: true })
+  funding_sources?: string[];
 
   @IsOptional()
   @IsArray()

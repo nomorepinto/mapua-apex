@@ -133,4 +133,67 @@ describe('SaafDto budget validation', () => {
     const proposal = instance.detailed_budget_proposal as unknown as Item;
     expect(proposal.has_budget).toBe(false);
   });
+
+  it('accepts a with-budget proposal carrying funding sources', () => {
+    expect(
+      issues({
+        has_budget: true,
+        funding_sources: ['sponsors', 'organization'],
+        items: [
+          {
+            item_no: '1',
+            unit: 'pc',
+            quantity: 2,
+            price_per_unit: 50,
+            total: 100,
+          },
+        ],
+        grand_total: 100,
+      }),
+    ).toEqual([]);
+  });
+
+  it('rejects an unknown funding source with the nested error key', () => {
+    const found = issues({
+      has_budget: true,
+      funding_sources: ['investors'],
+      items: [
+        {
+          item_no: '1',
+          unit: 'pc',
+          quantity: 2,
+          price_per_unit: 50,
+          total: 100,
+        },
+      ],
+      grand_total: 100,
+    });
+    expect(found.join('\n')).toContain(
+      'detailed_budget_proposal.funding_sources',
+    );
+  });
+
+  it('keeps `funding_sources` through the whitelist used by the global pipe', () => {
+    const instance = plainToInstance(
+      SaafDto,
+      bodyWith({
+        has_budget: true,
+        funding_sources: ['sponsors', 'organization'],
+        items: [
+          {
+            item_no: '1',
+            unit: 'pc',
+            quantity: 2,
+            price_per_unit: 50,
+            total: 100,
+          },
+        ],
+        grand_total: 100,
+      }),
+      { exposeUnsetFields: false },
+    );
+    validateSync(instance, { whitelist: true });
+    const proposal = instance.detailed_budget_proposal as unknown as Item;
+    expect(proposal.funding_sources).toEqual(['sponsors', 'organization']);
+  });
 });

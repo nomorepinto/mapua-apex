@@ -17,6 +17,25 @@ export async function choose(page: Page, combobox: Locator, option: string | Reg
   }
 }
 
+/**
+ * Drive a multi-select combobox: open it, click each option (the popup stays
+ * open across picks, unlike a single-select), close it, then assert the trigger
+ * summarizes every chosen label. `labels` are the visible option texts.
+ */
+export async function checkMulti(page: Page, combobox: Locator, labels: string[]) {
+  await combobox.click()
+  const listbox = page.getByRole("listbox").last()
+  await expect(listbox).toBeVisible()
+  for (const label of labels) {
+    const match = listbox.getByRole("option", { name: label }).first()
+    await expect(match).toBeVisible()
+    await match.click({ timeout: 10_000 })
+  }
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("listbox")).toHaveCount(0)
+  for (const label of labels) await expect(combobox).toContainText(label)
+}
+
 export async function pickIsoDate(page: Page, trigger: Locator, iso: string) {
   await trigger.click()
   const [year, month, day] = iso.split("-").map(Number)

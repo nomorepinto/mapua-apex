@@ -124,9 +124,10 @@ interface OrgState {
   eventName: string
   reserveFacilities: "yes" | "no" | null
   withBudget: "yes" | "no" | null
+  fundingSources: string[]
   saafValidated: boolean
   setSaafValidated: (value: boolean) => void
-  setSubmissionStart: (eventName: string, reserveFacilities: "yes" | "no", withBudget: "yes" | "no") => void
+  setSubmissionStart: (eventName: string, reserveFacilities: "yes" | "no", withBudget: "yes" | "no", fundingSources: string[]) => void
   clearSubmissionStart: () => void
 
   // SAAF Draft
@@ -392,11 +393,12 @@ export const useOrgStore = create<OrgState>()(
   eventName: "",
   reserveFacilities: null,
   withBudget: null,
+  fundingSources: [],
   saafValidated: false,
   setSaafValidated: (value) => set({ saafValidated: value }),
-  setSubmissionStart: (eventName, reserveFacilities, withBudget) =>
-    set({ eventName, reserveFacilities, withBudget, saafValidated: false }),
-  clearSubmissionStart: () => set({ eventName: "", reserveFacilities: null, withBudget: null, saafValidated: false }),
+  setSubmissionStart: (eventName, reserveFacilities, withBudget, fundingSources) =>
+    set({ eventName, reserveFacilities, withBudget, fundingSources, saafValidated: false }),
+  clearSubmissionStart: () => set({ eventName: "", reserveFacilities: null, withBudget: null, fundingSources: [], saafValidated: false }),
 
   // SAAF Draft
   saafDraft: null,
@@ -452,6 +454,7 @@ export const useOrgStore = create<OrgState>()(
         eventName: state.eventName,
         reserveFacilities: state.reserveFacilities,
         withBudget: state.withBudget,
+        fundingSources: state.fundingSources,
         saafValidated: state.saafValidated,
         saafDraft: state.saafDraft,
         reservationDraft: state.reservationDraft,
