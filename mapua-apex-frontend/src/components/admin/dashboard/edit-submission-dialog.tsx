@@ -170,11 +170,10 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
   const { actions } = useAdminDashboard()
   const updateSubmission = useUpdateAdminSubmissionMutation()
   const campusesQuery = useAdminCampusesQuery()
-  const initial = useMemo(
-    () => apiSubmissionToDrafts(submission).saaf,
-    [submission]
-  )
-  const [draft, setDraft] = useState<SaafDraft>(initial)
+  const initialDrafts = useMemo(() => apiSubmissionToDrafts(submission), [
+    submission,
+  ])
+  const [draft, setDraft] = useState<SaafDraft>(initialDrafts.saaf)
   const [showErrors, setShowErrors] = useState(false)
   const [formError, setFormError] = useState("")
 
@@ -286,7 +285,15 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
         eventId: submission.event_id,
         submissionId: submission.submission_id,
         payload: omitEventIdFromPayload(
-          buildSaafApiPayload(draft, null, undefined, hasBudget)
+          // Funding sources are chosen on the submission start step, not edited
+          // here, so the filed values are preserved instead of reset to none.
+          buildSaafApiPayload(
+            draft,
+            null,
+            undefined,
+            hasBudget,
+            initialDrafts.fundingSources
+          )
         ),
       })
       toastManager.add({
@@ -388,6 +395,7 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
               <BudgetProposalSection
               items={draft.budgetItems}
               grandTotal={budgetTotal(draft.budgetItems)}
+              note={draft.budgetNote}
               onUpdate={(id, field, value) =>
                 updateBudget(
                   draft.budgetItems.map((item) =>
@@ -410,6 +418,7 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
                   },
                 ])
               }
+              onNoteChange={(value) => updateField("budgetNote", value)}
             />
             )}
           </div>

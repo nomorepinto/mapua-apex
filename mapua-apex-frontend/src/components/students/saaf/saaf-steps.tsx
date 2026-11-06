@@ -108,9 +108,11 @@ export function SaafAlignmentStep() {
         <BudgetProposalSection
           items={state.draft.budgetItems}
           grandTotal={state.grandTotal}
+          note={state.draft.budgetNote}
           onUpdate={actions.handleUpdateBudgetItem}
           onRemove={actions.handleRemoveBudgetItem}
           onAdd={actions.handleAddBudgetItem}
+          onNoteChange={(value) => actions.updateField("budgetNote", value)}
         />
       )}
     </SaafStepPanel>

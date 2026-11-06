@@ -101,6 +101,11 @@ export interface DetailedBudgetProposal {
    * existed, which reads as "unknown" — render no funding row for those.
    */
   funding_sources?: string[]
+  /**
+   * Free-text note shown with the detailed budget. Absent on papers filed
+   * before the field existed, which reads as "no note".
+   */
+  note?: string
   items: BudgetItem[]
   grand_total: number
 }

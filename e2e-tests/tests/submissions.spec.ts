@@ -57,7 +57,7 @@ function drafts(): PaperDraft[] {
     "OSAAR",
   ]
   const papers: PaperDraft[] = [
-    { key: "P1", title: `Extra Online ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false, funding: ["Sponsors", "Organization"] },
+    { key: "P1", title: `Extra Online ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false, funding: ["Sponsors", "Organization", "Member Contributions", "Others"] },
     { key: "P2", title: `Extra Room ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(0, "R101") },
     { key: "P3", title: `Co Online ${run.tag}`, org: "orgA", roles: co, desks: ["adv1", "dean1", "osaar1", "osaar2", "osaarAll"], activity: "co-curricular", reserve: false },
     { key: "P4", title: `Co Room Equipment ${run.tag}`, org: "orgA", roles: coRoom, desks: ["adv1", "dean1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "co-curricular", reserve: true, pick: both(2) },

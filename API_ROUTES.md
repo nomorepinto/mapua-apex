@@ -248,7 +248,9 @@ Use this as the **POST** `/api/v2/students/submissions` body. For **PUT**, copy 
 
 `detailed_budget_proposal.has_budget` is an optional boolean mirroring `venue_reservation.has_reservation`. When the student answers "No budget for this activity" the SAAF wizard hides every budget field and the payload sends `{ has_budget: false, items: [], grand_total: 0 }` with `activity_details.proposed_budget` and `individual_contribution` both `0`; `items` and `grand_total` are therefore optional on the DTO. A **missing** `has_budget` key means an older paper that had a budget (treated as `true`) — no data migration. The flag does **not** affect routing (the signatory sequence keys only off `venue_reservation.has_reservation`).
 
-`detailed_budget_proposal.funding_sources` is an optional array of the slugs `sponsors`, `concessionaires`, `department`, `organization` — how a budgeted activity will be funded, picked on the proposal setup step. It is **optional on the DTO** (so legacy and API-shaped payloads keep filing) but **required in the wizard**: the SAAF setup step enforces at least one source when the budget answer is "Yes", and hides/clears the field when the answer is "No". A no-budget paper therefore stores `funding_sources: []`; a **missing** key means a paper filed before the field existed and renders no funding row.
+`detailed_budget_proposal.funding_sources` is an optional array of the slugs `sponsors`, `concessionaires`, `department`, `organization`, `member_contributions`, `others` — how a budgeted activity will be funded, picked on the proposal setup step. It is **optional on the DTO** (so legacy and API-shaped payloads keep filing) but **required in the wizard**: the SAAF setup step enforces at least one source when the budget answer is "Yes", and hides/clears the field when the answer is "No". A no-budget paper therefore stores `funding_sources: []`; a **missing** key means a paper filed before the field existed and renders no funding row.
+
+`detailed_budget_proposal.note` is an optional string (max 500 characters) — the free-text "Budget Note" a student writes on the SAAF budget step. It is **optional on the DTO** (so legacy and API-shaped payloads keep filing) but **required in the wizard** for a budgeted activity: the alignment & budget step enforces a non-empty note when the budget answer is "Yes", and hides/clears it when the answer is "No". A no-budget paper therefore stores `note: ""`; a **missing** key means a paper filed before the field existed and renders no note row. Reviewers see it in the activity detail modal.
 
 ```json
 {
@@ -306,6 +308,7 @@ Use this as the **POST** `/api/v2/students/submissions` body. For **PUT**, copy 
   "detailed_budget_proposal": {
     "has_budget": true,
     "funding_sources": ["sponsors", "organization"],
+    "note": "Sponsorship covers the venue; member contributions cover food.",
     "items": [
       {
         "item_no": "1",

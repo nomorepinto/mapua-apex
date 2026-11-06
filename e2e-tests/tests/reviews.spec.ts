@@ -6,7 +6,7 @@ import { ReviewPage } from "../pages/review.page"
 import { SaafPage, rolesMatch, trackerRoles } from "../pages/saaf.page"
 import { openApex } from "../support/auth"
 import { account, eventDate } from "../support/env"
-import { normalizeDesk } from "../support/data"
+import { BUDGET_NOTE, normalizeDesk } from "../support/data"
 import { readRun, writeRun, type PaperRecord } from "../support/run-state"
 import { captureJson } from "../support/ui"
 
@@ -85,12 +85,16 @@ test("admin edit keeps the current desk", async ({ browser }) => {
   })
 })
 
-test("shows the funding sources on a with-budget paper", async ({ browser }) => {
+test("shows the funding sources and budget note on a with-budget paper", async ({ browser }) => {
   const paper = readRun().papers.P1
+  // Runs after "admin edit keeps the current desk" (serial), so this also
+  // proves an admin edit preserves the filed funding sources and budget note
+  // instead of resetting them.
   await asUser(browser, "adv1", async (page) => {
     const review = new ReviewPage(page)
     await review.open("adv1", paper.title)
-    await review.expectFundingSources(paper.title, ["Sponsors", "Organization"])
+    await review.expectFundingSources(paper.title, ["Sponsors", "Organization", "Member Contributions", "Others"])
+    await review.expectBudgetNote(paper.title, BUDGET_NOTE)
   })
 })
 test("approves the straight-through papers", async ({ browser }) => {

@@ -107,6 +107,8 @@ export interface ApiSubmission {
     has_budget?: boolean
     /** Funding-source slugs picked on the setup step; absent = paper filed before the field existed. */
     funding_sources?: string[]
+    /** Free-text budget note; absent = paper filed before the field existed. */
+    note?: string
     items?: Array<{
       item_no: string
       /** Free-text measuring unit ("pc", "box", …); legacy rows stored a number. */
@@ -489,6 +491,9 @@ export function buildSaafApiPayload(
       // The funding sources only mean something for a budgeted activity; a
       // no-budget paper stores an empty list, mirroring how `items` is emptied.
       funding_sources: hasBudget ? fundingSources : [],
+      // The budget note only means something for a budgeted activity; a no-budget
+      // paper stores an empty string, mirroring how `items` is emptied.
+      note: hasBudget ? (saafDraft.budgetNote || "").trim() : "",
       // A no-budget paper carries no line items at all, so nothing budget-related
       // can surface in a reviewer view or the saved proposal PDF.
       items: hasBudget
@@ -1200,6 +1205,11 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     fundingSources: submissionHasBudget(submission)
       ? (submission.detailed_budget_proposal?.funding_sources ?? [])
       : [],
+    // Only a budgeted paper carries a budget note; a no-budget or legacy paper
+    // reads as empty so the detail modal renders no note row.
+    budgetNote: submissionHasBudget(submission)
+      ? (submission.detailed_budget_proposal?.note ?? "")
+      : "",
     dateOfEvent: submission.activity_details?.date_of_event,
     endDateOfEvent: submission.activity_details?.end_date_of_event,
     budgetGrandTotal:
@@ -1580,6 +1590,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
       proponents:
         proponents.length > 0 ? proponents : [createEmptyProponent("1")],
       budgetItems,
+      budgetNote: submission.detailed_budget_proposal?.note ?? "",
       dependentOrgs: submission.collaboration?.dependent_organization_ids || [],
     },
     reservation,

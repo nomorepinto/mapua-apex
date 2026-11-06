@@ -136,12 +136,13 @@ and 9:00 PM, end not earlier than start, and start ≠ end.
 
 ### detailed_budget_proposal
 
-`has_budget`, `funding_sources[]`, `items[] { item_no, unit, quantity, price_per_unit, total }`, `grand_total`.
+`has_budget`, `funding_sources[]`, `note`, `items[] { item_no, unit, quantity, price_per_unit, total }`, `grand_total`.
 
 | Property | Type | Notes |
 |---|---|---|
 | `has_budget` | boolean | Drives whether the budget UI is shown; a **missing** key means an older paper that had a budget (`true`). When `false` the paper stores `items: []`, `grand_total: 0` and `activity_details.proposed_budget`/`individual_contribution` of `0`; readers hide the budget and the post-eval wizard skips its financial step. Does **not** affect routing (only `has_reservation` does) |
-| `funding_sources[]` | list | How a budgeted activity is funded; each entry is one of `sponsors` \| `concessionaires` \| `department` \| `organization`. Picked on the proposal setup step, which requires ≥1 source when `has_budget` is `true` and stores `[]` for a no-budget paper. A **missing** key means a paper filed before the field existed; readers render no funding row. Does **not** affect routing |
+| `funding_sources[]` | list | How a budgeted activity is funded; each entry is one of `sponsors` \| `concessionaires` \| `department` \| `organization` \| `member_contributions` \| `others`. Picked on the proposal setup step, which requires ≥1 source when `has_budget` is `true` and stores `[]` for a no-budget paper. A **missing** key means a paper filed before the field existed; readers render no funding row. Does **not** affect routing |
+| `note` | string | Free-text "Budget Note" written on the SAAF alignment & budget step (max 500 chars). Required (non-empty) in the wizard when `has_budget` is `true`; stores `""` for a no-budget paper. A **missing** key means a paper filed before the field existed; readers render no note row. Shown to reviewers in the activity detail modal. Does **not** affect routing |
 
 ### venue_reservation & booking_refs
 

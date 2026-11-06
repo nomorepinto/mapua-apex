@@ -326,6 +326,7 @@ export function saafFieldWarnings(
       warnings.individualContribution = "Cannot exceed 5000."
     }
     if (isBlank(draft.proposedBudget)) warnings.proposedBudget = REQUIRED
+    if (isBlank(draft.budgetNote)) warnings.budgetNote = REQUIRED
   }
 
   if (!(draft.mission1 || draft.mission2 || draft.mission3)) {
@@ -368,7 +369,7 @@ export const STEP_PREFIXES_WITH_RESERVATION: Record<SaafStepIndex, string[]> = {
     "individualContribution",
     "proposedBudget",
   ],
-  4: ["mission", "coreValuesExplanation", "peoExplanation", "sdgExplanation"],
+  4: ["mission", "coreValuesExplanation", "peoExplanation", "sdgExplanation", "budgetNote"],
 }
 
 export const STEP_PREFIXES_NO_RESERVATION: Record<SaafStepIndex, string[]> = {
@@ -386,7 +387,7 @@ export const STEP_PREFIXES_NO_RESERVATION: Record<SaafStepIndex, string[]> = {
     "individualContribution",
     "proposedBudget",
   ],
-  3: ["mission", "coreValuesExplanation", "peoExplanation", "sdgExplanation"],
+  3: ["mission", "coreValuesExplanation", "peoExplanation", "sdgExplanation", "budgetNote"],
   4: [],
 }
 
@@ -403,6 +404,7 @@ const WARNING_KEY_LABELS: Record<string, string> = {
   expectedParticipants: "Expected participants",
   individualContribution: "Individual contribution",
   proposedBudget: "Proposed budget",
+  budgetNote: "Budget note",
   mission: "Mission statement",
   coreValuesExplanation: "Core values explanation",
   peoExplanation: "Program educational objectives",

@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test"
 
 import {
+  BUDGET_NOTE,
   EQUIPMENT_REMARK,
   PROSE,
   ROOM_PURPOSE,
@@ -198,6 +199,8 @@ export class SaafPage {
     await choose(this.page, panel.getByRole("combobox", { name: "Budget item" }), "Food and Refreshments")
     await panel.getByRole("textbox", { name: "Quantity" }).fill("2")
     await panel.getByRole("textbox", { name: "Price per unit" }).fill("50")
+    // A with-budget paper must carry a budget note before it can leave the step.
+    await panel.getByLabel("Budget Note").fill(BUDGET_NOTE)
   }
 
   /** A no-budget paper never renders the line-item table or the money inputs. */
@@ -205,6 +208,7 @@ export class SaafPage {
     const panel = stepPanel(this.page)
     await expect(panel.getByRole("combobox", { name: "Budget item" })).toHaveCount(0)
     await expect(this.page.getByPlaceholder("0.00")).toHaveCount(0)
+    await expect(panel.getByLabel("Budget Note")).toHaveCount(0)
     await expect(this.page.getByText("Alignment & budget")).toHaveCount(0)
   }
 

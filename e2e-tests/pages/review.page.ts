@@ -111,4 +111,11 @@ export class ReviewPage {
     await expect(row).toBeVisible()
     await expect(row).toContainText(labels.join(", "))
   }
+
+  async expectBudgetNote(title: string, text: string) {
+    const dialog = this.page.getByRole("dialog", { name: `${title} Proposal` })
+    const row = dialog.getByText("Budget Note", { exact: true }).locator("xpath=..")
+    await expect(row).toBeVisible()
+    await expect(row).toContainText(text)
+  }
 }

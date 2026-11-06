@@ -188,6 +188,8 @@ export const FUNDING_SOURCES = [
   'concessionaires',
   'department',
   'organization',
+  'member_contributions',
+  'others',
 ] as const;
 
 export class BudgetDto {
@@ -201,6 +203,12 @@ export class BudgetDto {
   @IsArray()
   @IsIn(FUNDING_SOURCES, { each: true })
   funding_sources?: string[];
+
+  /** Free-text note attached to the budget; optional so legacy and no-budget papers keep filing. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500, { message: 'The budget note cannot exceed 500 characters.' })
+  note?: string;
 
   @IsOptional()
   @IsArray()

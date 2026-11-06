@@ -196,4 +196,84 @@ describe('SaafDto budget validation', () => {
     const proposal = instance.detailed_budget_proposal as unknown as Item;
     expect(proposal.funding_sources).toEqual(['sponsors', 'organization']);
   });
+
+  it('accepts the newly added funding sources', () => {
+    expect(
+      issues({
+        has_budget: true,
+        funding_sources: ['member_contributions', 'others'],
+        items: [
+          {
+            item_no: '1',
+            unit: 'pc',
+            quantity: 2,
+            price_per_unit: 50,
+            total: 100,
+          },
+        ],
+        grand_total: 100,
+      }),
+    ).toEqual([]);
+  });
+
+  it('accepts a with-budget proposal carrying a budget note', () => {
+    expect(
+      issues({
+        has_budget: true,
+        note: 'Sponsorship covers the venue; contributions cover food.',
+        items: [
+          {
+            item_no: '1',
+            unit: 'pc',
+            quantity: 2,
+            price_per_unit: 50,
+            total: 100,
+          },
+        ],
+        grand_total: 100,
+      }),
+    ).toEqual([]);
+  });
+
+  it('rejects a budget note longer than 500 characters', () => {
+    const found = issues({
+      has_budget: true,
+      note: 'a'.repeat(501),
+      items: [
+        {
+          item_no: '1',
+          unit: 'pc',
+          quantity: 2,
+          price_per_unit: 50,
+          total: 100,
+        },
+      ],
+      grand_total: 100,
+    });
+    expect(found.join('\n')).toContain('detailed_budget_proposal.note');
+  });
+
+  it('keeps `note` through the whitelist used by the global pipe', () => {
+    const instance = plainToInstance(
+      SaafDto,
+      bodyWith({
+        has_budget: true,
+        note: 'Member contributions cover catering.',
+        items: [
+          {
+            item_no: '1',
+            unit: 'pc',
+            quantity: 2,
+            price_per_unit: 50,
+            total: 100,
+          },
+        ],
+        grand_total: 100,
+      }),
+      { exposeUnsetFields: false },
+    );
+    validateSync(instance, { whitelist: true });
+    const proposal = instance.detailed_budget_proposal as unknown as Item;
+    expect(proposal.note).toBe('Member contributions cover catering.');
+  });
 });

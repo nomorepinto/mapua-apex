@@ -19,6 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
+import { Textarea } from "@/components/ui/textarea"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 
@@ -214,15 +216,19 @@ const BudgetRow = memo(function BudgetRow({
 export function BudgetProposalSection({
   items,
   grandTotal,
+  note,
   onUpdate,
   onRemove,
   onAdd,
+  onNoteChange,
 }: {
   items: BudgetItem[]
   grandTotal: number
+  note: string
   onUpdate: (id: string, field: keyof BudgetItem, value: string) => void
   onRemove: (id: string) => void
   onAdd: () => void
+  onNoteChange: (value: string) => void
 }) {
   const canRemove = items.length > 1
 
@@ -296,6 +302,24 @@ export function BudgetProposalSection({
         <PlusIcon className="h-4 w-4 text-neutral-600" />
         <span>Add more Item</span>
       </button>
+
+      <Field className="w-full">
+        <FieldLabel htmlFor="budgetNote">
+          Budget Note <span className="text-red-500">*</span>
+        </FieldLabel>
+        <Textarea
+          id="budgetNote"
+          name="budgetNote"
+          value={note}
+          maxLength={500}
+          placeholder="Write any budget clarifications here"
+          onChange={(event) => onNoteChange(event.target.value.slice(0, 500))}
+          className="bg-white text-neutral-900"
+        />
+        <FieldDescription>
+          Add any clarifying details about this budget.
+        </FieldDescription>
+      </Field>
     </div>
   )
 }

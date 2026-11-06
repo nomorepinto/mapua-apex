@@ -46,10 +46,13 @@ function budgetFields(draft: SaafDraft, includeBudget = true): GibberishField[] 
   // A no-budget activity renders no line items, so its stale draft rows are out
   // of scope for the detector.
   if (!includeBudget) return []
-  return draft.budgetItems.map((item, index) => ({
-    label: `Budget item ${index + 1} · Item`,
-    value: item.item,
-  }))
+  return [
+    ...draft.budgetItems.map((item, index) => ({
+      label: `Budget item ${index + 1} · Item`,
+      value: item.item,
+    })),
+    { label: "Budget note", value: draft.budgetNote },
+  ]
 }
 
 function alignmentFields(draft: SaafDraft): GibberishField[] {

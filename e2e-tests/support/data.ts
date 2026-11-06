@@ -7,6 +7,10 @@ export const DENY_COMMENT = "This proposal is denied after review of the activit
 export const ROOM_PURPOSE = "Room purpose for the end to end reservation check."
 export const EQUIPMENT_REMARK = "Projector for the plenary session."
 
+/** Free-text budget note filed on every with-budget paper; the reviewer modal reads it back. */
+export const BUDGET_NOTE =
+  "Sponsorship covers the venue while member contributions cover food and refreshments."
+
 /**
  * Desk contact details recorded for the first adviser. The proponent's
  * Signatories tab reads them back off the desk holding the paper, so one desk in

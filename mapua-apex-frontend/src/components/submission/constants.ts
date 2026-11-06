@@ -722,6 +722,7 @@ export function saafStepHasUserInput(
         return true
       }
       if (draft.budgetItems.length !== DEFAULT_BUDGET_ITEMS.length) return true
+      if (filled(draft.budgetNote)) return true
       return draft.budgetItems.some(
         (item, index) =>
           filled(item.item) ||
@@ -784,6 +785,7 @@ export function getClearedFieldsForSaafStep(
         peoExplanation: "",
         sdgExplanation: "",
         budgetItems: DEFAULT_BUDGET_ITEMS,
+        budgetNote: "",
       }
     default:
       return {}
@@ -813,5 +815,6 @@ export const DEFAULT_SAAF_DRAFT: SaafDraft = {
   sdgExplanation: "",
   proponents: [createEmptyProponent("1")],
   budgetItems: DEFAULT_BUDGET_ITEMS,
+  budgetNote: "",
   dependentOrgs: [],
 }

@@ -90,6 +90,8 @@ export interface Activity {
   hasBudget?: boolean
   /** Funding sources picked on the proposal setup step (stored slugs; empty/absent on legacy rows). */
   fundingSources?: string[]
+  /** Free-text budget note (empty/absent on legacy or no-budget rows). */
+  budgetNote?: string
   /** Raw start date of the event in YYYY-MM-DD */
   dateOfEvent?: string
   /** Raw end date of the event in YYYY-MM-DD */

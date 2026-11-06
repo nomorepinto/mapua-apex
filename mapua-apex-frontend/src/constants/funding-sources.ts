@@ -8,6 +8,8 @@ export const FUNDING_SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: "concessionaires", label: "Concessionaires" },
   { value: "department", label: "Department" },
   { value: "organization", label: "Organization" },
+  { value: "member_contributions", label: "Member Contributions" },
+  { value: "others", label: "Others" },
 ]
 
 const LABEL_BY_VALUE = new Map(
