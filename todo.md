@@ -258,13 +258,23 @@ e-mailing OSAAR blindly.
 
 ## 8. Ever-present footer with bug reporting
 
-**Status:** Partially done — the ever-present footer shipped; the in-product
-capture pipeline is still deferred. A small footer bar fixed to the bottom of
-the viewport (never scrolls away) now renders on every screen of all three apps
-(`mapua-apex-frontend` `SiteFooter` mounted in `main.tsx`, with `--site-footer-h`
-reserving space in `#root` and `layout.frame`; arcus-attendance `AppFooter` and
-arcus-evaluation `SiteFooter` mounted in their root `layout.tsx`), carrying the
-single line "Email mapuaapex@gmail.com for bug reports" as a `mailto:` link.
+**Status:** Partially done — the ever-present footer shipped (and was repaired
+after it covered page content); the in-product capture pipeline is still
+deferred. A slim footer bar now renders on every screen of all three apps
+(`mapua-apex-frontend` `SiteFooter` mounted in `main.tsx`; arcus-attendance
+`AppFooter` and arcus-evaluation `SiteFooter` mounted in their root
+`layout.tsx`), carrying the single line "Email mapuaapex@gmail.com for bug
+reports" as a `mailto:` link. **Layout fix (Nov 6, 2026):** the bar was
+`position: fixed`, so it painted over the bottom of the viewport — on desktop
+app screens the `lg:h-dvh` frame left no clearance at all and the last rows of
+scrollable content were permanently hidden, and on scrolling pages (landing,
+error/404) content slid under the opaque strip. The bar is now an in-flow strip
+that owns its own `--site-footer-h` band: `layout.frame` ends at
+`calc(100dvh - var(--site-footer-h))` at every breakpoint (the `lg:h-dvh` and
+`lg:left-64` overrides are gone), `#root` no longer pads its bottom, and
+`layout.center` / `layout.fallback`, the landing root, and the error/404 shells
+use the same calc. On app screens the strip stays pinned to the viewport
+bottom; on document-flow pages it sits at the end of the content.
 Still open: the in-product capture below (DynamoDB `BUG#` partition,
 `POST /api/v1/bug-reports`, admin `GET/PATCH` review list, and the report dialog)
 so issues are stored in-product instead of by e-mail.

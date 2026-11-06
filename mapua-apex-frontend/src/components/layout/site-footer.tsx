@@ -1,21 +1,22 @@
 import { Bug } from "lucide-react"
 
 /**
- * Slim, ever-present footer fixed to the bottom of the viewport so it is
- * visible on every screen and never scrolls away. Carries the bug-report
- * entry point as a plain mailto link. Space for it is reserved by
- * `--site-footer-h` (see index.css and `layout.frame` in config.ts).
+ * Slim, ever-present footer pinned to the bottom of the viewport so it is
+ * visible on every screen. Carries the bug-report entry point as a plain
+ * mailto link.
  *
- * Stacking/positioning rules:
- * - On desktop it starts after the sidebar column (`lg:left-64` matches the
- *   `w-64` AppSidebar), so it only ever covers the bottom of the main page.
- * - z-20 (not z-30): it must never paint above the sticky mobile header
- *   (AppSidebar header is z-30), and the desktop sidebar column is z-20 —
- *   the left offset removes the overlap, the lowered z-index is the safety net.
+ * Positioning rules:
+ * - It is a normal in-flow strip, NOT a `fixed` overlay. `layout.frame` (and
+ *   the other full-height shells) end at `calc(100dvh - var(--site-footer-h))`,
+ *   so this bar owns the remaining strip and page content can never be painted
+ *   over by it. A `fixed` bar covered the bottom of the scrollable main column
+ *   and every scrolling page (the sidebar offset trick only worked below `lg`).
+ * - Rendered as the last child of `#root` (see main.tsx), full width, so it
+ *   also sits below the desktop sidebar column.
  */
 export function SiteFooter() {
   return (
-    <footer className="fixed inset-x-0 bottom-0 z-20 flex h-[var(--site-footer-h)] items-center justify-center gap-2 border-t border-[#8B0000] bg-neutral-900 px-4 text-xs text-neutral-300 lg:left-64">
+    <footer className="flex h-[var(--site-footer-h)] shrink-0 items-center justify-center gap-2 border-t border-[#8B0000] bg-neutral-900 px-4 text-xs text-neutral-300">
       <Bug className="h-3.5 w-3.5 shrink-0 text-[#FBC02D]" />
       <span>
         Email{" "}

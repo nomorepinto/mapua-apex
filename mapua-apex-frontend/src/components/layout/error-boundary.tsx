@@ -23,7 +23,7 @@ export function RootErrorBoundary() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-6 text-center">
+    <div className="min-h-[calc(100dvh-var(--site-footer-h))] bg-neutral-50 flex flex-col items-center justify-center p-6 text-center">
       <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center mb-6 text-[#8B0000]">
         <AlertCircleIcon className="w-8 h-8" />
       </div>
@@ -60,7 +60,7 @@ export function NotFoundPage() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-6 text-center">
+    <div className="min-h-[calc(100dvh-var(--site-footer-h))] bg-neutral-50 flex flex-col items-center justify-center p-6 text-center">
       <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center mb-6 text-[#8B0000]">
         <AlertCircleIcon className="w-8 h-8" />
       </div>

@@ -23,16 +23,16 @@ export const brand = {
 export const layout = {
   /** Full-page grey canvas. */
   page: "min-h-full w-full min-w-0 overflow-x-clip bg-page p-4 text-neutral-900 sm:p-6 lg:p-8",
-  /** Sidebar shell behind <main>. On desktop the footer only covers the main
-   *  column (it starts after the sidebar), so the frame runs full height there;
-   *  below lg the footer is full width, so the frame reserves `--site-footer-h`. */
+  /** Sidebar shell behind <main>. Ends above the in-flow `SiteFooter` strip at
+   *  every breakpoint, so the footer owns its own space and never covers page
+   *  content (`--site-footer-h`, see index.css). */
   frame:
-    "flex h-[calc(100dvh-var(--site-footer-h))] w-full flex-col overflow-hidden bg-page lg:h-dvh lg:flex-row",
+    "flex h-[calc(100dvh-var(--site-footer-h))] w-full flex-col overflow-hidden bg-page lg:flex-row",
   /** Scrollable main column next to the sidebar. */
   main: "min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto",
   fallback:
-    "flex min-h-dvh w-full items-center justify-center bg-page text-sm font-medium text-neutral-600",
-  center: "flex min-h-dvh w-full items-center justify-center bg-page p-4",
+    "flex min-h-[calc(100dvh-var(--site-footer-h))] w-full items-center justify-center bg-page text-sm font-medium text-neutral-600",
+  center: "flex min-h-[calc(100dvh-var(--site-footer-h))] w-full items-center justify-center bg-page p-4",
   /** Space between page sections. */
   stack: "flex flex-col gap-4",
   gap: "gap-4",
