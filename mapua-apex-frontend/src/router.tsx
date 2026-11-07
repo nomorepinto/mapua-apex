@@ -136,6 +136,16 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "organization",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { StudentOrganizationPage } = await import(
+            "@/routes/students/organization"
+          )
+          return { Component: StudentOrganizationPage }
+        },
+      },
+      {
         path: "members",
         HydrateFallback: RouteFallback,
         lazy: async () => {

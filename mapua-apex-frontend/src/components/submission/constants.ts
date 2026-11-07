@@ -813,7 +813,7 @@ export const DEFAULT_SAAF_DRAFT: SaafDraft = {
   coreValuesExplanation: "",
   peoExplanation: "",
   sdgExplanation: "",
-  proponents: [createEmptyProponent("1")],
+  proponents: [],
   budgetItems: DEFAULT_BUDGET_ITEMS,
   budgetNote: "",
   dependentOrgs: [],

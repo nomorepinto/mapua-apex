@@ -52,6 +52,7 @@ export function SaafPeopleStep() {
         onUpdate={actions.handleUpdateProponent}
         onRemove={actions.handleRemoveProponent}
         onAdd={actions.handleAddProponent}
+        onAddFromOfficer={actions.handleAddProponent}
       />
       <CollaboratorsSection
         value={draft.dependentOrgs}

@@ -57,9 +57,9 @@ submitted post-eval, automatically set the linked SUBMISSION
 
 **Goal:** Suggest a room from the number of participants.
 
-## 3. Proponent position spelling
+## ~~3. Proponent position spelling~~
 
-**Status:** Not started.
+**Status:** Closed — added `position_roles` attribute to ORGANIZATION items, `PATCH /api/v2/students/organization/roles` endpoint, student Organization profile & roles management page (`/students/organization`), and updated `ProponentCard` in the SAAF form to offer a dropdown of configured roles with an "Other" custom role escape hatch. Additionally enhanced with an Org Officer Roster (`ORG_OFFICER` item, `/students/organization/officers` CRUD endpoints, roster management on `/students/organization`, and one-click auto-fill for proponent cards in the SAAF wizard).
 
 **Goal:** Stop free-typed position text from being saved with the wrong
 spelling. The same check applies to every field that should be a known value,

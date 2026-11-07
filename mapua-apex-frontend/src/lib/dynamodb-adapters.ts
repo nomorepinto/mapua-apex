@@ -319,7 +319,29 @@ export interface ApiOrganization {
   skip_dean?: boolean
   skip_post_eval?: boolean
   signatories?: ApiOrganizationSignatory[]
+  position_roles?: string[]
 }
+
+/** Officer roster entry — stored under ORGANIZATION#uuid / OFFICER#uuid. */
+export interface ApiOfficer {
+  officer_id: string
+  first_name: string
+  middle_name?: string | null
+  last_name: string
+  suffix?: string | null
+  student_number: string
+  program_and_year: string
+  department?: string | null
+  position_of_applicant: string
+  contact_number: string
+  email_address: string
+  facebook_link: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type CreateOfficerPayload = Omit<ApiOfficer, "officer_id" | "created_at" | "updated_at">
+export type UpdateOfficerPayload = Partial<CreateOfficerPayload>
 
 export type CreateOrganizationPayload = {
   name: string

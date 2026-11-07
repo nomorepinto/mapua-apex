@@ -33,9 +33,9 @@ import {
 import { validateEmailDomain, validateEmailLive } from "@/lib/auth-validation"
 
 // Matches letters, spaces, hyphens, periods, and apostrophes (no digits)
-const LETTERS_ONLY_PATTERN = /^[\p{L}\s\-'.]+$/u
+export const LETTERS_ONLY_PATTERN = /^[\p{L}\s\-'.]+$/u
 // Positions can also include slashes, ampersands, and parentheses (e.g., "VP / Co-Lead")
-const POSITION_LETTERS_ONLY_PATTERN = /^[\p{L}\s\-'./&(),]+$/u
+export const POSITION_LETTERS_ONLY_PATTERN = /^[\p{L}\s\-'./&(),]+$/u
 
 function isBlank(value: string | undefined): boolean {
   return !value || !value.trim()
@@ -71,7 +71,7 @@ function isInsideEventWindow(value: string): boolean {
   )
 }
 
-function isValidFacebookUrl(value: string): boolean {
+export function isValidFacebookUrl(value: string): boolean {
   const trimmed = value.trim()
   if (!/^https:\/\/(www\.)?facebook\.com\/.+/i.test(trimmed)) {
     return false
@@ -256,7 +256,10 @@ export function saafFieldWarnings(
     warnings.totalOrgMembers = "Cannot exceed 3000 members."
   }
 
-  if (draft.proponents.length > MAX_PROPONENTS) {
+  if (draft.proponents.length === 0) {
+    warnings["proponent.min"] =
+      "At least one proponent is required. Select an officer from your roster or add a proponent manually."
+  } else if (draft.proponents.length > MAX_PROPONENTS) {
     warnings["proponent.max"] = `A maximum of ${MAX_PROPONENTS} proponents is allowed. Remove ${draft.proponents.length - MAX_PROPONENTS} to continue.`
   }
 
@@ -427,6 +430,7 @@ const PROPONENT_FIELD_LABELS: Record<string, string> = {
 }
 
 function warningKeyLabel(key: string, proponents: Proponent[]): string {
+  if (key === "proponent.min") return "Proponents"
   if (key === "proponent.max") return "Number of proponents"
   const match = /^proponent\.([^.]+)\.(.+)$/.exec(key)
   if (match) {

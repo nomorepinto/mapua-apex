@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -38,6 +39,14 @@ export class OrganizationDto {
   @ValidateNested({ each: true })
   @Type(() => DeskDto)
   signatories?: DeskDto[];
+
+  /** Optional list of named position roles the org exposes for the SAAF form. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  @MaxLength(60, { each: true })
+  position_roles?: string[];
 }
 
 export class UpdateOrganizationDto extends OrganizationDto {
@@ -45,4 +54,13 @@ export class UpdateOrganizationDto extends OrganizationDto {
   @ValidateNested({ each: true })
   @Type(() => DeskDto)
   declare signatories: DeskDto[];
+}
+
+/** Student-only DTO: replace the org's position_roles list in-place. */
+export class UpdateOrgRolesDto {
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  @MaxLength(60, { each: true })
+  position_roles!: string[];
 }

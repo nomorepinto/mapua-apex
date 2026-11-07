@@ -13,7 +13,10 @@ import {
   type ApiNotification,
   type ApiDeadline,
   type ApiOrganization,
+  type ApiOfficer,
   type ApiAnnouncement,
+  type CreateOfficerPayload,
+  type UpdateOfficerPayload,
 } from "@/lib/dynamodb-adapters"
 
 export const SUBMISSION_KEYS = {
@@ -24,6 +27,7 @@ export const SUBMISSION_KEYS = {
     ["submission-notifications", eventId, submissionId] as const,
   deadlines: ["org-deadlines"] as const,
   organization: ["org-organization"] as const,
+  officers: ["org-officers"] as const,
   announcements: ["org-announcements"] as const,
   organizationDirectory: ["org-organization-directory"] as const,
 }
@@ -173,6 +177,100 @@ export function useCurrentOrganizationQuery() {
         "/students/organization"
       )
       return res.data
+    },
+  })
+}
+
+/**
+ * Update the organization's position roles list.
+ */
+export function usePatchOrgRolesMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (position_roles: string[]) => {
+      const res = await apiClient.patch<{ data: ApiOrganization }>(
+        "/students/organization/roles",
+        { position_roles }
+      )
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.organization })
+    },
+  })
+}
+
+/**
+ * Fetch the logged-in student org's officer roster.
+ */
+export function useOfficersQuery() {
+  return useQuery({
+    queryKey: SUBMISSION_KEYS.officers,
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: ApiOfficer[] }>(
+        "/students/organization/officers"
+      )
+      return res.data
+    },
+  })
+}
+
+/**
+ * Create a new officer in the org's roster.
+ */
+export function useCreateOfficerMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: CreateOfficerPayload) => {
+      const res = await apiClient.post<{ data: ApiOfficer }>(
+        "/students/organization/officers",
+        payload
+      )
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.officers })
+    },
+  })
+}
+
+/**
+ * Partial-update an existing officer.
+ */
+export function useUpdateOfficerMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      officerId,
+      payload,
+    }: {
+      officerId: string
+      payload: UpdateOfficerPayload
+    }) => {
+      const res = await apiClient.patch<{ data: ApiOfficer }>(
+        `/students/organization/officers/${officerId}`,
+        payload
+      )
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.officers })
+    },
+  })
+}
+
+/**
+ * Delete an officer from the org's roster.
+ */
+export function useDeleteOfficerMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (officerId: string) => {
+      await apiClient.delete(`/students/organization/officers/${officerId}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.officers })
     },
   })
 }
