@@ -46,7 +46,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Form } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import {
@@ -75,7 +75,6 @@ import {
   useDeleteOfficerMutation,
 } from "@/hooks/use-submissions"
 import { mutationErrorMessage } from "@/hooks/use-admin"
-import { checkEmailExistence } from "@/hooks/use-email-existence"
 import { checkGibberishFields } from "@/hooks/use-gibberish-check"
 import {
   MAX_STUDENT_YEAR,
@@ -95,7 +94,6 @@ import {
 } from "@/lib/numeric-input"
 import {
   LETTERS_ONLY_PATTERN,
-  POSITION_LETTERS_ONLY_PATTERN,
   isValidFacebookUrl,
 } from "@/components/submission/validate-saaf-step"
 import {
@@ -127,6 +125,14 @@ function parseProgramAndYear(val: string): { program: string; year: string } {
       ) ?? matchedYear
     return { program: match[1].trim(), year: canonicalYear }
   }
+
+  const foundYear = (YEAR_LEVEL_OPTIONS as readonly string[]).find(
+    (y) => y.toLowerCase() === trimmed.toLowerCase()
+  )
+  if (foundYear) {
+    return { program: "", year: foundYear }
+  }
+
   return { program: trimmed, year: "" }
 }
 
@@ -147,7 +153,8 @@ interface OfficerFormData {
   last_name: string
   suffix: string
   student_number: string
-  program_and_year: string
+  program: string
+  year: string
   department: string
   position_of_applicant: string
   contact_number: string
@@ -161,7 +168,8 @@ const EMPTY_OFFICER_FORM: OfficerFormData = {
   last_name: "",
   suffix: "",
   student_number: "",
-  program_and_year: "",
+  program: "",
+  year: "",
   department: "",
   position_of_applicant: "",
   contact_number: "",
@@ -170,13 +178,15 @@ const EMPTY_OFFICER_FORM: OfficerFormData = {
 }
 
 function officerToFormData(o: ApiOfficer): OfficerFormData {
+  const { program, year } = parseProgramAndYear(o.program_and_year || "")
   return {
     first_name: o.first_name ?? "",
     middle_name: o.middle_name ?? "",
     last_name: o.last_name ?? "",
     suffix: o.suffix ?? "",
     student_number: o.student_number ?? "",
-    program_and_year: o.program_and_year ?? "",
+    program,
+    year,
     department: o.department ?? "",
     position_of_applicant: o.position_of_applicant ?? "",
     contact_number: o.contact_number ?? "",
@@ -257,7 +267,7 @@ export function StudentOrganizationPage() {
     }
   }
 
-  function validateForm(): boolean {
+  function validateForm(): Partial<Record<keyof OfficerFormData, string>> {
     const errors: Partial<Record<keyof OfficerFormData, string>> = {}
 
     // 1. First Name
@@ -323,25 +333,19 @@ export function StudentOrganizationPage() {
     }
 
     // 7. Program & Year
-    const progYear = formData.program_and_year.trim()
-    if (!progYear) {
-      errors.program_and_year = "Both program and year level are required."
-    } else {
-      const hasYear = (YEAR_LEVEL_OPTIONS as readonly string[]).some((yr) =>
-        progYear.toLowerCase().endsWith(yr.toLowerCase())
-      )
-      const hasProgram = progYear.includes(" - ") || (!hasYear && !progYear)
-      if (!hasYear || !hasProgram) {
-        errors.program_and_year = "Both program and year level are required (e.g. BSCS - 3rd Year)."
-      }
+    const program = formData.program.trim()
+    const year = formData.year.trim()
+    if (!program) {
+      errors.program = "Program is required."
+    }
+    if (!year) {
+      errors.year = "Year level is required."
     }
 
     // 8. Position
     const pos = formData.position_of_applicant.trim()
     if (!pos) {
       errors.position_of_applicant = "Position title is required."
-    } else if (!POSITION_LETTERS_ONLY_PATTERN.test(pos)) {
-      errors.position_of_applicant = "Position must only contain letters."
     }
 
     // 9. Contact / Mobile Number
@@ -377,28 +381,26 @@ export function StudentOrganizationPage() {
     }
 
     // 12. Facebook Link
-    const fb = formData.facebook_link.trim()
+    let fb = formData.facebook_link.trim()
     if (!fb) {
       errors.facebook_link = "Facebook link is required."
-    } else if (!isValidFacebookUrl(fb)) {
-      errors.facebook_link = "Facebook link must start with https://facebook.com/ (e.g. https://facebook.com/username)"
+    } else {
+      if (!/^https?:\/\//i.test(fb)) {
+        fb = `https://${fb}`
+      }
+      if (!isValidFacebookUrl(fb)) {
+        errors.facebook_link = "Facebook link must start with https://facebook.com/ (e.g. https://facebook.com/username)"
+      }
     }
 
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
+    return errors
   }
 
   async function handleFormSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!validateForm()) return
-
-    // Pre-submit Mailbox Existence Check
-    const emailState = await checkEmailExistence(formData.email_address.trim())
-    if (emailState === "invalid") {
-      setFormErrors((prev) => ({
-        ...prev,
-        email_address: "This email address does not have an active mailbox. Please double-check it.",
-      }))
+    const validationErrors = validateForm()
+    if (Object.keys(validationErrors).length > 0) {
+      setFormErrors(validationErrors)
       return
     }
 
@@ -418,19 +420,26 @@ export function StudentOrganizationPage() {
       return
     }
 
+    let fbLink = formData.facebook_link.trim()
+    if (fbLink && !/^https?:\/\//i.test(fbLink)) {
+      fbLink = `https://${fbLink}`
+    }
+
     const payload: CreateOfficerPayload = {
       first_name: formData.first_name.trim(),
       last_name: formData.last_name.trim(),
       student_number: formData.student_number.trim(),
-      program_and_year: formData.program_and_year.trim(),
+      program_and_year: `${formData.program.trim()} - ${formData.year.trim()}`,
       position_of_applicant: formData.position_of_applicant.trim(),
       contact_number: formData.contact_number.trim(),
       email_address: formData.email_address.trim(),
-      facebook_link: formData.facebook_link.trim(),
+      facebook_link: fbLink,
     }
     if (formData.middle_name.trim()) payload.middle_name = formData.middle_name.trim()
-    if (formData.suffix.trim()) payload.suffix = formData.suffix.trim()
-    const orgDepartment = org?.department?.trim() || ""
+    if (formData.suffix.trim() && formData.suffix.trim().toLowerCase() !== "none") {
+      payload.suffix = formData.suffix.trim()
+    }
+    const orgDepartment = org?.department?.trim() || formData.department?.trim() || ""
     if (orgDepartment) payload.department = orgDepartment
 
     try {
@@ -454,6 +463,7 @@ export function StudentOrganizationPage() {
       }
       setIsFormDialogOpen(false)
     } catch (error) {
+      console.error("Failed to save officer:", error)
       toastManager.add({
         title: editingOfficer ? "Could not update officer" : "Could not add officer",
         description: mutationErrorMessage(error, "Please verify all fields and try again."),
@@ -806,13 +816,15 @@ export function StudentOrganizationPage() {
                         placeholder="e.g. Alice"
                         value={formData.first_name}
                         maxLength={30}
+                        aria-invalid={Boolean(formErrors.first_name)}
+                        className={formErrors.first_name ? "!border-red-500 focus-visible:!ring-red-500/20" : undefined}
                         onKeyDown={blockDigitKeys}
                         onChange={(e) =>
                           handleFieldChange("first_name", stripDigits(e.target.value))
                         }
                       />
                       {formErrors.first_name && (
-                        <FieldError>{formErrors.first_name}</FieldError>
+                        <p className="text-xs font-medium text-red-600 mt-1">{formErrors.first_name}</p>
                       )}
                     </Field>
                     <Field>
@@ -824,13 +836,15 @@ export function StudentOrganizationPage() {
                         placeholder="e.g. Reyes"
                         value={formData.last_name}
                         maxLength={30}
+                        aria-invalid={Boolean(formErrors.last_name)}
+                        className={formErrors.last_name ? "!border-red-500 focus-visible:!ring-red-500/20" : undefined}
                         onKeyDown={blockDigitKeys}
                         onChange={(e) =>
                           handleFieldChange("last_name", stripDigits(e.target.value))
                         }
                       />
                       {formErrors.last_name && (
-                        <FieldError>{formErrors.last_name}</FieldError>
+                        <p className="text-xs font-medium text-red-600 mt-1">{formErrors.last_name}</p>
                       )}
                     </Field>
                   </div>
@@ -843,13 +857,15 @@ export function StudentOrganizationPage() {
                         placeholder="(optional)"
                         value={formData.middle_name}
                         maxLength={30}
+                        aria-invalid={Boolean(formErrors.middle_name)}
+                        className={formErrors.middle_name ? "!border-red-500 focus-visible:!ring-red-500/20" : undefined}
                         onKeyDown={blockDigitKeys}
                         onChange={(e) =>
                           handleFieldChange("middle_name", stripDigits(e.target.value))
                         }
                       />
                       {formErrors.middle_name && (
-                        <FieldError>{formErrors.middle_name}</FieldError>
+                        <p className="text-xs font-medium text-red-600 mt-1">{formErrors.middle_name}</p>
                       )}
                     </Field>
                     <Field>
@@ -907,6 +923,8 @@ export function StudentOrganizationPage() {
                         minLength={STUDENT_NUMBER_LENGTH}
                         maxLength={STUDENT_NUMBER_LENGTH}
                         value={formData.student_number}
+                        aria-invalid={Boolean(formErrors.student_number)}
+                        className={formErrors.student_number ? "!border-red-500 focus-visible:!ring-red-500/20" : undefined}
                         onKeyDown={blockNonIntegerKeys}
                         onChange={(e) =>
                           handleFieldChange(
@@ -919,7 +937,7 @@ export function StudentOrganizationPage() {
                         }
                       />
                       {formErrors.student_number && (
-                        <FieldError>{formErrors.student_number}</FieldError>
+                        <p className="text-xs font-medium text-red-600 mt-1">{formErrors.student_number}</p>
                       )}
                     </Field>
 
@@ -943,8 +961,6 @@ export function StudentOrganizationPage() {
                   {/* Program & Year level selectors */}
                   {(() => {
                     const programOptions = getDepartmentPrograms(org?.department)
-                    const { program: currentProg, year: currentYear } =
-                      parseProgramAndYear(formData.program_and_year)
 
                     return (
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -954,19 +970,20 @@ export function StudentOrganizationPage() {
                           </FieldLabel>
                           {programOptions.length > 0 ? (
                             <Select
-                              value={currentProg}
+                              value={formData.program}
                               onValueChange={(val) => {
                                 if (typeof val === "string") {
-                                  const combined = currentYear
-                                    ? `${val} - ${currentYear}`
-                                    : val
-                                  handleFieldChange("program_and_year", combined)
+                                  handleFieldChange("program", val)
                                 }
                               }}
                             >
-                              <SelectTrigger id="dlg-program">
+                              <SelectTrigger
+                                id="dlg-program"
+                                aria-invalid={Boolean(formErrors.program)}
+                                className={cn(formErrors.program && "!border-red-500 focus-visible:!ring-red-500/20")}
+                              >
                                 <SelectValue placeholder="Select Program">
-                                  {currentProg || "Select Program"}
+                                  {formData.program || "Select Program"}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent className="z-50 max-h-60 rounded-xl bg-white p-1 text-xs text-neutral-900 shadow-md">
@@ -987,18 +1004,17 @@ export function StudentOrganizationPage() {
                             <Input
                               id="dlg-program"
                               placeholder="e.g. BSCS"
-                              value={currentProg}
+                              value={formData.program}
                               maxLength={80}
-                              onChange={(e) => {
-                                const combined = currentYear
-                                  ? `${e.target.value} - ${currentYear}`
-                                  : e.target.value
-                                handleFieldChange("program_and_year", combined)
-                              }}
+                              aria-invalid={Boolean(formErrors.program)}
+                              className={formErrors.program ? "!border-red-500 focus-visible:!ring-red-500/20" : undefined}
+                              onChange={(e) =>
+                                handleFieldChange("program", e.target.value)
+                              }
                             />
                           )}
-                          {formErrors.program_and_year && (
-                            <FieldError>{formErrors.program_and_year}</FieldError>
+                          {formErrors.program && (
+                            <p className="text-xs font-medium text-red-600 mt-1">{formErrors.program}</p>
                           )}
                         </Field>
 
@@ -1007,19 +1023,20 @@ export function StudentOrganizationPage() {
                             Year Level <span className="text-red-500">*</span>
                           </FieldLabel>
                           <Select
-                            value={currentYear}
+                            value={formData.year}
                             onValueChange={(val) => {
                               if (typeof val === "string") {
-                                const combined = currentProg
-                                  ? `${currentProg} - ${val}`
-                                  : val
-                                handleFieldChange("program_and_year", combined)
+                                handleFieldChange("year", val)
                               }
                             }}
                           >
-                            <SelectTrigger id="dlg-year-level">
+                            <SelectTrigger
+                              id="dlg-year-level"
+                              aria-invalid={Boolean(formErrors.year)}
+                              className={cn(formErrors.year && "!border-red-500 focus-visible:!ring-red-500/20")}
+                            >
                               <SelectValue placeholder="Select Year Level">
-                                {currentYear || "Select Year Level"}
+                                {formData.year || "Select Year Level"}
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent className="z-50 max-h-60 rounded-xl bg-white p-1 text-xs text-neutral-900 shadow-md">
@@ -1034,6 +1051,9 @@ export function StudentOrganizationPage() {
                               ))}
                             </SelectContent>
                           </Select>
+                          {formErrors.year && (
+                            <p className="text-xs font-medium text-red-600 mt-1">{formErrors.year}</p>
+                          )}
                         </Field>
                       </div>
                     )
@@ -1048,6 +1068,8 @@ export function StudentOrganizationPage() {
                       placeholder="e.g. President, Vice President"
                       value={formData.position_of_applicant}
                       maxLength={80}
+                      aria-invalid={Boolean(formErrors.position_of_applicant)}
+                      className={formErrors.position_of_applicant ? "!border-red-500 focus-visible:!ring-red-500/20" : undefined}
                       onChange={(e) =>
                         handleFieldChange("position_of_applicant", e.target.value)
                       }
@@ -1067,7 +1089,7 @@ export function StudentOrganizationPage() {
                       ))}
                     </div>
                     {formErrors.position_of_applicant && (
-                      <FieldError>{formErrors.position_of_applicant}</FieldError>
+                      <p className="text-xs font-medium text-red-600 mt-1">{formErrors.position_of_applicant}</p>
                     )}
                   </Field>
                 </div>
@@ -1089,6 +1111,8 @@ export function StudentOrganizationPage() {
                         inputMode="numeric"
                         value={formData.contact_number}
                         maxLength={MOBILE_NUMBER_LENGTH}
+                        aria-invalid={Boolean(formErrors.contact_number)}
+                        className={formErrors.contact_number ? "!border-red-500 focus-visible:!ring-red-500/20" : undefined}
                         onKeyDown={blockNonIntegerKeys}
                         onChange={(e) =>
                           handleFieldChange(
@@ -1101,7 +1125,7 @@ export function StudentOrganizationPage() {
                         }
                       />
                       {formErrors.contact_number && (
-                        <FieldError>{formErrors.contact_number}</FieldError>
+                        <p className="text-xs font-medium text-red-600 mt-1">{formErrors.contact_number}</p>
                       )}
                     </Field>
                     <Field>
@@ -1114,12 +1138,14 @@ export function StudentOrganizationPage() {
                         placeholder="student@mymail.mapua.edu.ph"
                         value={formData.email_address}
                         maxLength={150}
+                        aria-invalid={Boolean(formErrors.email_address)}
+                        className={formErrors.email_address ? "!border-red-500 focus-visible:!ring-red-500/20" : undefined}
                         onChange={(e) =>
                           handleFieldChange("email_address", e.target.value)
                         }
                       />
                       {formErrors.email_address && (
-                        <FieldError>{formErrors.email_address}</FieldError>
+                        <p className="text-xs font-medium text-red-600 mt-1">{formErrors.email_address}</p>
                       )}
                     </Field>
                   </div>
@@ -1134,12 +1160,14 @@ export function StudentOrganizationPage() {
                       placeholder="https://facebook.com/username"
                       value={formData.facebook_link}
                       maxLength={300}
+                      aria-invalid={Boolean(formErrors.facebook_link)}
+                      className={formErrors.facebook_link ? "!border-red-500 focus-visible:!ring-red-500/20" : undefined}
                       onChange={(e) =>
                         handleFieldChange("facebook_link", e.target.value)
                       }
                     />
                     {formErrors.facebook_link && (
-                      <FieldError>{formErrors.facebook_link}</FieldError>
+                      <p className="text-xs font-medium text-red-600 mt-1">{formErrors.facebook_link}</p>
                     )}
                   </Field>
                 </div>
