@@ -173,6 +173,10 @@ export class AppConfigService implements OnModuleInit {
     return this.integer('ARCUS_POST_EVALUATION_WINDOW_DAYS', 3);
   }
 
+  osaarTermLockoutDays(): number {
+    return Math.max(0, this.integer('OSAAR_TERM_LOCKOUT_DAYS', 14));
+  }
+
   /**
    * Kill-switch for the TTL auto-cancel feature (default on). When off, the
    * final-approval sentinel is never written and the cancel path no-ops, so a

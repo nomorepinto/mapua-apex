@@ -196,9 +196,11 @@ Cognito synchronously, which throttles during event-day sign-up bursts.
   carries the full hosted-UI stack, so treat this as a replacement of that
   flow, not an additional one.
 
-## 6. OSAAR term start / term end settings
+## ~~6. OSAAR term start / term end settings~~
 
-**Status:** Not started.
+**Status:** Closed.
+
+Implemented the OSAAR Term settings tab, singleton term storage/API and audit log, server-side blackout/lockout enforcement for proposal and reschedule writes, and date-picker guidance.
 
 **Goal:** Let OSAAR define an academic term window. Two rules follow from it:
 (a) once a term is within **two weeks of its term-end date**, no new events

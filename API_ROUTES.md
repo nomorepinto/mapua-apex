@@ -353,6 +353,16 @@ Use this as the **POST** `/api/v2/students/submissions` body. For **PUT**, copy 
 }
 ```
 
+## OSAAR term settings
+
+| Method | Path | Behavior |
+| :-- | :-- | :-- |
+| **GET** | `/api/v2/public/term` | Returns the configured academic-calendar catalog `{ active_academic_year_id, academic_years: [{ id, label, terms: [{ id, label, start, end, blackouts }] }] }`, or `null`. This read only supports date-picker guidance; write validation remains server-side. |
+| **GET** | `/api/v2/osaar/term` | Returns the same term settings for OSAAR, admin, or super-admin users. |
+| **PUT** | `/api/v2/osaar/term` | OSAAR/admin/super-admin only. Replaces the singleton using `{ active_academic_year_id, academic_years: [{ id, label, terms: [{ id, label, start, end, blackouts: [{ start, end, reason }] }] }] }`. Each year has one to five non-overlapping terms; blackout ranges are inclusive and must stay inside their own term. Only the selected active year controls new event dates. Invalid input returns `422`. The activity log retains sanitized before/after values. |
+
+The proposal and event-date paths reject dates in a blackout or in the final `OSAAR_TERM_LOCKOUT_DAYS` days of their active term (default `14`). This applies to proposal creation, edits, OSAAR correction, booking dates, and approved-event rescheduling.
+
 ---
 
 ## Session Lifecycle (Any Authenticated Role)

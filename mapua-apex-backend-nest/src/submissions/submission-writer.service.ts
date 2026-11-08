@@ -19,6 +19,9 @@ import {
 import { abort } from '../common/http.js';
 import { record, str, type Item } from '../common/records.js';
 import { AppConfigService } from '../config/app-config.service.js';
+import { TermSettingsService } from '../term-settings/term-settings.service.js';
+import { assertTermDateAllowed } from '../term-settings/term-window.js';
+import { addDays } from '../common/availability-window.js';
 import type { CreateSaafDto, SaafDto } from './dto/saaf.dto.js';
 import {
   dependentIds,
@@ -34,10 +37,11 @@ export class SubmissionWriterService {
     private readonly routing: RoutingService,
     private readonly bookings: BookingService,
     private readonly config: AppConfigService,
+    private readonly terms: TermSettingsService,
   ) {}
 
   async create(organizationId: string, body: CreateSaafDto): Promise<Item> {
-    this.assertDates(body);
+    await this.assertDates(body);
     const dependents = await this.resolveDependents(
       organizationId,
       body.collaboration?.dependent_organization_ids ?? [],
@@ -97,7 +101,7 @@ export class SubmissionWriterService {
     submissionId: string,
     body: SaafDto,
   ): Promise<{ before: Item; after: Item }> {
-    this.assertDates(body);
+    await this.assertDates(body);
     const event = await this.submissions.getEvent(eventId);
     if (
       !event ||
@@ -231,7 +235,7 @@ export class SubmissionWriterService {
     );
     const reserved = hasVenueReservation(existing);
     if (!reserved) {
-      this.assertDates({
+      await this.assertDates({
         ...body,
         activity_details: details,
         venue_reservation: { has_reservation: false },
@@ -362,20 +366,30 @@ export class SubmissionWriterService {
     return ids;
   }
 
-  private assertDates(body: SaafDto): void {
+  private async assertDates(body: SaafDto): Promise<void> {
     const start = body.activity_details.date_of_event;
     const end = body.activity_details.end_date_of_event;
     const floor = eventDateFloorKey(this.config.allowAnyEventDate());
+    if (end && end < start) {
+      abort(422, 'The end date of event must be on or after the start date.');
+    }
     assertEventDateAllowed(start, floor);
+    const term = await this.terms.get();
+    const lockoutDays = this.config.osaarTermLockoutDays();
+    let cursor = start;
+    const last = end || start;
+    for (let checked = 0; cursor <= last && checked <= 366; checked += 1) {
+      assertTermDateAllowed(cursor, term, lockoutDays);
+      cursor = addDays(cursor, 1);
+    }
+    if (cursor <= last) abort(422, 'An event cannot span more than 367 days.');
     if (body.venue_reservation.has_reservation) {
       for (const reservation of body.venue_reservation.reservations ?? []) {
         for (const selection of reservation.selections ?? []) {
           assertEventDateAllowed(selection.date, floor);
+          assertTermDateAllowed(selection.date, term, lockoutDays);
         }
       }
-    }
-    if (end && end < start) {
-      abort(422, 'The end date of event must be on or after the start date.');
     }
   }
 

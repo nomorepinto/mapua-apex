@@ -9,6 +9,7 @@ export type RouteRole =
   | 'student'
   | 'signatory'
   | 'admin'
+  | 'osaar'
   | 'session_admin'
   | 'report_admin'
   | 'super_admin'
@@ -47,6 +48,7 @@ export const ROUTE_GROUPS: Record<
     'super_admin',
   ],
   admin: ['admin', 'osaar', 'cdm_reviewer', 'cdm', 'super_admin'],
+  osaar: ['osaar', 'admin', 'super_admin'],
   session_admin: ['admin', 'super_admin'],
   report_admin: ['admin', 'osaar', 'super_admin'],
   super_admin: ['super_admin'],

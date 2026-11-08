@@ -4,6 +4,7 @@ import { CampusesModule } from '../campuses/campuses.module.js';
 import { MailModule } from '../mail/mail.module.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { SignatoriesModule } from '../signatories/signatories.module.js';
+import { TermSettingsModule } from '../term-settings/term-settings.module.js';
 import { AdminSubmissionsController } from './admin-submissions.controller.js';
 import { RoutingService } from './routing.service.js';
 import { SignatorySubmissionsController } from './signatory-submissions.controller.js';
@@ -20,6 +21,7 @@ import { SubmissionWriterService } from './submission-writer.service.js';
     CampusesModule,
     BookingsModule,
     MailModule,
+    TermSettingsModule,
   ],
   controllers: [
     StudentSubmissionsController,

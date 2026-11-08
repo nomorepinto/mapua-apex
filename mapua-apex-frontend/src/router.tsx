@@ -430,6 +430,14 @@ export const router = createBrowserRouter([
               return { Component: AdminCampusPage }
             },
           },
+          {
+            path: "term",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { OsaarTermSettingsPage } = await import("@/routes/osaar/term-settings")
+              return { Component: OsaarTermSettingsPage }
+            },
+          },
         ],
       },
       {

@@ -1290,3 +1290,26 @@ json
   "revocation_reason": null,
   "TTL": 1736222400
 }
+
+TERM SETTINGS (singleton)
+  PK: OSAAR#TERM
+  SK: OSAAR#TERM
+  active_academic_year_id: string
+  academic_years: [{
+    id: string
+    label: string
+    terms: [{
+      id: string
+      label: string                 (for example, "Quarter 1")
+      start: "YYYY-MM-DD"
+      end: "YYYY-MM-DD"
+      blackouts: [{ start: "YYYY-MM-DD", end: "YYYY-MM-DD", reason: string }]
+    }]
+  }]
+  updated_at: timestamp
+  updated_by: Cognito subject
+
+There is one term-settings record and no GSI. Proposal, booking, and
+rescheduling validators use a direct GetItem to find the matching term in the
+active academic year, apply its inclusive blackout ranges and its configurable
+pre-term-end lockout, and reject dates outside that calendar.
