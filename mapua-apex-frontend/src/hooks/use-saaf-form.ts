@@ -90,6 +90,21 @@ export function useSaafForm() {
   // validation callbacks below keep their identity between unrelated renders.
   const saafDraft = useOrgStore((state) => state.saafDraft)
   const eventName = useOrgStore((state) => state.eventName)
+  const draftProponents = useMemo(() => {
+    const list = saafDraft?.proponents ?? DEFAULT_SAAF_DRAFT.proponents
+    if (
+      list.length === 1 &&
+      !list[0].firstName &&
+      !list[0].lastName &&
+      !list[0].studentNumber &&
+      !list[0].contactNumber &&
+      !list[0].emailAddress
+    ) {
+      return []
+    }
+    return list
+  }, [saafDraft?.proponents])
+
   const draft: SaafDraft = useMemo(
     () => ({
       ...DEFAULT_SAAF_DRAFT,
@@ -98,12 +113,12 @@ export function useSaafForm() {
         saafDraft?.activityTitle ||
         eventName ||
         DEFAULT_SAAF_DRAFT.activityTitle,
-      proponents: saafDraft?.proponents ?? DEFAULT_SAAF_DRAFT.proponents,
+      proponents: draftProponents,
       budgetItems: saafDraft?.budgetItems ?? DEFAULT_SAAF_DRAFT.budgetItems,
       departmentValues:
         saafDraft?.departmentValues ?? DEFAULT_SAAF_DRAFT.departmentValues,
     }),
-    [saafDraft, eventName]
+    [saafDraft, eventName, draftProponents]
   )
 
   useScrollToTop()
@@ -207,23 +222,45 @@ export function useSaafForm() {
     []
   )
 
-  const handleAddProponent = useCallback(() => {
+  const handleAddProponent = useCallback((custom?: Proponent) => {
+    // Defend against click events or non-proponent objects being passed as custom proponent
+    const isProponent =
+      custom &&
+      typeof custom === "object" &&
+      !("nativeEvent" in custom) &&
+      !("target" in custom) &&
+      !("currentTarget" in custom) &&
+      ("firstName" in custom || "id" in custom)
+    const validCustom = isProponent ? custom : undefined
+
     const current = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
-    // Section 2 caps the application at MAX_PROPONENTS proponents; the button
-    // is hidden at the limit, so this guard also covers stale callers.
-    if (current.proponents.length >= MAX_PROPONENTS) return
     const today = new Date().toISOString().split("T")[0]
-    const newProponent = createEmptyProponent(String(Date.now()))
-    newProponent.dateOfSubmission = today
+
+    // Filter out any blank placeholder before checking capacity
+    const existing = (current.proponents ?? []).filter(
+      (p) => p.firstName || p.lastName || p.studentNumber || p.contactNumber
+    )
+    if (existing.length >= MAX_PROPONENTS) return
+
+    const newProponent = validCustom ?? createEmptyProponent(String(Date.now()))
+    if (!newProponent.dateOfSubmission) {
+      newProponent.dateOfSubmission = today
+    }
+    if (organizationDepartment) {
+      newProponent.department = organizationDepartment
+    }
 
     useOrgStore.getState().patchSaafDraft({
-      proponents: [...current.proponents, newProponent],
+      proponents: [...existing, newProponent],
+      departmentValues: {
+        ...current.departmentValues,
+        [newProponent.id]: organizationDepartment || newProponent.department,
+      },
     })
-  }, [])
+  }, [organizationDepartment])
 
   const handleRemoveProponent = useCallback((id: string) => {
     const current = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
-    if (current.proponents.length === 1) return
     useOrgStore.getState().patchSaafDraft({
       proponents: current.proponents.filter((p) => p.id !== id),
     })
@@ -415,15 +452,9 @@ export function useSaafForm() {
   )
 
   const handleClearForm = useCallback(() => {
-    const today = new Date().toISOString().split("T")[0]
     useOrgStore.getState().setSaafDraft({
       ...DEFAULT_SAAF_DRAFT,
-      proponents: [
-        {
-          ...createEmptyProponent("1"),
-          dateOfSubmission: today,
-        },
-      ],
+      proponents: [],
     })
     setShowErrors(false)
     setShowConfirmClearModal(false)

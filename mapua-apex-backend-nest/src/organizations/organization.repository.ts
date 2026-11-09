@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DynamoTable } from '../aws/dynamo-table.js';
-import { organizationKey, stripPrefix } from '../common/dynamo-keys.js';
+import { officerKey, organizationKey, stripPrefix } from '../common/dynamo-keys.js';
 import type { Item } from '../common/records.js';
+import type { CreateOfficerDto, UpdateOfficerDto } from './dto/officer.dto.js';
+
+const MAX_OFFICERS = 50;
 
 const DESK_ORDER = ['adviser', 'dean', 'osaar', 'cdm', 'admin'];
 
@@ -44,6 +47,7 @@ export class OrganizationRepository {
     desks: Desk[],
     skipDean: boolean,
     skipPostEval: boolean,
+    positionRoles?: string[],
   ): Promise<Item> {
     const id = randomUUID();
     const key = organizationKey(id);
@@ -55,6 +59,9 @@ export class OrganizationRepository {
       skip_post_eval: skipPostEval,
       signatories: orderDesks(desks),
     };
+    if (positionRoles && positionRoles.length > 0) {
+      item['position_roles'] = positionRoles;
+    }
     await this.table.put(item);
     return item;
   }
@@ -65,16 +72,30 @@ export class OrganizationRepository {
     desks: Desk[],
     skipDean: boolean,
     skipPostEval: boolean,
+    positionRoles?: string[],
   ): Promise<Item> {
+    const key = organizationKey(id);
+    const set: Record<string, unknown> = {
+      name,
+      skip_dean: skipDean,
+      skip_post_eval: skipPostEval,
+      signatories: orderDesks(desks),
+    };
+    if (positionRoles !== undefined) {
+      set['position_roles'] = positionRoles;
+    }
+    return this.table.update({
+      key: { PK: key, SK: key },
+      set,
+    });
+  }
+
+  /** Targeted patch: replaces only the position_roles attribute. */
+  patchRoles(id: string, positionRoles: string[]): Promise<Item> {
     const key = organizationKey(id);
     return this.table.update({
       key: { PK: key, SK: key },
-      set: {
-        name,
-        skip_dean: skipDean,
-        skip_post_eval: skipPostEval,
-        signatories: orderDesks(desks),
-      },
+      set: { position_roles: positionRoles },
     });
   }
 
@@ -102,6 +123,74 @@ export class OrganizationRepository {
       allPages: false,
     });
     return items.length > 0;
+  }
+
+  // ── Officer roster ──────────────────────────────────────────────────────────
+
+  async listOfficers(orgId: string): Promise<Item[]> {
+    return this.table.query({
+      keyCondition: 'PK = :pk AND begins_with(SK, :sk)',
+      values: { ':pk': organizationKey(orgId), ':sk': 'OFFICER#' },
+      allPages: true,
+    });
+  }
+
+  async createOfficer(orgId: string, dto: CreateOfficerDto): Promise<Item> {
+    // Enforce capacity: count existing officers first.
+    const existing = await this.listOfficers(orgId);
+    if (existing.length >= MAX_OFFICERS) {
+      throw new Error(
+        `Officer roster is full (maximum ${MAX_OFFICERS} officers).`,
+      );
+    }
+
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const item: Item = {
+      PK: organizationKey(orgId),
+      SK: officerKey(id),
+      first_name: dto.first_name,
+      last_name: dto.last_name,
+      student_number: dto.student_number,
+      program_and_year: dto.program_and_year,
+      position_of_applicant: dto.position_of_applicant,
+      contact_number: dto.contact_number,
+      email_address: dto.email_address,
+      facebook_link: dto.facebook_link,
+      created_at: now,
+      updated_at: now,
+    };
+    if (dto.middle_name) item['middle_name'] = dto.middle_name;
+    if (dto.suffix) item['suffix'] = dto.suffix;
+    if (dto.department) item['department'] = dto.department;
+    await this.table.put(item);
+    return item;
+  }
+
+  async updateOfficer(
+    orgId: string,
+    officerId: string,
+    dto: UpdateOfficerDto,
+  ): Promise<Item> {
+    const pk = organizationKey(orgId);
+    const sk = officerKey(officerId);
+    const set: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (dto.first_name !== undefined) set['first_name'] = dto.first_name;
+    if (dto.middle_name !== undefined) set['middle_name'] = dto.middle_name;
+    if (dto.last_name !== undefined) set['last_name'] = dto.last_name;
+    if (dto.suffix !== undefined) set['suffix'] = dto.suffix;
+    if (dto.student_number !== undefined) set['student_number'] = dto.student_number;
+    if (dto.program_and_year !== undefined) set['program_and_year'] = dto.program_and_year;
+    if (dto.department !== undefined) set['department'] = dto.department;
+    if (dto.position_of_applicant !== undefined) set['position_of_applicant'] = dto.position_of_applicant;
+    if (dto.contact_number !== undefined) set['contact_number'] = dto.contact_number;
+    if (dto.email_address !== undefined) set['email_address'] = dto.email_address;
+    if (dto.facebook_link !== undefined) set['facebook_link'] = dto.facebook_link;
+    return this.table.update({ key: { PK: pk, SK: sk }, set });
+  }
+
+  deleteOfficer(orgId: string, officerId: string): Promise<void> {
+    return this.table.delete(organizationKey(orgId), officerKey(officerId));
   }
 }
 

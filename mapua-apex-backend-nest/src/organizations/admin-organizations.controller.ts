@@ -39,6 +39,7 @@ export class AdminOrganizationsController {
       body.skip_dean,
       body.skip_post_eval,
       body.signatories,
+      body.position_roles,
     );
   }
 
@@ -66,6 +67,7 @@ export class AdminOrganizationsController {
       body.skip_dean,
       body.skip_post_eval,
       body.signatories,
+      body.position_roles,
     );
   }
 

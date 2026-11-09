@@ -34,6 +34,8 @@ export function DatePicker({
   modifiers,
   modifiersClassNames,
   legend,
+  disabledDates,
+  blockedDateReason,
 }: {
   value: string
   onChange: (value: string) => void
@@ -50,12 +52,16 @@ export function DatePicker({
   modifiers?: React.ComponentProps<typeof Calendar>["modifiers"]
   modifiersClassNames?: React.ComponentProps<typeof Calendar>["modifiersClassNames"]
   legend?: React.ReactNode
+  disabledDates?: (date: Date) => boolean
+  /** Explains a disabled calendar date on hover or keyboard focus. */
+  blockedDateReason?: (date: Date) => string | undefined
 }): ReactElement {
   const selected = value ? parseDateKey(value) : undefined
   const minimum =
     typeof minDate === "string" ? parseDateKey(minDate) : minDate
   const minDateKey = minimum ? getDateKey(minimum) : undefined
   const [open, setOpen] = useState(false)
+  const [blockedReason, setBlockedReason] = useState("")
   const [month, setMonth] = useState<Date>(
     () => selected ?? minimum ?? new Date()
   )
@@ -109,12 +115,18 @@ export function DatePicker({
               onMonthChange={setMonth}
               modifiers={modifiers}
               modifiersClassNames={modifiersClassNames}
+              onDayMouseEnter={(date) => setBlockedReason(blockedDateReason?.(date) ?? "")}
+              onDayFocus={(date) => setBlockedReason(blockedDateReason?.(date) ?? "")}
+              onDayMouseLeave={() => setBlockedReason("")}
               disabled={
-                minDateKey
-                  ? (date) => getDateKey(date) < minDateKey
+                minDateKey || disabledDates
+                  ? (date) =>
+                      (minDateKey ? getDateKey(date) < minDateKey : false) ||
+                      (disabledDates?.(date) ?? false)
                   : undefined
               }
             />
+            {blockedReason ? <p className="max-w-64 px-1 text-xs text-muted-foreground" role="status">{blockedReason}</p> : null}
           </div>
         </PopoverPopup>
       </Popover>

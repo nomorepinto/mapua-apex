@@ -136,6 +136,16 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "organization",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { StudentOrganizationPage } = await import(
+            "@/routes/students/organization"
+          )
+          return { Component: StudentOrganizationPage }
+        },
+      },
+      {
         path: "members",
         HydrateFallback: RouteFallback,
         lazy: async () => {
@@ -418,6 +428,14 @@ export const router = createBrowserRouter([
             lazy: async () => {
               const { AdminCampusPage } = await import("@/routes/osaar/campus")
               return { Component: AdminCampusPage }
+            },
+          },
+          {
+            path: "term",
+            HydrateFallback: RouteFallback,
+            lazy: async () => {
+              const { OsaarTermSettingsPage } = await import("@/routes/osaar/term-settings")
+              return { Component: OsaarTermSettingsPage }
             },
           },
         ],

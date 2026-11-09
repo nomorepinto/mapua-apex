@@ -30,6 +30,7 @@ export class ActivityLogService {
     organizationName: string;
     organizationId?: string;
     eventId?: string;
+    before?: unknown;
     after: unknown;
   }): Promise<void> {
     try {
@@ -72,6 +73,10 @@ export class ActivityLogService {
       };
       if (after && typeof after === 'object' && Object.keys(after).length > 0) {
         item.after = after;
+      }
+      const before = stripSecrets(input.before);
+      if (before && typeof before === 'object' && Object.keys(before).length > 0) {
+        item.before = before;
       }
       await this.table.put(item, undefined, this.config.activityLogTable());
     } catch (error) {

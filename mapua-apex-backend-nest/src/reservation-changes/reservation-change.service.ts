@@ -32,6 +32,9 @@ import {
 import { dependentIds } from '../submissions/routing.service.js';
 import { refsOf } from '../submissions/submission-writer.service.js';
 import { DynamoTable } from '../aws/dynamo-table.js';
+import { AppConfigService } from '../config/app-config.service.js';
+import { TermSettingsService } from '../term-settings/term-settings.service.js';
+import { assertTermDateAllowed } from '../term-settings/term-window.js';
 
 @Injectable()
 export class ReservationChangeService {
@@ -41,6 +44,8 @@ export class ReservationChangeService {
     private readonly bookings: BookingService,
     private readonly reservables: ReservableRepository,
     private readonly mail: MailService,
+    private readonly config: AppConfigService,
+    private readonly terms: TermSettingsService,
   ) {}
 
   async request(
@@ -354,6 +359,8 @@ export class ReservationChangeService {
     );
     const campusId = str(change, 'campus_id') ?? '';
     const organizationId = str(change, 'organization_id') ?? '';
+    const term = await this.terms.get();
+    const lockoutDays = this.config.osaarTermLockoutDays();
     const newRefs: { pk: string; sk: string }[] = [];
     const reservations: Item[] = [];
     const selections: Selection[] = [];
@@ -375,6 +382,9 @@ export class ReservationChangeService {
           422,
           'Select at least one date and time slot for each changed hold.',
         );
+      }
+      for (const selection of next) {
+        assertTermDateAllowed(selection.date, term, lockoutDays);
       }
       if (action === 'update') {
         const reservableId = str(hold, 'reservable_id') ?? '';

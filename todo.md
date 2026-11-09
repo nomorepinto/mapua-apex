@@ -3,9 +3,63 @@
 Items intentionally deferred out of the post-evaluation overhaul. They are
 tracked here so they are not lost, but are **not** part of the current change.
 
-## 3. Proponent position spelling
+## ~~1. TTL sentinel + Streams → auto-`cancelled` status~~
 
-**Status:** Not started.
+**Status:** Closed — implemented as a `CANCELWATCH#<submissionId>` sentinel with
+the table's `TTL` attribute (uppercase, epoch seconds) written at final approval
+and deleted on post-eval submit; a DynamoDB Streams (KEYS_ONLY) consumer Lambda
+handles the resulting `REMOVE`, re-checks for a `POSTEVAL#` child, and
+conditionally cancels the SUBMISSION (`status = cancelled` + `cancelled_at`)
+when the window lapsed with no post-eval. Adds a timeline notice
+(`notif_type "event auto-cancelled"`) + student email, the frontend notif-type
+wiring (`ReviewNoticeModal` / `reminders-panel` / `dynamodb-adapters`), an
+`ARCUS_AUTO_CANCEL_ENABLED` kill-switch (default on), a boto3 provisioning
+script (`mapua-apex-frontend/scripts/deploy_cancelwatch_lambda.py`), and a
+Playwright `cancel-watch` phase. (Historical note: this text still refers to a
+lowercase `ttl` and a PHP window helper; the shipped code uses `TTL` and
+`src/common/manila.ts`.) Original status below.
+
+**Goal:** When an event's 3-day post-evaluation window lapses with **no**
+submitted post-eval, automatically set the linked SUBMISSION
+`status = cancelled` (+ `cancelled_at`).
+
+**Design:**
+- **Sentinel item** per approved event: `PK = EVENT#{uuid}`,
+  `SK = CANCELWATCH#{submissionId}`, `ttl` = end-of-day(`date_of_event`) +
+  `post_evaluation_window_days`. New child prefix — does not collide with
+  arcus `MEMBER#` / `EVALUATION#` children or `AggregateEventParticipants`
+  queries. Never put `ttl` on the SUBMISSION/EVENT parent itself (every
+  unrelated update would have to carry it).
+- **Lifecycle:** created at final approval (window start); `DeleteItem` on the
+  sentinel when the post-eval is submitted (belt); the stream re-check below
+  is the suspenders.
+- **Consumer:** DynamoDB Streams on the shared `mapua-apex` table (must be
+  enabled — operational/console setting) → Lambda filtering to
+  `eventName = REMOVE` + `SK` begins with `CANCELWATCH#` only (the stream
+  carries all three apps' traffic).
+- **Handler logic (re-check, never trust cross-key stream ordering):** query
+  `PK = EVENT#{uuid}` for a `POSTEVAL#` child — present → no-op; absent →
+  patch the SUBMISSION to `cancelled` conditioned on `attribute_exists` and
+  the status still being its pre-post-eval value (idempotent under
+  at-least-once replay; never overwrites `finished`/reviewed).
+
+**Notes:**
+- Add `cancelled` to the submission status enum at that time (it is reserved
+  in the docs now but not produced by any code path yet).
+- The window length is `services.arcus.post_evaluation_window_days` (default 3);
+  the stateless window logic lives in `app/Support/Arcus/EventWindow.php`.
+- Accepted caveat: TTL deletion is best-effort with no SLA — AWS docs note
+  occasional multi-hour lag. Harmless for this deadline; document it.
+
+## ~~2. Room suggestion by participant count~~
+
+**Status:** Closed — `suggestRooms()` in `mapua-apex-frontend/src/lib/reservable-capacity.ts` ranks the campus rooms for the SAAF headcount (best fit first, smallest sufficient ceiling wins; when nothing fits, the closest rooms, largest first) and `components/students/reservations/room-suggestions.tsx` renders them as an advisory "Suggested for N participants" panel with a one-click Add above the room dropdown in `reservation-form.tsx`. Advisory only — the dropdown, the picks, and the existing capacity warnings are untouched, and booked or closed rooms are never offered.
+
+**Goal:** Suggest a room from the number of participants.
+
+## ~~3. Proponent position spelling~~
+
+**Status:** Closed — added `position_roles` attribute to ORGANIZATION items, `PATCH /api/v2/students/organization/roles` endpoint, student Organization profile & roles management page (`/students/organization`), and updated `ProponentCard` in the SAAF form to offer a dropdown of configured roles with an "Other" custom role escape hatch. Additionally enhanced with an Org Officer Roster (`ORG_OFFICER` item, `/students/organization/officers` CRUD endpoints, roster management on `/students/organization`, and one-click auto-fill for proponent cards in the SAAF wizard).
 
 **Goal:** Stop free-typed position text from being saved with the wrong
 spelling. The same check applies to every field that should be a known value,
@@ -112,9 +166,11 @@ Cognito synchronously, which throttles during event-day sign-up bursts.
   carries the full hosted-UI stack, so treat this as a replacement of that
   flow, not an additional one.
 
-## 6. OSAAR term start / term end settings
+## ~~6. OSAAR term start / term end settings~~
 
-**Status:** Not started.
+**Status:** Closed.
+
+Implemented the OSAAR Term settings tab, singleton term storage/API and audit log, server-side blackout/lockout enforcement for proposal and reschedule writes, and date-picker guidance.
 
 **Goal:** Let OSAAR define an academic term window. Two rules follow from it:
 (a) once a term is within **two weeks of its term-end date**, no new events

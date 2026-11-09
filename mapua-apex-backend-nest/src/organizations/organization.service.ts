@@ -11,6 +11,7 @@ import { organizationKey, stripPrefix } from '../common/dynamo-keys.js';
 import { str, type Item } from '../common/records.js';
 import { SignatoryRepository } from '../signatories/signatory.repository.js';
 import type { DeskDto } from './dto/organization.dto.js';
+import type { CreateOfficerDto, UpdateOfficerDto } from './dto/officer.dto.js';
 import {
   desksOf,
   OrganizationRepository,
@@ -24,11 +25,29 @@ export interface OrganizationView {
   skip_dean: boolean;
   skip_post_eval: boolean;
   signatories: Desk[];
+  position_roles: string[];
 }
 
 export interface OrganizationDirectoryEntry {
   organization_id: string;
   name: string;
+}
+
+export interface OfficerView {
+  officer_id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
+  suffix: string | null;
+  student_number: string;
+  program_and_year: string;
+  department: string | null;
+  position_of_applicant: string;
+  contact_number: string;
+  email_address: string;
+  facebook_link: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 @Injectable()
@@ -74,6 +93,7 @@ export class OrganizationService {
     skipDean: boolean | undefined,
     skipPostEval: boolean | undefined,
     desks: DeskDto[] | undefined,
+    positionRoles?: string[],
   ): Promise<OrganizationView> {
     const ordered = await this.checkedDesks(desks ?? []);
     const item = await this.organizations.create(
@@ -81,6 +101,7 @@ export class OrganizationService {
       ordered,
       skipDean === true,
       skipPostEval === true,
+      positionRoles,
     );
     return this.toView(item, null);
   }
@@ -91,6 +112,7 @@ export class OrganizationService {
     skipDean: boolean | undefined,
     skipPostEval: boolean | undefined,
     desks: DeskDto[],
+    positionRoles?: string[],
   ): Promise<OrganizationView> {
     const existing = await this.organizations.get(id);
     if (!existing) {
@@ -109,8 +131,21 @@ export class OrganizationService {
       ordered,
       keepSkipDean,
       keepSkipPostEval,
+      positionRoles,
     );
     return this.toView({ ...existing, ...item }, null);
+  }
+
+  async patchRoles(
+    organizationId: string,
+    roles: string[],
+  ): Promise<OrganizationView> {
+    const existing = await this.organizations.get(organizationId);
+    if (!existing) {
+      throw new NotFoundException('Organization not found.');
+    }
+    await this.organizations.patchRoles(organizationId, roles);
+    return this.showForStudent(organizationId);
   }
 
   async remove(id: string): Promise<void> {
@@ -151,6 +186,83 @@ export class OrganizationService {
     }
     const bare = stripPrefix(id, 'ORGANIZATION#') ?? id;
     return this.accounts.assignOrganization(bare, username, callerSub);
+  }
+
+  // ── Officer roster ──────────────────────────────────────────────────────────
+
+  async listOfficers(organizationId: string): Promise<OfficerView[]> {
+    const existing = await this.organizations.get(organizationId);
+    if (!existing) {
+      throw new NotFoundException('Organization not found.');
+    }
+    const items = await this.organizations.listOfficers(organizationId);
+    return items.map((item) => this.toOfficerView(item));
+  }
+
+  async createOfficer(
+    organizationId: string,
+    dto: CreateOfficerDto,
+  ): Promise<OfficerView> {
+    const existing = await this.organizations.get(organizationId);
+    if (!existing) {
+      throw new NotFoundException('Organization not found.');
+    }
+    try {
+      const item = await this.organizations.createOfficer(organizationId, dto);
+      return this.toOfficerView(item);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Officer roster is full')) {
+        abort(422, error.message);
+      }
+      throw error;
+    }
+  }
+
+  async updateOfficer(
+    organizationId: string,
+    officerId: string,
+    dto: UpdateOfficerDto,
+  ): Promise<OfficerView> {
+    const existing = await this.organizations.get(organizationId);
+    if (!existing) {
+      throw new NotFoundException('Organization not found.');
+    }
+    const item = await this.organizations.updateOfficer(
+      organizationId,
+      officerId,
+      dto,
+    );
+    return this.toOfficerView(item);
+  }
+
+  async deleteOfficer(
+    organizationId: string,
+    officerId: string,
+  ): Promise<void> {
+    const existing = await this.organizations.get(organizationId);
+    if (!existing) {
+      throw new NotFoundException('Organization not found.');
+    }
+    await this.organizations.deleteOfficer(organizationId, officerId);
+  }
+
+  private toOfficerView(item: Item): OfficerView {
+    return {
+      officer_id: stripPrefix(item.SK, 'OFFICER#') ?? String(item.SK ?? ''),
+      first_name: str(item, 'first_name') ?? '',
+      middle_name: str(item, 'middle_name'),
+      last_name: str(item, 'last_name') ?? '',
+      suffix: str(item, 'suffix'),
+      student_number: str(item, 'student_number') ?? '',
+      program_and_year: str(item, 'program_and_year') ?? '',
+      department: str(item, 'department'),
+      position_of_applicant: str(item, 'position_of_applicant') ?? '',
+      contact_number: str(item, 'contact_number') ?? '',
+      email_address: str(item, 'email_address') ?? '',
+      facebook_link: str(item, 'facebook_link') ?? '',
+      created_at: str(item, 'created_at'),
+      updated_at: str(item, 'updated_at'),
+    };
   }
 
   private async bestEffort(
@@ -222,6 +334,10 @@ export class OrganizationService {
   }
 
   private toView(item: Item, department: string | null): OrganizationView {
+    const rolesRaw = item.position_roles;
+    const position_roles = Array.isArray(rolesRaw)
+      ? rolesRaw.filter((r): r is string => typeof r === 'string')
+      : [];
     return {
       organization_id:
         stripPrefix(item.PK, 'ORGANIZATION#') ??
@@ -232,6 +348,7 @@ export class OrganizationService {
       skip_dean: item.skip_dean === true,
       skip_post_eval: item.skip_post_eval === true,
       signatories: desksOf(item),
+      position_roles,
     };
   }
 }

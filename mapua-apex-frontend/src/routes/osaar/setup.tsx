@@ -1,4 +1,4 @@
-import { Building2Icon, ListOrderedIcon, MapPinIcon, StampIcon } from "lucide-react"
+import { Building2Icon, CalendarDaysIcon, ListOrderedIcon, MapPinIcon, StampIcon } from "lucide-react"
 import { Outlet, useLocation, useNavigate } from "react-router"
 
 import {
@@ -14,6 +14,7 @@ type SetupSection =
   | "signatories"
   | "approval-stages"
   | "campuses"
+  | "term"
 
 const SECTION_ITEMS: SegmentedItem<SetupSection>[] = [
   { value: "organizations", label: "Organizations", icon: Building2Icon },
@@ -24,6 +25,7 @@ const SECTION_ITEMS: SegmentedItem<SetupSection>[] = [
     icon: ListOrderedIcon,
   },
   { value: "campuses", label: "Campuses", icon: MapPinIcon },
+  { value: "term", label: "Academic calendar", icon: CalendarDaysIcon },
 ]
 
 function resolveSection(pathname: string): SetupSection {

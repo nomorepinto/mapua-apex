@@ -6,6 +6,7 @@ SK: ORGANIZATION#uuid
 name: string
 skip_dean: boolean (default false)
 skip_post_eval: boolean (default false)
+position_roles: string[] (optional, default [])
 signatories: [
   { role: "adviser", signatory_id: "adv001" },
   { role: "dean",     signatory_id: "dean001" }
@@ -17,6 +18,9 @@ Not stored on SIGNATORY. Approval routing uses org desks for adviser
 and dean. If skip_dean is true, Dean is skipped; Adviser still
 reviews first. skip_post_eval is independent: when true, the organization
 cannot file a post-evaluation. It does not change the approval chain.
+position_roles stores custom position titles (e.g. ["President", "Vice President"])
+configured by the organization via PATCH /api/v2/students/organization/roles
+and surfaced as dropdown options in the SAAF proponent position field.
 CDM is campus-wide: the single SIGNATORY whose role is cdm (GSI4
 ROLE#CDM). OSAAR stages are the OSAAR signatories whose campus_id
 matches the plan's campus, in osaar_order, then the one signatory with
@@ -56,6 +60,33 @@ PK=ORGANIZATION#{org}, SK=MEMBER#{studentId}) to decide whether a scanned
 student may check in to that org's event. It is distinct from the arcus STUDENT
 profile (arcus-owned identity, see ATTENDANCE CHECK-IN below) and replaces the
 deprecated arcus-written ORGANIZATION + MEMBER join rows noted there.
+
+ORG OFFICER (officer roster)
+PK: ORGANIZATION#uuid
+SK: OFFICER#uuid
+first_name: string
+middle_name: string (optional)
+last_name: string
+suffix: string (optional)
+student_number: string
+program_and_year: string (e.g. "BSCS - 3rd Year")
+department: string (optional; org department used at SAAF time when absent)
+position_of_applicant: string (should match a position_roles entry if configured)
+contact_number: string (11-digit PH mobile, starts with 09)
+email_address: string
+facebook_link: string
+created_at: ISO-8601 timestamp
+updated_at: ISO-8601 timestamp
+
+Stored under the same PK partition as the ORGANIZATION item.
+Distinct from ORGANIZATION MEMBER (MEMBER# prefix) — Members are the
+attendance gate for Arcus; Officers are the proponent contact-detail
+roster used for SAAF proposal auto-fill.
+Queried by: PK = ORGANIZATION#uuid, begins_with(SK, "OFFICER#").
+Capacity limited to 50 officers per org (enforced server-side).
+Managed via /api/v2/students/organization/officers (GET, POST, PATCH, DELETE).
+Deleting an officer does not affect submitted SAAF proponent data — submission
+items are immutable after submit.
 
 EVENT
 PK: EVENT#uuid
@@ -1259,3 +1290,26 @@ json
   "revocation_reason": null,
   "TTL": 1736222400
 }
+
+TERM SETTINGS (singleton)
+  PK: OSAAR#TERM
+  SK: OSAAR#TERM
+  active_academic_year_id: string
+  academic_years: [{
+    id: string
+    label: string
+    terms: [{
+      id: string
+      label: string                 (for example, "Quarter 1")
+      start: "YYYY-MM-DD"
+      end: "YYYY-MM-DD"
+      blackouts: [{ start: "YYYY-MM-DD", end: "YYYY-MM-DD", reason: string }]
+    }]
+  }]
+  updated_at: timestamp
+  updated_by: Cognito subject
+
+There is one term-settings record and no GSI. Proposal, booking, and
+rescheduling validators use a direct GetItem to find the matching term in the
+active academic year, apply its inclusive blackout ranges and its configurable
+pre-term-end lockout, and reject dates outside that calendar.
