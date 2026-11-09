@@ -1,13 +1,13 @@
 # NestJS Backend Agent Guidelines
 
-These rules apply to `mapua-apex-backend-nest`. Also follow the root `AGENTS.md` (cross-system changes, reuse before rebuilding, `todo.md`, documentation sync, boto3 scripts). When a change also touches the Laravel backend or the frontend, read that sub-project's `AGENTS.md` too.
+These rules apply to `mapua-apex-backend-nest`. Also follow the root `AGENTS.md` (cross-system changes, reuse before rebuilding, `docs/todo.md`, documentation sync, boto3 scripts). When a change also touches the Laravel backend or the frontend, read that sub-project's `AGENTS.md` too.
 
 ## Foundational Context
 
 - This is a NestJS 12 application on TypeScript 6, running as **native ESM** (`"type": "module"`, `module`/`moduleResolution: nodenext`). Tests use **Vitest** (not Jest), linting uses **oxlint**, and formatting uses **Prettier**.
 - Use the APIs that match the installed major version of each package. Do not assume a version. Check `package.json` (or `npm ls <package>`) before relying on a package's API.
 - Activate the `nestjs-best-practices` skill whenever you write, review, or refactor code in this project. Rule IDs below (for example `arch-feature-modules`) refer to files in that skill's `rules/` folder. Read the matching rule file when a step applies.
-- Data lives in **DynamoDB** (see `DynamoDB Schema.txt` at the repository root) and callers authenticate with **Cognito JWTs**. The HTTP contract is documented in `API_ROUTES.md` at the repository root.
+- Data lives in **DynamoDB** (see `docs/DynamoDB Schema.txt`) and callers authenticate with **Cognito JWTs**. The HTTP contract is documented in `docs/routes/API_ROUTES.md`.
 
 ## Conventions
 
@@ -34,7 +34,7 @@ Do these steps in order. Do not write code until steps 1–3 are done.
 
 ### 1. Understand the contract and the data
 
-- [ ] Read the relevant sections of `API_ROUTES.md` and `DynamoDB Schema.txt`. Write down the exact route, method, request body, response body, status codes, and the DynamoDB keys and access patterns that the feature uses.
+- [ ] Read the relevant sections of `docs/routes/API_ROUTES.md` and `docs/DynamoDB Schema.txt`. Write down the exact route, method, request body, response body, status codes, and the DynamoDB keys and access patterns that the feature uses.
 - [ ] If the feature changes the HTTP contract and the frontend must change too (or the reverse), **stop and consult the user** before you edit the other system (root `AGENTS.md`, "Cross-System Changes").
 - [ ] If an equivalent endpoint already exists in `mapua-apex-backend` (Laravel), read its controller, request validation, and resource. Keep the paths, payload shapes, status codes, and error behavior the same unless the user approves a change.
 
@@ -86,7 +86,7 @@ Do these steps in order. Do not write code until steps 1–3 are done.
 - [ ] **Design for the documented access patterns** (`perf-optimize-database`). Use `Query` on a partition key or GSI. Never use `Scan` on a request path unless the schema doc says that pattern is a scan. Use projection expressions so you read only the attributes you need.
 - [ ] **Avoid N+1 reads** (`db-avoid-n-plus-one`). Use `BatchGetItem` or one `Query`, not a `GetItem` inside a loop.
 - [ ] **Make multi-item writes atomic** (`db-use-transactions`). When several items must change together, use `TransactWriteItems` with condition expressions. Use conditional writes to prevent lost updates.
-- [ ] **Treat schema changes as migrations** (`db-use-migrations`). A new table, GSI, or key format is a schema change. Update `DynamoDB Schema.txt`, and if existing items need backfilling, write the backfill as a reviewed script (boto3 scripts go in `mapua-apex-frontend/scripts/`, as the root `AGENTS.md` says). Never mutate data ad hoc.
+- [ ] **Treat schema changes as migrations** (`db-use-migrations`). A new table, GSI, or key format is a schema change. Update `docs/DynamoDB Schema.txt`, and if existing items need backfilling, write the backfill as a reviewed script (boto3 scripts go in `mapua-apex-frontend/scripts/`, as the root `AGENTS.md` says). Never mutate data ad hoc.
 - [ ] **Cache only when it is clearly worth it** (`perf-use-caching`). Cache expensive or external lookups with explicit TTLs and cache keys that include every input (and a version when thresholds can change).
 - [ ] **Do async setup in lifecycle hooks** (`perf-async-hooks`). Warm clients in `onModuleInit` or `onApplicationBootstrap`, not in constructors. Lazy-load rarely used heavy modules (`perf-lazy-loading`) only when startup time matters.
 
@@ -115,9 +115,9 @@ Do these steps in order. Do not write code until steps 1–3 are done.
 
 ### 12. Sync the docs and close out
 
-- [ ] Update `API_ROUTES.md` and `DynamoDB Schema.txt` if the contract or data model changed (see "API Documentation & Schema Sync" below).
+- [ ] Update `docs/routes/API_ROUTES.md` and `docs/DynamoDB Schema.txt` if the contract or data model changed (see "API Documentation & Schema Sync" below).
 - [ ] After a major change, check `docs/erd/` against the code and fix anything that is no longer accurate (root `AGENTS.md`).
-- [ ] If the work matches an item in `todo.md` at the repository root, update that item (root `AGENTS.md`, "Todo List").
+- [ ] If the work matches an item in `docs/todo.md`, update that item (root `AGENTS.md`, "Todo List").
 
 ## Running Commands
 
@@ -126,5 +126,5 @@ Do these steps in order. Do not write code until steps 1–3 are done.
 
 ## API Documentation & Schema Sync
 
-- Whenever you change the API (add, remove, or modify a route, controller, request or response shape, status code, or any other part of the API contract), update both **`API_ROUTES.md`** and **`DynamoDB Schema.txt`** (at the repository root) in the same change, so they stay in sync with the code.
+- Whenever you change the API (add, remove, or modify a route, controller, request or response shape, status code, or any other part of the API contract), update both **`docs/routes/API_ROUTES.md`** and **`docs/DynamoDB Schema.txt`** in the same change, so they stay in sync with the code.
 - This applies even when the change was driven by frontend work. Treat the docs and schema update as part of finishing the API change, not as a separate task.

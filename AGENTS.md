@@ -14,14 +14,14 @@ These rules apply across the entire repository (both `mapua-apex-frontend` and `
 
 ## Todo List
 
-- **A finished task that matches `todo.md` must be recorded there in the same change.** After you complete work, check `todo.md` at the repository root. If an item is what you just finished, update it before you stop.
+- **A finished task that matches `todo.md` must be recorded there in the same change.** After you complete work, check `docs/todo.md`. If an item is what you just finished, update it before you stop.
 - Strike through the heading (`## ~~N. Title~~`) and set **Status** to **Closed**, with one line on what was done. Leave the original goal and notes in place.
 - If the work only finishes part of an item, leave the heading as it is. Update **Status** to say what is done and what is still open.
 - Do not add, renumber, or close items the current task did not accomplish.
 
 ## Documentation Sync
 
-- **API routes edited → update the API contract docs.** Whenever you change an API route, controller, request/response shape, status code, or backend data model, update both `API_ROUTES.md` and `DynamoDB Schema.txt` (at the repository root) in the same change. Do not leave them describing the pre-change behavior.
+- **API routes edited → update the API contract docs.** Whenever you change an API route, controller, request/response shape, status code, or backend data model, update both `docs/routes/API_ROUTES.md` and `docs/DynamoDB Schema.txt` in the same change. Do not leave them describing the pre-change behavior.
 - **Major change → verify the `docs/` files first, then fix if inaccurate.** After a significant change, check the reference documents under `docs/` (e.g. `docs/erd/objects.md`, `docs/erd/access-patterns.md`, `docs/erd/erd.mmd` and its generated `mapua-apex-data-model.pdf`) against the current code and data model. If they are still accurate, leave them. If they are inaccurate, update them to match reality (and rebuild the PDF via `docs/erd/build_pdf.py` when the ERD changed).
 
 ## E2E Suite

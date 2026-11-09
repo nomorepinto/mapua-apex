@@ -2,7 +2,7 @@
 
 Source: client interview notes relayed by Ryan (Nov 6, 2026). Every raw note is
 grouped below by the **frontend route** that owns the surface to change, per
-[`FRONTEND_ROUTES.md`](FRONTEND_ROUTES.md). A change that needs backend or
+[`FRONTEND_ROUTES.md`](routes/FRONTEND_ROUTES.md). A change that needs backend or
 DynamoDB work is marked **[backend]** and also lists its frontend display
 surface, since the route table above is frontend-only.
 
@@ -16,11 +16,11 @@ implement around an assumption without checking one of these first.**
 
 ## `/students/submissions/saaf` — SAAF wizard
 
-Pages: [`src/routes/students/saaf.tsx`](mapua-apex-frontend/src/routes/students/saaf.tsx)
+Pages: [`src/routes/students/saaf.tsx`](../mapua-apex-frontend/src/routes/students/saaf.tsx)
 + the sections in
-[`src/components/submission/`](mapua-apex-frontend/src/components/submission/)
+[`src/components/submission/`](../mapua-apex-frontend/src/components/submission/)
 rendered by
-[`src/components/students/saaf/saaf-steps.tsx`](mapua-apex-frontend/src/components/students/saaf/saaf-steps.tsx).
+[`src/components/students/saaf/saaf-steps.tsx`](../mapua-apex-frontend/src/components/students/saaf/saaf-steps.tsx).
 
 ### S-1. Terms & Conditions gate replaces the pre-submit instructions **[frontend + backend]**
 Raw notes: *"instructions before submit forms"* · *"tick box na lahat ng disclaimers
@@ -28,9 +28,9 @@ before everything dapat understand niya"* · *"replace instructions with terms a
 conditions, add average turn around time"* · *"terms and conditions update"* ·
 *"add minor major to terms and conditions"*.
 
-- Replace the current instructions surface ([`how-it-works.tsx`](mapua-apex-frontend/src/components/submission/how-it-works.tsx),
+- Replace the current instructions surface ([`how-it-works.tsx`](../mapua-apex-frontend/src/components/submission/how-it-works.tsx),
   opened from the Guide dialog in
-  [`submission-guide.tsx`](mapua-apex-frontend/src/components/students/submissions/submission-guide.tsx))
+  [`submission-guide.tsx`](../mapua-apex-frontend/src/components/students/submissions/submission-guide.tsx))
   with a **Terms & Conditions** block shown before submission.
 - The T&C must state the **average turnaround time (2–3 working days)** and the
   filing window (**7:00 AM – 3:00 PM**, confirmed).
@@ -40,9 +40,9 @@ conditions, add average turn around time"* · *"terms and conditions update"* ·
   field. Exact criteria wording to be supplied by the client.
 - Every disclaimer is an **explicit tick-to-acknowledge** item; Submit stays
   disabled until all boxes are checked (i.e. add the acknowledgment flags to
-  [`validate-saaf-step.ts`](mapua-apex-frontend/src/components/submission/validate-saaf-step.ts)
+  [`validate-saaf-step.ts`](../mapua-apex-frontend/src/components/submission/validate-saaf-step.ts)
   and to the `formComplete` gate in
-  [`saaf-context.tsx`](mapua-apex-frontend/src/components/students/saaf/saaf-context.tsx)).
+  [`saaf-context.tsx`](../mapua-apex-frontend/src/components/students/saaf/saaf-context.tsx)).
 - The T&C text itself has to be stored versioned per submission so "the student
   agreed to version X on date Y" is provable **[backend]**.
 
@@ -52,7 +52,7 @@ curricular / co curricular"* · *"dapat kasama if selling activity siya"* ·
 *"fund raising/charity activity"* · *"add booth option selling activity to saaf 4"* ·
 *"add fundraising option to saaf 4"*.
 
-- [`activity-classification-section.tsx`](mapua-apex-frontend/src/components/submission/activity-classification-section.tsx)
+- [`activity-classification-section.tsx`](../mapua-apex-frontend/src/components/submission/activity-classification-section.tsx)
   currently offers exactly two radios (`co-curricular` / `extra-curricular`) in a
   **single-select**. Add the missing natures as **additional, tickable** values:
   - **Selling activity** (booth / concession);
@@ -61,7 +61,7 @@ curricular / co curricular"* · *"dapat kasama if selling activity siya"* ·
   stops being one radio group: keep co/extra-curricular as the classification and
   add a separate multi-select "nature of activity" (selling / fundraising /
   none). Persist the new fields in
-  [`dynamodb-adapters.ts` `buildSaafApiPayload`](mapua-apex-frontend/src/lib/dynamodb-adapters.ts)
+  [`dynamodb-adapters.ts` `buildSaafApiPayload`](../mapua-apex-frontend/src/lib/dynamodb-adapters.ts)
   (currently hardcodes `activity_type: saafDraft.activityType || "extra-curricular"`)
   **[backend]** — the SUBMISSION item needs the extra attributes and the enum
   must accept them.
@@ -74,16 +74,16 @@ note ito or warning"* · *"bill add rental charges for booth"*.
 
 - When the activity involves a **booth / concessionaire setup**, show a
   warning/note that a **rental charge applies**, in
-  [`activity-details-section.tsx`](mapua-apex-frontend/src/components/submission/activity-details-section.tsx)
+  [`activity-details-section.tsx`](../mapua-apex-frontend/src/components/submission/activity-details-section.tsx)
   (the step-4 "Activity" panel) and again in
-  [`budget-proposal-section.tsx`](mapua-apex-frontend/src/components/submission/budget-proposal-section.tsx).
+  [`budget-proposal-section.tsx`](../mapua-apex-frontend/src/components/submission/budget-proposal-section.tsx).
 - Add a predefined budget line item (or an "Add rental charge" quick-add button)
   for the booth/concession rental so it cannot be forgotten in the bill.
 - **Ask the client how the rental / non-Mapúa payments actually work** — rate,
   who collects, and how it is settled (see **Still open**, Q-A). The form should
   flag the charge and record it, but the amount/payee logic is not yet specified.
   Concessionaires already exist as a funding source
-  ([`funding-sources.ts`](mapua-apex-frontend/src/constants/funding-sources.ts))
+  ([`funding-sources.ts`](../mapua-apex-frontend/src/constants/funding-sources.ts))
   — reuse that vocabulary rather than adding a second term.
 
 ### S-4. Turnaround-time (TAT) printed on the form — T&C text only **[frontend]**
@@ -104,7 +104,7 @@ Raw notes: *"dapat nakalagay whether off or on campus ang event"* · *"skip ang
 cdmo kapag off campus kasi wala na sa scope nila"* · *"on campus, off campus"*.
 
 - Add a required **Location: On-campus / Off-campus** choice to the Activity
-  step ([`activity-details-section.tsx`](mapua-apex-frontend/src/components/submission/activity-details-section.tsx))
+  step ([`activity-details-section.tsx`](../mapua-apex-frontend/src/components/submission/activity-details-section.tsx))
   and persist it on the SUBMISSION **[backend]**.
 - **Off-campus** must:
   - hide/skip the Reservation step's room holds and the CDM (CDMO) desk in the
@@ -112,7 +112,7 @@ cdmo kapag off campus kasi wala na sa scope nila"* · *"on campus, off campus"*.
     not from a hardcoded role list;
   - still be reviewable by OSAAR/adviser/dean.
 - The chain-skipping itself is **[backend]** (stage selection at submission
-  creation, [`approval-stages`](mapua-apex-frontend/src/routes/osaar/approval-stages.tsx)
+  creation, [`approval-stages`](../mapua-apex-frontend/src/routes/osaar/approval-stages.tsx)
   only orders the OSAAR stages today). Frontend: the tracker/timeline must not
   render a CDM desk that was never entered (see D-1, R-2).
 
@@ -121,21 +121,21 @@ Raw note: *"event participants should mapuan or non mapuan, payment req for non
 Mapuan"*.
 
 - Split the headcount in the Classification step
-  ([`activity-classification-section.tsx`](mapua-apex-frontend/src/components/submission/activity-classification-section.tsx),
+  ([`activity-classification-section.tsx`](../mapua-apex-frontend/src/components/submission/activity-classification-section.tsx),
   currently one `totalOrgMembers` field with a 30–3000 bound) into **Mapúa** and
   **non-Mapúa** participant counts.
 - When **non-Mapúa** participants > 0, show the note that a **payment requirement
   applies** to them. Amount/payee not yet specified — **ask the client how the
   payment works** (see **Still open**, Q-A).
 - Persist both counts + the flag **[backend]**; the room-suggestion capacity
-  ([`reservable-capacity.ts`](mapua-apex-frontend/src/lib/reservable-capacity.ts))
+  ([`reservable-capacity.ts`](../mapua-apex-frontend/src/lib/reservable-capacity.ts))
   should keep reading the **total**.
 
 ### S-7. Campus added to proponent details **[frontend + backend]**
 Raw note: *"add campus to proponent details"*.
 
 - Add a **Campus** field to
-  [`proponent-card.tsx`](mapua-apex-frontend/src/components/submission/proponent-card.tsx)
+  [`proponent-card.tsx`](../mapua-apex-frontend/src/components/submission/proponent-card.tsx)
   (proponents already carry `department` via `departmentValues`), populated from
   the campus master data maintained at `/osaar/setup/campuses`.
 - Store per proponent **[backend]** (`proponents[]` entries in
@@ -146,11 +146,11 @@ Raw notes: *"equipment should be room specific"* · *"outside equipment, drone,
 cars, etc add options for reserving events"* · *"checkboxes: add warning for
 bringing equipment"*.
 
-- In the Reservation step ([`reservation-form.tsx`](mapua-apex-frontend/src/components/students/reservations/reservation-form.tsx)),
+- In the Reservation step ([`reservation-form.tsx`](../mapua-apex-frontend/src/components/students/reservations/reservation-form.tsx)),
   the equipment pick must be **filtered by the room(s) already selected** — the
   equipment list has to be attached to rooms on the reservable model **[backend]**
   (today a reservable is only `room` | `equipment`, see
-  [`types.ts` `ReservableType`](mapua-apex-frontend/src/lib/types.ts) — there is
+  [`types.ts` `ReservableType`](../mapua-apex-frontend/src/lib/types.ts) — there is
   no room↔equipment relation).
 - Add an **"outside / non-reservable equipment"** free-list option (drones, cars,
   audio rigs brought in by the org, etc.) as its own reservation sub-section, so
@@ -164,7 +164,7 @@ Raw note: *"is classroom check should appear before setting other properties"*.
 
 - In the Reservation step, the **room-vs-classroom** determination (the
   `is_classroom` / classroom-name-format branch, cf.
-  [`types.ts`](mapua-apex-frontend/src/lib/types.ts) `classroom_name_prefixes`,
+  [`types.ts`](../mapua-apex-frontend/src/lib/types.ts) `classroom_name_prefixes`,
   `classroom_name_digits`, `is_classroom`) currently sits with the rest of the
   room properties. Move it **upstream**: pick the room kind first, then reveal
   the properties that only apply to that kind (classroom code format vs. function
@@ -174,8 +174,8 @@ Raw note: *"is classroom check should appear before setting other properties"*.
 
 ## `/students/dashboard` — student org dashboard
 
-Pages: [`src/routes/students/dashboard.tsx`](mapua-apex-frontend/src/routes/students/dashboard.tsx),
-[`SubmissionTrackerModal.tsx`](mapua-apex-frontend/src/components/org/SubmissionTrackerModal.tsx).
+Pages: [`src/routes/students/dashboard.tsx`](../mapua-apex-frontend/src/routes/students/dashboard.tsx),
+[`SubmissionTrackerModal.tsx`](../mapua-apex-frontend/src/components/org/SubmissionTrackerModal.tsx).
 
 ### D-1. Milestone modal: turnaround time + elapsed hours before approval **[frontend + backend]**
 Raw notes: *"note turnaround time sa milestones"* · *"tapos timestamp kung ilang
@@ -183,7 +183,7 @@ oras nagtake bago maapprove"* · *"add turn around time to milestone modal, add
 hours before approved"*.
 
 - The **"Milestone & Progress"** tab
-  ([`SubmissionTrackerModal.tsx` L248](mapua-apex-frontend/src/components/org/SubmissionTrackerModal.tsx))
+  ([`SubmissionTrackerModal.tsx` L248](../mapua-apex-frontend/src/components/org/SubmissionTrackerModal.tsx))
   gains, per stage: the **expected TAT** for that stage and the **actual elapsed
   time** (hours, and days/hours when > 24 h) between entering the desk and being
   acted on.
@@ -191,8 +191,8 @@ hours before approved"*.
   submission **[backend]** (the activity log already records the actions, but the
   tracker reads the submission record, so add the durations to the chain DTO).
 - Show the same elapsed time next to the decision in the submission cards
-  ([`submissions-panel.tsx`](mapua-apex-frontend/src/components/students/dashboard/submissions-panel.tsx),
-  [`student-calendar-card.tsx`](mapua-apex-frontend/src/components/students/dashboard/student-calendar-card.tsx))
+  ([`submissions-panel.tsx`](../mapua-apex-frontend/src/components/students/dashboard/submissions-panel.tsx),
+  [`student-calendar-card.tsx`](../mapua-apex-frontend/src/components/students/dashboard/student-calendar-card.tsx))
   where the paper is already decided.
 
 ### D-2. Document ID shown as sequential SAAF-#### **[frontend + backend]**
@@ -200,7 +200,7 @@ Raw notes: *"change ang document id to be sequential saaf-id, siguro gamitin na
 lang timestamp for that"* · *"palitan din apex"* (apex-side display too).
 
 - Replace the current display code — first 8 hex chars of the UUID,
-  [`formatDocumentId`](mapua-apex-frontend/src/lib/dynamodb-adapters.ts) (`SAAF-1289C970`)
+  [`formatDocumentId`](../mapua-apex-frontend/src/lib/dynamodb-adapters.ts) (`SAAF-1289C970`)
   — with a **sequential, human-readable document number** (`SAAF-0001`, `SAAF-0002`, …).
 - Recommended mechanism (client suggested a timestamp): a **timestamp-derived**
   sequence, e.g. `SAAF-YYMMDD-###` from a per-day atomic counter, or a monotonic
@@ -210,11 +210,11 @@ lang timestamp for that"* · *"palitan din apex"* (apex-side display too).
   the UUID as the internal key.
 - **All** call sites must change together (they all import `formatDocumentId`):
   student submissions panel / calendar / tracker, the OSAAR + adviser + dean +
-  CDM desks ([`activity-row.tsx`](mapua-apex-frontend/src/components/ui/activity-row.tsx),
-  [`use-review-dashboard.ts`](mapua-apex-frontend/src/hooks/use-review-dashboard.ts)),
+  CDM desks ([`activity-row.tsx`](../mapua-apex-frontend/src/components/ui/activity-row.tsx),
+  [`use-review-dashboard.ts`](../mapua-apex-frontend/src/hooks/use-review-dashboard.ts)),
   announcements dialog, post-eval IDs (`POST` prefix), signatory IDs (`SIG`
-  prefix), PDF output ([`save-proposal-pdf.ts`](mapua-apex-frontend/src/lib/save-proposal-pdf.ts),
-  [`pdf-generator.ts`](mapua-apex-frontend/src/lib/pdf-generator.ts)), and the
+  prefix), PDF output ([`save-proposal-pdf.ts`](../mapua-apex-frontend/src/lib/save-proposal-pdf.ts),
+  [`pdf-generator.ts`](../mapua-apex-frontend/src/lib/pdf-generator.ts)), and the
   reports/exports.
 - Note the shared-table caveat: the counter lives on the `mapua-apex` table also
   written by the arcus apps — one writer only (the submission-creation path).
@@ -223,7 +223,7 @@ lang timestamp for that"* · *"palitan din apex"* (apex-side display too).
 
 ## `/cdm/dashboard` · `/dean/dashboard` · `/adviser/dashboard` · `/osaar/dashboard/review` — reviewer desks
 
-Shared desk code: [`src/components/dashboard/submissions/`](mapua-apex-frontend/src/components/dashboard/submissions/)
+Shared desk code: [`src/components/dashboard/submissions/`](../mapua-apex-frontend/src/components/dashboard/submissions/)
 (one `SubmissionDesk` for all four, per the shared-desk architecture).
 
 ### R-1. "Approve" button text is exclusive to the campus OSAAR desk; every other desk says "Review" **[frontend]**
@@ -239,9 +239,9 @@ label ay REVIEWED"* · *"other osaars should not have approve title"*.
     outcome wording.
 - Implementation: the decision/action cell is selected by `ActivityRow`'s
   `statusField`/role in
-  [`activity-row.tsx`](mapua-apex-frontend/src/components/ui/activity-row.tsx)
+  [`activity-row.tsx`](../mapua-apex-frontend/src/components/ui/activity-row.tsx)
   and the desk shell in
-  [`src/components/dashboard/submissions/`](mapua-apex-frontend/src/components/dashboard/submissions/)
+  [`src/components/dashboard/submissions/`](../mapua-apex-frontend/src/components/dashboard/submissions/)
   — gate the label on the **desk/role** the current user is acting as. Do **not**
   hardcode person names or account IDs.
 - The underlying status value stays whatever it is today (approved/under_review/
@@ -277,11 +277,11 @@ Raw note: *"osaar should be able to send 10 days before"*.
 
 - The 10-day minimum event-date lead is **already implemented and enforced in
   code** — `EVENT_DATE_MIN_LEAD_DAYS = 10`
-  ([`date-key.ts`](mapua-apex-frontend/src/lib/date-key.ts)) on the frontend,
+  ([`date-key.ts`](../mapua-apex-frontend/src/lib/date-key.ts)) on the frontend,
   mirrored by the backend
-  ([`event-date.ts`](mapua-apex-backend-nest/src/common/event-date.ts),
+  ([`event-date.ts`](../mapua-apex-backend-nest/src/common/event-date.ts),
   `The date of event must be at least 10 days from today.`), shown inline in
-  [`activity-details-section.tsx` L350](mapua-apex-frontend/src/components/submission/activity-details-section.tsx).
+  [`activity-details-section.tsx` L350](../mapua-apex-frontend/src/components/submission/activity-details-section.tsx).
   **No enforcement change is needed.**
 - The only change here: state the rule in the **S-1 Terms & Conditions** as **10
   calendar days** (client decision **RD-10** — calendar, not working days),
@@ -298,17 +298,17 @@ Raw note: *"osaar should be able to view activity and session logs page"*.
 
 - **Activity log is already available to OSAAR**: `osaar` is in
   `ACTIVITY_LOG_GROUPS` and the `/osaar/activities` page exists
-  ([`FRONTEND_ROUTES.md`](FRONTEND_ROUTES.md)).
+  ([`FRONTEND_ROUTES.md`](routes/FRONTEND_ROUTES.md)).
 - **Session log is not**: `osaar` is **missing from `SESSION_LOG_GROUPS`**
   (currently `["admin"]`,
-  [`constants/auth.ts`](mapua-apex-frontend/src/constants/auth.ts)) and there is
+  [`constants/auth.ts`](../mapua-apex-frontend/src/constants/auth.ts)) and there is
   **no `/osaar/sessions` route**.
 - Change: add `"osaar"` to `SESSION_LOG_GROUPS`, mount a `/osaar/sessions` route
   that reuses `AdminMonitorSessionsPage`
-  ([`monitor-sessions.tsx`](mapua-apex-frontend/src/routes/admin/monitor-sessions.tsx))
+  ([`monitor-sessions.tsx`](../mapua-apex-frontend/src/routes/admin/monitor-sessions.tsx))
   wrapped in `AuthGuard`, exactly as `/osaar/activities` reuses the activity
   page, and surface it in the OSAAR sidebar
-  ([`osaar-layout.tsx`](mapua-apex-frontend/src/routes/layouts/osaar-layout.tsx))
+  ([`osaar-layout.tsx`](../mapua-apex-frontend/src/routes/layouts/osaar-layout.tsx))
   + `page-names.ts`.
 - **[backend]** the session-log read endpoint is gated to the `session_admin`
   role — that gate must also accept the OSAAR role, or OSAAR will pass the
@@ -322,19 +322,19 @@ Raw note: *"osaar should be able to view activity and session logs page"*.
 
 ## `/cdm/reservables` (and the same page mounted at the admin reservables desk)
 
-Page: [`src/routes/cdm-reviewer/reservables.tsx`](mapua-apex-frontend/src/routes/cdm-reviewer/reservables.tsx).
+Page: [`src/routes/cdm-reviewer/reservables.tsx`](../mapua-apex-frontend/src/routes/cdm-reviewer/reservables.tsx).
 
 ### C-1. Room types: function room, classroom, multi-purpose hall, open spaces, laboratories **[frontend + backend]**
 Raw note: *"add room type: function room, classroom, multi purpose hall, open
 spaces, laboratories"*.
 
 - Today a reservable is only typed `room | equipment`
-  ([`types.ts` `ReservableType`](mapua-apex-frontend/src/lib/types.ts)), and the
+  ([`types.ts` `ReservableType`](../mapua-apex-frontend/src/lib/types.ts)), and the
   UI infers "Classroom" vs "Function Room" from the name at render time
-  ([`cdm-calendar-section.tsx` L336-360](mapua-apex-frontend/src/components/signatories/dashboard/cdm-calendar-section.tsx)).
+  ([`cdm-calendar-section.tsx` L336-360](../mapua-apex-frontend/src/components/signatories/dashboard/cdm-calendar-section.tsx)).
 - Add a first-class **room subtype** enum with the five values above on the
   reservable record **[backend]**, editable on the Add/View reservable forms and
-  in CSV import ([`parse-csv.ts` `RESERVABLE_TYPE_ALIASES`](mapua-apex-frontend/src/lib/parse-csv.ts)),
+  in CSV import ([`parse-csv.ts` `RESERVABLE_TYPE_ALIASES`](../mapua-apex-frontend/src/lib/parse-csv.ts)),
   then replace the name-sniffing in the calendar/table with the stored subtype.
 - Subtype drives S-8 (room-specific equipment) and S-9 (classroom check ordering).
 
@@ -342,8 +342,8 @@ spaces, laboratories"*.
 
 ## `/admin/reports` · `/admin/activities` (and the reused OSAAR/CDM activity log)
 
-Pages: [`reports-export.tsx`](mapua-apex-frontend/src/routes/reports/reports-export.tsx),
-[`monitor-activities.tsx`](mapua-apex-frontend/src/routes/admin/monitor-activities.tsx).
+Pages: [`reports-export.tsx`](../mapua-apex-frontend/src/routes/reports/reports-export.tsx),
+[`monitor-activities.tsx`](../mapua-apex-frontend/src/routes/admin/monitor-activities.tsx).
 
 ### A-3. Turnaround-time metrics in reports **[backend + frontend]**
 Raw notes: *"turnaround time lang ng cdm sana ung logs, sa osaar overall na"*.
@@ -351,7 +351,7 @@ Raw notes: *"turnaround time lang ng cdm sana ung logs, sa osaar overall na"*.
 - Proposal report gains: per-desk duration (CDM from its own action logs) and an
   **overall** submission turnaround for OSAAR; median is already computed
   (`median_duration_minutes`,
-  [`reporting.ts`](mapua-apex-frontend/src/lib/reporting.ts)) — extend with
+  [`reporting.ts`](../mapua-apex-frontend/src/lib/reporting.ts)) — extend with
   per-stage breakdown and export columns.
 
 ### A-4. Data Privacy Act disclaimer / consent **[frontend + backend]**

@@ -1,6 +1,6 @@
 # Frontend routes
 
-Client-side route map for `mapua-apex-frontend`. The single source of truth is the `createBrowserRouter` tree in [`src/router.tsx`](mapua-apex-frontend/src/router.tsx); this document mirrors it. This is the frontend counterpart to [`API_ROUTES.md`](API_ROUTES.md) (backend HTTP contract) — keep the two separate.
+Client-side route map for `mapua-apex-frontend`. The single source of truth is the `createBrowserRouter` tree in [`src/router.tsx`](../../mapua-apex-frontend/src/router.tsx); this document mirrors it. This is the frontend counterpart to [`API_ROUTES.md`](API_ROUTES.md) (backend HTTP contract) — keep the two separate.
 
 ## Routing model
 
@@ -156,4 +156,4 @@ Layout: `AdminLayout` (`src/routes/layouts/admin-layout.tsx`). Sidebar: Session 
 
 ## Conventions when editing routes
 
-Keep this file in sync with `src/router.tsx` — see the "Frontend Route Docs" rule in [`mapua-apex-frontend/AGENTS.md`](mapua-apex-frontend/AGENTS.md). Filenames are kebab-case under the matching `src/routes/<section>/` folder; layouts live in `src/routes/layouts/`; page-name labels for session tracking are mapped separately in `src/lib/page-names.ts`.
+Keep this file in sync with `src/router.tsx` — see the "Frontend Route Docs" rule in [`mapua-apex-frontend/AGENTS.md`](../../mapua-apex-frontend/AGENTS.md). Filenames are kebab-case under the matching `src/routes/<section>/` folder; layouts live in `src/routes/layouts/`; page-name labels for session tracking are mapped separately in `src/lib/page-names.ts`.

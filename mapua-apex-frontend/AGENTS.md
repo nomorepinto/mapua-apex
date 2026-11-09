@@ -19,7 +19,7 @@ These rules apply to `mapua-apex-frontend`. Also follow the root `AGENTS.md` (cr
 
 ## Frontend Route Docs
 
-- **Keep `FRONTEND_ROUTES.md` (repo root) in sync with `src/router.tsx`.** When you add, change, or remove anything in the client route tree — a path, layout, nested section, lazy page, `action`, index/wildcard redirect, `AuthGuard` group set, or a `RoleRedirect` landing — update `FRONTEND_ROUTES.md` in the **same turn**. Do not leave the doc describing the pre-change tree.
+- **Keep `docs/routes/FRONTEND_ROUTES.md` in sync with `src/router.tsx`.** When you add, change, or remove anything in the client route tree — a path, layout, nested section, lazy page, `action`, index/wildcard redirect, `AuthGuard` group set, or a `RoleRedirect` landing — update `FRONTEND_ROUTES.md` in the **same turn**. Do not leave the doc describing the pre-change tree.
 - `src/router.tsx` is the source of truth; the doc mirrors it (path, component, source file, allowed groups, notes). Match the doc's existing table format and keep source-file paths accurate.
 - Skip the doc only for refactors that do not change the URL, the component wired to a route, or the gating groups.
 
