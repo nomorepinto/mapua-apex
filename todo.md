@@ -3,60 +3,6 @@
 Items intentionally deferred out of the post-evaluation overhaul. They are
 tracked here so they are not lost, but are **not** part of the current change.
 
-## ~~1. TTL sentinel + Streams → auto-`cancelled` status~~
-
-**Status:** Closed — implemented as a `CANCELWATCH#<submissionId>` sentinel with
-the table's `TTL` attribute (uppercase, epoch seconds) written at final approval
-and deleted on post-eval submit; a DynamoDB Streams (KEYS_ONLY) consumer Lambda
-handles the resulting `REMOVE`, re-checks for a `POSTEVAL#` child, and
-conditionally cancels the SUBMISSION (`status = cancelled` + `cancelled_at`)
-when the window lapsed with no post-eval. Adds a timeline notice
-(`notif_type "event auto-cancelled"`) + student email, the frontend notif-type
-wiring (`ReviewNoticeModal` / `reminders-panel` / `dynamodb-adapters`), an
-`ARCUS_AUTO_CANCEL_ENABLED` kill-switch (default on), a boto3 provisioning
-script (`mapua-apex-frontend/scripts/deploy_cancelwatch_lambda.py`), and a
-Playwright `cancel-watch` phase. (Historical note: this text still refers to a
-lowercase `ttl` and a PHP window helper; the shipped code uses `TTL` and
-`src/common/manila.ts`.) Original status below.
-
-**Goal:** When an event's 3-day post-evaluation window lapses with **no**
-submitted post-eval, automatically set the linked SUBMISSION
-`status = cancelled` (+ `cancelled_at`).
-
-**Design:**
-- **Sentinel item** per approved event: `PK = EVENT#{uuid}`,
-  `SK = CANCELWATCH#{submissionId}`, `ttl` = end-of-day(`date_of_event`) +
-  `post_evaluation_window_days`. New child prefix — does not collide with
-  arcus `MEMBER#` / `EVALUATION#` children or `AggregateEventParticipants`
-  queries. Never put `ttl` on the SUBMISSION/EVENT parent itself (every
-  unrelated update would have to carry it).
-- **Lifecycle:** created at final approval (window start); `DeleteItem` on the
-  sentinel when the post-eval is submitted (belt); the stream re-check below
-  is the suspenders.
-- **Consumer:** DynamoDB Streams on the shared `mapua-apex` table (must be
-  enabled — operational/console setting) → Lambda filtering to
-  `eventName = REMOVE` + `SK` begins with `CANCELWATCH#` only (the stream
-  carries all three apps' traffic).
-- **Handler logic (re-check, never trust cross-key stream ordering):** query
-  `PK = EVENT#{uuid}` for a `POSTEVAL#` child — present → no-op; absent →
-  patch the SUBMISSION to `cancelled` conditioned on `attribute_exists` and
-  the status still being its pre-post-eval value (idempotent under
-  at-least-once replay; never overwrites `finished`/reviewed).
-
-**Notes:**
-- Add `cancelled` to the submission status enum at that time (it is reserved
-  in the docs now but not produced by any code path yet).
-- The window length is `services.arcus.post_evaluation_window_days` (default 3);
-  the stateless window logic lives in `app/Support/Arcus/EventWindow.php`.
-- Accepted caveat: TTL deletion is best-effort with no SLA — AWS docs note
-  occasional multi-hour lag. Harmless for this deadline; document it.
-
-## ~~2. Room suggestion by participant count~~
-
-**Status:** Closed — `suggestRooms()` in `mapua-apex-frontend/src/lib/reservable-capacity.ts` ranks the campus rooms for the SAAF headcount (best fit first, smallest sufficient ceiling wins; when nothing fits, the closest rooms, largest first) and `components/students/reservations/room-suggestions.tsx` renders them as an advisory "Suggested for N participants" panel with a one-click Add above the room dropdown in `reservation-form.tsx`. Advisory only — the dropdown, the picks, and the existing capacity warnings are untouched, and booked or closed rooms are never offered.
-
-**Goal:** Suggest a room from the number of participants.
-
 ## 3. Proponent position spelling
 
 **Status:** Not started.
@@ -64,36 +10,6 @@ submitted post-eval, automatically set the linked SUBMISSION
 **Goal:** Stop free-typed position text from being saved with the wrong
 spelling. The same check applies to every field that should be a known value,
 not only position.
-
-## ~~4. e2e-tests coverage for the Reports & Export restructure~~
-
-**Status:** Closed — already wired into the `e2e-tests/` suite (committed in
-`fb17f19`): `tests/reports.spec.ts` + `pages/reports.page.ts` (admin builds and
-exports every report type, OSAAR loses the Session log — the
-`REPORT_EXPORT_GROUPS` / `session_admin` gating — and CSV download is asserted),
-`tests/monitor.spec.ts` + `pages/monitor.page.ts` (in-place log monitors and
-group gating), the `reports` project in `playwright.config.ts` (depends on
-`monitor`), and the `reports` phase in `run_e2e.py`. This item's Status line was
-simply stale.
-
-**Goal:** Per the AGENTS.md "E2E Suite" rule (added on `origin/master`), the
-user-visible reporting restructure should be covered by the `e2e-tests/`
-Playwright suite: date range + PDF/CSV export moved to the gated
-`/admin/reports` and `/osaar/reports` pages (`REPORT_EXPORT_GROUPS` = admin,
-super_admin, osaar); in-place log/history filters and record timelines made
-filter-only; report endpoints gated to `report_admin` (sessions stay
-`session_admin`); student/signatory report endpoints removed.
-
-**Notes:**
-- No current `e2e-tests` project owns reports/monitor behavior, so this needs a
-  new spec under `e2e-tests/tests/`, a page object under `e2e-tests/pages/`, a
-  project in `e2e-tests/playwright.config.ts` that depends on the projects it
-  needs, and a `--phase` choice in `e2e-tests/run_e2e.py`.
-- Already covered elsewhere: `mapua-apex-frontend/scripts/report-browser.test.mjs`
-  (Playwright harness) and backend `test/reports.e2e-spec.ts` (17 tests, green).
-- Running the suite needs `npm ci` + `playwright install` inside `e2e-tests/`,
-  live backend + frontend servers, and Cognito test users — deferred until that
-  environment is available.
 
 ## 5. Cognito API login for the arcus apps (replace hosted UI)
 
@@ -231,73 +147,6 @@ date ranges** during which no events may be scheduled at all.
   *rescheduling* of already-approved events; the validator placement above
   covers both if applied on every date write.
 
-## ~~7. Signatory contact information on the student side~~
-
-**Status:** Closed — SIGNATORY items carry `contact_email` / `office` / `contact_number`, maintained on the admin signatory screen (add card, edit dialog, and a new Contact column); `GET /api/v2/students/events/{event}/submissions/{submission}` alone derives `approval_chain_contacts` from the desk holding the paper onward (OSAAR links stand in once the paper is decided), and a new "Signatories" tab in `SubmissionTrackerModal.tsx` renders it in approval order with the current desk highlighted and plain `mailto:` / `tel:` links. Deviation from the design below: the chain comes from the submission's own frozen `signatory_steps` rather than the organization's `signatories[]` map, so a paper keeps the desks it was filed with, and each entry also carries `signatory_id`, `organization_name`, `contact_number`, and `is_current`.
-
-**Goal:** Show the approving signatories' contact information — e-mail, and
-office/phone where available — in a dedicated tab inside the proposal modal
-the student sees, so the proponent can follow up with the desk instead of
-e-mailing OSAAR blindly.
-
-**Design:**
-- Source data is the SIGNATORY items referenced by the organization's
-  `signatories[]` role→id map (`GSI2PK = SIGNATORY#uuid` inbox items already
-  carry the signatory record); extend those items with `contact_email`
-  (and optionally `office`, `contact_number`) maintained on the admin
-  signatory screen.
-- **Response shape:** the proposal-detail endpoint gains an
-  `approval_chain_contacts` array — one entry per signatory currently in or
-  next in the student's approval chain (`name`, `role`, `contact_email`,
-  `office`) — rather than exposing the full signatory directory.
-- **Frontend:** a "Signatories" tab in the existing proposal modal
-  (student dashboard) rendering the chain in approval order with the current
-  desk highlighted; plain `mailto:` links, no new pages.
-- Gate the contact fields to authenticated students viewing **their own**
-  proposal only; the list endpoints must not serialize them.
-
-## 8. Ever-present footer with bug reporting
-
-**Status:** Partially done — the ever-present footer shipped (and was repaired
-after it covered page content); the in-product capture pipeline is still
-deferred. A slim footer bar now renders on every screen of all three apps
-(`mapua-apex-frontend` `SiteFooter` mounted in `main.tsx`; arcus-attendance
-`AppFooter` and arcus-evaluation `SiteFooter` mounted in their root
-`layout.tsx`), carrying the single line "Email mapuaapex@gmail.com for bug
-reports" as a `mailto:` link. **Layout fix (Nov 6, 2026):** the bar was
-`position: fixed`, so it painted over the bottom of the viewport — on desktop
-app screens the `lg:h-dvh` frame left no clearance at all and the last rows of
-scrollable content were permanently hidden, and on scrolling pages (landing,
-error/404) content slid under the opaque strip. The bar is now an in-flow strip
-that owns its own `--site-footer-h` band: `layout.frame` ends at
-`calc(100dvh - var(--site-footer-h))` at every breakpoint (the `lg:h-dvh` and
-`lg:left-64` overrides are gone), `#root` no longer pads its bottom, and
-`layout.center` / `layout.fallback`, the landing root, and the error/404 shells
-use the same calc. On app screens the strip stays pinned to the viewport
-bottom; on document-flow pages it sits at the end of the content.
-Still open: the in-product capture below (DynamoDB `BUG#` partition,
-`POST /api/v1/bug-reports`, admin `GET/PATCH` review list, and the report dialog)
-so issues are stored in-product instead of by e-mail.
-
-**Goal:** A persistent footer on every screen (public, student, OSAAR, and
-arcus app surfaces) that carries a "Report a bug" entry point, so issues are
-captured in-product instead of by e-mail.
-
-**Design:**
-- **Storage:** a `BUG#` partition on the shared `mapua-apex` table
-  (`PK = SK = BUG#{uuid}`, plus `GSI1PK = "BUG"` ordered by timestamp for the
-  admin list) holding description, optional email, page path, user agent,
-  submitted-by (from session when signed in; anonymous allowed), `status`
-  (`open` / `resolved`), and timestamps. Attribute-light single writer —
-  `PutItem` is safe here (single-owner key).
-- **Endpoints:** `POST /api/v1/bug-reports` (public, rate-limited per IP,
-  server-side length/validation, honeypot field to deter bots) and
-  `GET/PATCH /api/v1/admin/bug-reports` gated to admins for the review list.
-- **Frontend:** one shared `<SiteFooter>` mounted in the root layout of each
-  app; the bug dialog is a small form (what/where/optional contact) — no
-  screenshot upload in v1.
-- Optional later: e-mail or activity-log notification to admins on new
-  reports, reusing the existing notification pipeline.
 
 ## 9. Penetration test using agent skills
 
