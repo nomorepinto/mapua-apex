@@ -10,6 +10,7 @@ export interface TermBlackout {
 export interface TermSettings {
   active_academic_year_id: string;
   academic_years: AcademicYear[];
+  event_filing_lead_days: number;
 }
 
 export interface AcademicYear {
@@ -35,19 +36,32 @@ export function assertTermDateAllowed(
   if (!date || !term) {
     return;
   }
-  const year = term.academic_years.find((entry) => entry.id === term.active_academic_year_id);
+  const year = term.academic_years.find(
+    (entry) => entry.id === term.active_academic_year_id,
+  );
   if (!year) abort(422, 'No active academic year is configured.');
-  const active = year.terms.find((entry) => date >= entry.start && date <= entry.end);
+  const active = year.terms.find(
+    (entry) => date >= entry.start && date <= entry.end,
+  );
   if (!active) {
-    abort(422, 'The selected date is outside the configured academic calendar.');
+    abort(
+      422,
+      'The selected date is outside the configured academic calendar.',
+    );
   }
   const blackout = active.blackouts.find(
     (range) => date >= range.start && date <= range.end,
   );
   if (blackout) {
-    abort(422, `Events cannot be scheduled during blackout: ${blackout.reason}.`);
+    abort(
+      422,
+      `Events cannot be scheduled during blackout: ${blackout.reason}.`,
+    );
   }
   if (lockoutDays > 0 && date >= addDays(active.end, 1 - lockoutDays)) {
-    abort(422, 'Events cannot be scheduled during the term-end lockout period.');
+    abort(
+      422,
+      'Events cannot be scheduled during the term-end lockout period.',
+    );
   }
 }

@@ -11,7 +11,7 @@ const ADMIN_TITLES = [
   "Reservation-change history",
 ]
 
-test("administrators build and export every report; OSAAR loses the session log", async ({
+test("administrators and OSAAR build and export every report", async ({
   browser,
 }) => {
   test.setTimeout(420_000)
@@ -37,8 +37,7 @@ test("administrators build and export every report; OSAAR loses the session log"
   try {
     await osaarReports.open("/osaar/reports")
     const offered = await osaarReports.availableReportTitles()
-    await expect(offered).not.toContain("Session log")
-    for (const title of ADMIN_TITLES.filter((item) => item !== "Session log")) {
+    for (const title of ADMIN_TITLES) {
       await expect(offered).toContain(title)
     }
     await osaarReports.preview("Activity log")

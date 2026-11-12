@@ -406,12 +406,16 @@ export class SubmissionWriterService {
   private async assertDates(body: SaafDto): Promise<void> {
     const start = body.activity_details.date_of_event;
     const end = body.activity_details.end_date_of_event;
-    const floor = eventDateFloorKey(this.config.allowAnyEventDate());
+    const term = await this.terms.get();
+    const floor = eventDateFloorKey(
+      this.config.allowAnyEventDate(),
+      undefined,
+      term?.event_filing_lead_days,
+    );
     if (end && end < start) {
       abort(422, 'The end date of event must be on or after the start date.');
     }
-    assertEventDateAllowed(start, floor);
-    const term = await this.terms.get();
+    assertEventDateAllowed(start, floor, term?.event_filing_lead_days);
     const lockoutDays = this.config.osaarTermLockoutDays();
     let cursor = start;
     const last = end || start;
@@ -423,7 +427,11 @@ export class SubmissionWriterService {
     if (body.venue_reservation.has_reservation) {
       for (const reservation of body.venue_reservation.reservations ?? []) {
         for (const selection of reservation.selections ?? []) {
-          assertEventDateAllowed(selection.date, floor);
+          assertEventDateAllowed(
+            selection.date,
+            floor,
+            term?.event_filing_lead_days,
+          );
           assertTermDateAllowed(selection.date, term, lockoutDays);
         }
       }

@@ -358,9 +358,9 @@ Use this as the **POST** `/api/v2/students/submissions` body. For **PUT**, copy 
 
 | Method | Path | Behavior |
 | :-- | :-- | :-- |
-| **GET** | `/api/v2/public/term` | Returns the configured academic-calendar catalog `{ active_academic_year_id, academic_years: [{ id, label, terms: [{ id, label, start, end, blackouts }] }] }`, or `null`. This read only supports date-picker guidance; write validation remains server-side. |
+| **GET** | `/api/v2/public/term` | Returns the configured academic-calendar catalog `{ active_academic_year_id, event_filing_lead_days, academic_years: [{ id, label, terms: [{ id, label, start, end, blackouts }] }] }`, or `null`. This read only supports date-picker guidance; write validation remains server-side. |
 | **GET** | `/api/v2/osaar/term` | Returns the same term settings for OSAAR, admin, or super-admin users. |
-| **PUT** | `/api/v2/osaar/term` | OSAAR/admin/super-admin only. Replaces the singleton using `{ active_academic_year_id, academic_years: [{ id, label, terms: [{ id, label, start, end, blackouts: [{ start, end, reason }] }] }] }`. Each year has one to five non-overlapping terms; blackout ranges are inclusive and must stay inside their own term. Only the selected active year controls new event dates. Invalid input returns `422`. The activity log retains sanitized before/after values. |
+| **PUT** | `/api/v2/osaar/term` | OSAAR/admin/super-admin only. Replaces the singleton using `{ active_academic_year_id, event_filing_lead_days, academic_years: [{ id, label, terms: [{ id, label, start, end, blackouts: [{ start, end, reason }] }] }] }`. `event_filing_lead_days` is an integer from 0–90 (defaulting to 10 for legacy records) and applies to Manila calendar dates. Each year has one to five non-overlapping terms; blackout ranges are inclusive and must stay inside their own term. Only the selected active year controls new event dates. Invalid input returns `422`. The activity log retains sanitized before/after values. |
 
 The proposal and event-date paths reject dates in a blackout or in the final `OSAAR_TERM_LOCKOUT_DAYS` days of their active term (default `14`). This applies to proposal creation, edits, OSAAR correction, booking dates, and approved-event rescheduling.
 
@@ -395,7 +395,7 @@ Allowed groups: `admin`, `osaar`, `cdm_reviewer`, `cdm`, and `super_admin`.
 
 ### Session Log Routes
 
-Session list/detail/report and `/stats` require `admin` or `super_admin` (dedicated `session_admin` permission). OSAAR/CDM retain Activity Log access but cannot read session data. Existing active-session checks still apply.
+Session list/detail/report and `/stats` require `admin`, `osaar`, or `super_admin` (dedicated `session_admin` permission). CDM retains Activity Log access but cannot read session data. Existing active-session checks still apply.
 
 | Method | Endpoint | Description |
 | :---- | :---- | :---- |
@@ -452,11 +452,13 @@ Dates are inclusive Asia/Manila calendar days, not UTC days. Invalid/reversed ra
 
 ### Read-only Report Routes
 
-All paths below accept **POST**, return **200** with `{ "data": ReportPayload }`, and set `Cache-Control: no-store`. No files are stored/uploaded by these endpoints. Report generation is restricted to OSAAR and super administrators: the four collection reports require the dedicated `report_admin` permission (`admin`, `osaar`, `super_admin`) and the session report requires `session_admin` (`admin`, `super_admin`). The former student and signatory report endpoints were removed — in-place log/history panels only filter, and every date range and PDF/CSV export now lives on the gated Reports & Export page.
+The session report uses the `session_admin` permission for `admin`, `osaar`, and `super_admin` callers.
+
+All paths below accept **POST**, return **200** with `{ "data": ReportPayload }`, and set `Cache-Control: no-store`. No files are stored/uploaded by these endpoints. Report generation is restricted to OSAAR and super administrators: the four collection reports require the dedicated `report_admin` permission (`admin`, `osaar`, `super_admin`) and the session report requires `session_admin` (`admin`, `osaar`, `super_admin`). The former student and signatory report endpoints were removed — in-place log/history panels only filter, and every date range and PDF/CSV export now lives on the gated Reports & Export page.
 
 | Endpoint | Report type | Visibility |
 |---|---|---|
-| `/api/v2/admins/monitor/sessions/report` | `sessions` | `session_admin` — admin, super_admin |
+| `/api/v2/admins/monitor/sessions/report` | `sessions` | `session_admin` — admin, OSAAR, super_admin |
 | `/api/v2/admins/monitor/activity/report` | `activity` | `report_admin` — admin, OSAAR, super_admin |
 | `/api/v2/admins/submissions/report` | `proposals` | `report_admin` — admin, OSAAR, super_admin |
 | `/api/v2/admins/postevals/report` | `postevals` | `report_admin` — admin, OSAAR, super_admin |

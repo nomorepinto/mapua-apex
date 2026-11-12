@@ -278,6 +278,12 @@ Raw notes: *"maam eira (tama ba spelling) at sir bobet"* · *"John Benedict"* ·
 ### O-OSAAR-1. Filing lead time: **10 calendar days** before the event — T&C wording only **[frontend]**
 Raw note: *"osaar should be able to send 10 days before"*.
 
+**Implemented extension:** OSAAR can now configure the minimum filing lead time
+from `/osaar/setup/term`. The persisted `event_filing_lead_days` value accepts
+0–90 Manila calendar days and defaults to 10 for existing calendar records;
+the submission API remains the authoritative enforcement point and the SAAF
+date picker reflects the configured value.
+
 - The 10-day minimum event-date lead is **already implemented and enforced in
   code** — `EVENT_DATE_MIN_LEAD_DAYS = 10`
   ([`date-key.ts`](../mapua-apex-frontend/src/lib/date-key.ts)) on the frontend,
@@ -298,6 +304,11 @@ Raw note: *"osaar should be able to send 10 days before"*.
 
 ### O-OSAAR-2. OSAAR can view the activity **and session** log pages **[frontend + backend]**
 Raw note: *"osaar should be able to view activity and session logs page"*.
+
+**Implemented:** OSAAR now has `/osaar/sessions`, reusing the shared session
+monitor and sidebar pattern. The `session_admin` permission also admits OSAAR,
+so the monitor and Session log report/export work without a frontend/backend
+authorization mismatch.
 
 - **Activity log is already available to OSAAR**: `osaar` is in
   `ACTIVITY_LOG_GROUPS` and the `/osaar/activities` page exists
