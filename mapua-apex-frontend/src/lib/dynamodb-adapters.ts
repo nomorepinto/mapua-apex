@@ -53,6 +53,10 @@ export interface ApiSubmission {
   first_submitted_at?: string
   first_submitted_at_source?: "recorded" | "linked_creation_evidence"
   fully_approved_at?: string
+  /** Human document code, `SAAF-YYMMDD-###`. Absent on papers filed before the counter. */
+  document_number?: string | null
+  /** Per-desk clocks. Absent on papers filed before stage timings were stored. */
+  stage_timings?: ApiStageTiming[]
   status:
     "pending" | "approved" | "denied" | "returned" | "cancelled" | "finished"
   current_signatory?: string
@@ -251,6 +255,18 @@ export interface ApiSignatoryChainLink {
   organization_name?: string | null
   /** `osaar_1`, `adviser:ORG#…`, `cdm`, and so on. Null on older submissions. */
   stage_key?: string | null
+  entered_at?: string | null
+  acted_at?: string | null
+  expected_tat_hours?: number | null
+  elapsed_hours?: number | null
+}
+
+export interface ApiStageTiming {
+  signatory_id: string
+  entered_at: string | null
+  acted_at: string | null
+  expected_tat_hours: number
+  elapsed_hours: number | null
 }
 
 /**
@@ -374,7 +390,10 @@ export interface ApiOfficer {
   updated_at?: string | null
 }
 
-export type CreateOfficerPayload = Omit<ApiOfficer, "officer_id" | "created_at" | "updated_at">
+export type CreateOfficerPayload = Omit<
+  ApiOfficer,
+  "officer_id" | "created_at" | "updated_at"
+>
 export type UpdateOfficerPayload = Partial<CreateOfficerPayload>
 
 export type CreateOrganizationPayload = {
@@ -654,6 +673,9 @@ export interface DashboardSubmissionRow {
   submitted_date: string
   /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
   sent_at: string
+  document_number?: string | null
+  /** Set once a desk has acted: "Elapsed 5h" or "Elapsed 1d 4h". */
+  decision_elapsed: string | null
   api_status: ApiSubmission["status"]
   activity_details: {
     title: string
@@ -680,6 +702,8 @@ export interface TrackerAssignee {
   name: string
   statusText: string
   state: "completed" | "current" | "queued"
+  /** Expected TAT and the time spent on this desk. Null for the system sign-off row. */
+  turnaroundText: string | null
 }
 
 export interface TrackerStepper {
@@ -764,9 +788,81 @@ export function formatDisplayDateTime(value?: string | null): string {
 }
 
 /**
- * Formats a raw UUID or ID into a clean human-readable document code (e.g., SAAF-1289C970)
+ * Hours between two timestamps. Under an hour stays "under 1 hour".
+ * A full day or more is "1d 4h".
  */
-export function formatDocumentId(id?: string | null, prefix = "SAAF"): string {
+export function formatElapsed(
+  from?: string | null,
+  to?: string | null,
+  now = Date.now()
+): string | null {
+  if (!from) return null
+  const start = Date.parse(from)
+  const end = to ? Date.parse(to) : now
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start)
+    return null
+  const hours = Math.floor((end - start) / 3_600_000)
+  if (hours < 1) return "under 1 hour"
+  if (hours < 24) return `${hours}h`
+  const days = Math.floor(hours / 24)
+  const remainder = hours % 24
+  return remainder === 0 ? `${days}d` : `${days}d ${remainder}h`
+}
+
+export function formatExpectedTat(hours?: number | null): string {
+  const value = hours && hours > 0 ? hours : 24
+  if (value % 24 === 0) {
+    const days = value / 24
+    return days === 1 ? "1 day" : `${days} days`
+  }
+  return `${value}h`
+}
+
+export function stageTurnaroundText(
+  timing: ApiStageTiming | undefined,
+  state: TrackerAssignee["state"],
+  now = Date.now()
+): string | null {
+  if (!timing) return null
+  const expected = `Expected ${formatExpectedTat(timing.expected_tat_hours)}`
+  if (timing.entered_at && timing.acted_at) {
+    const elapsed = formatElapsed(timing.entered_at, timing.acted_at, now)
+    return elapsed ? `${expected} · Elapsed ${elapsed}` : expected
+  }
+  if (timing.entered_at && state === "current") {
+    const elapsed = formatElapsed(timing.entered_at, null, now)
+    return elapsed ? `${expected} · In review ${elapsed}` : expected
+  }
+  return expected
+}
+
+const DECIDED_STATUSES = new Set(["approved", "denied", "returned", "finished"])
+
+/** Elapsed time of the desk that made the latest decision. */
+export function decisionElapsedLabel(
+  submission: Pick<ApiSubmission, "status" | "stage_timings">,
+  now = Date.now()
+): string | null {
+  if (!DECIDED_STATUSES.has(submission.status)) return null
+  const acted = [...(submission.stage_timings ?? [])]
+    .reverse()
+    .find((row) => row.entered_at && row.acted_at)
+  if (!acted?.entered_at || !acted.acted_at) return null
+  const elapsed = formatElapsed(acted.entered_at, acted.acted_at, now)
+  return elapsed ? `Elapsed ${elapsed}` : null
+}
+
+/**
+ * Prefers the stored document number (`SAAF-YYMMDD-###`).
+ * Older papers and non-SAAF ids still use the short hex code.
+ */
+export function formatDocumentId(
+  id?: string | null,
+  prefix = "SAAF",
+  documentNumber?: string | null
+): string {
+  const assigned = documentNumber?.trim()
+  if (assigned && assigned !== "—") return assigned
   if (!id || id === "—") return "—"
   const cleaned = id.replace(/^(SUBMISSION#|EVENT#)/i, "")
   const targetId = cleaned.includes(":") ? cleaned.split(":").pop()! : cleaned
@@ -1060,6 +1156,8 @@ export function apiSubmissionToDashboardRow(
     requires_venue: Boolean(submission.venue_reservation?.has_reservation),
     submitted_date: formatDisplayDate(submission.sent_at),
     sent_at: submission.sent_at || "",
+    document_number: submission.document_number,
+    decision_elapsed: decisionElapsedLabel(submission),
     api_status: submission.status,
     activity_details: {
       title,
@@ -1201,6 +1299,7 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     id: `${submission.event_id}:${submission.submission_id}`,
     eventId: submission.event_id,
     submissionId: submission.submission_id,
+    documentNumber: submission.document_number,
     title,
     org:
       submission.organization_name ||
@@ -1357,12 +1456,17 @@ export function apiNotificationsToStepper(
     ? chain!.filter((link) => (link.role ?? "").toLowerCase() === "osaar")
         .length
     : 0
-  const steps: Array<{ key: string; label: string }> = useChain
-    ? chain!.map((link) => ({
-        key: stripId(link.signatory_id),
-        label: signatoryChainLabel(link, qualifyOrg, osaarCount),
-      }))
-    : resolveExpectedRoles(options).map((role) => ({ key: role, label: role }))
+  const steps: Array<{ key: string; label: string; signatoryId?: string }> =
+    useChain
+      ? chain!.map((link) => ({
+          key: stripId(link.signatory_id),
+          label: signatoryChainLabel(link, qualifyOrg, osaarCount),
+          signatoryId: stripId(link.signatory_id),
+        }))
+      : resolveExpectedRoles(options).map((role) => ({
+          key: role,
+          label: role,
+        }))
 
   // Resolve each notification to the step key it belongs to.
   const resolvedNotifs: Array<{
@@ -1467,7 +1571,13 @@ export function apiNotificationsToStepper(
     )
     if (deskSuffix) statusText = `${statusText} · ${deskSuffix} on desk`
 
-    return { role: step.label, name: step.label, statusText, state }
+    return {
+      role: step.label,
+      name: step.label,
+      statusText,
+      state,
+      turnaroundText: null,
+    }
   })
 
   assigneesList.push({
@@ -1475,6 +1585,7 @@ export function apiNotificationsToStepper(
     name: "System sign-off",
     statusText: isAllApproved ? "Approved" : "Queued (pending all signatures)",
     state: isAllApproved ? "completed" : "queued",
+    turnaroundText: null,
   })
 
   const completedCount = isAllApproved

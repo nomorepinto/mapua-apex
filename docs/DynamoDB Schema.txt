@@ -142,6 +142,7 @@ PK: EVENT#uuid
 SK: SUBMISSION#uuid
 submission_type: string
 sent_at: timestamp (latest submission/resubmission, not original filing time)
+document_number: string (SAAF-YYMMDD-###, assigned once at create from COUNTER#SAAF#YYMMDD; absent on older papers; edits never change it)
 first_submitted_at: timestamp (optional legacy; server-owned immutable first filing)
 first_submitted_at_source: "recorded" | "linked_creation_evidence" (optional legacy)
 fully_approved_at: timestamp (optional; server-owned first final approval)
@@ -784,6 +785,7 @@ json
   "SK": "SUBMISSION#s001",
   "submission_type": "saaf",
   "sent_at": "2026-09-10T14:00:00Z",
+  "document_number": "SAAF-260910-001",
   "status": "pending",
   "current_signatory": "SIGNATORY#adv001",
   "signatory_sequence": ["SIGNATORY#adv001", "SIGNATORY#osaar", "SIGNATORY#osaar2", "SIGNATORY#cdm"],

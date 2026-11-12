@@ -87,6 +87,8 @@ export class SubmissionWriterService {
     );
     item.first_submitted_at = sentAt;
     item.first_submitted_at_source = 'recorded';
+    item.document_number =
+      await this.submissions.allocateDocumentNumber(sentAt);
     item.privacy_consent = this.consentRecord(sentAt);
     await this.submissions.putSubmission(item, 'attribute_not_exists(SK)');
     await this.bookings.commit(planned);

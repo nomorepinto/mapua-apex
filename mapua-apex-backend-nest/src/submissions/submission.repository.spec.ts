@@ -82,6 +82,34 @@ describe('immutable reporting timestamps', () => {
       ).rejects.toThrow();
     }
   });
+  it('keeps the assigned document number across an edit', async () => {
+    await store.update({
+      table: 'test',
+      key: original,
+      set: { document_number: 'SAAF-261113-001' },
+    });
+    const updated = await repository.replaceEditable(original, {
+      ...original,
+      status: 'pending',
+      sent_at: '2024-01-04T00:00:00Z',
+      document_number: 'SAAF-0000-999',
+    });
+    expect(updated.document_number).toBe('SAAF-261113-001');
+  });
+  it('assigns SAAF-YYMMDD-### from a per-day counter', async () => {
+    const first = await repository.allocateDocumentNumber(
+      '2026-11-13T01:00:00Z',
+    );
+    const second = await repository.allocateDocumentNumber(
+      '2026-11-13T02:00:00Z',
+    );
+    const nextDay = await repository.allocateDocumentNumber(
+      '2026-11-14T01:00:00Z',
+    );
+    expect(first).toBe('SAAF-261113-001');
+    expect(second).toBe('SAAF-261113-002');
+    expect(nextDay).toBe('SAAF-261114-001');
+  });
   it('sets final approval only once and retains it after completion or cancellation', async () => {
     await repository.updateSubmission('e', 's', {
       status: 'approved',

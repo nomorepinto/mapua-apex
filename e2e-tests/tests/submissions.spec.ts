@@ -103,7 +103,12 @@ async function file(browser: import("@playwright/test").Browser, paper: PaperDra
     } else {
       await saaf.alignment()
     }
-    await captureJson(session.page, "/students/submissions", "POST", () => saaf.submit())
+    const created = await captureJson(session.page, "/students/submissions", "POST", () => saaf.submit())
+    const payload =
+      created.data && typeof created.data === "object" && !Array.isArray(created.data)
+        ? (created.data as Record<string, unknown>)
+        : created
+    expect(payload.document_number).toMatch(/^SAAF-\d{6}-\d{3}$/)
     const actual = await trackerRoles(session.page, paper.title)
     rolesMatch(actual, paper.roles)
     writeRun((state) => {

@@ -456,9 +456,20 @@ export function StudentCalendarCard() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-mono text-xs font-bold text-neutral-500">
-                        {formatDocumentId(sub.submission_id)}
+                        {formatDocumentId(
+                          sub.submission_id,
+                          "SAAF",
+                          sub.document_number
+                        )}
                       </span>
-                      <ProposalStatusBadge status={mappedStatus} />
+                      <span className="flex items-center gap-2">
+                        {sub.decision_elapsed ? (
+                          <span className="text-[11px] font-medium text-neutral-500">
+                            {sub.decision_elapsed}
+                          </span>
+                        ) : null}
+                        <ProposalStatusBadge status={mappedStatus} />
+                      </span>
                     </div>
 
                     <h4 className="text-sm leading-snug font-bold text-neutral-900">

@@ -27,6 +27,9 @@ function build(opts: { existing?: Record<string, unknown> } = {}) {
       return { ...opts.existing, ...set };
     },
     async putSubmission() {},
+    async allocateDocumentNumber() {
+      return 'SAAF-261113-001';
+    },
     async putEvent() {},
     async putCollaboration() {},
     async deleteCollaboration() {},

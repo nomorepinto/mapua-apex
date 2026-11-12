@@ -1,5 +1,13 @@
 import { useState } from "react"
-import { Check, CheckCircle2, CircleAlertIcon, DownloadIcon, FileText, Loader2, Pencil } from "lucide-react"
+import {
+  Check,
+  CheckCircle2,
+  CircleAlertIcon,
+  DownloadIcon,
+  FileText,
+  Loader2,
+  Pencil,
+} from "lucide-react"
 
 import {
   ANNOUNCEMENT_MAX,
@@ -84,9 +92,16 @@ export function SubmissionDetailDialog() {
             <div className="mb-2.5 flex flex-wrap items-center gap-2">
               <span
                 className="rounded-md bg-white/20 px-2.5 py-0.5 font-mono text-xs font-bold text-white shadow-2xs"
-                title={state.selectedKeys?.submissionId || selectedRow?.submission_id}
+                title={
+                  state.selectedKeys?.submissionId || selectedRow?.submission_id
+                }
               >
-                {formatDocumentId(state.selectedKeys?.submissionId || selectedRow?.submission_id)}
+                {formatDocumentId(
+                  state.selectedKeys?.submissionId ||
+                    selectedRow?.submission_id,
+                  "SAAF",
+                  selectedRow?.document_number
+                )}
               </span>
               {selectedRow?.organization_name ? (
                 <span className={brand.chipGold}>
@@ -99,7 +114,7 @@ export function SubmissionDetailDialog() {
                 </span>
               ) : null}
             </div>
-            <DialogTitle className="text-2xl font-extrabold tracking-tight leading-tight text-white sm:text-3xl">
+            <DialogTitle className="text-2xl leading-tight font-extrabold tracking-tight text-white sm:text-3xl">
               {selectedRow?.activity_details.title
                 ? `${selectedRow.activity_details.title} Proposal`
                 : "Submission Detail"}
@@ -111,15 +126,15 @@ export function SubmissionDetailDialog() {
             </DialogDescription>
 
             <div className="mt-4 flex items-center">
-              <div className="inline-flex items-center rounded-xl bg-black/20 p-1 border border-white/10 backdrop-blur-xs">
+              <div className="inline-flex items-center rounded-xl border border-white/10 bg-black/20 p-1 backdrop-blur-xs">
                 <button
                   type="button"
                   onClick={() => setActiveTab("details")}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer",
+                    "flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all",
                     activeTab === "details"
                       ? "bg-white text-[#8B0000] shadow-xs"
-                      : "text-white/80 hover:text-white hover:bg-white/10"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
                   )}
                 >
                   <FileText className="h-3.5 w-3.5" />
@@ -129,10 +144,10 @@ export function SubmissionDetailDialog() {
                   type="button"
                   onClick={() => setActiveTab("progress")}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer",
+                    "flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all",
                     activeTab === "progress"
                       ? "bg-white text-[#8B0000] shadow-xs"
-                      : "text-white/80 hover:text-white hover:bg-white/10"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
                   )}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
@@ -157,7 +172,7 @@ export function SubmissionDetailDialog() {
             <div className="space-y-6">
               {selectedActivity.proponents.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-center text-xs font-bold uppercase tracking-widest text-neutral-500">
+                  <h3 className="text-center text-xs font-bold tracking-widest text-neutral-500 uppercase">
                     Proponents
                   </h3>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -202,24 +217,26 @@ export function SubmissionDetailDialog() {
                     className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <span className="font-bold text-neutral-900">{label}</span>
-                    <span className="font-medium capitalize text-neutral-600 sm:text-right">
+                    <span className="font-medium text-neutral-600 capitalize sm:text-right">
                       {value || "—"}
                     </span>
                   </div>
                 ))}
                 <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-bold text-neutral-900">Event Nature</span>
+                  <span className="font-bold text-neutral-900">
+                    Event Nature
+                  </span>
                   <span className="font-medium sm:text-right">
                     {selectedActivity.nature?.toLowerCase() === "major" ? (
-                      <span className="inline-flex items-center rounded-md border border-red-200 bg-red-100 px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-[#8B0000]">
+                      <span className="inline-flex items-center rounded-md border border-red-200 bg-red-100 px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-[#8B0000] uppercase">
                         Major Event
                       </span>
                     ) : selectedActivity.nature?.toLowerCase() === "minor" ? (
-                      <span className="inline-flex items-center rounded-md border border-neutral-200 bg-neutral-100 px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-neutral-700">
+                      <span className="inline-flex items-center rounded-md border border-neutral-200 bg-neutral-100 px-2.5 py-0.5 text-[11px] font-extrabold tracking-wider text-neutral-700 uppercase">
                         Minor Event
                       </span>
                     ) : (
-                      <span className="text-xs italic text-neutral-400">
+                      <span className="text-xs text-neutral-400 italic">
                         Pending classification
                       </span>
                     )}
@@ -274,18 +291,22 @@ export function SubmissionDetailDialog() {
             </div>
           ) : selectedActivity && activeTab === "progress" ? (
             <div className="space-y-6">
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-50/60 p-5 sm:p-6 shadow-2xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-200/80 pb-4 mb-4 sm:mb-6">
+              <div className="rounded-2xl border border-neutral-200 bg-neutral-50/60 p-5 shadow-2xs sm:p-6">
+                <div className="mb-4 flex flex-col justify-between gap-2 border-b border-neutral-200/80 pb-4 sm:mb-6 sm:flex-row sm:items-center">
                   <div>
-                    <h3 className="text-base font-bold text-neutral-900">Approval Milestone</h3>
-                    <p className="text-xs font-medium text-neutral-500 mt-0.5">
+                    <h3 className="text-base font-bold text-neutral-900">
+                      Approval Milestone
+                    </h3>
+                    <p className="mt-0.5 text-xs font-medium text-neutral-500">
                       {stepper.isAllApproved
                         ? "Completed — all signatories approved this proposal."
                         : `Current Stage: Step ${Math.min(stepper.currentStepIdx + 1, stepper.fullSteps.length)} of ${stepper.fullSteps.length}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <span className="text-xs font-medium text-neutral-500">Overall progress</span>
+                    <span className="text-xs font-medium text-neutral-500">
+                      Overall progress
+                    </span>
                     <span className="text-base font-extrabold text-[#8B0000]">
                       {stepper.progressPercent}%
                     </span>
@@ -295,24 +316,32 @@ export function SubmissionDetailDialog() {
                 {/* Mobile Stepper List */}
                 <ol className="flex flex-col gap-3 md:hidden">
                   {stepper.fullSteps.map((stepName, idx) => {
-                    const isCompleted = stepper.isAllApproved || idx < stepper.currentStepIdx
-                    const isCurrent = !stepper.isAllApproved && idx === stepper.currentStepIdx
-                    let nodeBg = "bg-neutral-100 border-neutral-300 text-neutral-400"
+                    const isCompleted =
+                      stepper.isAllApproved || idx < stepper.currentStepIdx
+                    const isCurrent =
+                      !stepper.isAllApproved && idx === stepper.currentStepIdx
+                    let nodeBg =
+                      "bg-neutral-100 border-neutral-300 text-neutral-400"
                     if (isCompleted) {
-                      nodeBg = "bg-emerald-100 border-emerald-500 text-emerald-800"
+                      nodeBg =
+                        "bg-emerald-100 border-emerald-500 text-emerald-800"
                     } else if (isCurrent) {
-                      nodeBg = "bg-amber-100 border-amber-500 text-amber-900 ring-4 ring-amber-100"
+                      nodeBg =
+                        "bg-amber-100 border-amber-500 text-amber-900 ring-4 ring-amber-100"
                     }
 
                     return (
-                      <li key={`${stepName}-${idx}`} className="flex items-center gap-3">
+                      <li
+                        key={`${stepName}-${idx}`}
+                        className="flex items-center gap-3"
+                      >
                         <div
                           className={`flex size-10 shrink-0 items-center justify-center rounded-full border-2 font-bold shadow-xs ${nodeBg}`}
                         >
                           {isCompleted ? (
                             <Check className="h-5 w-5 stroke-[2.5] text-emerald-800" />
                           ) : isCurrent ? (
-                            <span className="h-3.5 w-3.5 rounded-full bg-amber-500 animate-pulse"></span>
+                            <span className="h-3.5 w-3.5 animate-pulse rounded-full bg-amber-500"></span>
                           ) : (
                             <span className="h-2.5 w-2.5 rounded-full bg-neutral-300"></span>
                           )}
@@ -335,14 +364,17 @@ export function SubmissionDetailDialog() {
                 </ol>
 
                 {/* Desktop Stepper Bar */}
-                <div className="relative hidden select-none px-2 py-4 md:block">
-                  <div className="absolute top-9 left-8 right-8 -translate-y-1/2 h-1.5 bg-neutral-200 rounded-full z-0 overflow-hidden">
+                <div className="relative hidden px-2 py-4 select-none md:block">
+                  <div className="absolute top-9 right-8 left-8 z-0 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-neutral-200">
                     <div
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out"
+                      className="h-full rounded-full bg-emerald-500 transition-all duration-500 ease-out"
                       style={{
                         width: `${
                           stepper.fullSteps.length > 1
-                            ? (Math.min(stepper.currentStepIdx, stepper.fullSteps.length - 1) /
+                            ? (Math.min(
+                                stepper.currentStepIdx,
+                                stepper.fullSteps.length - 1
+                              ) /
                                 (stepper.fullSteps.length - 1)) *
                               100
                             : 0
@@ -351,23 +383,28 @@ export function SubmissionDetailDialog() {
                     ></div>
                   </div>
 
-                  <div className="relative z-10 w-full min-h-[76px]">
+                  <div className="relative z-10 min-h-[76px] w-full">
                     {stepper.fullSteps.map((stepName, idx) => {
                       const totalSteps = stepper.fullSteps.length
-                      const isCompleted = stepper.isAllApproved || idx < stepper.currentStepIdx
-                      const isCurrent = !stepper.isAllApproved && idx === stepper.currentStepIdx
+                      const isCompleted =
+                        stepper.isAllApproved || idx < stepper.currentStepIdx
+                      const isCurrent =
+                        !stepper.isAllApproved && idx === stepper.currentStepIdx
 
-                      let nodeBg = "bg-neutral-100 border-neutral-300 text-neutral-400"
+                      let nodeBg =
+                        "bg-neutral-100 border-neutral-300 text-neutral-400"
                       if (isCompleted) {
-                        nodeBg = "bg-emerald-100 border-emerald-500 text-emerald-800"
+                        nodeBg =
+                          "bg-emerald-100 border-emerald-500 text-emerald-800"
                       } else if (isCurrent) {
-                        nodeBg = "bg-amber-100 border-amber-500 text-amber-900 ring-4 ring-amber-100"
+                        nodeBg =
+                          "bg-amber-100 border-amber-500 text-amber-900 ring-4 ring-amber-100"
                       }
 
                       return (
                         <div
                           key={`${stepName}-${idx}`}
-                          className="absolute top-4 -translate-x-1/2 flex flex-col items-center"
+                          className="absolute top-4 flex -translate-x-1/2 flex-col items-center"
                           style={{
                             left:
                               totalSteps > 1
@@ -376,23 +413,23 @@ export function SubmissionDetailDialog() {
                           }}
                         >
                           <div
-                            className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-bold transition-all duration-300 shadow-xs ${nodeBg}`}
+                            className={`flex h-10 w-10 items-center justify-center rounded-full border-2 font-bold shadow-xs transition-all duration-300 ${nodeBg}`}
                           >
                             {isCompleted ? (
-                              <Check className="w-5 h-5 stroke-[2.5] text-emerald-800" />
+                              <Check className="h-5 w-5 stroke-[2.5] text-emerald-800" />
                             ) : isCurrent ? (
-                              <span className="w-3.5 h-3.5 rounded-full bg-amber-500 animate-pulse"></span>
+                              <span className="h-3.5 w-3.5 animate-pulse rounded-full bg-amber-500"></span>
                             ) : (
-                              <span className="w-2.5 h-2.5 rounded-full bg-neutral-300"></span>
+                              <span className="h-2.5 w-2.5 rounded-full bg-neutral-300"></span>
                             )}
                           </div>
                           <span
                             className={cn(
-                              "text-xs font-bold mt-2 text-center whitespace-nowrap px-1 max-w-[120px] truncate",
+                              "mt-2 max-w-[120px] truncate px-1 text-center text-xs font-bold whitespace-nowrap",
                               isCompleted
                                 ? "text-neutral-900"
                                 : isCurrent
-                                  ? "text-amber-900 font-extrabold"
+                                  ? "font-extrabold text-amber-900"
                                   : "text-neutral-400"
                             )}
                             title={stepName}
@@ -407,31 +444,48 @@ export function SubmissionDetailDialog() {
               </div>
 
               {/* Signatory Approvals Reviewers */}
-              <div className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-2xs">
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-base font-bold text-neutral-900">Signatory Approvals</h3>
+              <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs sm:p-6">
+                <div className="mb-1 flex items-center justify-between">
+                  <h3 className="text-base font-bold text-neutral-900">
+                    Signatory Approvals
+                  </h3>
                 </div>
-                <p className="text-xs font-semibold text-neutral-500 mb-4">Required Reviewers</p>
+                <p className="mb-4 text-xs font-semibold text-neutral-500">
+                  Required Reviewers
+                </p>
                 <div className="space-y-3.5">
                   {stepper.assigneesList.map((item, idx) => {
                     let iconBg = "bg-neutral-200 text-neutral-400"
-                    if (item.state === "completed") iconBg = "bg-emerald-500 text-white"
-                    else if (item.state === "current") iconBg = "bg-amber-500 text-white"
+                    if (item.state === "completed")
+                      iconBg = "bg-emerald-500 text-white"
+                    else if (item.state === "current")
+                      iconBg = "bg-amber-500 text-white"
 
                     return (
-                      <div key={`${item.role}-${idx}`} className="flex items-center gap-3">
+                      <div
+                        key={`${item.role}-${idx}`}
+                        className="flex items-center gap-3"
+                      >
                         <div
-                          className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${iconBg}`}
                         >
                           {item.state === "completed" ? (
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <Check className="h-3.5 w-3.5 stroke-[3]" />
                           ) : (
-                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                            <div className="h-2 w-2 rounded-full bg-white"></div>
                           )}
                         </div>
-                        <div className="text-xs sm:text-sm font-medium text-neutral-900">
+                        <div className="min-w-0 text-xs font-medium text-neutral-900 sm:text-sm">
                           <span className="font-bold">{item.name}</span>
-                          <span className="text-neutral-500"> — {item.statusText}</span>
+                          <span className="text-neutral-500">
+                            {" "}
+                            — {item.statusText}
+                          </span>
+                          {item.turnaroundText ? (
+                            <p className="text-[11px] font-medium text-neutral-500">
+                              {item.turnaroundText}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     )
@@ -443,8 +497,8 @@ export function SubmissionDetailDialog() {
         </DialogPanel>
 
         <div className="flex shrink-0 justify-end gap-3 rounded-b-2xl border-t border-neutral-200 bg-white px-4 py-4 sm:px-8">
-          {(state.selectedSubmission?.status === "pending" ||
-            state.selectedSubmission?.status === "returned") ? (
+          {state.selectedSubmission?.status === "pending" ||
+          state.selectedSubmission?.status === "returned" ? (
             <Button
               type="button"
               onClick={actions.openSubmissionEdit}
@@ -511,7 +565,9 @@ export function CreateAnnouncementDialog() {
               <FieldDescription>
                 {state.createContent.length}/{ANNOUNCEMENT_MAX}
               </FieldDescription>
-              {state.createError ? <FieldError>{state.createError}</FieldError> : null}
+              {state.createError ? (
+                <FieldError>{state.createError}</FieldError>
+              ) : null}
             </Field>
           </DialogPanel>
           <DialogFooter>
@@ -558,7 +614,9 @@ export function EditAnnouncementDialog() {
           </DialogHeader>
           <DialogPanel className="flex flex-col gap-4">
             <Field data-invalid={state.editError ? true : undefined}>
-              <FieldLabel htmlFor="edit-announcement-content">Content</FieldLabel>
+              <FieldLabel htmlFor="edit-announcement-content">
+                Content
+              </FieldLabel>
               <Textarea
                 aria-invalid={state.editError ? true : undefined}
                 id="edit-announcement-content"
@@ -576,7 +634,9 @@ export function EditAnnouncementDialog() {
               <FieldDescription>
                 {state.editContent.length}/{ANNOUNCEMENT_MAX}
               </FieldDescription>
-              {state.editError ? <FieldError>{state.editError}</FieldError> : null}
+              {state.editError ? (
+                <FieldError>{state.editError}</FieldError>
+              ) : null}
             </Field>
             {state.deleteError ? (
               <Alert variant="error">
@@ -623,7 +683,8 @@ export function DeleteAnnouncementDialog() {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this announcement?</AlertDialogTitle>
           <AlertDialogDescription>
-            This notice will be removed from the bulletin. This cannot be undone.
+            This notice will be removed from the bulletin. This cannot be
+            undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

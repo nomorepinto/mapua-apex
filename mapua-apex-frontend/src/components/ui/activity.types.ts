@@ -48,6 +48,8 @@ export interface Activity {
   id: string
   eventId: string
   submissionId: string
+  /** Stored `SAAF-YYMMDD-###` when the paper has one. */
+  documentNumber?: string | null
   title: string
   org: string
   department: string

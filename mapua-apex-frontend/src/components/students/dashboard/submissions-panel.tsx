@@ -186,7 +186,11 @@ export function SubmissionsPanel() {
                       className="py-3.5 pr-4 font-mono text-xs font-bold whitespace-nowrap text-neutral-900 transition-colors group-hover:text-[#8B0000]"
                       title={sub.submission_id}
                     >
-                      {formatDocumentId(sub.submission_id)}
+                      {formatDocumentId(
+                        sub.submission_id,
+                        "SAAF",
+                        sub.document_number
+                      )}
                     </TableCell>
 
                     {/* Proposal Title */}
@@ -224,6 +228,11 @@ export function SubmissionsPanel() {
                       <Badge className={mappedStatus.color}>
                         {mappedStatus.label}
                       </Badge>
+                      {sub.decision_elapsed ? (
+                        <span className="ml-2 text-[11px] font-medium text-neutral-500">
+                          {sub.decision_elapsed}
+                        </span>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 )

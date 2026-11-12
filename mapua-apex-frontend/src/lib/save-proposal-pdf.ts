@@ -1,6 +1,10 @@
 import type { Activity } from "@/components/ui/activity.types"
 import type { ReservationPdfData, SAAFPdfData } from "@/lib/pdf-generator"
-import { apiSubmissionToDrafts, type ApiSubmission } from "@/lib/dynamodb-adapters"
+import {
+  apiSubmissionToDrafts,
+  formatDocumentId,
+  type ApiSubmission,
+} from "@/lib/dynamodb-adapters"
 import { withReservationDefaults } from "@/components/reservation/constants"
 import type { ReservationDraft } from "@/components/reservation/types"
 import { slotEnd, slotStart } from "@/lib/schedule-slots"
@@ -60,6 +64,11 @@ export async function saveSubmissionAsPdf(submission: ApiSubmission) {
 
   await saveProposalPdf(
     {
+      documentCode: formatDocumentId(
+        submission.submission_id,
+        "SAAF",
+        submission.document_number
+      ),
       activityType: saaf.activityType,
       totalOrgMembers: saaf.totalOrgMembers,
       activityTitle: saaf.activityTitle,
@@ -94,6 +103,11 @@ export async function saveActivityAsPdf(activity: Activity) {
     : ""
 
   const saafData: SAAFPdfData = {
+    documentCode: formatDocumentId(
+      activity.submissionId,
+      "SAAF",
+      activity.documentNumber
+    ),
     activityType: activity.type,
     activityTitle: activity.title,
     activityDescription: activity.description,
@@ -154,4 +168,3 @@ export async function saveActivityAsPdf(activity: Activity) {
 
   await saveProposalPdf(saafData, reservationData)
 }
-

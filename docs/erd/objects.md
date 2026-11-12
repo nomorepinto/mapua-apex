@@ -93,6 +93,7 @@ submission, including any collaboration.
 | `first_submitted_at` | timestamp, optional | Server-owned immutable first filing; absent legacy values remain unknown |
 | `first_submitted_at_source` | string, optional | `recorded` on new submissions or `linked_creation_evidence` from conservative backfill |
 | `fully_approved_at` | timestamp, optional | First successful final approval, set once and preserved through completion/cancellation |
+| `document_number` | string, optional | `SAAF-YYMMDD-###`, assigned once at create. The UUID in `SK` stays the key. Absent on papers filed before the counter |
 | `status` | string | `pending / approved / denied / returned / finished / cancelled`. `finished` is terminal and set only when OSAAR approves the event's POSTEVAL (see below). `cancelled` is terminal and has two writers: a CDM `cancel` resolution of a RESERVATION_CHANGE, and the auto-cancel DynamoDB Streams consumer when a `CANCELWATCH` sentinel's TTL lapses with nothing filed (see below) |
 | `cancelled_at` | timestamp | Optional — set only by the auto-cancel stream consumer (the CDM cancel path does not stamp it) |
 | `current_signatory` | string | `SIGNATORY#uuid` holding the paper now |

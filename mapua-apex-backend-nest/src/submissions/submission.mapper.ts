@@ -1,5 +1,6 @@
 import { stripPrefix } from '../common/dynamo-keys.js';
 import { record, str, type Item } from '../common/records.js';
+import { publicStageTimings, withChainDurations } from './stage-timings.js';
 
 const HIDDEN = new Set([
   'PK',
@@ -40,6 +41,11 @@ export function toSubmission(item: Item, extras: Item = {}): Item {
   if (Array.isArray(item.signatory_steps)) {
     view.signatory_steps = publicSteps(item.signatory_steps);
   }
+  if (Array.isArray(item.stage_timings)) {
+    view.stage_timings = publicStageTimings(item.stage_timings);
+  } else {
+    delete view.stage_timings;
+  }
   const collaboration = record(item.collaboration);
   if (collaboration) {
     const ids = Array.isArray(collaboration.dependent_organization_ids)
@@ -52,7 +58,9 @@ export function toSubmission(item: Item, extras: Item = {}): Item {
     };
   }
   if (extras.signatory_chain) {
-    view.signatory_chain = extras.signatory_chain;
+    view.signatory_chain = Array.isArray(item.stage_timings)
+      ? withChainDurations(extras.signatory_chain, item.stage_timings)
+      : extras.signatory_chain;
   }
   if (extras.approval_chain_contacts) {
     view.approval_chain_contacts = extras.approval_chain_contacts;

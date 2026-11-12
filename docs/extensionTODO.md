@@ -180,7 +180,6 @@ Pages: [`src/routes/students/dashboard.tsx`](../mapua-apex-frontend/src/routes/s
 ### D-1. Milestone modal: turnaround time + elapsed hours before approval **[frontend + backend]**
 
 **Status: Partially closed** — the per-stage `entered_at`/`acted_at` timestamps now persist as `desk_timings[]` on the submission, and the "Milestone & Progress" tab shows each desk's `<duration> on desk` plus a `Total time to final approval` line (working minutes use Manila working hours). Still open: the elapsed-time suffix on the decided submission cards (`submissions-panel.tsx`, `student-calendar-card.tsx`) — the agreed display scope for this pass was limited to the tracker modal.
-
 Raw notes: *"note turnaround time sa milestones"* · *"tapos timestamp kung ilang
 oras nagtake bago maapprove"* · *"add turn around time to milestone modal, add
 hours before approved"*.
@@ -199,6 +198,8 @@ hours before approved"*.
   where the paper is already decided.
 
 ### D-2. Document ID shown as sequential SAAF-#### **[frontend + backend]**
+
+**Status:** Done for SAAF papers as `SAAF-YYMMDD-###` from a per-day counter. The UUID stays the key. Post-eval (`POST`) and signatory (`SIG`) codes are unchanged.
 Raw notes: *"change ang document id to be sequential saaf-id, siguro gamitin na
 lang timestamp for that"* · *"palitan din apex"* (apex-side display too).
 
