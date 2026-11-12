@@ -21,15 +21,7 @@ import type {
 } from "@/components/submission/saaf-stepper"
 import type { Proponent, SaafDraft } from "@/components/submission/types"
 import type { ReservationDraft } from "@/components/reservation/types"
-import {
-  capacityIssue,
-  withinCapacity,
-} from "@/lib/reservable-capacity"
-import {
-  ALLOW_ANY_EVENT_DATE,
-  EVENT_DATE_TOO_SOON_MESSAGE,
-  minEventDateKey,
-} from "@/lib/date-key"
+import { capacityIssue, withinCapacity } from "@/lib/reservable-capacity"
 import { validateEmailDomain, validateEmailLive } from "@/lib/auth-validation"
 
 // Matches letters, spaces, hyphens, periods, and apostrophes (no digits)
@@ -80,7 +72,8 @@ export function isValidFacebookUrl(value: string): boolean {
     const url = new URL(trimmed)
     return (
       url.protocol === "https:" &&
-      (url.hostname === "facebook.com" || url.hostname === "www.facebook.com") &&
+      (url.hostname === "facebook.com" ||
+        url.hostname === "www.facebook.com") &&
       url.pathname.length > 1
     )
   } catch {
@@ -94,12 +87,12 @@ const UNIQUE_PROPONENT_FIELDS: Array<{
   field: keyof Proponent
   label: string
 }> = [
-    { field: "studentNumber", label: "student number" },
-    { field: "contactNumber", label: "mobile number" },
-    { field: "emailAddress", label: "email address" },
-    { field: "positionOfApplicant", label: "position of the applicant" },
-    { field: "facebookLink", label: "Facebook link" },
-  ]
+  { field: "studentNumber", label: "student number" },
+  { field: "contactNumber", label: "mobile number" },
+  { field: "emailAddress", label: "email address" },
+  { field: "positionOfApplicant", label: "position of the applicant" },
+  { field: "facebookLink", label: "Facebook link" },
+]
 
 function markDuplicateProponents(
   proponents: Proponent[],
@@ -108,12 +101,16 @@ function markDuplicateProponents(
   for (const { field, label } of UNIQUE_PROPONENT_FIELDS) {
     const counts = new Map<string, number>()
     for (const proponent of proponents) {
-      const value = String(proponent[field] ?? "").trim().toLowerCase()
+      const value = String(proponent[field] ?? "")
+        .trim()
+        .toLowerCase()
       if (!value) continue
       counts.set(value, (counts.get(value) ?? 0) + 1)
     }
     for (const proponent of proponents) {
-      const value = String(proponent[field] ?? "").trim().toLowerCase()
+      const value = String(proponent[field] ?? "")
+        .trim()
+        .toLowerCase()
       if (!value || (counts.get(value) ?? 0) < 2) continue
       const key = `proponent.${proponent.id}.${field}`
       if (!warnings[key]) {
@@ -123,7 +120,10 @@ function markDuplicateProponents(
   }
 
   const normalizePart = (value: string | undefined): string =>
-    String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ")
+    String(value ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ")
   const nameKeyOf = (proponent: Proponent): string | null => {
     const first = normalizePart(proponent.firstName)
     const middle = normalizePart(proponent.middleName)
@@ -163,7 +163,10 @@ function proponentWarnings(
   }
 
   // Middle Name validation (optional, but no digits if provided)
-  if (!isBlank(proponent.middleName) && !LETTERS_ONLY_PATTERN.test(proponent.middleName.trim())) {
+  if (
+    !isBlank(proponent.middleName) &&
+    !LETTERS_ONLY_PATTERN.test(proponent.middleName.trim())
+  ) {
     warnings[key("middleName")] = "Middle name must only contain letters."
   }
 
@@ -195,21 +198,24 @@ function proponentWarnings(
       trimmed.toLowerCase().endsWith(yr.toLowerCase())
     )
     const hasProgram =
-      trimmed.includes(" - ") ||
-      (!hasYear && !isBlank(trimmed))
+      trimmed.includes(" - ") || (!hasYear && !isBlank(trimmed))
     if (!hasYear || !hasProgram) {
-      warnings[key("programAndYear")] = "Both program and year level are required."
+      warnings[key("programAndYear")] =
+        "Both program and year level are required."
     }
   }
 
   // Position validation
   if (isBlank(proponent.positionOfApplicant)) {
     warnings[key("positionOfApplicant")] = REQUIRED
-  } else if (!POSITION_LETTERS_ONLY_PATTERN.test(proponent.positionOfApplicant.trim())) {
+  } else if (
+    !POSITION_LETTERS_ONLY_PATTERN.test(proponent.positionOfApplicant.trim())
+  ) {
     warnings[key("positionOfApplicant")] = "Position must only contain letters."
   }
 
-  if (isBlank(proponent.orgOrCourseSection)) warnings[key("orgOrCourseSection")] = REQUIRED
+  if (isBlank(proponent.orgOrCourseSection))
+    warnings[key("orgOrCourseSection")] = REQUIRED
 
   if (isBlank(proponent.contactNumber)) {
     warnings[key("contactNumber")] = REQUIRED
@@ -260,7 +266,8 @@ export function saafFieldWarnings(
     warnings["proponent.min"] =
       "At least one proponent is required. Select an officer from your roster or add a proponent manually."
   } else if (draft.proponents.length > MAX_PROPONENTS) {
-    warnings["proponent.max"] = `A maximum of ${MAX_PROPONENTS} proponents is allowed. Remove ${draft.proponents.length - MAX_PROPONENTS} to continue.`
+    warnings["proponent.max"] =
+      `A maximum of ${MAX_PROPONENTS} proponents is allowed. Remove ${draft.proponents.length - MAX_PROPONENTS} to continue.`
   }
 
   for (const proponent of draft.proponents) {
@@ -292,9 +299,6 @@ export function saafFieldWarnings(
   const endDate = draft.endDateOfEvent || draft.dateOfEvent
   if (isBlank(startDate)) warnings.dateOfEvent = REQUIRED
   if (isBlank(endDate)) warnings.endDateOfEvent = REQUIRED
-  if (!ALLOW_ANY_EVENT_DATE && !isBlank(startDate) && startDate < minEventDateKey()) {
-    warnings.dateOfEvent = EVENT_DATE_TOO_SOON_MESSAGE
-  }
   if (!isBlank(startDate) && !isBlank(endDate) && endDate < startDate) {
     warnings.endDateOfEvent = "End date cannot be earlier than the start date."
   }
@@ -305,11 +309,23 @@ export function saafFieldWarnings(
   } else if (!isInsideEventWindow(start) || !isInsideEventWindow(end)) {
     warnings.timeOfEvent = "Event time must be between 7:00 AM and 9:00 PM."
   } else {
-    const startMinutes = clockMinutes(clockFromDraft(undefined, undefined, undefined, start))
-    const endMinutes = clockMinutes(clockFromDraft(undefined, undefined, undefined, end))
-    if (startMinutes !== null && endMinutes !== null && startMinutes === endMinutes) {
+    const startMinutes = clockMinutes(
+      clockFromDraft(undefined, undefined, undefined, start)
+    )
+    const endMinutes = clockMinutes(
+      clockFromDraft(undefined, undefined, undefined, end)
+    )
+    if (
+      startMinutes !== null &&
+      endMinutes !== null &&
+      startMinutes === endMinutes
+    ) {
       warnings.timeOfEvent = SAME_EVENT_TIME_MESSAGE
-    } else if (startMinutes !== null && endMinutes !== null && endMinutes < startMinutes) {
+    } else if (
+      startMinutes !== null &&
+      endMinutes !== null &&
+      endMinutes < startMinutes
+    ) {
       warnings.timeOfEvent = "End time cannot be earlier than the start time."
     }
   }
@@ -372,7 +388,13 @@ export const STEP_PREFIXES_WITH_RESERVATION: Record<SaafStepIndex, string[]> = {
     "individualContribution",
     "proposedBudget",
   ],
-  4: ["mission", "coreValuesExplanation", "peoExplanation", "sdgExplanation", "budgetNote"],
+  4: [
+    "mission",
+    "coreValuesExplanation",
+    "peoExplanation",
+    "sdgExplanation",
+    "budgetNote",
+  ],
 }
 
 export const STEP_PREFIXES_NO_RESERVATION: Record<SaafStepIndex, string[]> = {
@@ -390,7 +412,13 @@ export const STEP_PREFIXES_NO_RESERVATION: Record<SaafStepIndex, string[]> = {
     "individualContribution",
     "proposedBudget",
   ],
-  3: ["mission", "coreValuesExplanation", "peoExplanation", "sdgExplanation", "budgetNote"],
+  3: [
+    "mission",
+    "coreValuesExplanation",
+    "peoExplanation",
+    "sdgExplanation",
+    "budgetNote",
+  ],
   4: [],
 }
 
@@ -436,7 +464,9 @@ function warningKeyLabel(key: string, proponents: Proponent[]): string {
   if (match) {
     const index = proponents.findIndex((p) => p.id === match[1])
     const field = PROPONENT_FIELD_LABELS[match[2]] ?? match[2]
-    return index >= 0 ? `Proponent ${index + 1} · ${field}` : `Proponent · ${field}`
+    return index >= 0
+      ? `Proponent ${index + 1} · ${field}`
+      : `Proponent · ${field}`
   }
   return WARNING_KEY_LABELS[key] ?? key
 }
@@ -476,12 +506,23 @@ export function isSaafStepComplete(
   includeReservation: boolean = false,
   includeBudget: boolean = true
 ): boolean {
-  return stepWarningEntries(step, draft, includeReservation, includeBudget).length === 0
+  return (
+    stepWarningEntries(step, draft, includeReservation, includeBudget)
+      .length === 0
+  )
 }
 
-export function isSaafDraftComplete(draft: SaafDraft, includeReservation: boolean = false, includeBudget: boolean = true): boolean {
-  const total = includeReservation ? ([0, 1, 2, 3, 4] as const) : ([0, 1, 2, 3] as const)
-  return total.every((step) => isSaafStepComplete(step, draft, includeReservation, includeBudget))
+export function isSaafDraftComplete(
+  draft: SaafDraft,
+  includeReservation: boolean = false,
+  includeBudget: boolean = true
+): boolean {
+  const total = includeReservation
+    ? ([0, 1, 2, 3, 4] as const)
+    : ([0, 1, 2, 3] as const)
+  return total.every((step) =>
+    isSaafStepComplete(step, draft, includeReservation, includeBudget)
+  )
 }
 
 const RESERVATION_EMPTY_MESSAGE =
@@ -593,20 +634,26 @@ export function getReservationStepIssue(
         )
       }
     } else if (roomPicks.length > 1) {
-      const totalMax = roomPicks.reduce((acc, r) => {
-        if (acc === null || (r.max_participants ?? null) === null) return null
-        return acc + r.max_participants!
-      }, 0 as number | null)
+      const totalMax = roomPicks.reduce(
+        (acc, r) => {
+          if (acc === null || (r.max_participants ?? null) === null) return null
+          return acc + r.max_participants!
+        },
+        0 as number | null
+      )
 
       if (totalMax !== null && headcount > totalMax) {
         return `The combined capacity of the reserved rooms (${totalMax} participants) cannot accommodate the expected participants (${headcount}). Please add another room.`
       }
 
-      const minRequired = roomPicks.reduce((acc, r) => {
-        const min = r.min_participants ?? null
-        if (min === null) return acc
-        return acc === null ? min : Math.min(acc, min)
-      }, null as number | null)
+      const minRequired = roomPicks.reduce(
+        (acc, r) => {
+          const min = r.min_participants ?? null
+          if (min === null) return acc
+          return acc === null ? min : Math.min(acc, min)
+        },
+        null as number | null
+      )
 
       if (minRequired !== null && headcount < minRequired) {
         return `Expected participants (${headcount}) is below the minimum capacity (${minRequired}).`

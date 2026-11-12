@@ -3,7 +3,7 @@ import { HttpException } from '@nestjs/common';
 import {
   assertEventDateAllowed,
   eventDateFloorKey,
-  EVENT_DATE_TOO_SOON_MESSAGE,
+  eventDateTooSoonMessage,
 } from './event-date.js';
 
 describe('eventDateFloorKey', () => {
@@ -27,7 +27,7 @@ describe('assertEventDateAllowed', () => {
       expect(error).toBeInstanceOf(HttpException);
       expect((error as HttpException).getStatus()).toBe(422);
       expect((error as HttpException).getResponse()).toEqual({
-        message: EVENT_DATE_TOO_SOON_MESSAGE,
+        message: eventDateTooSoonMessage(10),
       });
     }
   });
@@ -36,8 +36,13 @@ describe('assertEventDateAllowed', () => {
     expect(() =>
       assertEventDateAllowed('2026-11-09', '2026-11-09'),
     ).not.toThrow();
-    expect(() =>
-      assertEventDateAllowed('2020-01-01', undefined),
-    ).not.toThrow();
+    expect(() => assertEventDateAllowed('2020-01-01', undefined)).not.toThrow();
+  });
+
+  it('uses the configured calendar-day lead time', () => {
+    expect(eventDateFloorKey(false, '2026-10-30', 3)).toBe('2026-11-02');
+    expect(() => assertEventDateAllowed('2026-11-01', '2026-11-02', 3)).toThrow(
+      eventDateTooSoonMessage(3),
+    );
   });
 });

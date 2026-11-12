@@ -19,10 +19,13 @@ test("the log monitors list records and gate by group", async ({ browser }) => {
     await admin.close()
   }
 
-  // OSAAR and CDM reviewers reach the shared Activity Log; the Session Log is admin-only.
+  // OSAAR reaches both shared logs; CDM reviewers only reach the Activity Log.
   const osaar = await openApex(browser, "osaar1")
   try {
-    await new MonitorPage(osaar.page).openActivityLog("/osaar/activities")
+    const osaarMonitor = new MonitorPage(osaar.page)
+    await osaarMonitor.openActivityLog("/osaar/activities")
+    await osaarMonitor.openSessionLog("/osaar/sessions")
+    await osaarMonitor.expectRows()
   } finally {
     await osaar.close()
   }

@@ -10,9 +10,36 @@ import type { PostEvalDraft } from "@/components/posteval/types"
 import type { Activity } from "@/components/ui/activity.types"
 import { slotEnd, slotStart } from "@/lib/schedule-slots"
 import { departmentAbbreviation } from "@/lib/departments"
+import { formatDuration } from "@/lib/turnaround"
 
 /**
- * Backend API Submission shape returned by Laravel DynamoDB routes
+ * Per-desk turnaround entry written server-side on each decision (or derived by
+ * the legacy backfill). Mirrors the backend `DeskTimingEntry`; the clock math
+ * lives on the server, so the client only formats these values.
+ */
+export interface DeskTiming {
+  stage_key: string | null
+  role: string | null
+  signatory_id: string
+  organization_id: string | null
+  action: "approved" | "fully approved" | "returned" | "denied"
+  entered_at: string | null
+  acted_at: string
+  wall_minutes: number | null
+  working_minutes: number | null
+  source: "decision" | "backfill"
+}
+
+/** RA 10173 consent of record persisted on the submission by the student write path. */
+export interface PrivacyConsent {
+  version: string
+  accepted_at: string
+  notice_hash?: string
+  channel?: string
+}
+
+/**
+ * Backend API Submission shape returned by the Nest DynamoDB routes
  */
 export interface ApiSubmission {
   event_id: string
@@ -161,6 +188,13 @@ export interface ApiSubmission {
       }>
     }
   }
+  /**
+   * Per-desk turnaround timings; absent on papers decided before the feature or
+   * with no derivable history. Read-only — written server-side.
+   */
+  desk_timings?: DeskTiming[]
+  /** RA 10173 consent of record; absent on papers filed before the consent gate. */
+  privacy_consent?: PrivacyConsent
 }
 
 /**
@@ -457,7 +491,8 @@ export function buildSaafApiPayload(
   reservationDraft?: ReservationDraft | null,
   existingEventId?: string,
   hasBudget = true,
-  fundingSources: string[] = []
+  fundingSources: string[] = [],
+  privacyConsentVersion?: string | null
 ) {
   const event_id = existingEventId || crypto.randomUUID()
   // Proposed budget is locked to the itemized Detailed Budget grand total so the
@@ -567,6 +602,12 @@ export function buildSaafApiPayload(
           : {}),
       })),
     },
+    // RA 10173 consent is only emitted on the student create/resubmit paths,
+    // which pass the notice version they consented against. The admin edit path
+    // omits it so an admin PUT never fabricates or overwrites a recorded consent.
+    ...(privacyConsentVersion
+      ? { privacy_consent: { version: privacyConsentVersion, accepted: true } }
+      : {}),
   }
 }
 
@@ -1345,6 +1386,12 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
                   (Number(curr.price_per_unit) || 0)),
             0
           ),
+    privacyConsent: submission.privacy_consent
+      ? {
+          version: submission.privacy_consent.version,
+          acceptedAt: submission.privacy_consent.accepted_at,
+        }
+      : undefined,
   }
 }
 
@@ -1363,8 +1410,12 @@ export function apiNotificationsToStepper(
     }>
     signatorySequence?: string[]
     signatoryChain?: ApiSignatoryChainLink[]
-    stageTimings?: ApiStageTiming[]
-    now?: number
+    /**
+     * Stored per-desk timings for this submission. When present, each stage's
+     * `statusText` gains a `· <duration> on desk` suffix matched by signatory id
+     * (chain path) or role (legacy path).
+     */
+    deskTimings?: DeskTiming[]
   }
 ): TrackerStepper {
   const sorted = [...notifications].sort((a, b) =>
@@ -1480,27 +1531,6 @@ export function apiNotificationsToStepper(
     }
   }
 
-  const now = options?.now ?? Date.now()
-  const usedTimings = new Set<number>()
-  const timings = options?.stageTimings ?? []
-  const timingFor = (
-    step: { signatoryId?: string },
-    idx: number
-  ): ApiStageTiming | undefined => {
-    if (step.signatoryId) {
-      const found = timings.findIndex(
-        (row, position) =>
-          !usedTimings.has(position) &&
-          stripId(row.signatory_id) === step.signatoryId
-      )
-      if (found >= 0) {
-        usedTimings.add(found)
-        return timings[found]
-      }
-    }
-    return timings[idx]
-  }
-
   const assigneesList: TrackerAssignee[] = steps.map((step, idx) => {
     const latest = latestByKey.get(step.key)
     let state: TrackerAssignee["state"] = "queued"
@@ -1528,12 +1558,25 @@ export function apiNotificationsToStepper(
       }
     }
 
+    // Append the stored time this desk took, matched by signatory id on the
+    // chain path or by role on the legacy no-chain path. Absent history (or a
+    // stage not yet acted on) leaves the status text exactly as before.
+    const timing = options?.deskTimings?.find((entry) =>
+      useChain
+        ? stripId(entry.signatory_id) === step.key
+        : (entry.role ?? "").toLowerCase() === step.key.toLowerCase()
+    )
+    const deskSuffix = formatDuration(
+      timing ? (timing.working_minutes ?? timing.wall_minutes) : null
+    )
+    if (deskSuffix) statusText = `${statusText} · ${deskSuffix} on desk`
+
     return {
       role: step.label,
       name: step.label,
       statusText,
       state,
-      turnaroundText: stageTurnaroundText(timingFor(step, idx), state, now),
+      turnaroundText: null,
     }
   })
 

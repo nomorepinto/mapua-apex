@@ -25,9 +25,9 @@ Sign-in is Amazon Cognito (OIDC). Unauthenticated hits on a guarded layout redir
 
 **Post-login hand-off** (`RoleRedirect`, first match wins): `admin` → `/admin/sessions`; `osaar` → `/osaar/dashboard`; `cdm_reviewer` → `/cdm/dashboard`; `dean` → `/dean/dashboard`; `org_adviser` → `/adviser/dashboard`; `org_submitter` → `/students/dashboard`. A signed-in user with none of those groups stays on `/` and sees `PendingAssignment` until OSAAR links the account.
 
-**Log monitor gating.** Three page groups are wrapped in an extra `AuthGuard` at the route level (constants in `src/constants/auth.ts`):
+**Log monitor gating.** Three page groups are wrapped in an extra `AuthGuard` at the route level (constants in `src/constants/auth.ts`). `SESSION_LOG_GROUPS` is now `admin`, `osaar`, and `super_admin`, which gates both `/admin/sessions` and `/osaar/sessions`:
 
-- `SESSION_LOG_GROUPS = ["admin"]` — gates `/admin/sessions`.
+- `SESSION_LOG_GROUPS = ["admin", "osaar", "super_admin"]` — gates the reused Session Log at `/admin/sessions` and `/osaar/sessions`.
 - `ACTIVITY_LOG_GROUPS = ["admin", "osaar", "cdm_reviewer", "cdm"]` — gates the Activity Log pages reused across sections (`/admin/activities`, `/osaar/activities`, `/cdm/activities`).
 - `REPORT_EXPORT_GROUPS = ["admin", "super_admin", "osaar"]` — gates the date-scoped Reports & Export page (`/admin/reports`, `/osaar/reports`). Every PDF/CSV export and its date range live there; in-place log/history panels only filter. The Session log report type is offered only to callers in `SESSION_LOG_GROUPS`, mirroring the backend `session_admin` role.
 
@@ -100,7 +100,7 @@ Layout: `OrgAdviserLayout` (`src/routes/layouts/org-adviser-layout.tsx`). Sideba
 
 ## OSAAR routes (`/osaar`)
 
-Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboard, Setup, Post-evals, Activity Log, Reports & Export.
+Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboard, Setup, Post-evals, Activity Log, Session Log, Reports & Export.
 
 | Path | Component | Source file | Notes |
 | :---- | :---- | :---- | :---- |
@@ -115,12 +115,13 @@ Layout: `OsaarLayout` (`src/routes/layouts/osaar-layout.tsx`). Sidebar: Dashboar
 | `/osaar/setup/organizations` | `AdminOrganizationsPage` | `src/routes/osaar/organizations.tsx` | Manage orgs + their adviser/dean desks. CDM is stamped from the single CDM signatory. |
 | `/osaar/setup/signatories` | `AdminSignatoriesPage` | `src/routes/osaar/signatories.tsx` | Manage signatory people. CDM stays one account; OSAAR may be several. |
 | `/osaar/setup/approval-stages` | `AdminApprovalStagesPage` | `src/routes/osaar/approval-stages.tsx` | Ordered OSAAR stages for new proposals. |
-| `/osaar/setup/term` | `OsaarTermSettingsPage` | `src/routes/osaar/term-settings.tsx` | Configure selectable academic years, the active calendar, up to five terms per year, and blackout date ranges. |
+| `/osaar/setup/term` | `OsaarTermSettingsPage` | `src/routes/osaar/term-settings.tsx` | Configure selectable academic years, the active calendar, filing lead time, up to five terms per year, and blackout date ranges. |
 | `/osaar/setup/campuses` | `AdminCampusPage` | `src/routes/osaar/campus.tsx` | Manage campuses. |
 | `/osaar/setup` (index) | redirect | — | → `organizations`. |
 | `/osaar/review` | `PassThroughLayout` | — | Index and every child redirect to `/osaar/dashboard/review`. |
 | `/osaar/activities` | `AdminMonitorActivitiesPage` | `src/routes/admin/monitor-activities.tsx` | Reused admin page, wrapped in `AuthGuard` `ACTIVITY_LOG_GROUPS`. |
-| `/osaar/reports` | `ReportsExportPage` | `src/routes/reports/reports-export.tsx` | Date-scoped report builder + PDF/CSV export, wrapped in `AuthGuard` `REPORT_EXPORT_GROUPS`. The Session log type is hidden here (OSAAR is not in `SESSION_LOG_GROUPS`). |
+| `/osaar/sessions` | `AdminMonitorSessionsPage` | `src/routes/admin/monitor-sessions.tsx` | Reused admin page, wrapped in `AuthGuard` `SESSION_LOG_GROUPS`. |
+| `/osaar/reports` | `ReportsExportPage` | `src/routes/reports/reports-export.tsx` | Date-scoped report builder + PDF/CSV export, wrapped in `AuthGuard` `REPORT_EXPORT_GROUPS`. OSAAR can export the Session log. |
 | `/osaar/about` | `About` | `src/routes/about.tsx` | Shared. |
 | `/osaar/*` | redirect | — | → `dashboard` |
 

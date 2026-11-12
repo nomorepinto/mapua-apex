@@ -18,6 +18,10 @@ import {
 } from '../common/event-date.js';
 import { abort } from '../common/http.js';
 import { record, str, type Item } from '../common/records.js';
+import {
+  PRIVACY_NOTICE_VERSION,
+  privacyNoticeHash,
+} from '../privacy/privacy-notice.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import { TermSettingsService } from '../term-settings/term-settings.service.js';
 import { assertTermDateAllowed } from '../term-settings/term-window.js';
@@ -29,7 +33,6 @@ import {
   type SignatoryStep,
 } from './routing.service.js';
 import { SubmissionRepository } from './submission.repository.js';
-import { initialStageTimings, reopenStage } from './stage-timings.js';
 
 @Injectable()
 export class SubmissionWriterService {
@@ -43,6 +46,7 @@ export class SubmissionWriterService {
 
   async create(organizationId: string, body: CreateSaafDto): Promise<Item> {
     await this.assertDates(body);
+    this.assertConsent(body);
     const dependents = await this.resolveDependents(
       organizationId,
       body.collaboration?.dependent_organization_ids ?? [],
@@ -85,7 +89,7 @@ export class SubmissionWriterService {
     item.first_submitted_at_source = 'recorded';
     item.document_number =
       await this.submissions.allocateDocumentNumber(sentAt);
-    item.stage_timings = initialStageTimings(sequence, sentAt);
+    item.privacy_consent = this.consentRecord(sentAt);
     await this.submissions.putSubmission(item, 'attribute_not_exists(SK)');
     await this.bookings.commit(planned);
     for (const dependent of dependents) {
@@ -106,6 +110,7 @@ export class SubmissionWriterService {
     body: SaafDto,
   ): Promise<{ before: Item; after: Item }> {
     await this.assertDates(body);
+    this.assertConsent(body);
     const event = await this.submissions.getEvent(eventId);
     if (
       !event ||
@@ -180,12 +185,9 @@ export class SubmissionWriterService {
       sentAt,
       planned,
     );
-    item.stage_timings = reopenStage(
-      existing.stage_timings,
-      sequence,
-      desk,
-      sentAt,
-    );
+    // A student resubmit overwrites the stored consent with this fresh
+    // acceptance; `replaceEditable` SETs it because it is not a protected field.
+    item.privacy_consent = this.consentRecord(sentAt);
     const updated = await this.submissions.replaceEditable(existing, item);
     await this.bookings.releaseRefs(previousRefs);
     await this.bookings.commit(planned);
@@ -376,15 +378,46 @@ export class SubmissionWriterService {
     return ids;
   }
 
+  /**
+   * Student create/resubmit must carry an accepted, current RA 10173 consent.
+   * The DTO's `@IsIn` already rejects a stale version at the boundary; this
+   * guard covers the absent case and re-checks acceptance so the write path
+   * never persists a submission without a valid consent of record.
+   */
+  private assertConsent(body: SaafDto): void {
+    const consent = body.privacy_consent;
+    if (
+      !consent ||
+      consent.version !== PRIVACY_NOTICE_VERSION ||
+      consent.accepted !== true
+    ) {
+      abort(422, 'Please review and accept the current data privacy notice.');
+    }
+  }
+
+  /** Consent of record: the accepted version, when, the text hash, and channel. */
+  private consentRecord(sentAt: string): Item {
+    return {
+      version: PRIVACY_NOTICE_VERSION,
+      accepted_at: sentAt,
+      notice_hash: privacyNoticeHash(),
+      channel: 'web',
+    };
+  }
+
   private async assertDates(body: SaafDto): Promise<void> {
     const start = body.activity_details.date_of_event;
     const end = body.activity_details.end_date_of_event;
-    const floor = eventDateFloorKey(this.config.allowAnyEventDate());
+    const term = await this.terms.get();
+    const floor = eventDateFloorKey(
+      this.config.allowAnyEventDate(),
+      undefined,
+      term?.event_filing_lead_days,
+    );
     if (end && end < start) {
       abort(422, 'The end date of event must be on or after the start date.');
     }
-    assertEventDateAllowed(start, floor);
-    const term = await this.terms.get();
+    assertEventDateAllowed(start, floor, term?.event_filing_lead_days);
     const lockoutDays = this.config.osaarTermLockoutDays();
     let cursor = start;
     const last = end || start;
@@ -396,7 +429,11 @@ export class SubmissionWriterService {
     if (body.venue_reservation.has_reservation) {
       for (const reservation of body.venue_reservation.reservations ?? []) {
         for (const selection of reservation.selections ?? []) {
-          assertEventDateAllowed(selection.date, floor);
+          assertEventDateAllowed(
+            selection.date,
+            floor,
+            term?.event_filing_lead_days,
+          );
           assertTermDateAllowed(selection.date, term, lockoutDays);
         }
       }

@@ -7,6 +7,7 @@ import { Reflector } from '@nestjs/core';
 import { describe, expect, it } from 'vitest';
 import { ArcusService } from '../common/decorators.js';
 import { ArcusServiceGuard } from './arcus-service.guard.js';
+import type { AppConfigService } from '../config/app-config.service.js';
 
 class Probe {
   @ArcusService()
@@ -36,8 +37,9 @@ describe('ArcusServiceGuard', () => {
   });
 });
 
-function config(token: string): { arcusServiceToken(): string } {
-  return { arcusServiceToken: () => token };
+function config(token: string): AppConfigService {
+  // Test-only partial mock: the guard reads just arcusServiceToken().
+  return { arcusServiceToken: () => token } as unknown as AppConfigService;
 }
 
 function context(handler: () => void, token: string): ExecutionContext {

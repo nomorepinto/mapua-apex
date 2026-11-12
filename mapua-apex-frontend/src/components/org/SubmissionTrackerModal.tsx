@@ -25,6 +25,7 @@ import {
   formatSignatoryRole,
   signatoryChainLabel,
 } from "@/lib/dynamodb-adapters"
+import { formatDuration, overallTurnaroundMinutes } from "@/lib/turnaround"
 import { brand, modal } from "@/config"
 import { LoadingBlock } from "@/components/ui/loading-block"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -89,7 +90,7 @@ export function SubmissionTrackerModal({
       orgSignatories: orgQuery.data?.signatories,
       signatorySequence: detailQuery.data?.signatory_sequence,
       signatoryChain: detailQuery.data?.signatory_chain,
-      stageTimings: detailQuery.data?.stage_timings,
+      deskTimings: detailQuery.data?.desk_timings,
     }
   )
 
@@ -98,6 +99,12 @@ export function SubmissionTrackerModal({
     "SAAF",
     detailQuery.data?.document_number || activity?.documentNumber
   )
+
+  // Wall-clock turnaround from first submit to final approval; null (and thus
+  // hidden) until the paper is fully approved.
+  const overallTurnaroundLabel = detailQuery.data
+    ? formatDuration(overallTurnaroundMinutes(detailQuery.data))
+    : null
 
   const canResubmit = detailQuery.data?.status === "returned"
   const isDependent = detailQuery.data?.role === "dependent"
@@ -576,6 +583,20 @@ export function SubmissionTrackerModal({
                     )}
                   </span>
                 </div>
+
+                {detailQuery.data?.privacy_consent ? (
+                  <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="font-bold text-neutral-900">
+                      Data privacy consent
+                    </span>
+                    <span className="font-medium text-neutral-600 sm:text-right">
+                      v{detailQuery.data.privacy_consent.version} accepted{" "}
+                      {formatDisplayDateTime(
+                        detailQuery.data.privacy_consent.accepted_at
+                      )}
+                    </span>
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2 pt-2">
@@ -664,6 +685,15 @@ export function SubmissionTrackerModal({
                     )}
                   </span>
                 </div>
+
+                {overallTurnaroundLabel ? (
+                  <p className="mb-4 text-xs font-medium text-neutral-600">
+                    Total time to final approval ·{" "}
+                    <span className="font-bold text-neutral-900">
+                      {overallTurnaroundLabel}
+                    </span>
+                  </p>
+                ) : null}
 
                 <div className="mb-6 flex flex-col gap-2 text-xs text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
                   <span className="min-w-0">

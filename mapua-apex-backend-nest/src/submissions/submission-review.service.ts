@@ -22,7 +22,11 @@ import {
   SubmissionRepository,
 } from './submission.repository.js';
 import { dependentIds, RoutingService } from './routing.service.js';
-import { stampStageAction } from './stage-timings.js';
+import {
+  appendDeskTiming,
+  type DeskTimingAction,
+  type DeskTimingEntry,
+} from './desk-timing.js';
 
 @Injectable()
 export class SubmissionReviewService {
@@ -72,13 +76,6 @@ export class SubmissionReviewService {
     }
     const next = sequence[index + 1];
     const sentAt = nowIso();
-    const stageTimings = stampStageAction(
-      item.stage_timings,
-      sequence,
-      bareDesk,
-      sentAt,
-      next ? (stripPrefix(next, 'SIGNATORY#') ?? next) : null,
-    );
     if (next) {
       const updated = await this.submissions.updateSubmission(
         eventId,
@@ -87,9 +84,9 @@ export class SubmissionReviewService {
           status: 'pending',
           current_signatory: next,
           signatory_sequence: sequence,
-          stage_timings: stageTimings,
           GSI2PK: next,
           GSI2SK: sentAt,
+          ...this.timingSet(item, bareDesk, 'approved', sentAt),
         },
       );
       await this.notify(
@@ -128,7 +125,7 @@ export class SubmissionReviewService {
         fully_approved_at: str(item, 'fully_approved_at') ?? sentAt,
         current_signatory: signatoryKey(bareDesk),
         signatory_sequence: sequence,
-        stage_timings: stageTimings,
+        ...this.timingSet(item, bareDesk, 'fully approved', sentAt),
       },
       ['GSI2PK', 'GSI2SK'],
     );
@@ -193,21 +190,21 @@ export class SubmissionReviewService {
     submissionId: string,
     comment: string,
   ): Promise<Item> {
-    await this.requireOpen(signatoryId, eventId, submissionId);
-    const item = await this.must(eventId, submissionId);
-    await this.bookings.releaseRefs(refsOf(item));
-    const sentAt = nowIso();
+    const item = await this.requireOpen(signatoryId, eventId, submissionId);
+    await this.bookings.releaseRefs(
+      refsOf(await this.must(eventId, submissionId)),
+    );
+    const actedAt = nowIso();
     const updated = await this.submissions.updateSubmission(
       eventId,
       submissionId,
       {
         status: 'returned',
-        stage_timings: stampStageAction(
-          item.stage_timings,
-          prefixedSequence(item),
-          signatoryId,
-          sentAt,
-          null,
+        ...this.timingSet(
+          item,
+          stripPrefix(signatoryId, 'SIGNATORY#') ?? signatoryId,
+          'returned',
+          actedAt,
         ),
       },
       ['booking_refs'],
@@ -217,7 +214,7 @@ export class SubmissionReviewService {
       signatoryId,
       'returned',
       comment,
-      sentAt,
+      actedAt,
       updated,
     );
     await this.mail.decision(updated, 'returned', comment, null);
@@ -232,18 +229,17 @@ export class SubmissionReviewService {
   ): Promise<Item> {
     const item = await this.requireOpen(signatoryId, eventId, submissionId);
     await this.bookings.releaseRefs(refsOf(item));
-    const sentAt = nowIso();
+    const actedAt = nowIso();
     const updated = await this.submissions.updateSubmission(
       eventId,
       submissionId,
       {
         status: 'denied',
-        stage_timings: stampStageAction(
-          item.stage_timings,
-          prefixedSequence(item),
-          signatoryId,
-          sentAt,
-          null,
+        ...this.timingSet(
+          item,
+          stripPrefix(signatoryId, 'SIGNATORY#') ?? signatoryId,
+          'denied',
+          actedAt,
         ),
       },
       ['GSI2PK', 'GSI2SK', 'booking_refs'],
@@ -253,7 +249,7 @@ export class SubmissionReviewService {
       signatoryId,
       'denied',
       comment,
-      sentAt,
+      actedAt,
       updated,
     );
     await this.mail.decision(updated, 'denied', comment, null);
@@ -333,6 +329,42 @@ export class SubmissionReviewService {
       throw new NotFoundException('Not Found');
     }
     return item;
+  }
+
+  /**
+   * `desk_timings` SET payload for a live decision. Resolves the acting desk's
+   * stage/role/org from the submission's stored `signatory_steps` (no extra
+   * DynamoDB read) and omits the key entirely when the desk clock cannot be
+   * established without guessing.
+   */
+  private timingSet(
+    item: Item,
+    bareDesk: string,
+    action: DeskTimingAction,
+    actedAt: string,
+  ): { desk_timings?: DeskTimingEntry[] } {
+    const steps = Array.isArray(item.signatory_steps)
+      ? item.signatory_steps
+      : [];
+    const link = steps
+      .map((step) => record(step))
+      .filter((step): step is Item => step !== null)
+      .find(
+        (step) =>
+          (stripPrefix(step.signatory_id, 'SIGNATORY#') ??
+            str(step, 'signatory_id')) === bareDesk,
+      );
+    const timings = appendDeskTiming(item, {
+      signatory_id: bareDesk,
+      stage_key: link ? str(link, 'key') : null,
+      role: link ? str(link, 'role') : null,
+      organization_id: link
+        ? stripPrefix(link.organization_id, 'ORGANIZATION#')
+        : null,
+      action,
+      acted_at: actedAt,
+    });
+    return timings ? { desk_timings: timings } : {};
   }
 
   private async notify(

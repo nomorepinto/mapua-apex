@@ -9,6 +9,7 @@ const REQUIRED = [
   'GET /api/v2/public/organizations',
   'GET /api/v2/public/validate-email',
   'POST /api/v2/public/detect-gibberish',
+  'GET /api/v2/public/privacy-notice',
   'POST /api/v2/sessions/start',
   'PATCH /api/v2/sessions/:sessionId/heartbeat',
   'POST /api/v2/sessions/:sessionId/end',
@@ -118,12 +119,13 @@ describe('route inventory', () => {
   });
 });
 
-function collect(app: {
-  _router?: { stack: Layer[] };
-  router?: { stack: Layer[] };
-}): string[] {
+function collect(app: unknown): string[] {
+  const router = app as {
+    _router?: { stack: Layer[] };
+    router?: { stack: Layer[] };
+  };
   const found: string[] = [];
-  walk(app.router?.stack ?? app._router?.stack ?? [], '', found);
+  walk(router.router?.stack ?? router._router?.stack ?? [], '', found);
   return found;
 }
 

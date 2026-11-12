@@ -143,14 +143,6 @@ SK: SUBMISSION#uuid
 submission_type: string
 sent_at: timestamp (latest submission/resubmission, not original filing time)
 document_number: string (SAAF-YYMMDD-###, assigned once at create from COUNTER#SAAF#YYMMDD; absent on older papers; edits never change it)
-stage_timings: [                          (per desk, written at create and updated on approve/return/deny/resubmit; absent on older papers)
-  {
-    signatory_id: SIGNATORY#uuid,
-    entered_at: timestamp | null,   (when the paper reached this desk)
-    acted_at: timestamp | null,     (when this desk approved, returned, or denied)
-    expected_tat_hours: number      (24 at filing; kept so a later policy change does not rewrite history)
-  }
-]
 first_submitted_at: timestamp (optional legacy; server-owned immutable first filing)
 first_submitted_at_source: "recorded" | "linked_creation_evidence" (optional legacy)
 fully_approved_at: timestamp (optional; server-owned first final approval)
@@ -171,6 +163,26 @@ signatory_steps: [                         (same snapshot, with stable keys; abs
     organization_id: ORGANIZATION#uuid | null
   }
 ]
+desk_timings: [                            (per-desk turnaround; one entry appended per decision, absent until the first hop is acted on)
+  {
+    stage_key: "adviser:ORG#uuid" | "dean:ORG#uuid" | "osaar_1" | "cdm" | null,
+    role: "adviser" | "dean" | "osaar" | "cdm" | null,
+    signatory_id: string                   (bare SIGNATORY uuid),
+    organization_id: ORGANIZATION#uuid | null,
+    action: "approved" | "fully approved" | "returned" | "denied",
+    entered_at: timestamp | null           (the later of sent_at and the previous entry's acted_at),
+    acted_at: timestamp,
+    wall_minutes: number | null            (wall-clock elapsed entered_at -> acted_at),
+    working_minutes: number | null         (Manila working hours Mon-Fri 08:00-17:00, fixed UTC+8, no holidays),
+    source: "decision" | "backfill"        ("backfill" = legacy paper reconstructed from its notifications)
+  }
+]
+privacy_consent: {                         (RA 10173 consent of record; written on create and rewritten on every resubmit)
+  version: string                          (the accepted PRIVACY_NOTICE_VERSION, e.g. "1.0"),
+  accepted_at: timestamp,
+  notice_hash: string                      (sha256 of the canonical notice text at acceptance),
+  channel: "web"
+}
 signatory_chain is derived at read time, never persisted.
 approval_chain_contacts is derived at read time on the student detail only,
 never persisted (see the SIGNATORY contact attributes below).
@@ -774,9 +786,6 @@ json
   "submission_type": "saaf",
   "sent_at": "2026-09-10T14:00:00Z",
   "document_number": "SAAF-260910-001",
-  "stage_timings": [
-    { "signatory_id": "SIGNATORY#adv001", "entered_at": "2026-09-10T14:00:00Z", "acted_at": null, "expected_tat_hours": 24 }
-  ],
   "status": "pending",
   "current_signatory": "SIGNATORY#adv001",
   "signatory_sequence": ["SIGNATORY#adv001", "SIGNATORY#osaar", "SIGNATORY#osaar2", "SIGNATORY#cdm"],
@@ -1161,7 +1170,7 @@ No new table, GSI, report-storage item, or visit-log collection is introduced.
 POST report handlers under the admin session/activity/submission/post-evaluation/
 campus reservation-change collections return HTTP 200 public JSON and no-store.
 Report generation is role-gated: the session report requires session_admin
-(admin, super_admin) and the four collection reports require report_admin
+(admin, osaar, super_admin) and the four collection reports require report_admin
 (admin, osaar, super_admin). The former student and signatory report handlers
 were removed; in-place log/history panels only filter, and every date range and
 PDF/CSV export lives on the gated Reports & Export page.
@@ -1308,6 +1317,7 @@ TERM SETTINGS (singleton)
   PK: OSAAR#TERM
   SK: OSAAR#TERM
   active_academic_year_id: string
+  event_filing_lead_days: integer (0-90, default 10)
   academic_years: [{
     id: string
     label: string

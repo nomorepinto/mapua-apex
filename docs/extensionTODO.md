@@ -179,7 +179,7 @@ Pages: [`src/routes/students/dashboard.tsx`](../mapua-apex-frontend/src/routes/s
 
 ### D-1. Milestone modal: turnaround time + elapsed hours before approval **[frontend + backend]**
 
-**Status:** Done. Each desk stores `entered_at` / `acted_at` and a 24-hour expected TAT. The Milestone & Progress tab shows both, and a decided proposal card shows that desk's elapsed time.
+**Status: Partially closed** — the per-stage `entered_at`/`acted_at` timestamps now persist as `desk_timings[]` on the submission, and the "Milestone & Progress" tab shows each desk's `<duration> on desk` plus a `Total time to final approval` line (working minutes use Manila working hours). Still open: the elapsed-time suffix on the decided submission cards (`submissions-panel.tsx`, `student-calendar-card.tsx`) — the agreed display scope for this pass was limited to the tracker modal.
 Raw notes: *"note turnaround time sa milestones"* · *"tapos timestamp kung ilang
 oras nagtake bago maapprove"* · *"add turn around time to milestone modal, add
 hours before approved"*.
@@ -279,6 +279,12 @@ Raw notes: *"maam eira (tama ba spelling) at sir bobet"* · *"John Benedict"* ·
 ### O-OSAAR-1. Filing lead time: **10 calendar days** before the event — T&C wording only **[frontend]**
 Raw note: *"osaar should be able to send 10 days before"*.
 
+**Implemented extension:** OSAAR can now configure the minimum filing lead time
+from `/osaar/setup/term`. The persisted `event_filing_lead_days` value accepts
+0–90 Manila calendar days and defaults to 10 for existing calendar records;
+the submission API remains the authoritative enforcement point and the SAAF
+date picker reflects the configured value.
+
 - The 10-day minimum event-date lead is **already implemented and enforced in
   code** — `EVENT_DATE_MIN_LEAD_DAYS = 10`
   ([`date-key.ts`](../mapua-apex-frontend/src/lib/date-key.ts)) on the frontend,
@@ -299,6 +305,11 @@ Raw note: *"osaar should be able to send 10 days before"*.
 
 ### O-OSAAR-2. OSAAR can view the activity **and session** log pages **[frontend + backend]**
 Raw note: *"osaar should be able to view activity and session logs page"*.
+
+**Implemented:** OSAAR now has `/osaar/sessions`, reusing the shared session
+monitor and sidebar pattern. The `session_admin` permission also admits OSAAR,
+so the monitor and Session log report/export work without a frontend/backend
+authorization mismatch.
 
 - **Activity log is already available to OSAAR**: `osaar` is in
   `ACTIVITY_LOG_GROUPS` and the `/osaar/activities` page exists
@@ -349,7 +360,10 @@ spaces, laboratories"*.
 Pages: [`reports-export.tsx`](../mapua-apex-frontend/src/routes/reports/reports-export.tsx),
 [`monitor-activities.tsx`](../mapua-apex-frontend/src/routes/admin/monitor-activities.tsx).
 
-### A-3. Turnaround-time metrics in reports **[backend + frontend]**
+### ~~A-3. Turnaround-time metrics in reports~~ **[backend + frontend]**
+
+**Status: Closed** — the proposal report persists per-desk `desk_timings[]` on each SUBMISSION and exports `overall_turnaround_working_minutes`, per-role `{adviser,dean,osaar,cdm}_desk_working_minutes`, `duration_minutes` (wall-clock), `desk_history`, and the consent columns; summaries add the per-desk medians, `average_cdm_desk_working_minutes`, `cdm_desk_sample_count`, `median_overall_turnaround_working_minutes`, `proposals_missing_desk_history`, a `desk_median_working_minutes` breakdown, a `desk_history` facet, and a no-history coverage warning. CDM is measured per-desk and OSAAR overall, per the raw note; working minutes count Manila working hours (Mon–Fri 08:00–17:00).
+
 Raw notes: *"turnaround time lang ng cdm sana ung logs, sa osaar overall na"*.
 
 - Proposal report gains: per-desk duration (CDM from its own action logs) and an
@@ -358,7 +372,10 @@ Raw notes: *"turnaround time lang ng cdm sana ung logs, sa osaar overall na"*.
   [`reporting.ts`](../mapua-apex-frontend/src/lib/reporting.ts)) — extend with
   per-stage breakdown and export columns.
 
-### A-4. Data Privacy Act disclaimer / consent **[frontend + backend]**
+### ~~A-4. Data Privacy Act disclaimer / consent~~ **[frontend + backend]**
+
+**Status: Closed** — a versioned RA 10173 notice lives in the backend (`PRIVACY_NOTICE_VERSION`, drafted for RD-7 legal review) served by public `GET /api/v2/public/privacy-notice`; the pre-submit dialog gates Proceed behind a consent checkbox that re-asks on every resubmit, the SAAF DTO rejects a stale/unaccepted version (`422`), and the writer persists `privacy_consent { version, accepted_at, notice_hash, channel }`. It is shown in the tracker's Document Details tab and exported via the `privacy_consent_version`/`privacy_consent_at` report columns. Implemented as a standalone gate — the S-1 T&C set is untouched.
+
 Raw note: *"data privacy act disclaimer - pwedeng magamit yung data nila sa
 relevant facilities"*.
 

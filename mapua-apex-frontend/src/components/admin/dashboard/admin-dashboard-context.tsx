@@ -191,7 +191,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       orgSignatories: signatoriesQuery.data,
       signatorySequence: detailQuery.data?.signatory_sequence,
       signatoryChain: detailQuery.data?.signatory_chain,
-      stageTimings: detailQuery.data?.stage_timings,
+      deskTimings: detailQuery.data?.desk_timings,
     }
   )
 

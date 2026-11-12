@@ -12,7 +12,7 @@ const filters = { start_date: '2024-02-29', end_date: '2024-02-29' };
 // student/signatory report endpoints were removed, and the reservation-changes
 // report is now `report_admin`, so CDM reviewers can no longer export it.
 const routes: [string, keyof typeof TOKENS][] = [
-  ['admins/monitor/sessions', 'admin'],
+  ['admins/monitor/sessions', 'osaar'],
   ['admins/monitor/activity', 'osaar'],
   ['admins/submissions', 'admin'],
   ['admins/postevals', 'osaar'],
@@ -81,9 +81,8 @@ describe('authorized report contracts', () => {
       expect(invalid.body.code).toBe('INVALID_REPORT_FILTER');
     });
   }
-  it('keeps sessions super-admin-only and narrows activity reports to report admins', async () => {
+  it('allows OSAAR session reports and rejects callers outside report permissions', async () => {
     for (const token of [
-      'osaar',
       'cdm',
       'student',
       'signatory',
@@ -103,6 +102,19 @@ describe('authorized report contracts', () => {
         .set('Authorization', bearer(token))
         .expect(401);
     }
+    await request(app.getHttpServer())
+      .post('/api/v2/admins/monitor/sessions/report')
+      .set('Authorization', bearer('osaar'))
+      .send({ filters })
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v2/admins/monitor/sessions')
+      .set('Authorization', bearer('osaar'))
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v2/admins/monitor/sessions/any')
+      .set('Authorization', bearer('osaar'))
+      .expect(404);
     // Activity reports are now `report_admin` (admin + osaar + super_admin), so
     // CDM reviewers lose export access while OSAAR keeps it.
     await request(app.getHttpServer())

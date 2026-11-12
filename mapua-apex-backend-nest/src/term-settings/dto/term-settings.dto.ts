@@ -3,8 +3,12 @@ import {
   ArrayMinSize,
   IsArray,
   IsDateString,
+  IsInt,
+  IsOptional,
   IsString,
   MaxLength,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -22,6 +26,12 @@ export class BlackoutDto {
 }
 
 export class UpdateTermSettingsDto {
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(90)
+  event_filing_lead_days?: number;
+
   @IsString()
   @MaxLength(40)
   active_academic_year_id!: string;

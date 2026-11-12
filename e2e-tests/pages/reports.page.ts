@@ -66,4 +66,51 @@ export class ReportsPage {
     expect(download.suggestedFilename()).toContain(typeSlug)
     expect(download.suggestedFilename()).toMatch(/\.summary\.csv$/)
   }
+
+  /**
+   * The Proposal statistics summary always carries the per-desk turnaround
+   * cards, so their labels are present even before any desk time is recorded.
+   */
+  async expectTurnaroundSummary() {
+    const preview = this.page.getByRole("region", { name: "Report preview" })
+    await expect(preview.getByText("Median CDM desk time (working minutes)")).toBeVisible()
+    await expect(preview.getByText("Median overall turnaround (working minutes)")).toBeVisible()
+  }
+
+  /**
+   * Tick exportable columns in the "Export columns and appendices" picker. Each
+   * change invalidates the preview, so the caller must refresh before downloading.
+   */
+  async selectColumns(labels: string[]) {
+    const search = this.page.getByLabel("Search Export columns and appendices")
+    for (const label of labels) {
+      await search.fill(label)
+      const option = this.page.getByText(label, { exact: true })
+      await expect(option).toBeVisible()
+      await option.click()
+    }
+    await search.fill("")
+  }
+
+  /** Re-run the report after a content change so the downloads unlock again. */
+  async refreshPreview() {
+    const refresh = this.page.getByRole("button", { name: "Refresh preview" })
+    await expect(refresh).toBeEnabled()
+    await refresh.click()
+    const panel = this.page.getByRole("region", { name: "Report preview" })
+    await expect(panel).toBeVisible()
+    await expect(panel.getByText("matching records")).toBeVisible()
+  }
+
+  /** Download the detail-row CSV and assert Playwright captured the local file. */
+  async downloadDetailsCsv(typeSlug: string) {
+    await this.unlockDownloads()
+    const details = this.page.getByRole("button", { name: "Detail CSV" })
+    await expect(details).toBeEnabled({ timeout: 30_000 })
+    const pending = this.page.waitForEvent("download")
+    await details.click()
+    const download = await pending
+    expect(download.suggestedFilename()).toContain(typeSlug)
+    expect(download.suggestedFilename()).toMatch(/\.details\.csv$/)
+  }
 }

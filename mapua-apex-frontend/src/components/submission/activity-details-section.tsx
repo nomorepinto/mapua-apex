@@ -86,7 +86,9 @@ export function ActivityDetailsSection({
   fallbackTitle?: string
 }) {
   const displayTitle = values.activityTitle || fallbackTitle || ""
-  const descriptionGibberish = useGibberishField(values.activityDescription || "")
+  const descriptionGibberish = useGibberishField(
+    values.activityDescription || ""
+  )
   const objectivesGibberish = useGibberishField(values.activityObjectives || "")
 
   useEffect(() => {
@@ -95,21 +97,30 @@ export function ActivityDetailsSection({
     }
   }, [values.activityTitle, displayTitle, onChange])
 
-  const minStartDate = eventDateFloorKey()
   const termQuery = usePublicTermSettingsQuery()
+  const filingLeadDays = termQuery.data?.event_filing_lead_days
+  const minStartDate = eventDateFloorKey(filingLeadDays)
   const termBlockReason = (date: Date) => {
     const term = termQuery.data
     if (!term) return undefined
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
-    const year = term.academic_years.find((entry) => entry.id === term.active_academic_year_id)
-    const active = year?.terms.find((entry) => key >= entry.start && key <= entry.end)
+    const year = term.academic_years.find(
+      (entry) => entry.id === term.active_academic_year_id
+    )
+    const active = year?.terms.find(
+      (entry) => key >= entry.start && key <= entry.end
+    )
     if (!active) return "Term break — outside the active academic calendar."
-    const blackout = active.blackouts.find((row) => key >= row.start && key <= row.end)
+    const blackout = active.blackouts.find(
+      (row) => key >= row.start && key <= row.end
+    )
     if (blackout) return `Blackout: ${blackout.reason}.`
     const lockout = new Date(`${active.end}T12:00:00`)
     lockout.setDate(lockout.getDate() - 13)
     const lockoutKey = `${lockout.getFullYear()}-${String(lockout.getMonth() + 1).padStart(2, "0")}-${String(lockout.getDate()).padStart(2, "0")}`
-    return key >= lockoutKey ? `${active.label} is in its term-end lockout period.` : undefined
+    return key >= lockoutKey
+      ? `${active.label} is in its term-end lockout period.`
+      : undefined
   }
   const isTermBlocked = (date: Date) => Boolean(termBlockReason(date))
   const minEndDate =
@@ -231,11 +242,13 @@ export function ActivityDetailsSection({
         </div>
 
         <div className="space-y-1.5">
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between">
             <label className="block text-xs font-semibold text-neutral-800">
               Description <span className="text-red-500">*</span>
             </label>
-            <span className={`text-[11px] ${values.activityDescription.length < 100 ? "text-amber-600 font-medium" : "text-neutral-400"}`}>
+            <span
+              className={`text-[11px] ${values.activityDescription.length < 100 ? "font-medium text-amber-600" : "text-neutral-400"}`}
+            >
               {values.activityDescription.length}/100 min
             </span>
           </div>
@@ -259,11 +272,13 @@ export function ActivityDetailsSection({
         </div>
 
         <div className="space-y-1.5">
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between">
             <label className="block text-xs font-semibold text-neutral-800">
               Objectives of the Activity <span className="text-red-500">*</span>
             </label>
-            <span className={`text-[11px] ${values.activityObjectives.length < 50 ? "text-amber-600 font-medium" : "text-neutral-400"}`}>
+            <span
+              className={`text-[11px] ${values.activityObjectives.length < 50 ? "font-medium text-amber-600" : "text-neutral-400"}`}
+            >
               {values.activityObjectives.length}/50 min
             </span>
           </div>
@@ -366,7 +381,7 @@ export function ActivityDetailsSection({
             )}
             {!scheduleLocked && !ALLOW_ANY_EVENT_DATE && (
               <span className="block text-[10px] text-neutral-500">
-                At least 10 days from today
+                At least {filingLeadDays ?? 10} calendar days from today
               </span>
             )}
             {!scheduleLocked && termQuery.data ? (
@@ -425,7 +440,8 @@ export function ActivityDetailsSection({
           {scheduleLocked ? (
             <>
               <label className="block text-xs font-semibold text-neutral-800">
-                Time of Event (Start to End) <span className="text-red-500">*</span>
+                Time of Event (Start to End){" "}
+                <span className="text-red-500">*</span>
               </label>
               <Input
                 name="timeOfEvent"
@@ -444,7 +460,9 @@ export function ActivityDetailsSection({
               end={endParts}
               onStartHour={(hour) => updateStart(withHour(startParts, hour))}
               onStartMinute={(minute) => updateStart({ ...startParts, minute })}
-              onStartPeriod={(period) => updateStart(withPeriod(startParts, period))}
+              onStartPeriod={(period) =>
+                updateStart(withPeriod(startParts, period))
+              }
               onEndHour={(hour) => updateEnd(withHour(endParts, hour))}
               onEndMinute={(minute) => updateEnd({ ...endParts, minute })}
               onEndPeriod={(period) => updateEnd(withPeriod(endParts, period))}
@@ -465,7 +483,10 @@ export function ActivityDetailsSection({
           <input
             type="hidden"
             name="timeOfEvent"
-            value={values.timeOfEvent || combineEventTime(format24(startParts), format24(endParts))}
+            value={
+              values.timeOfEvent ||
+              combineEventTime(format24(startParts), format24(endParts))
+            }
             required
           />
           <FieldWarning name="timeOfEvent" />

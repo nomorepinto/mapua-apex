@@ -214,7 +214,17 @@ export class SaafPage {
 
   async submit() {
     await this.page.getByRole("button", { name: "Submit", exact: true }).click()
-    await this.page.getByRole("button", { name: "Proceed" }).click()
+    // The RA 10173 gate: Proceed stays disabled until the notice is ticked, and
+    // the label names a version only once the backend notice has loaded.
+    const proceed = this.page.getByRole("button", { name: "Proceed" })
+    await expect(proceed).toBeDisabled()
+    const consent = this.page.getByText(
+      /I have read and agree to the Data Privacy Act of 2012 \(RA 10173\) notice \(v/,
+    )
+    await expect(consent).toBeVisible()
+    await consent.click()
+    await expect(proceed).toBeEnabled()
+    await proceed.click()
     await expect(this.page.getByRole("heading", { name: "Activity Application Submitted!" })).toBeVisible()
     await this.page.getByRole("button", { name: "Back to Dashboard" }).click()
     await expect(this.page).toHaveURL(/\/students\/dashboard/)
@@ -265,7 +275,6 @@ export async function trackerRoles(page: Page, title: string): Promise<string[]>
   const dialog = page.getByRole("dialog", { name: `${title} Proposal` })
   await dialog.getByRole("button", { name: "Milestone & Progress" }).click()
   await expect(dialog.getByText(/SAAF-\d{6}-\d{3}/).first()).toBeVisible()
-  await expect(dialog.getByText("Expected 1 day").first()).toBeVisible()
   const reviewers = dialog.getByText("Required Reviewers", { exact: true }).locator("xpath=..")
   await expect(reviewers).toBeVisible()
   const labels = await reviewers.locator("span.font-bold").allTextContents()
@@ -313,6 +322,47 @@ export async function trackerSignatories(
   }
   await dialog.getByRole("button", { name: "Close", exact: true }).filter({ hasText: "Close" }).click()
   return desks
+}
+
+/**
+ * Open a filed paper's tracker on Document Details and read the recorded
+ * RA 10173 consent line, e.g. "Data privacy consent v1.0 accepted <Manila>".
+ */
+export async function trackerConsent(page: Page, title: string): Promise<string> {
+  await page.goto("/students/dashboard")
+  await page.getByRole("region", { name: "Proposal statistics filters" }).getByLabel("Search records").fill(title)
+  await page.locator("tr").filter({ hasText: title }).first().click()
+  const dialog = page.getByRole("dialog", { name: `${title} Proposal` })
+  await dialog.getByRole("button", { name: "Document Details", exact: true }).click()
+  const row = dialog.getByText("Data privacy consent", { exact: true }).locator("xpath=..")
+  await expect(row).toBeVisible()
+  const text = (await row.innerText()).replace(/\s+/g, " ").trim()
+  await dialog.getByRole("button", { name: "Close", exact: true }).filter({ hasText: "Close" }).click()
+  return text
+}
+
+/**
+ * Open a decided paper's tracker on Milestone & Progress and read the overall
+ * turnaround line plus every per-desk "<duration> on desk" suffix. `total` is
+ * null until the paper is fully approved.
+ */
+export async function trackerTurnaround(
+  page: Page,
+  title: string,
+): Promise<{ total: string | null; deskDurations: string[] }> {
+  await page.goto("/students/dashboard")
+  await page.getByRole("region", { name: "Proposal statistics filters" }).getByLabel("Search records").fill(title)
+  await page.locator("tr").filter({ hasText: title }).first().click()
+  const dialog = page.getByRole("dialog", { name: `${title} Proposal` })
+  await dialog.getByRole("button", { name: "Milestone & Progress" }).click()
+  const totalLine = dialog.getByText(/Total time to final approval/)
+  const total =
+    (await totalLine.count()) > 0
+      ? (await totalLine.first().innerText()).replace(/\s+/g, " ").trim()
+      : null
+  const desks = await dialog.getByText(/on desk/).allTextContents()
+  await dialog.getByRole("button", { name: "Close", exact: true }).filter({ hasText: "Close" }).click()
+  return { total, deskDurations: desks.map((text) => text.replace(/\s+/g, " ").trim()) }
 }
 
 export function rolesMatch(actual: string[], expected: string[]) {

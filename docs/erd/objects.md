@@ -94,19 +94,20 @@ submission, including any collaboration.
 | `first_submitted_at_source` | string, optional | `recorded` on new submissions or `linked_creation_evidence` from conservative backfill |
 | `fully_approved_at` | timestamp, optional | First successful final approval, set once and preserved through completion/cancellation |
 | `document_number` | string, optional | `SAAF-YYMMDD-###`, assigned once at create. The UUID in `SK` stays the key. Absent on papers filed before the counter |
-| `stage_timings` | list, optional | One `{ signatory_id, entered_at, acted_at, expected_tat_hours }` per desk. `expected_tat_hours` is 24 at filing. Absent on older papers |
 | `status` | string | `pending / approved / denied / returned / finished / cancelled`. `finished` is terminal and set only when OSAAR approves the event's POSTEVAL (see below). `cancelled` is terminal and has two writers: a CDM `cancel` resolution of a RESERVATION_CHANGE, and the auto-cancel DynamoDB Streams consumer when a `CANCELWATCH` sentinel's TTL lapses with nothing filed (see below) |
 | `cancelled_at` | timestamp | Optional — set only by the auto-cancel stream consumer (the CDM cancel path does not stamp it) |
 | `current_signatory` | string | `SIGNATORY#uuid` holding the paper now |
 | `signatory_sequence` | list | Ordered `SIGNATORY#uuid` routing snapshot, written at submit time |
 | `signatory_steps` | list | Same snapshot with `{ key, role, signatory_id, organization_id }`. Keys: `adviser:ORG#id`, `dean:ORG#id`, `osaar_1`..`n`, `cdm`. Absent on items sent before stages were stored; those items are not backfilled |
+| `desk_timings` | list | Per-desk turnaround, one entry appended per decision: `{ stage_key, role, signatory_id, organization_id, action, entered_at, acted_at, wall_minutes, working_minutes, source }`. `action` is `approved / fully approved / returned / denied`; `working_minutes` counts Manila working hours (Mon–Fri 08:00–17:00, fixed UTC+8, no holidays); `source` is `decision` (live) or `backfill` (legacy reconstruction from notifications). Absent until the first hop is acted on |
+| `privacy_consent` | map | RA 10173 consent of record `{ version, accepted_at, notice_hash, channel }`, written on create and rewritten on every resubmit against the current notice version |
 | `collaboration.dependent_organization_ids` | list | `ORGANIZATION#uuid` dependents; empty/absent = no collaboration |
 | `GSI1PK` | string | `ORGANIZATION#uuid` (proponent org) |
 | `GSI1SK` | string | `SUBMISSION#uuid` |
 | `GSI2PK` | string | `SIGNATORY#uuid` — sparse signatory inbox (present while `pending`/`returned`) |
 | `GSI2SK` | timestamp | Desk queue time |
 
-The NestJS `/api/v2` report API enumerates the authorized organization/collaboration scope before applying dates; GSI1 is organization/ID-based, not date-based. Editable updates condition on status/latest date/current desk and do not overwrite reporting timestamps from stale reads. Final approval uses `if_not_exists`. Historical recovery is dry-run-first, accepts only reliable linked creation/final-approval evidence, and conditionally avoids replacing concurrent values. Unknown dates and log retention produce explicit coverage notes, never fabricated cohort dates. Reports do not create persistent data objects.
+The NestJS `/api/v2` report API enumerates the authorized organization/collaboration scope before applying dates; GSI1 is organization/ID-based, not date-based. Editable updates condition on status/latest date/current desk and do not overwrite reporting timestamps from stale reads. Final approval uses `if_not_exists`. Historical recovery is dry-run-first, accepts only reliable linked creation/final-approval evidence, and conditionally avoids replacing concurrent values. Unknown dates and log retention produce explicit coverage notes, never fabricated cohort dates. Reports do not create persistent data objects. Per-desk `desk_timings` are appended by each decision (working minutes use Manila working hours); a dry-run-first legacy backfill reconstructs them from notification history, marks `source: backfill`, and conditionally skips items that already carry timings.
 
 ### activity_classification
 
