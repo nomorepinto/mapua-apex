@@ -142,6 +142,15 @@ PK: EVENT#uuid
 SK: SUBMISSION#uuid
 submission_type: string
 sent_at: timestamp (latest submission/resubmission, not original filing time)
+document_number: string (SAAF-YYMMDD-###, assigned once at create from COUNTER#SAAF#YYMMDD; absent on older papers; edits never change it)
+stage_timings: [                          (per desk, written at create and updated on approve/return/deny/resubmit; absent on older papers)
+  {
+    signatory_id: SIGNATORY#uuid,
+    entered_at: timestamp | null,   (when the paper reached this desk)
+    acted_at: timestamp | null,     (when this desk approved, returned, or denied)
+    expected_tat_hours: number      (24 at filing; kept so a later policy change does not rewrite history)
+  }
+]
 first_submitted_at: timestamp (optional legacy; server-owned immutable first filing)
 first_submitted_at_source: "recorded" | "linked_creation_evidence" (optional legacy)
 fully_approved_at: timestamp (optional; server-owned first final approval)
@@ -764,6 +773,10 @@ json
   "SK": "SUBMISSION#s001",
   "submission_type": "saaf",
   "sent_at": "2026-09-10T14:00:00Z",
+  "document_number": "SAAF-260910-001",
+  "stage_timings": [
+    { "signatory_id": "SIGNATORY#adv001", "entered_at": "2026-09-10T14:00:00Z", "acted_at": null, "expected_tat_hours": 24 }
+  ],
   "status": "pending",
   "current_signatory": "SIGNATORY#adv001",
   "signatory_sequence": ["SIGNATORY#adv001", "SIGNATORY#osaar", "SIGNATORY#osaar2", "SIGNATORY#cdm"],

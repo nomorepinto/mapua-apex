@@ -22,6 +22,7 @@ import {
   SubmissionRepository,
 } from './submission.repository.js';
 import { dependentIds, RoutingService } from './routing.service.js';
+import { stampStageAction } from './stage-timings.js';
 
 @Injectable()
 export class SubmissionReviewService {
@@ -71,6 +72,13 @@ export class SubmissionReviewService {
     }
     const next = sequence[index + 1];
     const sentAt = nowIso();
+    const stageTimings = stampStageAction(
+      item.stage_timings,
+      sequence,
+      bareDesk,
+      sentAt,
+      next ? (stripPrefix(next, 'SIGNATORY#') ?? next) : null,
+    );
     if (next) {
       const updated = await this.submissions.updateSubmission(
         eventId,
@@ -79,6 +87,7 @@ export class SubmissionReviewService {
           status: 'pending',
           current_signatory: next,
           signatory_sequence: sequence,
+          stage_timings: stageTimings,
           GSI2PK: next,
           GSI2SK: sentAt,
         },
@@ -119,6 +128,7 @@ export class SubmissionReviewService {
         fully_approved_at: str(item, 'fully_approved_at') ?? sentAt,
         current_signatory: signatoryKey(bareDesk),
         signatory_sequence: sequence,
+        stage_timings: stageTimings,
       },
       ['GSI2PK', 'GSI2SK'],
     );
@@ -184,13 +194,22 @@ export class SubmissionReviewService {
     comment: string,
   ): Promise<Item> {
     await this.requireOpen(signatoryId, eventId, submissionId);
-    await this.bookings.releaseRefs(
-      refsOf(await this.must(eventId, submissionId)),
-    );
+    const item = await this.must(eventId, submissionId);
+    await this.bookings.releaseRefs(refsOf(item));
+    const sentAt = nowIso();
     const updated = await this.submissions.updateSubmission(
       eventId,
       submissionId,
-      { status: 'returned' },
+      {
+        status: 'returned',
+        stage_timings: stampStageAction(
+          item.stage_timings,
+          prefixedSequence(item),
+          signatoryId,
+          sentAt,
+          null,
+        ),
+      },
       ['booking_refs'],
     );
     await this.notify(
@@ -198,7 +217,7 @@ export class SubmissionReviewService {
       signatoryId,
       'returned',
       comment,
-      nowIso(),
+      sentAt,
       updated,
     );
     await this.mail.decision(updated, 'returned', comment, null);
@@ -213,10 +232,20 @@ export class SubmissionReviewService {
   ): Promise<Item> {
     const item = await this.requireOpen(signatoryId, eventId, submissionId);
     await this.bookings.releaseRefs(refsOf(item));
+    const sentAt = nowIso();
     const updated = await this.submissions.updateSubmission(
       eventId,
       submissionId,
-      { status: 'denied' },
+      {
+        status: 'denied',
+        stage_timings: stampStageAction(
+          item.stage_timings,
+          prefixedSequence(item),
+          signatoryId,
+          sentAt,
+          null,
+        ),
+      },
       ['GSI2PK', 'GSI2SK', 'booking_refs'],
     );
     await this.notify(
@@ -224,7 +253,7 @@ export class SubmissionReviewService {
       signatoryId,
       'denied',
       comment,
-      nowIso(),
+      sentAt,
       updated,
     );
     await this.mail.decision(updated, 'denied', comment, null);

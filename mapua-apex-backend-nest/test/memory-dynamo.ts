@@ -141,6 +141,10 @@ export class MemoryDynamo implements DynamoPort {
     for (const [name, value] of Object.entries(args.setIfAbsent ?? {})) {
       if (next[name] === undefined) next[name] = value;
     }
+    for (const [name, value] of Object.entries(args.add ?? {})) {
+      const current = Number(next[name] ?? 0);
+      next[name] = (Number.isFinite(current) ? current : 0) + value;
+    }
     for (const name of args.remove ?? []) {
       delete next[name];
     }

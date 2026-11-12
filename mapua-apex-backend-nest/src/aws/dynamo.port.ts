@@ -46,6 +46,8 @@ export interface UpdateArgs {
   key: Record<string, unknown>;
   set?: Record<string, unknown>;
   setIfAbsent?: Record<string, unknown>;
+  /** Numeric ADD. Used by the per-day SAAF document counter. */
+  add?: Record<string, number>;
   remove?: string[];
   condition?: string;
   values?: Record<string, unknown>;

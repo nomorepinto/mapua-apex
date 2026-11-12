@@ -29,6 +29,7 @@ import {
   type SignatoryStep,
 } from './routing.service.js';
 import { SubmissionRepository } from './submission.repository.js';
+import { initialStageTimings, reopenStage } from './stage-timings.js';
 
 @Injectable()
 export class SubmissionWriterService {
@@ -82,6 +83,9 @@ export class SubmissionWriterService {
     );
     item.first_submitted_at = sentAt;
     item.first_submitted_at_source = 'recorded';
+    item.document_number =
+      await this.submissions.allocateDocumentNumber(sentAt);
+    item.stage_timings = initialStageTimings(sequence, sentAt);
     await this.submissions.putSubmission(item, 'attribute_not_exists(SK)');
     await this.bookings.commit(planned);
     for (const dependent of dependents) {
@@ -175,6 +179,12 @@ export class SubmissionWriterService {
       'pending',
       sentAt,
       planned,
+    );
+    item.stage_timings = reopenStage(
+      existing.stage_timings,
+      sequence,
+      desk,
+      sentAt,
     );
     const updated = await this.submissions.replaceEditable(existing, item);
     await this.bookings.releaseRefs(previousRefs);

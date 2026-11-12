@@ -89,7 +89,14 @@ export function SubmissionTrackerModal({
       orgSignatories: orgQuery.data?.signatories,
       signatorySequence: detailQuery.data?.signatory_sequence,
       signatoryChain: detailQuery.data?.signatory_chain,
+      stageTimings: detailQuery.data?.stage_timings,
     }
+  )
+
+  const documentCode = formatDocumentId(
+    submissionId || activity?.submissionId,
+    "SAAF",
+    detailQuery.data?.document_number || activity?.documentNumber
   )
 
   const canResubmit = detailQuery.data?.status === "returned"
@@ -97,9 +104,9 @@ export function SubmissionTrackerModal({
   const isDenied = detailQuery.data?.status === "denied"
   const canRequestReservationChange = Boolean(
     onRequestReservationChange &&
-      !isDependent &&
-      detailQuery.data?.status === "approved" &&
-      detailQuery.data?.venue_reservation?.has_reservation
+    !isDependent &&
+    detailQuery.data?.status === "approved" &&
+    detailQuery.data?.venue_reservation?.has_reservation
   )
 
   const returnNotifications = useMemo(() => {
@@ -196,7 +203,7 @@ export function SubmissionTrackerModal({
                 className="rounded-md bg-white/20 px-2.5 py-0.5 font-mono text-xs font-bold text-white shadow-2xs"
                 title={submissionId || activity?.submissionId || undefined}
               >
-                {formatDocumentId(submissionId || activity?.submissionId)}
+                {documentCode}
               </span>
               {activity?.org ? (
                 <span className={brand.chipGold}>{activity.org}</span>
@@ -660,8 +667,8 @@ export function SubmissionTrackerModal({
 
                 <div className="mb-6 flex flex-col gap-2 text-xs text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
                   <span className="min-w-0">
-                    {formatDocumentId(submissionId)} • Submitted{" "}
-                    {activity?.submittedDate || "—"} •{" "}
+                    {documentCode} • Submitted {activity?.submittedDate || "—"}{" "}
+                    •{" "}
                     {stepper.isAllApproved
                       ? "All steps completed"
                       : `${stepper.remainingSteps} tasks remaining before final approval`}
@@ -835,12 +842,17 @@ export function SubmissionTrackerModal({
                             <div className="h-2 w-2 rounded-full bg-white"></div>
                           )}
                         </div>
-                        <div className="text-xs font-medium text-neutral-900 sm:text-sm">
+                        <div className="min-w-0 text-xs font-medium text-neutral-900 sm:text-sm">
                           <span className="font-bold">{item.name}</span>
                           <span className="text-neutral-500">
                             {" "}
                             — {item.statusText}
                           </span>
+                          {item.turnaroundText ? (
+                            <p className="text-[11px] font-medium text-neutral-500">
+                              {item.turnaroundText}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     )
@@ -871,7 +883,7 @@ export function SubmissionTrackerModal({
             <Button
               type="button"
               onClick={onRequestReservationChange}
-              className="bg-[#8B0000] text-white hover:bg-[#700000] font-bold shadow-xs cursor-pointer"
+              className="cursor-pointer bg-[#8B0000] font-bold text-white shadow-xs hover:bg-[#700000]"
             >
               Request a reservation change
             </Button>

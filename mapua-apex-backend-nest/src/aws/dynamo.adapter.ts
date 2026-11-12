@@ -166,7 +166,12 @@ export class DynamoAdapter implements DynamoPort, OnModuleDestroy {
   }
 
   async update(args: UpdateArgs): Promise<Record<string, unknown>> {
-    const built = buildUpdate(args.set, args.remove, args.setIfAbsent);
+    const built = buildUpdate(
+      args.set,
+      args.remove,
+      args.setIfAbsent,
+      args.add,
+    );
     const result = await this.doc.send(
       new UpdateCommand({
         TableName: args.table,
@@ -306,6 +311,7 @@ function buildUpdate(
   set: Record<string, unknown> | undefined,
   remove: string[] | undefined,
   setIfAbsent?: Record<string, unknown>,
+  add?: Record<string, number>,
 ): {
   UpdateExpression: string;
   ExpressionAttributeNames?: Record<string, string>;
@@ -336,6 +342,14 @@ function buildUpdate(
     names[name] = key;
     return name;
   });
+  const adds: string[] = [];
+  Object.entries(add ?? {}).forEach(([key, value], index) => {
+    const name = `#d${index}`;
+    const placeholder = `:d${index}`;
+    names[name] = key;
+    values[placeholder] = value;
+    adds.push(`${name} ${placeholder}`);
+  });
   const parts: string[] = [];
   if (sets.length > 0) {
     parts.push(`SET ${sets.join(', ')}`);
@@ -343,9 +357,12 @@ function buildUpdate(
   if (removals.length > 0) {
     parts.push(`REMOVE ${removals.join(', ')}`);
   }
+  if (adds.length > 0) {
+    parts.push(`ADD ${adds.join(', ')}`);
+  }
   if (parts.length === 0) {
     throw new Error(
-      'Dynamo update needs at least one attribute to set or remove.',
+      'Dynamo update needs at least one attribute to set, add, or remove.',
     );
   }
   return {

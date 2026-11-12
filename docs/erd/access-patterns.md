@@ -37,8 +37,8 @@ Index summary:
 | 12 | Org directory (`/students/organizations`) | Scan (fully paginated) | `PK` begins `ORGANIZATION#`, `PK = SK`; org list → `{ organization_id, name }` | Base |
 | 13 | Announcement list | Query | `PK = ANNOUNCEMENT`, `SK` desc (newest first) | Base |
 | 14 | Announcement show / edit / delete | GetItem / PutItem / DeleteItem | `PK = ANNOUNCEMENT`, `SK = timestamp` | Base |
-| 15 | Write submission (+ collab pointers) | PutItem | `PK = EVENT#id`, `SK = SUBMISSION#id`; maintain one COLLAB pointer per dependent | Base |
-| 16 | Approve / return / deny | UpdateItem | advance `current_signatory` / `GSI2PK` from stored `signatory_sequence`; write NOTIFICATION | Base |
+| 15 | Write submission (+ collab pointers) | UpdateItem ADD, then PutItem | `PK = SK = COUNTER#SAAF#YYMMDD` `ADD seq` assigns `document_number`, then `PK = EVENT#id`, `SK = SUBMISSION#id` stores that number and the first desk's `stage_timings`; maintain one COLLAB pointer per dependent | Base |
+| 16 | Approve / return / deny | UpdateItem | advance `current_signatory` / `GSI2PK` from stored `signatory_sequence`, stamp `stage_timings` `acted_at` / next `entered_at`, and write NOTIFICATION | Base |
 | 17 | Admin: delete organization (guarded) | Query → DeleteItem | block (**409**) if `GSI1PK = ORGANIZATION#id` has events/submissions or base `PK = ORGANIZATION#id`, `SK` begins `COLLAB#`; else DeleteItem `PK = SK = ORGANIZATION#id` | GSI1 + Base |
 | 18 | Admin: delete signatory (guarded) | Scan/Query → DeleteItem | block (**409**) if any `ORGANIZATION.signatories` desk holds the id or `GSI2PK = SIGNATORY#id` (open inbox); else DeleteItem `PK = SK = SIGNATORY#id` | GSI2 + Base |
 | 19 | Campus list (osaar `/campus`, SAAF venue dropdown) | Scan | `PK` begins `CAMPUS#` AND `PK = SK` | Base |

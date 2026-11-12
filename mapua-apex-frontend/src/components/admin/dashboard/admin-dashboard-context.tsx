@@ -191,6 +191,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
       orgSignatories: signatoriesQuery.data,
       signatorySequence: detailQuery.data?.signatory_sequence,
       signatoryChain: detailQuery.data?.signatory_chain,
+      stageTimings: detailQuery.data?.stage_timings,
     }
   )
 
@@ -204,8 +205,7 @@ export function AdminDashboardProvider({ children }: { children: ReactNode }) {
     setSubmissionEdit({
       ...submission,
       organization_name:
-        submission.organization_name ||
-        (named && named !== "—" ? named : null),
+        submission.organization_name || (named && named !== "—" ? named : null),
     })
   }
 

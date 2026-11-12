@@ -264,6 +264,8 @@ export async function trackerRoles(page: Page, title: string): Promise<string[]>
   await page.locator("tr").filter({ hasText: title }).first().click()
   const dialog = page.getByRole("dialog", { name: `${title} Proposal` })
   await dialog.getByRole("button", { name: "Milestone & Progress" }).click()
+  await expect(dialog.getByText(/SAAF-\d{6}-\d{3}/).first()).toBeVisible()
+  await expect(dialog.getByText("Expected 1 day").first()).toBeVisible()
   const reviewers = dialog.getByText("Required Reviewers", { exact: true }).locator("xpath=..")
   await expect(reviewers).toBeVisible()
   const labels = await reviewers.locator("span.font-bold").allTextContents()

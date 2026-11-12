@@ -42,8 +42,15 @@ export interface ActivityRowProps {
   statusField?: "decision" | "status"
 }
 
-const ActivityRow = memo(function ActivityRow({ activity, onSelect, statusField = "decision" }: ActivityRowProps) {
-  const handleClick = useCallback(() => onSelect(activity), [activity, onSelect])
+const ActivityRow = memo(function ActivityRow({
+  activity,
+  onSelect,
+  statusField = "decision",
+}: ActivityRowProps) {
+  const handleClick = useCallback(
+    () => onSelect(activity),
+    [activity, onSelect]
+  )
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -51,12 +58,12 @@ const ActivityRow = memo(function ActivityRow({ activity, onSelect, statusField 
         handleClick()
       }
     },
-    [handleClick],
+    [handleClick]
   )
 
   return (
     <TableRow
-      className="cursor-pointer group transition-colors hover:bg-neutral-100/80 border-b border-neutral-100"
+      className="group cursor-pointer border-b border-neutral-100 transition-colors hover:bg-neutral-100/80"
       onClick={handleClick}
       tabIndex={0}
       role="button"
@@ -65,44 +72,48 @@ const ActivityRow = memo(function ActivityRow({ activity, onSelect, statusField 
     >
       {/* 1. DOCUMENT ID */}
       <TableCell
-        className="py-4.5 px-6 font-mono text-xs font-bold whitespace-nowrap text-neutral-900"
+        className="px-6 py-4.5 font-mono text-xs font-bold whitespace-nowrap text-neutral-900"
         title={activity.submissionId}
       >
-        {formatDocumentId(activity.submissionId)}
+        {formatDocumentId(
+          activity.submissionId,
+          "SAAF",
+          activity.documentNumber
+        )}
       </TableCell>
 
       {/* 2. ORGANIZATION */}
-      <TableCell className="py-4.5 px-6 font-bold text-neutral-900 text-sm whitespace-nowrap">
+      <TableCell className="px-6 py-4.5 text-sm font-bold whitespace-nowrap text-neutral-900">
         {activity.org}
       </TableCell>
 
       {/* 3. DEPARTMENT */}
-      <TableCell className="py-4.5 px-6 text-neutral-700 text-sm whitespace-nowrap">
+      <TableCell className="px-6 py-4.5 text-sm whitespace-nowrap text-neutral-700">
         {activity.departmentCode}
       </TableCell>
 
       {/* 4. ACTIVITY NAME */}
-      <TableCell className="py-4.5 px-6 text-neutral-700 text-sm font-medium">
+      <TableCell className="px-6 py-4.5 text-sm font-medium text-neutral-700">
         <span className="line-clamp-1">{activity.title}</span>
       </TableCell>
 
       {/* 5. SUBMITTED */}
-      <TableCell className="py-4.5 px-6 text-neutral-500 text-xs sm:text-sm whitespace-nowrap">
+      <TableCell className="px-6 py-4.5 text-xs whitespace-nowrap text-neutral-500 sm:text-sm">
         {activity.submittedDate}
       </TableCell>
 
       {/* 6. TYPE & NATURE */}
-      <TableCell className="py-4.5 px-6">
+      <TableCell className="px-6 py-4.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-700">
+          <span className="inline-flex items-center rounded bg-neutral-100 px-2 py-0.5 text-[11px] font-bold tracking-wider text-neutral-700 uppercase">
             {activity.type}
           </span>
           {activity.nature?.toLowerCase() === "major" ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-red-100 text-[#8B0000] border border-red-200/60">
+            <span className="inline-flex items-center rounded border border-red-200/60 bg-red-100 px-2 py-0.5 text-[10px] font-extrabold tracking-wider text-[#8B0000] uppercase">
               Major
             </span>
           ) : activity.nature?.toLowerCase() === "minor" ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-neutral-100 text-neutral-700 border border-neutral-200/60">
+            <span className="inline-flex items-center rounded border border-neutral-200/60 bg-neutral-100 px-2 py-0.5 text-[10px] font-extrabold tracking-wider text-neutral-700 uppercase">
               Minor
             </span>
           ) : null}
@@ -110,19 +121,19 @@ const ActivityRow = memo(function ActivityRow({ activity, onSelect, statusField 
       </TableCell>
 
       {/* 7. DECISION (Review, Return, Reject) or processed STATUS outcome */}
-      <TableCell className="py-4.5 px-6 text-right">
+      <TableCell className="px-6 py-4.5 text-right">
         {statusField === "status" ? (
           <StatusBadge status={activity.status} />
         ) : activity.decision === "Review" ? (
-          <span className="inline-flex items-center text-xs font-semibold text-neutral-800 group-hover:text-black py-1 px-3 rounded-lg hover:bg-neutral-200/60 transition-colors">
+          <span className="inline-flex items-center rounded-lg px-3 py-1 text-xs font-semibold text-neutral-800 transition-colors group-hover:text-black hover:bg-neutral-200/60">
             Review
           </span>
         ) : activity.decision === "Return" ? (
-          <span className="inline-flex items-center text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-md">
+          <span className="inline-flex items-center rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
             Return
           </span>
         ) : (
-          <span className="inline-flex items-center text-xs font-semibold text-red-700 bg-red-50 border border-red-200/80 px-2.5 py-1 rounded-md">
+          <span className="inline-flex items-center rounded-md border border-red-200/80 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
             Reject
           </span>
         )}
