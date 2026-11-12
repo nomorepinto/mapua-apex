@@ -178,6 +178,9 @@ Pages: [`src/routes/students/dashboard.tsx`](../mapua-apex-frontend/src/routes/s
 [`SubmissionTrackerModal.tsx`](../mapua-apex-frontend/src/components/org/SubmissionTrackerModal.tsx).
 
 ### D-1. Milestone modal: turnaround time + elapsed hours before approval **[frontend + backend]**
+
+**Status: Partially closed** — the per-stage `entered_at`/`acted_at` timestamps now persist as `desk_timings[]` on the submission, and the "Milestone & Progress" tab shows each desk's `<duration> on desk` plus a `Total time to final approval` line (working minutes use Manila working hours). Still open: the elapsed-time suffix on the decided submission cards (`submissions-panel.tsx`, `student-calendar-card.tsx`) — the agreed display scope for this pass was limited to the tracker modal.
+
 Raw notes: *"note turnaround time sa milestones"* · *"tapos timestamp kung ilang
 oras nagtake bago maapprove"* · *"add turn around time to milestone modal, add
 hours before approved"*.
@@ -345,7 +348,10 @@ spaces, laboratories"*.
 Pages: [`reports-export.tsx`](../mapua-apex-frontend/src/routes/reports/reports-export.tsx),
 [`monitor-activities.tsx`](../mapua-apex-frontend/src/routes/admin/monitor-activities.tsx).
 
-### A-3. Turnaround-time metrics in reports **[backend + frontend]**
+### ~~A-3. Turnaround-time metrics in reports~~ **[backend + frontend]**
+
+**Status: Closed** — the proposal report persists per-desk `desk_timings[]` on each SUBMISSION and exports `overall_turnaround_working_minutes`, per-role `{adviser,dean,osaar,cdm}_desk_working_minutes`, `duration_minutes` (wall-clock), `desk_history`, and the consent columns; summaries add the per-desk medians, `average_cdm_desk_working_minutes`, `cdm_desk_sample_count`, `median_overall_turnaround_working_minutes`, `proposals_missing_desk_history`, a `desk_median_working_minutes` breakdown, a `desk_history` facet, and a no-history coverage warning. CDM is measured per-desk and OSAAR overall, per the raw note; working minutes count Manila working hours (Mon–Fri 08:00–17:00).
+
 Raw notes: *"turnaround time lang ng cdm sana ung logs, sa osaar overall na"*.
 
 - Proposal report gains: per-desk duration (CDM from its own action logs) and an
@@ -354,7 +360,10 @@ Raw notes: *"turnaround time lang ng cdm sana ung logs, sa osaar overall na"*.
   [`reporting.ts`](../mapua-apex-frontend/src/lib/reporting.ts)) — extend with
   per-stage breakdown and export columns.
 
-### A-4. Data Privacy Act disclaimer / consent **[frontend + backend]**
+### ~~A-4. Data Privacy Act disclaimer / consent~~ **[frontend + backend]**
+
+**Status: Closed** — a versioned RA 10173 notice lives in the backend (`PRIVACY_NOTICE_VERSION`, drafted for RD-7 legal review) served by public `GET /api/v2/public/privacy-notice`; the pre-submit dialog gates Proceed behind a consent checkbox that re-asks on every resubmit, the SAAF DTO rejects a stale/unaccepted version (`422`), and the writer persists `privacy_consent { version, accepted_at, notice_hash, channel }`. It is shown in the tracker's Document Details tab and exported via the `privacy_consent_version`/`privacy_consent_at` report columns. Implemented as a standalone gate — the S-1 T&C set is untouched.
+
 Raw note: *"data privacy act disclaimer - pwedeng magamit yung data nila sa
 relevant facilities"*.
 

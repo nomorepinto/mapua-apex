@@ -19,6 +19,7 @@ import { MembersModule } from './members/members.module.js';
 import { MonitorModule } from './monitor/monitor.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { PostEvalsModule } from './postevals/postevals.module.js';
+import { PrivacyModule } from './privacy/privacy.module.js';
 import { ReservationChangesModule } from './reservation-changes/reservation-changes.module.js';
 import { ReservablesModule } from './reservables/reservables.module.js';
 import { SessionsModule } from './sessions/sessions.module.js';
@@ -52,6 +53,7 @@ const envFile = existingRootEnv();
     DeadlinesModule,
     InputChecksModule,
     PostEvalsModule,
+    PrivacyModule,
     ReservationChangesModule,
     ArcusModule,
     SessionsModule,

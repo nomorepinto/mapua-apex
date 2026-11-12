@@ -3,7 +3,7 @@ import { expect, type Browser, type Page, test } from "@playwright/test"
 import { AdminEditPage, DashboardPage, editedSentence } from "../pages/dashboard.page"
 import { ReservablesPage } from "../pages/reservables.page"
 import { ReviewPage } from "../pages/review.page"
-import { SaafPage, rolesMatch, trackerRoles } from "../pages/saaf.page"
+import { SaafPage, rolesMatch, trackerRoles, trackerTurnaround } from "../pages/saaf.page"
 import { openApex } from "../support/auth"
 import { account, eventDate } from "../support/env"
 import { BUDGET_NOTE, normalizeDesk } from "../support/data"
@@ -101,6 +101,18 @@ test("approves the straight-through papers", async ({ browser }) => {
   const papers = readRun().papers
   // P15 is the no-budget paper; approving it makes it eligible for a post-eval.
   for (const key of ["P1", "P2", "P3", "P6", "P7", "P15"]) await approveAll(browser, papers[key])
+})
+
+test("shows the proponent the per-desk and overall turnaround", async ({ browser }) => {
+  const paper = readRun().papers.P1
+  await asUser(browser, paper.org, async (page) => {
+    // P1 is fully approved above, so the overall line and every desk duration appear.
+    const { total, deskDurations } = await trackerTurnaround(page, paper.title)
+    expect(total).not.toBeNull()
+    expect(total).toContain("Total time to final approval")
+    expect(deskDurations.length).toBeGreaterThan(0)
+    for (const duration of deskDurations) expect(duration).toContain("on desk")
+  })
 })
 
 test("returns and approves P5 and P4 at every desk", async ({ browser }) => {

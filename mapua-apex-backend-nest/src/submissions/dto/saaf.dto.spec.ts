@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
+import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacy-notice.js';
 import { SaafDto } from './saaf.dto.js';
 
 /** Minimal SAAF body; each test overrides the budget section it cares about. */
@@ -275,5 +276,70 @@ describe('SaafDto budget validation', () => {
     validateSync(instance, { whitelist: true });
     const proposal = instance.detailed_budget_proposal as unknown as Item;
     expect(proposal.note).toBe('Member contributions cover catering.');
+  });
+});
+
+describe('SaafDto privacy consent validation', () => {
+  const noBudget = { has_budget: false, items: [], grand_total: 0 };
+
+  function consentIssues(consent: unknown): string[] {
+    const body: Item = { ...bodyWith(noBudget) };
+    if (consent !== undefined) body.privacy_consent = consent;
+    const instance = plainToInstance(SaafDto, body, {
+      exposeUnsetFields: false,
+    });
+    const found: string[] = [];
+    const walk = (
+      errors: ReturnType<typeof validateSync>,
+      path: string,
+    ): void => {
+      for (const error of errors) {
+        const key = path ? `${path}.${error.property}` : error.property;
+        if (error.constraints)
+          found.push(`${key}: ${JSON.stringify(error.constraints)}`);
+        if (error.children?.length) walk(error.children, key);
+      }
+    };
+    walk(validateSync(instance, { whitelist: true }), '');
+    return found;
+  }
+
+  it('accepts the current notice version with accepted true', () => {
+    expect(
+      consentIssues({ version: PRIVACY_NOTICE_VERSION, accepted: true }),
+    ).toEqual([]);
+  });
+
+  it('leaves consent optional at the DTO boundary so the admin PUT still validates', () => {
+    expect(consentIssues(undefined)).toEqual([]);
+  });
+
+  it('rejects a stale notice version', () => {
+    expect(
+      consentIssues({ version: '0.9-old', accepted: true }).join('\n'),
+    ).toContain('privacy_consent.version');
+  });
+
+  it('rejects an unaccepted consent', () => {
+    expect(
+      consentIssues({ version: PRIVACY_NOTICE_VERSION, accepted: false }).join(
+        '\n',
+      ),
+    ).toContain('privacy_consent.accepted');
+  });
+
+  it('keeps the consent through the whitelist used by the global pipe', () => {
+    const instance = plainToInstance(
+      SaafDto,
+      {
+        ...bodyWith(noBudget),
+        privacy_consent: { version: PRIVACY_NOTICE_VERSION, accepted: true },
+      },
+      { exposeUnsetFields: false },
+    );
+    validateSync(instance, { whitelist: true });
+    const consent = instance.privacy_consent as unknown as Item;
+    expect(consent.version).toBe(PRIVACY_NOTICE_VERSION);
+    expect(consent.accepted).toBe(true);
   });
 });

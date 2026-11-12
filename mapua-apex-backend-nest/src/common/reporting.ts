@@ -5,6 +5,8 @@ import {
   reportTooLarge,
   withReportBudget,
 } from './report-budget.js';
+import { describeWorkingHours, workingMinutes } from './turnaround.js';
+import { readEntries } from '../submissions/desk-timing.js';
 
 export type ReportKind =
   'sessions' | 'activity' | 'proposals' | 'postevals' | 'reservation_changes';
@@ -111,6 +113,7 @@ export const REPORT_DEFINITIONS: Record<ReportKind, ReportDefinition> = {
       has_reservation: 'Has reservation',
       has_budget: 'Has budget',
       collaboration_role: 'Collaboration role',
+      desk_history: 'Desk history',
     },
     columns: {
       ...identity,
@@ -126,6 +129,16 @@ export const REPORT_DEFINITIONS: Record<ReportKind, ReportDefinition> = {
       collaboration_role: 'Collaboration role',
       proposed_budget: 'Proposed budget (PHP)',
       planned_participants: 'Planned participant places',
+      duration_minutes: 'Overall turnaround (wall-clock minutes)',
+      overall_turnaround_working_minutes:
+        'Overall turnaround (working minutes)',
+      adviser_desk_working_minutes: 'Adviser desk time (working minutes)',
+      dean_desk_working_minutes: 'Dean desk time (working minutes)',
+      osaar_desk_working_minutes: 'OSAAR desk time (working minutes)',
+      cdm_desk_working_minutes: 'CDM desk time (working minutes)',
+      desk_history: 'Desk history',
+      privacy_consent_version: 'Data privacy consent (version)',
+      privacy_consent_at: 'Data privacy consent accepted (Manila)',
     },
     defaults: ['id', 'date', 'title', 'organization', 'type', 'status'],
   },
@@ -200,6 +213,7 @@ const ENUM_FILTERS: Partial<Record<ReportKind, Record<string, string[]>>> = {
     has_reservation: ['true', 'false'],
     has_budget: ['true', 'false'],
     collaboration_role: ['proponent', 'dependent'],
+    desk_history: ['recorded', 'backfilled', 'missing'],
   },
   postevals: { status: ['submitted', 'approved', 'denied'] },
   reservation_changes: {
@@ -429,6 +443,30 @@ export function reportRow(kind: ReportKind, item: Item): ReportRow {
     const dependentIds = Array.isArray(collaboration.dependent_organization_ids)
       ? collaboration.dependent_organization_ids
       : [];
+    const timings = Array.isArray(item.desk_timings)
+      ? readEntries(item.desk_timings)
+      : null;
+    const deskHistory =
+      timings === null
+        ? 'missing'
+        : timings.some((entry) => entry.source === 'backfill')
+          ? 'backfilled'
+          : 'recorded';
+    const roleWorking = (role: string): number | null => {
+      if (!timings) return null;
+      const samples = timings
+        .filter((entry) => entry.role === role)
+        .map((entry) => entry.working_minutes)
+        .filter((value): value is number => typeof value === 'number');
+      return samples.length
+        ? samples.reduce((total, value) => total + value, 0)
+        : null;
+    };
+    const overallWorking =
+      timings === null
+        ? null
+        : workingMinutes(item.first_submitted_at, item.fully_approved_at);
+    const consent = record(item.privacy_consent) ?? {};
     return {
       id: `${text(item, 'event_id')}:${text(item, 'submission_id')}`,
       date: text(item, 'first_submitted_at'),
@@ -473,6 +511,14 @@ export function reportRow(kind: ReportKind, item: Item): ReportRow {
       )
         ? duration(item.first_submitted_at, item.fully_approved_at)
         : null,
+      overall_turnaround_working_minutes: overallWorking,
+      adviser_desk_working_minutes: roleWorking('adviser'),
+      dean_desk_working_minutes: roleWorking('dean'),
+      osaar_desk_working_minutes: roleWorking('osaar'),
+      cdm_desk_working_minutes: roleWorking('cdm'),
+      desk_history: deskHistory,
+      privacy_consent_version: text(consent, 'version'),
+      privacy_consent_at: text(consent, 'accepted_at'),
     };
   }
   const resolved =
@@ -633,6 +679,14 @@ class Aggregates {
   users = new Set<string>();
   entities = new Set<string>();
   durations: number[] = [];
+  deskSamples = {
+    adviser: [] as number[],
+    dean: [] as number[],
+    osaar: [] as number[],
+    cdm: [] as number[],
+  };
+  overallWorking: number[] = [];
+  missingDeskHistory = 0;
   reservationCount = 0;
   collaborationCount = 0;
   budgetCents = 0;
@@ -698,6 +752,7 @@ class Aggregates {
       'action',
       'module',
       'decision',
+      'desk_history',
     ]) {
       if (row[field])
         this.increment(field, String(row[field]), String(row[field]));
@@ -705,6 +760,13 @@ class Aggregates {
     if (this.kind === 'proposals') {
       const firstDay = manilaDay(String(row.first_submitted_at ?? ''));
       if (firstDay) this.increment('first_submission_day', firstDay, firstDay);
+      if (row.desk_history === 'missing') this.missingDeskHistory++;
+      for (const role of ['adviser', 'dean', 'osaar', 'cdm'] as const) {
+        const sample = row[`${role}_desk_working_minutes`];
+        if (typeof sample === 'number') this.deskSamples[role].push(sample);
+      }
+      if (typeof row.overall_turnaround_working_minutes === 'number')
+        this.overallWorking.push(row.overall_turnaround_working_minutes);
       const participants = JSON.parse(
         String(row.collaboration_ids || '[]'),
       ) as string[];
@@ -821,6 +883,30 @@ class Aggregates {
             .map((v) => `${v.label}: ${v.count.toFixed(1)}%`)
             .join('; ')
         : null;
+      const deskRoles = ['adviser', 'dean', 'osaar', 'cdm'] as const;
+      const deskMedians: Ranked[] = [];
+      for (const role of deskRoles) {
+        const value = median(this.deskSamples[role]);
+        summary[`median_${role}_desk_working_minutes`] = value;
+        if (value !== null)
+          deskMedians.push({
+            key: role,
+            label: role.toLocaleUpperCase(),
+            count: value,
+          });
+      }
+      summary.average_cdm_desk_working_minutes = this.deskSamples.cdm.length
+        ? this.deskSamples.cdm.reduce((a, b) => a + b, 0) /
+          this.deskSamples.cdm.length
+        : null;
+      summary.cdm_desk_sample_count = this.deskSamples.cdm.length;
+      summary.median_overall_turnaround_working_minutes = median(
+        this.overallWorking,
+      );
+      summary.proposals_missing_desk_history = this.missingDeskHistory;
+      breakdowns.desk_median_working_minutes = deskMedians.sort(
+        (a, b) => b.count - a.count || a.label.localeCompare(b.label),
+      );
     }
     if (this.kind === 'sessions') summary.distinct_users = this.users.size;
     if (this.kind === 'activity')
@@ -961,6 +1047,11 @@ export async function generateReport(
     const output = current.output();
     if (kind === 'activity')
       output.summary.unlinked_submission_actions = unlinkedActions;
+    const missingDesk = Number(output.summary.proposals_missing_desk_history ?? 0);
+    if (kind === 'proposals' && missingDesk > 0)
+      warnings.push(
+        `${missingDesk} of ${current.count} proposals (${current.count ? ((100 * missingDesk) / current.count).toFixed(1) : '0.0'}%) have no per-desk history, so their desk-time cells are empty. Desk durations count ${describeWorkingHours()}.`,
+      );
     const result: Item = {
       report_type: kind,
       filters: request.filters,

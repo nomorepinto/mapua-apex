@@ -98,6 +98,8 @@ export interface Activity {
   endDateOfEvent?: string
   /** Grand total of the detailed budget proposal */
   budgetGrandTotal?: number
+  /** RA 10173 consent of record; absent on papers filed before the consent gate. */
+  privacyConsent?: { version: string; acceptedAt: string }
 }
 
 export type StatusVariant = "success" | "warning" | "error" | "outline"

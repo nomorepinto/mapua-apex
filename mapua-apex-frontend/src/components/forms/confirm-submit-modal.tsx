@@ -1,4 +1,6 @@
+import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogPopup,
@@ -17,6 +19,7 @@ export function ConfirmSubmitModal({
   title = "Are you sure you want to submit?",
   description,
   isSubmitting = false,
+  consent,
   onClose,
   onConfirm,
 }: {
@@ -24,9 +27,23 @@ export function ConfirmSubmitModal({
   title?: string
   description: string
   isSubmitting?: boolean
+  /**
+   * Optional consent gate. When supplied, the disclosure `content` and a single
+   * checkbox `label` render in the panel and the Proceed button stays disabled
+   * until `checked`. Callers that omit it (post-eval dialogs, reviewer endorse)
+   * behave exactly as before.
+   */
+  consent?: {
+    label: string
+    content: ReactNode
+    checked: boolean
+    onChange: (checked: boolean) => void
+    disabled?: boolean
+  }
   onClose: () => void
   onConfirm: () => void
 }) {
+  const blockedByConsent = consent !== undefined && !consent.checked
   return (
     <Dialog
       open={open}
@@ -49,6 +66,20 @@ export function ConfirmSubmitModal({
               This action cannot be undone.
             </strong>
           </p>
+          {consent ? (
+            <div className="space-y-3 text-left">
+              {consent.content}
+              <label className="flex items-start gap-2 text-sm leading-snug text-neutral-700">
+                <Checkbox
+                  className="mt-0.5"
+                  checked={consent.checked}
+                  disabled={consent.disabled}
+                  onCheckedChange={(checked) => consent.onChange(Boolean(checked))}
+                />
+                <span>{consent.label}</span>
+              </label>
+            </div>
+          ) : null}
         </DialogPanel>
 
         <DialogFooter className={cn(layout.actions, "justify-center border-t border-neutral-100 p-4 sm:p-6")}>
@@ -61,7 +92,7 @@ export function ConfirmSubmitModal({
           <Button
             type="button"
             onClick={onConfirm}
-            disabled={isSubmitting}
+            disabled={isSubmitting || blockedByConsent}
             className="min-h-11 rounded-xl bg-[#8B0000] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#6B0000] sm:w-40"
           >
             {isSubmitting ? "Submitting..." : "Proceed"}

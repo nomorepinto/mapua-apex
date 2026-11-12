@@ -25,6 +25,9 @@ export async function action({
   const reservationDraft = useOrgStore.getState().reservationDraft
   const hasBudget = useOrgStore.getState().withBudget === "yes"
   const fundingSources = useOrgStore.getState().fundingSources
+  // The consent version the proponent just accepted in the pre-submit dialog;
+  // ephemeral in the store, so a resubmit must re-tick and re-send it.
+  const privacyConsentVersion = useOrgStore.getState().privacyConsentVersion
   // The edit ids live in the store once hydration loads a returned paper, but
   // the route's `?event=&submission=` params are the authoritative fallback so a
   // resubmit still PUTs (never POSTs a duplicate) if hydration has not run yet.
@@ -49,7 +52,8 @@ export async function action({
       reservationDraft,
       editingEventId ?? undefined,
       hasBudget,
-      fundingSources
+      fundingSources,
+      privacyConsentVersion
     )
 
     if (editingEventId && editingSubmissionId) {
@@ -65,6 +69,7 @@ export async function action({
     useOrgStore.getState().clearReservationDraft()
     useOrgStore.getState().clearSubmissionStart()
     useOrgStore.getState().clearEditingSubmission()
+    useOrgStore.getState().setPrivacyConsentVersion(null)
 
     // Invalidate server queries
     queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
