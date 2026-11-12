@@ -11,11 +11,17 @@ import { CdmReviewerLayout } from "@/routes/layouts/cdm-reviewer-layout"
 import { DeanLayout } from "@/routes/layouts/dean-layout"
 import { OrgAdviserLayout } from "@/routes/layouts/org-adviser-layout"
 import { OsaarLayout } from "@/routes/layouts/osaar-layout"
-import { ReservablesIndexRedirect, ReservablesLayout } from "@/routes/cdm-reviewer/reservables"
+import {
+  ReservablesIndexRedirect,
+  ReservablesLayout,
+} from "@/routes/cdm-reviewer/reservables"
 import { OsaarDashboardLayout } from "@/routes/osaar/dashboard"
 import { OsaarSetupLayout } from "@/routes/osaar/setup"
 import { StudentsLayout } from "@/routes/layouts/students-layout"
-import { RootErrorBoundary, NotFoundPage } from "@/components/layout/error-boundary"
+import {
+  RootErrorBoundary,
+  NotFoundPage,
+} from "@/components/layout/error-boundary"
 
 function RouteFallback() {
   return (
@@ -81,9 +87,8 @@ export const router = createBrowserRouter([
             index: true,
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { SubmissionsStart } = await import(
-                "@/routes/students/submissions"
-              )
+              const { SubmissionsStart } =
+                await import("@/routes/students/submissions")
               return { Component: SubmissionsStart }
             },
           },
@@ -108,9 +113,8 @@ export const router = createBrowserRouter([
             index: true,
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { PostEvalsStart } = await import(
-                "@/routes/students/postevals"
-              )
+              const { PostEvalsStart } =
+                await import("@/routes/students/postevals")
               return { Component: PostEvalsStart }
             },
           },
@@ -139,9 +143,8 @@ export const router = createBrowserRouter([
         path: "organization",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { StudentOrganizationPage } = await import(
-            "@/routes/students/organization"
-          )
+          const { StudentOrganizationPage } =
+            await import("@/routes/students/organization")
           return { Component: StudentOrganizationPage }
         },
       },
@@ -149,9 +152,8 @@ export const router = createBrowserRouter([
         path: "members",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { StudentMembersPage } = await import(
-            "@/routes/students/members"
-          )
+          const { StudentMembersPage } =
+            await import("@/routes/students/members")
           return { Component: StudentMembersPage }
         },
       },
@@ -174,9 +176,8 @@ export const router = createBrowserRouter([
         path: "dashboard",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { CdmReviewerDashboard } = await import(
-            "@/routes/cdm-reviewer/dashboard"
-          )
+          const { CdmReviewerDashboard } =
+            await import("@/routes/cdm-reviewer/dashboard")
           return { Component: CdmReviewerDashboard }
         },
       },
@@ -192,9 +193,8 @@ export const router = createBrowserRouter([
             path: "add",
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { AddReservableSection } = await import(
-                "@/components/admin/reservables/add-reservable-section"
-              )
+              const { AddReservableSection } =
+                await import("@/components/admin/reservables/add-reservable-section")
               return { Component: AddReservableSection }
             },
           },
@@ -202,9 +202,8 @@ export const router = createBrowserRouter([
             path: "view",
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { ViewReservableSection } = await import(
-                "@/components/admin/reservables/view-reservable-section"
-              )
+              const { ViewReservableSection } =
+                await import("@/components/admin/reservables/view-reservable-section")
               return { Component: ViewReservableSection }
             },
           },
@@ -212,9 +211,8 @@ export const router = createBrowserRouter([
             path: "reserve",
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { ReserveSection } = await import(
-                "@/components/admin/reservables/reserve-section"
-              )
+              const { ReserveSection } =
+                await import("@/components/admin/reservables/reserve-section")
               return { Component: ReserveSection }
             },
           },
@@ -224,9 +222,8 @@ export const router = createBrowserRouter([
         path: "reservations",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { CdmReservationsPage } = await import(
-            "@/routes/cdm-reviewer/reservations"
-          )
+          const { CdmReservationsPage } =
+            await import("@/routes/cdm-reviewer/reservations")
           return { Component: CdmReservationsPage }
         },
       },
@@ -234,9 +231,8 @@ export const router = createBrowserRouter([
         path: "activities",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { AdminMonitorActivitiesPage } = await import(
-            "@/routes/admin/monitor-activities"
-          )
+          const { AdminMonitorActivitiesPage } =
+            await import("@/routes/admin/monitor-activities")
           return {
             Component: () => (
               <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
@@ -304,9 +300,8 @@ export const router = createBrowserRouter([
         path: "dashboard",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { OrgAdviserDashboard } = await import(
-            "@/routes/org-adviser/dashboard"
-          )
+          const { OrgAdviserDashboard } =
+            await import("@/routes/org-adviser/dashboard")
           return { Component: OrgAdviserDashboard }
         },
       },
@@ -345,9 +340,8 @@ export const router = createBrowserRouter([
             path: "review",
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { AdminDashboardReviewPage } = await import(
-                "@/routes/osaar/dashboard-review"
-              )
+              const { AdminDashboardReviewPage } =
+                await import("@/routes/osaar/dashboard-review")
               return { Component: AdminDashboardReviewPage }
             },
           },
@@ -366,9 +360,8 @@ export const router = createBrowserRouter([
             path: "submissions",
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { AdminDashboardSubmissionsPage } = await import(
-                "@/routes/osaar/dashboard-submissions"
-              )
+              const { AdminDashboardSubmissionsPage } =
+                await import("@/routes/osaar/dashboard-submissions")
               return { Component: AdminDashboardSubmissionsPage }
             },
           },
@@ -376,9 +369,8 @@ export const router = createBrowserRouter([
             path: "announcements",
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { AdminDashboardAnnouncementsPage } = await import(
-                "@/routes/osaar/dashboard-announcements"
-              )
+              const { AdminDashboardAnnouncementsPage } =
+                await import("@/routes/osaar/dashboard-announcements")
               return { Component: AdminDashboardAnnouncementsPage }
             },
           },
@@ -390,15 +382,16 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            Component: () => <Navigate to="/osaar/setup/organizations" replace />,
+            Component: () => (
+              <Navigate to="/osaar/setup/organizations" replace />
+            ),
           },
           {
             path: "organizations",
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { AdminOrganizationsPage } = await import(
-                "@/routes/osaar/organizations"
-              )
+              const { AdminOrganizationsPage } =
+                await import("@/routes/osaar/organizations")
               return { Component: AdminOrganizationsPage }
             },
           },
@@ -406,9 +399,8 @@ export const router = createBrowserRouter([
             path: "signatories",
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { AdminSignatoriesPage } = await import(
-                "@/routes/osaar/signatories"
-              )
+              const { AdminSignatoriesPage } =
+                await import("@/routes/osaar/signatories")
               return { Component: AdminSignatoriesPage }
             },
           },
@@ -416,9 +408,8 @@ export const router = createBrowserRouter([
             path: "approval-stages",
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { AdminApprovalStagesPage } = await import(
-                "@/routes/osaar/approval-stages"
-              )
+              const { AdminApprovalStagesPage } =
+                await import("@/routes/osaar/approval-stages")
               return { Component: AdminApprovalStagesPage }
             },
           },
@@ -434,7 +425,8 @@ export const router = createBrowserRouter([
             path: "term",
             HydrateFallback: RouteFallback,
             lazy: async () => {
-              const { OsaarTermSettingsPage } = await import("@/routes/osaar/term-settings")
+              const { OsaarTermSettingsPage } =
+                await import("@/routes/osaar/term-settings")
               return { Component: OsaarTermSettingsPage }
             },
           },
@@ -466,9 +458,8 @@ export const router = createBrowserRouter([
         path: "activities",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { AdminMonitorActivitiesPage } = await import(
-            "@/routes/admin/monitor-activities"
-          )
+          const { AdminMonitorActivitiesPage } =
+            await import("@/routes/admin/monitor-activities")
           return {
             Component: () => (
               <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
@@ -479,12 +470,26 @@ export const router = createBrowserRouter([
         },
       },
       {
+        path: "sessions",
+        HydrateFallback: RouteFallback,
+        lazy: async () => {
+          const { AdminMonitorSessionsPage } =
+            await import("@/routes/admin/monitor-sessions")
+          return {
+            Component: () => (
+              <AuthGuard allowedGroups={SESSION_LOG_GROUPS}>
+                <AdminMonitorSessionsPage />
+              </AuthGuard>
+            ),
+          }
+        },
+      },
+      {
         path: "reports",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { ReportsExportPage } = await import(
-            "@/routes/reports/reports-export"
-          )
+          const { ReportsExportPage } =
+            await import("@/routes/reports/reports-export")
           return {
             Component: () => (
               <AuthGuard allowedGroups={REPORT_EXPORT_GROUPS}>
@@ -521,9 +526,8 @@ export const router = createBrowserRouter([
         path: "sessions",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { AdminMonitorSessionsPage } = await import(
-            "@/routes/admin/monitor-sessions"
-          )
+          const { AdminMonitorSessionsPage } =
+            await import("@/routes/admin/monitor-sessions")
           return {
             Component: () => (
               <AuthGuard allowedGroups={SESSION_LOG_GROUPS}>
@@ -537,9 +541,8 @@ export const router = createBrowserRouter([
         path: "activities",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { AdminMonitorActivitiesPage } = await import(
-            "@/routes/admin/monitor-activities"
-          )
+          const { AdminMonitorActivitiesPage } =
+            await import("@/routes/admin/monitor-activities")
           return {
             Component: () => (
               <AuthGuard allowedGroups={ACTIVITY_LOG_GROUPS}>
@@ -575,9 +578,8 @@ export const router = createBrowserRouter([
         path: "reports",
         HydrateFallback: RouteFallback,
         lazy: async () => {
-          const { ReportsExportPage } = await import(
-            "@/routes/reports/reports-export"
-          )
+          const { ReportsExportPage } =
+            await import("@/routes/reports/reports-export")
           return {
             Component: () => (
               <AuthGuard allowedGroups={REPORT_EXPORT_GROUPS}>

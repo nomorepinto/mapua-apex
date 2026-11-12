@@ -1,4 +1,4 @@
-export const EVENT_DATE_MIN_LEAD_DAYS = 10
+export const DEFAULT_EVENT_DATE_MIN_LEAD_DAYS = 10
 
 /**
  * Local-only escape hatch. Set VITE_ALLOW_ANY_EVENT_DATE=true in the repo-root
@@ -47,27 +47,26 @@ export function addDays(date: Date, days: number): Date {
   return next
 }
 
-export function minEventDate(): Date {
-  return addDays(
-    startOfLocalDay(),
-    ALLOW_ANY_EVENT_DATE ? 0 : EVENT_DATE_MIN_LEAD_DAYS,
-  )
+export function minEventDate(
+  leadDays = DEFAULT_EVENT_DATE_MIN_LEAD_DAYS
+): Date {
+  return addDays(startOfLocalDay(), ALLOW_ANY_EVENT_DATE ? 0 : leadDays)
 }
 
-export function minEventDateKey(): string {
-  return getDateKey(minEventDate())
+export function minEventDateKey(leadDays?: number): string {
+  return getDateKey(minEventDate(leadDays))
 }
 
 /**
  * Date-picker floor. Returns `undefined` when the override is on so the picker
  * imposes no minimum and any date (including the past) is selectable.
  */
-export function eventDateFloor(): Date | undefined {
-  return ALLOW_ANY_EVENT_DATE ? undefined : minEventDate()
+export function eventDateFloor(leadDays?: number): Date | undefined {
+  return ALLOW_ANY_EVENT_DATE ? undefined : minEventDate(leadDays)
 }
 
-export function eventDateFloorKey(): string | undefined {
-  return ALLOW_ANY_EVENT_DATE ? undefined : minEventDateKey()
+export function eventDateFloorKey(leadDays?: number): string | undefined {
+  return ALLOW_ANY_EVENT_DATE ? undefined : minEventDateKey(leadDays)
 }
 
 export function formatDisplayDate(
