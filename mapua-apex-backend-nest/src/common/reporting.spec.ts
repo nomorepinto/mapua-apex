@@ -491,3 +491,104 @@ describe('report aggregation and coverage', () => {
     ).rejects.toThrow('incomplete');
   });
 });
+
+describe('per-desk turnaround reporting', () => {
+  const deskTiming = (
+    role: string,
+    workingMinutesValue: number,
+    source: 'decision' | 'backfill' = 'decision',
+  ): Item => ({
+    signatory_id: role,
+    role,
+    stage_key: `${role}_1`,
+    action: 'approved',
+    acted_at: '2024-02-29T02:00:00Z',
+    wall_minutes: workingMinutesValue,
+    working_minutes: workingMinutesValue,
+    source,
+  });
+
+  it('sums each role desk time and records the consent of record on the row', () => {
+    const row = reportRow(
+      'proposals',
+      proposal('1', 'approved', {
+        fully_approved_at: '2024-02-29T16:00:00Z',
+        desk_timings: [deskTiming('adviser', 120), deskTiming('cdm', 60)],
+        privacy_consent: { version: 'v1', accepted_at: '2024-02-28T16:00:00Z' },
+      }),
+    );
+    expect(row).toMatchObject({
+      desk_history: 'recorded',
+      adviser_desk_working_minutes: 120,
+      cdm_desk_working_minutes: 60,
+      dean_desk_working_minutes: null,
+      osaar_desk_working_minutes: null,
+      privacy_consent_version: 'v1',
+      privacy_consent_at: '2024-02-28T16:00:00Z',
+    });
+    expect(typeof row.overall_turnaround_working_minutes).toBe('number');
+  });
+
+  it('flags a backfilled history and treats an absent one as missing', () => {
+    expect(
+      reportRow(
+        'proposals',
+        proposal('1', 'approved', {
+          desk_timings: [deskTiming('adviser', 90, 'backfill')],
+        }),
+      ).desk_history,
+    ).toBe('backfilled');
+    const missing = reportRow('proposals', proposal('2', 'approved'));
+    expect(missing.desk_history).toBe('missing');
+    expect(missing.adviser_desk_working_minutes).toBeNull();
+    expect(missing.overall_turnaround_working_minutes).toBeNull();
+  });
+
+  it('aggregates desk medians, the CDM average, and the missing-history warning', async () => {
+    const recorded = proposal('1', 'approved', {
+      fully_approved_at: '2024-02-29T16:00:00Z',
+      desk_timings: [deskTiming('adviser', 120), deskTiming('cdm', 60)],
+    });
+    const bare = proposal('2', 'approved');
+    const result = await generateReport(
+      'proposals',
+      { filters },
+      'test',
+      async () => [recorded, bare],
+    );
+    expect(result.summary).toMatchObject({
+      median_adviser_desk_working_minutes: 120,
+      median_cdm_desk_working_minutes: 60,
+      average_cdm_desk_working_minutes: 60,
+      cdm_desk_sample_count: 1,
+      proposals_missing_desk_history: 1,
+    });
+    const breakdowns = result.breakdowns as Record<
+      string,
+      { key: string; label: string; count: number }[]
+    >;
+    expect(breakdowns.desk_median_working_minutes?.[0]).toMatchObject({
+      key: 'adviser',
+      count: 120,
+    });
+    expect(
+      (result.warnings as string[]).some((line) =>
+        line.includes('no per-desk history'),
+      ),
+    ).toBe(true);
+  });
+
+  it('filters proposals by their desk_history facet', () => {
+    const applied = parseFilters('proposals', {
+      ...filters,
+      values: { desk_history: ['missing'] },
+    });
+    const source = [
+      proposal('1', 'approved', { desk_timings: [deskTiming('adviser', 120)] }),
+      proposal('2', 'approved'),
+    ];
+    const filtered = filterItems('proposals', source, applied);
+    expect(filtered).toHaveLength(1);
+    expect(String((filtered[0] as Item).submission_id)).toBe('2');
+  });
+});

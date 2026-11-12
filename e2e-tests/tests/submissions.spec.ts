@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test"
 import {
   SaafPage,
   rolesMatch,
+  trackerConsent,
   trackerRoles,
   trackerSignatories,
   type ReservationPick,
@@ -176,6 +177,21 @@ test.describe("submissions", () => {
         expect(desk.email).toBe("")
         expect(desk.text).toContain("No contact details are on file for this desk.")
       }
+    } finally {
+      await session.close()
+    }
+  })
+
+  test("records the proponent's data privacy consent on the paper", async ({ browser }) => {
+    const run = readRun()
+    const paper = run.papers.P1
+    if (!paper) throw new Error("P1")
+    const session = await openApex(browser, "orgA")
+    try {
+      // Filing ticks the RA 10173 gate, so the detail view names the accepted version.
+      const consent = await trackerConsent(session.page, paper.title)
+      expect(consent).toContain("Data privacy consent")
+      expect(consent).toContain("accepted")
     } finally {
       await session.close()
     }

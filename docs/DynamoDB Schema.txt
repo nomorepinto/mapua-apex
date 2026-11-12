@@ -162,6 +162,26 @@ signatory_steps: [                         (same snapshot, with stable keys; abs
     organization_id: ORGANIZATION#uuid | null
   }
 ]
+desk_timings: [                            (per-desk turnaround; one entry appended per decision, absent until the first hop is acted on)
+  {
+    stage_key: "adviser:ORG#uuid" | "dean:ORG#uuid" | "osaar_1" | "cdm" | null,
+    role: "adviser" | "dean" | "osaar" | "cdm" | null,
+    signatory_id: string                   (bare SIGNATORY uuid),
+    organization_id: ORGANIZATION#uuid | null,
+    action: "approved" | "fully approved" | "returned" | "denied",
+    entered_at: timestamp | null           (the later of sent_at and the previous entry's acted_at),
+    acted_at: timestamp,
+    wall_minutes: number | null            (wall-clock elapsed entered_at -> acted_at),
+    working_minutes: number | null         (Manila working hours Mon-Fri 08:00-17:00, fixed UTC+8, no holidays),
+    source: "decision" | "backfill"        ("backfill" = legacy paper reconstructed from its notifications)
+  }
+]
+privacy_consent: {                         (RA 10173 consent of record; written on create and rewritten on every resubmit)
+  version: string                          (the accepted PRIVACY_NOTICE_VERSION, e.g. "1.0"),
+  accepted_at: timestamp,
+  notice_hash: string                      (sha256 of the canonical notice text at acceptance),
+  channel: "web"
+}
 signatory_chain is derived at read time, never persisted.
 approval_chain_contacts is derived at read time on the student detail only,
 never persisted (see the SIGNATORY contact attributes below).

@@ -152,6 +152,11 @@ interface OrgState {
   editingSubmissionId: string | null;
   setEditingSubmission: (eventId: string, submissionId: string) => void;
   clearEditingSubmission: () => void;
+
+  // RA 10173 consent — ephemeral (never persisted): set right before the submit
+  // action reads it, cleared after, so consent is re-given on every submission.
+  privacyConsentVersion: string | null;
+  setPrivacyConsentVersion: (version: string | null) => void;
 }
 
 export const useOrgStore = create<OrgState>()(
@@ -446,6 +451,9 @@ export const useOrgStore = create<OrgState>()(
     set({ editingEventId: eventId, editingSubmissionId: submissionId }),
   clearEditingSubmission: () =>
     set({ editingEventId: null, editingSubmissionId: null }),
+
+  privacyConsentVersion: null,
+  setPrivacyConsentVersion: (version) => set({ privacyConsentVersion: version }),
 }),
     {
       name: "apex_org_wizard_v1",

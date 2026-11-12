@@ -46,3 +46,23 @@ test("administrators build and export every report; OSAAR loses the session log"
     await osaar.close()
   }
 })
+
+test("exports the proposal per-desk turnaround columns", async ({ browser }) => {
+  test.setTimeout(180_000)
+  const admin = await openApex(browser, "admin")
+  const reports = new ReportsPage(admin.page)
+  try {
+    await reports.open("/admin/reports")
+    await reports.preview("Proposal statistics")
+    // The turnaround summary cards and the per-desk export columns ship together.
+    await reports.expectTurnaroundSummary()
+    await reports.selectColumns([
+      "CDM desk time (working minutes)",
+      "Overall turnaround (working minutes)",
+    ])
+    await reports.refreshPreview()
+    await reports.downloadDetailsCsv("proposals")
+  } finally {
+    await admin.close()
+  }
+})

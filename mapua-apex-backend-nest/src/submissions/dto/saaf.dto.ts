@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
+  Equals,
   IsArray,
   IsBoolean,
   IsEmail,
@@ -16,6 +17,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacy-notice.js';
 
 const NO_DIGITS = { message: 'Names cannot contain numbers.' };
 
@@ -275,6 +277,22 @@ export class CollaborationDto {
   dependent_organization_ids?: string[];
 }
 
+/**
+ * RA 10173 consent as sent by the pre-submit dialog. `version` is pinned to the
+ * current notice version, so bumping `PRIVACY_NOTICE_VERSION` makes every older
+ * client payload fail validation and forces a re-accept. Optional on `SaafDto`
+ * so the admin `PUT` keeps validating; the student write path enforces presence
+ * in the service (see `submission-writer.service.ts`).
+ */
+export class PrivacyConsentDto {
+  @IsIn([PRIVACY_NOTICE_VERSION])
+  version!: string;
+
+  @IsBoolean()
+  @Equals(true)
+  accepted!: boolean;
+}
+
 export class SaafDto {
   @IsString()
   submission_type!: string;
@@ -309,6 +327,11 @@ export class SaafDto {
   @ValidateNested()
   @Type(() => VenueDto)
   venue_reservation!: VenueDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PrivacyConsentDto)
+  privacy_consent?: PrivacyConsentDto;
 }
 
 export class CreateSaafDto extends SaafDto {

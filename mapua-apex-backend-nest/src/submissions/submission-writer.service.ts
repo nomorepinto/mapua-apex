@@ -18,6 +18,10 @@ import {
 } from '../common/event-date.js';
 import { abort } from '../common/http.js';
 import { record, str, type Item } from '../common/records.js';
+import {
+  PRIVACY_NOTICE_VERSION,
+  privacyNoticeHash,
+} from '../privacy/privacy-notice.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import { TermSettingsService } from '../term-settings/term-settings.service.js';
 import { assertTermDateAllowed } from '../term-settings/term-window.js';
@@ -42,6 +46,7 @@ export class SubmissionWriterService {
 
   async create(organizationId: string, body: CreateSaafDto): Promise<Item> {
     await this.assertDates(body);
+    this.assertConsent(body);
     const dependents = await this.resolveDependents(
       organizationId,
       body.collaboration?.dependent_organization_ids ?? [],
@@ -82,6 +87,7 @@ export class SubmissionWriterService {
     );
     item.first_submitted_at = sentAt;
     item.first_submitted_at_source = 'recorded';
+    item.privacy_consent = this.consentRecord(sentAt);
     await this.submissions.putSubmission(item, 'attribute_not_exists(SK)');
     await this.bookings.commit(planned);
     for (const dependent of dependents) {
@@ -102,6 +108,7 @@ export class SubmissionWriterService {
     body: SaafDto,
   ): Promise<{ before: Item; after: Item }> {
     await this.assertDates(body);
+    this.assertConsent(body);
     const event = await this.submissions.getEvent(eventId);
     if (
       !event ||
@@ -176,6 +183,9 @@ export class SubmissionWriterService {
       sentAt,
       planned,
     );
+    // A student resubmit overwrites the stored consent with this fresh
+    // acceptance; `replaceEditable` SETs it because it is not a protected field.
+    item.privacy_consent = this.consentRecord(sentAt);
     const updated = await this.submissions.replaceEditable(existing, item);
     await this.bookings.releaseRefs(previousRefs);
     await this.bookings.commit(planned);
@@ -364,6 +374,33 @@ export class SubmissionWriterService {
       ids.push(id);
     }
     return ids;
+  }
+
+  /**
+   * Student create/resubmit must carry an accepted, current RA 10173 consent.
+   * The DTO's `@IsIn` already rejects a stale version at the boundary; this
+   * guard covers the absent case and re-checks acceptance so the write path
+   * never persists a submission without a valid consent of record.
+   */
+  private assertConsent(body: SaafDto): void {
+    const consent = body.privacy_consent;
+    if (
+      !consent ||
+      consent.version !== PRIVACY_NOTICE_VERSION ||
+      consent.accepted !== true
+    ) {
+      abort(422, 'Please review and accept the current data privacy notice.');
+    }
+  }
+
+  /** Consent of record: the accepted version, when, the text hash, and channel. */
+  private consentRecord(sentAt: string): Item {
+    return {
+      version: PRIVACY_NOTICE_VERSION,
+      accepted_at: sentAt,
+      notice_hash: privacyNoticeHash(),
+      channel: 'web',
+    };
   }
 
   private async assertDates(body: SaafDto): Promise<void> {
