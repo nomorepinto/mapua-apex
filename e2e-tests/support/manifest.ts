@@ -81,6 +81,13 @@ export function rememberBody(body: unknown, sourceUrl = ""): Promise<void> {
     if (sourceUrl.includes("/signatories") && typeof signatoryId === "string") {
       if (!data.created_signatory_ids.includes(signatoryId)) data.created_signatory_ids.push(signatoryId)
     }
+    const documentNumber = layers
+      .map((layer) => layer.document_number)
+      .find((value) => typeof value === "string")
+    if (typeof documentNumber === "string") {
+      const day = /^SAAF-(\d{6})-\d{3}$/.exec(documentNumber)
+      if (day?.[1]) addId(data, `COUNTER#SAAF#${day[1]}`)
+    }
     const organizationId = layers.map((layer) => layer.organization_id).find((value) => typeof value === "string")
     if (sourceUrl.includes("/organizations") && typeof organizationId === "string") {
       if (!data.created_org_ids.includes(organizationId)) data.created_org_ids.push(organizationId)

@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test"
 
 import {
+  BUDGET_NOTE,
   EQUIPMENT_REMARK,
   PROSE,
   ROOM_PURPOSE,
@@ -9,7 +10,7 @@ import {
   normalizeDesk,
 } from "../support/data"
 import { eventDate } from "../support/env"
-import { choose, pickIsoDate, stepPanel } from "../support/ui"
+import { checkMulti, choose, pickIsoDate, stepPanel } from "../support/ui"
 
 export type ReservationPick = {
   campus: string
@@ -21,7 +22,12 @@ export type ReservationPick = {
 export class SaafPage {
   constructor(private readonly page: Page) {}
 
-  async start(title: string, reserve: boolean, budget = true) {
+  async start(
+    title: string,
+    reserve: boolean,
+    budget = true,
+    funding = ["Sponsors", "Organization"],
+  ) {
     await this.page.goto("/students/submissions")
     await this.page.getByLabel("Event name").fill(title)
     await choose(
@@ -34,8 +40,24 @@ export class SaafPage {
       this.page.getByLabel("Will you be operating with a budget?"),
       budget ? "Yes, we will operate with a budget" : "No, this activity has no budget",
     )
+    if (budget) {
+      // A with-budget paper must name at least one funding source before it can
+      // leave the setup step: assert the gate blocks Continue, then satisfy it.
+      const fundingBox = this.page.getByLabel("How will this activity be funded?")
+      await expect(fundingBox).toBeVisible()
+      await this.page.getByRole("button", { name: "Continue" }).click()
+      await expect(this.page.getByText("Choose at least one funding source.")).toBeVisible()
+      await checkMulti(this.page, fundingBox, funding)
+    } else {
+      await this.expectFundingSourcesAbsent()
+    }
     await this.page.getByRole("button", { name: "Continue" }).click()
     await expect(this.page.getByRole("heading", { name: "Student Activity Application Form" })).toBeVisible()
+  }
+
+  /** A no-budget paper never renders the funding-source multi-select. */
+  async expectFundingSourcesAbsent() {
+    await expect(this.page.getByLabel("How will this activity be funded?")).toHaveCount(0)
   }
 
   async classification(activity: "extra-curricular" | "co-curricular") {
@@ -177,6 +199,8 @@ export class SaafPage {
     await choose(this.page, panel.getByRole("combobox", { name: "Budget item" }), "Food and Refreshments")
     await panel.getByRole("textbox", { name: "Quantity" }).fill("2")
     await panel.getByRole("textbox", { name: "Price per unit" }).fill("50")
+    // A with-budget paper must carry a budget note before it can leave the step.
+    await panel.getByLabel("Budget Note").fill(BUDGET_NOTE)
   }
 
   /** A no-budget paper never renders the line-item table or the money inputs. */
@@ -184,12 +208,23 @@ export class SaafPage {
     const panel = stepPanel(this.page)
     await expect(panel.getByRole("combobox", { name: "Budget item" })).toHaveCount(0)
     await expect(this.page.getByPlaceholder("0.00")).toHaveCount(0)
+    await expect(panel.getByLabel("Budget Note")).toHaveCount(0)
     await expect(this.page.getByText("Alignment & budget")).toHaveCount(0)
   }
 
   async submit() {
     await this.page.getByRole("button", { name: "Submit", exact: true }).click()
-    await this.page.getByRole("button", { name: "Proceed" }).click()
+    // The RA 10173 gate: Proceed stays disabled until the notice is ticked, and
+    // the label names a version only once the backend notice has loaded.
+    const proceed = this.page.getByRole("button", { name: "Proceed" })
+    await expect(proceed).toBeDisabled()
+    const consent = this.page.getByText(
+      /I have read and agree to the Data Privacy Act of 2012 \(RA 10173\) notice \(v/,
+    )
+    await expect(consent).toBeVisible()
+    await consent.click()
+    await expect(proceed).toBeEnabled()
+    await proceed.click()
     await expect(this.page.getByRole("heading", { name: "Activity Application Submitted!" })).toBeVisible()
     await this.page.getByRole("button", { name: "Back to Dashboard" }).click()
     await expect(this.page).toHaveURL(/\/students\/dashboard/)
@@ -239,6 +274,7 @@ export async function trackerRoles(page: Page, title: string): Promise<string[]>
   await page.locator("tr").filter({ hasText: title }).first().click()
   const dialog = page.getByRole("dialog", { name: `${title} Proposal` })
   await dialog.getByRole("button", { name: "Milestone & Progress" }).click()
+  await expect(dialog.getByText(/SAAF-\d{6}-\d{3}/).first()).toBeVisible()
   const reviewers = dialog.getByText("Required Reviewers", { exact: true }).locator("xpath=..")
   await expect(reviewers).toBeVisible()
   const labels = await reviewers.locator("span.font-bold").allTextContents()
@@ -286,6 +322,47 @@ export async function trackerSignatories(
   }
   await dialog.getByRole("button", { name: "Close", exact: true }).filter({ hasText: "Close" }).click()
   return desks
+}
+
+/**
+ * Open a filed paper's tracker on Document Details and read the recorded
+ * RA 10173 consent line, e.g. "Data privacy consent v1.0 accepted <Manila>".
+ */
+export async function trackerConsent(page: Page, title: string): Promise<string> {
+  await page.goto("/students/dashboard")
+  await page.getByRole("region", { name: "Proposal statistics filters" }).getByLabel("Search records").fill(title)
+  await page.locator("tr").filter({ hasText: title }).first().click()
+  const dialog = page.getByRole("dialog", { name: `${title} Proposal` })
+  await dialog.getByRole("button", { name: "Document Details", exact: true }).click()
+  const row = dialog.getByText("Data privacy consent", { exact: true }).locator("xpath=..")
+  await expect(row).toBeVisible()
+  const text = (await row.innerText()).replace(/\s+/g, " ").trim()
+  await dialog.getByRole("button", { name: "Close", exact: true }).filter({ hasText: "Close" }).click()
+  return text
+}
+
+/**
+ * Open a decided paper's tracker on Milestone & Progress and read the overall
+ * turnaround line plus every per-desk "<duration> on desk" suffix. `total` is
+ * null until the paper is fully approved.
+ */
+export async function trackerTurnaround(
+  page: Page,
+  title: string,
+): Promise<{ total: string | null; deskDurations: string[] }> {
+  await page.goto("/students/dashboard")
+  await page.getByRole("region", { name: "Proposal statistics filters" }).getByLabel("Search records").fill(title)
+  await page.locator("tr").filter({ hasText: title }).first().click()
+  const dialog = page.getByRole("dialog", { name: `${title} Proposal` })
+  await dialog.getByRole("button", { name: "Milestone & Progress" }).click()
+  const totalLine = dialog.getByText(/Total time to final approval/)
+  const total =
+    (await totalLine.count()) > 0
+      ? (await totalLine.first().innerText()).replace(/\s+/g, " ").trim()
+      : null
+  const desks = await dialog.getByText(/on desk/).allTextContents()
+  await dialog.getByRole("button", { name: "Close", exact: true }).filter({ hasText: "Close" }).click()
+  return { total, deskDurations: desks.map((text) => text.replace(/\s+/g, " ").trim()) }
 }
 
 export function rolesMatch(actual: string[], expected: string[]) {

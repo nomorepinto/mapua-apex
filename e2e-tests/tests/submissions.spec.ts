@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test"
 import {
   SaafPage,
   rolesMatch,
+  trackerConsent,
   trackerRoles,
   trackerSignatories,
   type ReservationPick,
@@ -18,6 +19,7 @@ type PaperDraft = PaperRecord & {
   activity: "extra-curricular" | "co-curricular"
   reserve: boolean
   budget?: boolean
+  funding?: string[]
   pick?: Omit<ReservationPick, "campus">
   collaborators?: string[]
   higherCouncil?: boolean
@@ -56,7 +58,7 @@ function drafts(): PaperDraft[] {
     "OSAAR",
   ]
   const papers: PaperDraft[] = [
-    { key: "P1", title: `Extra Online ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false },
+    { key: "P1", title: `Extra Online ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false, funding: ["Sponsors", "Organization", "Member Contributions", "Others"] },
     { key: "P2", title: `Extra Room ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(0, "R101") },
     { key: "P3", title: `Co Online ${run.tag}`, org: "orgA", roles: co, desks: ["adv1", "dean1", "osaar1", "osaar2", "osaarAll"], activity: "co-curricular", reserve: false },
     { key: "P4", title: `Co Room Equipment ${run.tag}`, org: "orgA", roles: coRoom, desks: ["adv1", "dean1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "co-curricular", reserve: true, pick: both(2) },
@@ -81,7 +83,7 @@ async function file(browser: import("@playwright/test").Browser, paper: PaperDra
   const email = account("admin").email
   const budget = paper.budget !== false
   try {
-    await saaf.start(paper.title, paper.reserve, budget)
+    await saaf.start(paper.title, paper.reserve, budget, paper.funding)
     await saaf.classification(paper.activity)
     await saaf.people(email, { chooseDepartment: Boolean(paper.higherCouncil), stay: Boolean(paper.collaborators) })
     if (paper.collaborators) {
@@ -101,7 +103,12 @@ async function file(browser: import("@playwright/test").Browser, paper: PaperDra
     } else {
       await saaf.alignment()
     }
-    await captureJson(session.page, "/students/submissions", "POST", () => saaf.submit())
+    const created = await captureJson(session.page, "/students/submissions", "POST", () => saaf.submit())
+    const payload =
+      created.data && typeof created.data === "object" && !Array.isArray(created.data)
+        ? (created.data as Record<string, unknown>)
+        : created
+    expect(payload.document_number).toMatch(/^SAAF-\d{6}-\d{3}$/)
     const actual = await trackerRoles(session.page, paper.title)
     rolesMatch(actual, paper.roles)
     writeRun((state) => {
@@ -175,6 +182,21 @@ test.describe("submissions", () => {
         expect(desk.email).toBe("")
         expect(desk.text).toContain("No contact details are on file for this desk.")
       }
+    } finally {
+      await session.close()
+    }
+  })
+
+  test("records the proponent's data privacy consent on the paper", async ({ browser }) => {
+    const run = readRun()
+    const paper = run.papers.P1
+    if (!paper) throw new Error("P1")
+    const session = await openApex(browser, "orgA")
+    try {
+      // Filing ticks the RA 10173 gate, so the detail view names the accepted version.
+      const consent = await trackerConsent(session.page, paper.title)
+      expect(consent).toContain("Data privacy consent")
+      expect(consent).toContain("accepted")
     } finally {
       await session.close()
     }

@@ -1,7 +1,7 @@
 import { FormPageHeader } from "@/components/forms/form-page-header"
 import { useSubmissionsStart } from "@/components/students/submissions/submissions-start-context"
 import { Button } from "@/components/ui/button"
-import { Field, FieldLabel } from "@/components/ui/field"
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -11,6 +11,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { layout } from "@/config"
+import {
+  FUNDING_SOURCE_OPTIONS,
+  fundingSourceLabels,
+} from "@/constants/funding-sources"
 import { checkGibberish, useGibberishField } from "@/hooks/use-gibberish-check"
 import { cn } from "@/lib/utils"
 
@@ -151,6 +155,53 @@ export function EventSetupForm() {
             </SelectPopup>
           </Select>
         </Field>
+
+        {state.withBudget === "yes" && (
+          <Field className="w-full">
+            <FieldLabel htmlFor="fundingSources">
+              How will this activity be funded? <span className="text-red-500">*</span>
+            </FieldLabel>
+            <Select
+              multiple
+              name="fundingSources"
+              value={state.fundingSources}
+              onValueChange={(next) =>
+                actions.changeFundingSources(next as string[])
+              }
+            >
+              <SelectTrigger
+                id="fundingSources"
+                className={cn(
+                  "w-full border-neutral-200 bg-white text-neutral-900",
+                  Boolean(state.error) &&
+                    "!border-red-500 focus-visible:!ring-red-500"
+                )}
+              >
+                <SelectValue>
+                  {(selected: string[]) =>
+                    fundingSourceLabels(selected).join(", ") ||
+                    "Select funding sources"
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup
+                alignItemWithTrigger={false}
+                className="bg-white text-neutral-900"
+              >
+                {FUNDING_SOURCE_OPTIONS.map((option) => (
+                  <SelectItem
+                    key={option.value}
+                    value={option.value}
+                    className="text-neutral-900 data-highlighted:bg-neutral-100 data-highlighted:text-neutral-900"
+                  >
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+            <FieldDescription>Select all that apply.</FieldDescription>
+          </Field>
+        )}
 
         <div className="flex justify-center pt-2">
           <Button type="submit" className="min-w-40 sm:min-w-48">

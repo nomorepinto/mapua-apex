@@ -25,6 +25,7 @@ import {
   formatSignatoryRole,
   signatoryChainLabel,
 } from "@/lib/dynamodb-adapters"
+import { formatDuration, overallTurnaroundMinutes } from "@/lib/turnaround"
 import { brand, modal } from "@/config"
 import { LoadingBlock } from "@/components/ui/loading-block"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -89,17 +90,30 @@ export function SubmissionTrackerModal({
       orgSignatories: orgQuery.data?.signatories,
       signatorySequence: detailQuery.data?.signatory_sequence,
       signatoryChain: detailQuery.data?.signatory_chain,
+      deskTimings: detailQuery.data?.desk_timings,
     }
   )
+
+  const documentCode = formatDocumentId(
+    submissionId || activity?.submissionId,
+    "SAAF",
+    detailQuery.data?.document_number || activity?.documentNumber
+  )
+
+  // Wall-clock turnaround from first submit to final approval; null (and thus
+  // hidden) until the paper is fully approved.
+  const overallTurnaroundLabel = detailQuery.data
+    ? formatDuration(overallTurnaroundMinutes(detailQuery.data))
+    : null
 
   const canResubmit = detailQuery.data?.status === "returned"
   const isDependent = detailQuery.data?.role === "dependent"
   const isDenied = detailQuery.data?.status === "denied"
   const canRequestReservationChange = Boolean(
     onRequestReservationChange &&
-      !isDependent &&
-      detailQuery.data?.status === "approved" &&
-      detailQuery.data?.venue_reservation?.has_reservation
+    !isDependent &&
+    detailQuery.data?.status === "approved" &&
+    detailQuery.data?.venue_reservation?.has_reservation
   )
 
   const returnNotifications = useMemo(() => {
@@ -196,7 +210,7 @@ export function SubmissionTrackerModal({
                 className="rounded-md bg-white/20 px-2.5 py-0.5 font-mono text-xs font-bold text-white shadow-2xs"
                 title={submissionId || activity?.submissionId || undefined}
               >
-                {formatDocumentId(submissionId || activity?.submissionId)}
+                {documentCode}
               </span>
               {activity?.org ? (
                 <span className={brand.chipGold}>{activity.org}</span>
@@ -569,6 +583,20 @@ export function SubmissionTrackerModal({
                     )}
                   </span>
                 </div>
+
+                {detailQuery.data?.privacy_consent ? (
+                  <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="font-bold text-neutral-900">
+                      Data privacy consent
+                    </span>
+                    <span className="font-medium text-neutral-600 sm:text-right">
+                      v{detailQuery.data.privacy_consent.version} accepted{" "}
+                      {formatDisplayDateTime(
+                        detailQuery.data.privacy_consent.accepted_at
+                      )}
+                    </span>
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2 pt-2">
@@ -658,10 +686,19 @@ export function SubmissionTrackerModal({
                   </span>
                 </div>
 
+                {overallTurnaroundLabel ? (
+                  <p className="mb-4 text-xs font-medium text-neutral-600">
+                    Total time to final approval ·{" "}
+                    <span className="font-bold text-neutral-900">
+                      {overallTurnaroundLabel}
+                    </span>
+                  </p>
+                ) : null}
+
                 <div className="mb-6 flex flex-col gap-2 text-xs text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
                   <span className="min-w-0">
-                    {formatDocumentId(submissionId)} • Submitted{" "}
-                    {activity?.submittedDate || "—"} •{" "}
+                    {documentCode} • Submitted {activity?.submittedDate || "—"}{" "}
+                    •{" "}
                     {stepper.isAllApproved
                       ? "All steps completed"
                       : `${stepper.remainingSteps} tasks remaining before final approval`}
@@ -835,12 +872,17 @@ export function SubmissionTrackerModal({
                             <div className="h-2 w-2 rounded-full bg-white"></div>
                           )}
                         </div>
-                        <div className="text-xs font-medium text-neutral-900 sm:text-sm">
+                        <div className="min-w-0 text-xs font-medium text-neutral-900 sm:text-sm">
                           <span className="font-bold">{item.name}</span>
                           <span className="text-neutral-500">
                             {" "}
                             — {item.statusText}
                           </span>
+                          {item.turnaroundText ? (
+                            <p className="text-[11px] font-medium text-neutral-500">
+                              {item.turnaroundText}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     )
@@ -871,7 +913,7 @@ export function SubmissionTrackerModal({
             <Button
               type="button"
               onClick={onRequestReservationChange}
-              className="bg-[#8B0000] text-white hover:bg-[#700000] font-bold shadow-xs cursor-pointer"
+              className="cursor-pointer bg-[#8B0000] font-bold text-white shadow-xs hover:bg-[#700000]"
             >
               Request a reservation change
             </Button>

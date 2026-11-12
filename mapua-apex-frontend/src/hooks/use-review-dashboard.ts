@@ -21,7 +21,10 @@ import {
   useSubmissionBookingConflictsQuery,
   useUpdateEventClassificationMutation,
 } from "@/hooks/use-signatory"
-import { apiSubmissionToActivity, formatDocumentId } from "@/lib/dynamodb-adapters"
+import {
+  apiSubmissionToActivity,
+  formatDocumentId,
+} from "@/lib/dynamodb-adapters"
 
 export function useReviewDashboard() {
   const auth = useAuth()
@@ -49,7 +52,9 @@ export function useReviewDashboard() {
     eventId: string
     submissionId: string
   } | null>(null)
-  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
+    null
+  )
   const [actionError, setActionError] = useState<string | null>(null)
 
   const detailQuery = useSignatorySubmissionDetailQuery(
@@ -170,12 +175,20 @@ export function useReviewDashboard() {
         handleModalClose()
       } catch (error) {
         setActionError(
-          error instanceof Error ? error.message : "Could not update this submission."
+          error instanceof Error
+            ? error.message
+            : "Could not update this submission."
         )
         throw error
       }
     },
-    [activeKeys, approveMutation, denyMutation, handleModalClose, returnMutation]
+    [
+      activeKeys,
+      approveMutation,
+      denyMutation,
+      handleModalClose,
+      returnMutation,
+    ]
   )
 
   const handleClassificationChange = useCallback(
@@ -191,14 +204,19 @@ export function useReviewDashboard() {
         })
       } catch (error) {
         setActionError(
-          error instanceof Error ? error.message : "Could not update event classification."
+          error instanceof Error
+            ? error.message
+            : "Could not update event classification."
         )
       }
     },
     [activeActivity?.nature, activeKeys, updateClassificationMutation]
   )
 
-  const stats = useMemo(() => computeReviewStats(activitiesList), [activitiesList])
+  const stats = useMemo(
+    () => computeReviewStats(activitiesList),
+    [activitiesList]
+  )
   const departmentOrgMap = useMemo(
     () => buildDepartmentOrgMap(activitiesList),
     [activitiesList]
@@ -224,7 +242,11 @@ export function useReviewDashboard() {
         activity.decision,
         activity.department,
         activity.submissionId,
-        formatDocumentId(activity.submissionId),
+        formatDocumentId(
+          activity.submissionId,
+          "SAAF",
+          activity.documentNumber
+        ),
       ]
         .join(" ")
         .toLowerCase()
@@ -292,12 +314,16 @@ export function useReviewDashboard() {
     /** Surfaced by the history table so a failed load is not shown as empty. */
     isHistoryError: historyQuery.isError,
     isActing:
-      approveMutation.isPending || returnMutation.isPending || denyMutation.isPending,
+      approveMutation.isPending ||
+      returnMutation.isPending ||
+      denyMutation.isPending,
     isUpdatingClassification: updateClassificationMutation.isPending,
     isReadOnly,
     /** CDM only: slots the open paper's holds collide with (empty when approvable). */
-    bookingConflicts: isCdm && !isReadOnly ? bookingConflictsQuery.data ?? [] : [],
-    isCheckingBookingConflicts: isCdm && !isReadOnly && bookingConflictsQuery.isLoading,
+    bookingConflicts:
+      isCdm && !isReadOnly ? (bookingConflictsQuery.data ?? []) : [],
+    isCheckingBookingConflicts:
+      isCdm && !isReadOnly && bookingConflictsQuery.isLoading,
     actionError,
     handleDeptSelect,
     handleOrgSelect,

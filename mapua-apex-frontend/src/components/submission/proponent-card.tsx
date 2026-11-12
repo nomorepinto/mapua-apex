@@ -1,4 +1,4 @@
-import { memo } from "react"
+import { memo, useState } from "react"
 import { AlertCircle, Loader2, Trash2Icon } from "lucide-react"
 
 import { FieldWarning } from "@/components/forms/field-warning"
@@ -76,6 +76,7 @@ interface ProponentCardProps {
   departmentValue: string
   /** Name of the applying organization; locks the "Name of Organization" field. */
   organizationName: string
+  orgRoles?: string[]
   onUpdate: (id: string, field: keyof Proponent, value: string) => void
   onRemove: (id: string) => void
 }
@@ -87,6 +88,7 @@ export const ProponentCard = memo(function ProponentCard({
   departmentEditable = false,
   departmentValue,
   organizationName,
+  orgRoles = [],
   onUpdate,
   onRemove,
 }: ProponentCardProps) {
@@ -96,6 +98,17 @@ export const ProponentCard = memo(function ProponentCard({
   // The only hand-typed prose on this card. Positions are short role titles, so
   // this is the field where keyboard-mash most often appears.
   const positionGibberish = useGibberishField(proponent.positionOfApplicant)
+
+  const hasOrgRoles = (orgRoles?.length ?? 0) > 0
+  const matchedRole = orgRoles?.find(
+    (role) =>
+      role.toLowerCase() ===
+      (proponent.positionOfApplicant || "").trim().toLowerCase()
+  )
+  const isCustomInitial = Boolean(
+    hasOrgRoles && proponent.positionOfApplicant && !matchedRole
+  )
+  const [isCustomPosition, setIsCustomPosition] = useState(isCustomInitial)
 
   const today = new Date().toISOString().split("T")[0]
   const submissionDate = proponent.dateOfSubmission || today
@@ -454,30 +467,131 @@ export const ProponentCard = memo(function ProponentCard({
           <label className="block text-xs font-medium text-neutral-700">
             Position of the Applicant <span className="text-red-500">*</span>
           </label>
-          <Input
-            name={`proponent_${index}_positionOfApplicant`}
-            value={proponent.positionOfApplicant}
-            maxLength={30}
-            onKeyDown={blockDigitKeys}
-            onChange={(e) => {
-              positionGibberish.reset()
-              onUpdate(
-                proponent.id,
-                "positionOfApplicant",
-                stripDigits(e.target.value)
-              )
-            }}
-            onBlur={positionGibberish.onBlur}
-            placeholder="President / Project Lead"
-            style={{ color: "#171717" }}
-            className={cn(
-              FIELD_INPUT_CLASS,
-              positionGibberish.state === "gibberish" &&
-                "!border-red-500 focus:!border-red-500 focus:!ring-red-500"
-            )}
-            required
-          />
-          {positionGibberish.indicator}
+          {hasOrgRoles ? (
+            <div className="space-y-2">
+              <Select
+                value={
+                  isCustomPosition
+                    ? "__OTHER__"
+                    : matchedRole ?? (proponent.positionOfApplicant || "")
+                }
+                onValueChange={(val) => {
+                  if (typeof val === "string") {
+                    if (val === "__OTHER__") {
+                      setIsCustomPosition(true)
+                      onUpdate(proponent.id, "positionOfApplicant", "")
+                    } else {
+                      setIsCustomPosition(false)
+                      onUpdate(proponent.id, "positionOfApplicant", val)
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger
+                  aria-label="Position of the Applicant"
+                  className={cn(
+                    "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
+                    !proponent.positionOfApplicant &&
+                      !isCustomPosition &&
+                      "saaf-glow-invalid"
+                  )}
+                >
+                  <SelectValue placeholder="Select Position">
+                    {isCustomPosition
+                      ? "Other (enter custom role)"
+                      : matchedRole || "Select Position"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
+                  style={SELECT_CONTENT_STYLE}
+                >
+                  {orgRoles.map((role) => (
+                    <SelectItem
+                      key={role}
+                      value={role}
+                      className={SELECT_ITEM_CLASS}
+                    >
+                      {role}
+                    </SelectItem>
+                  ))}
+                  <SelectItem
+                    value="__OTHER__"
+                    className={cn(
+                      SELECT_ITEM_CLASS,
+                      "border-t border-neutral-100 font-medium italic text-neutral-600"
+                    )}
+                  >
+                    Other (enter custom role)...
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              {isCustomPosition ? (
+                <div className="space-y-1">
+                  <Input
+                    name={`proponent_${index}_positionOfApplicant`}
+                    value={proponent.positionOfApplicant}
+                    maxLength={30}
+                    onKeyDown={blockDigitKeys}
+                    onChange={(e) => {
+                      positionGibberish.reset()
+                      onUpdate(
+                        proponent.id,
+                        "positionOfApplicant",
+                        stripDigits(e.target.value)
+                      )
+                    }}
+                    onBlur={positionGibberish.onBlur}
+                    placeholder="Enter custom position"
+                    style={{ color: "#171717" }}
+                    className={cn(
+                      FIELD_INPUT_CLASS,
+                      positionGibberish.state === "gibberish" &&
+                        "!border-red-500 focus:!border-red-500 focus:!ring-red-500"
+                    )}
+                    required
+                    autoFocus
+                  />
+                  {positionGibberish.indicator}
+                </div>
+              ) : (
+                <input
+                  type="hidden"
+                  name={`proponent_${index}_positionOfApplicant`}
+                  value={proponent.positionOfApplicant}
+                  required
+                />
+              )}
+            </div>
+          ) : (
+            <>
+              <Input
+                name={`proponent_${index}_positionOfApplicant`}
+                value={proponent.positionOfApplicant}
+                maxLength={30}
+                onKeyDown={blockDigitKeys}
+                onChange={(e) => {
+                  positionGibberish.reset()
+                  onUpdate(
+                    proponent.id,
+                    "positionOfApplicant",
+                    stripDigits(e.target.value)
+                  )
+                }}
+                onBlur={positionGibberish.onBlur}
+                placeholder="President / Project Lead"
+                style={{ color: "#171717" }}
+                className={cn(
+                  FIELD_INPUT_CLASS,
+                  positionGibberish.state === "gibberish" &&
+                    "!border-red-500 focus:!border-red-500 focus:!ring-red-500"
+                )}
+                required
+              />
+              {positionGibberish.indicator}
+            </>
+          )}
           <FieldWarning
             name={`proponent.${proponent.id}.positionOfApplicant`}
           />

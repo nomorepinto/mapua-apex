@@ -124,9 +124,10 @@ interface OrgState {
   eventName: string
   reserveFacilities: "yes" | "no" | null
   withBudget: "yes" | "no" | null
+  fundingSources: string[]
   saafValidated: boolean
   setSaafValidated: (value: boolean) => void
-  setSubmissionStart: (eventName: string, reserveFacilities: "yes" | "no", withBudget: "yes" | "no") => void
+  setSubmissionStart: (eventName: string, reserveFacilities: "yes" | "no", withBudget: "yes" | "no", fundingSources: string[]) => void
   clearSubmissionStart: () => void
 
   // SAAF Draft
@@ -151,6 +152,11 @@ interface OrgState {
   editingSubmissionId: string | null;
   setEditingSubmission: (eventId: string, submissionId: string) => void;
   clearEditingSubmission: () => void;
+
+  // RA 10173 consent — ephemeral (never persisted): set right before the submit
+  // action reads it, cleared after, so consent is re-given on every submission.
+  privacyConsentVersion: string | null;
+  setPrivacyConsentVersion: (version: string | null) => void;
 }
 
 export const useOrgStore = create<OrgState>()(
@@ -392,11 +398,12 @@ export const useOrgStore = create<OrgState>()(
   eventName: "",
   reserveFacilities: null,
   withBudget: null,
+  fundingSources: [],
   saafValidated: false,
   setSaafValidated: (value) => set({ saafValidated: value }),
-  setSubmissionStart: (eventName, reserveFacilities, withBudget) =>
-    set({ eventName, reserveFacilities, withBudget, saafValidated: false }),
-  clearSubmissionStart: () => set({ eventName: "", reserveFacilities: null, withBudget: null, saafValidated: false }),
+  setSubmissionStart: (eventName, reserveFacilities, withBudget, fundingSources) =>
+    set({ eventName, reserveFacilities, withBudget, fundingSources, saafValidated: false }),
+  clearSubmissionStart: () => set({ eventName: "", reserveFacilities: null, withBudget: null, fundingSources: [], saafValidated: false }),
 
   // SAAF Draft
   saafDraft: null,
@@ -444,6 +451,9 @@ export const useOrgStore = create<OrgState>()(
     set({ editingEventId: eventId, editingSubmissionId: submissionId }),
   clearEditingSubmission: () =>
     set({ editingEventId: null, editingSubmissionId: null }),
+
+  privacyConsentVersion: null,
+  setPrivacyConsentVersion: (version) => set({ privacyConsentVersion: version }),
 }),
     {
       name: "apex_org_wizard_v1",
@@ -452,6 +462,7 @@ export const useOrgStore = create<OrgState>()(
         eventName: state.eventName,
         reserveFacilities: state.reserveFacilities,
         withBudget: state.withBudget,
+        fundingSources: state.fundingSources,
         saafValidated: state.saafValidated,
         saafDraft: state.saafDraft,
         reservationDraft: state.reservationDraft,

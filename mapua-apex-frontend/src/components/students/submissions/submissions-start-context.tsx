@@ -15,6 +15,7 @@ interface SubmissionsStartState {
   eventName: string
   reserveFacilities: "yes" | "no" | ""
   withBudget: "yes" | "no" | ""
+  fundingSources: string[]
   error: string | null
   guideOpen: boolean
 }
@@ -23,6 +24,7 @@ interface SubmissionsStartActions {
   changeEventName: (value: string) => void
   changeReserveFacilities: (value: "yes" | "no" | "") => void
   changeWithBudget: (value: "yes" | "no" | "") => void
+  changeFundingSources: (value: string[]) => void
   submit: (event: FormEvent) => void
   setGuideOpen: (open: boolean) => void
 }
@@ -50,6 +52,7 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
   const savedName = useOrgStore((state) => state.eventName)
   const savedChoice = useOrgStore((state) => state.reserveFacilities)
   const savedBudget = useOrgStore((state) => state.withBudget)
+  const savedSources = useOrgStore((state) => state.fundingSources)
   const [eventName, setEventName] = useState(savedName)
   const [reserveFacilities, setReserveFacilities] = useState<"yes" | "no" | "">(
     savedChoice ?? ""
@@ -57,11 +60,21 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
   const [withBudget, setWithBudget] = useState<"yes" | "no" | "">(
     savedBudget ?? ""
   )
+  const [fundingSources, setFundingSources] = useState<string[]>(
+    savedSources ?? []
+  )
   const [error, setError] = useState<string | null>(null)
   const [guideOpen, setGuideOpen] = useState(false)
 
   const value: SubmissionsStartContextValue = {
-    state: { eventName, reserveFacilities, withBudget, error, guideOpen },
+    state: {
+      eventName,
+      reserveFacilities,
+      withBudget,
+      fundingSources,
+      error,
+      guideOpen,
+    },
     actions: {
       changeEventName: (next) => {
         setEventName(next)
@@ -73,6 +86,12 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
       },
       changeWithBudget: (next) => {
         setWithBudget(next)
+        // A no-budget activity has no funding to describe, so drop the pick.
+        if (next === "no") setFundingSources([])
+        setError(null)
+      },
+      changeFundingSources: (next) => {
+        setFundingSources(next)
         setError(null)
       },
       setGuideOpen,
@@ -100,6 +119,10 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
           setError("Choose whether you will operate with a budget.")
           return
         }
+        if (withBudget === "yes" && fundingSources.length === 0) {
+          setError("Choose at least one funding source.")
+          return
+        }
 
         const existingDraft = useOrgStore.getState().saafDraft
         const wasEditing = Boolean(useOrgStore.getState().editingEventId)
@@ -108,7 +131,7 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
           useOrgStore.getState().clearSaafDraft()
           useOrgStore.getState().clearReservationDraft()
         }
-        useOrgStore.getState().setSubmissionStart(name, reserveFacilities, withBudget)
+        useOrgStore.getState().setSubmissionStart(name, reserveFacilities, withBudget, fundingSources)
         useOrgStore.getState().setSaafDraft({
           ...DEFAULT_SAAF_DRAFT,
           ...(wasEditing ? {} : (existingDraft ?? {})),

@@ -1,7 +1,7 @@
 # Unused / orphaned API routes
 
 This audit records routes the `mapua-apex-frontend` SPA does not call. The
-canonical contract is [`API_ROUTES.md`](../API_ROUTES.md).
+canonical contract is [`API_ROUTES.md`](routes/API_ROUTES.md).
 
 The Nest server in `mapua-apex-backend-nest` does **not** implement the
 Section A routes. The Laravel server in `mapua-apex-backend` still exposes

@@ -158,6 +158,7 @@ export const REPORTS: Record<ReportKind, ReportDefinition> = {
       department: "Proponent department",
       has_reservation: "Has reservation",
       collaboration_role: "Collaboration role",
+      desk_history: "Desk history",
     },
     columns: {
       ...identity,
@@ -172,6 +173,16 @@ export const REPORTS: Record<ReportKind, ReportDefinition> = {
       collaboration_role: "Collaboration role",
       proposed_budget: "Proposed budget (PHP)",
       planned_participants: "Planned participant places",
+      duration_minutes: "Overall turnaround (wall-clock minutes)",
+      overall_turnaround_working_minutes:
+        "Overall turnaround (working minutes)",
+      adviser_desk_working_minutes: "Adviser desk time (working minutes)",
+      dean_desk_working_minutes: "Dean desk time (working minutes)",
+      osaar_desk_working_minutes: "OSAAR desk time (working minutes)",
+      cdm_desk_working_minutes: "CDM desk time (working minutes)",
+      desk_history: "Desk history",
+      privacy_consent_version: "Data privacy consent (version)",
+      privacy_consent_at: "Data privacy consent accepted (Manila)",
     },
     defaults: ["id", "date", "title", "organization", "type", "status"],
   },
@@ -411,6 +422,13 @@ export function filterRow(
         recordOf(item.venue_reservation).has_reservation === true
       ),
       collaboration_role: text(item.role) || "proponent",
+      desk_history: Array.isArray(item.desk_timings)
+        ? item.desk_timings.some(
+              (entry) => recordOf(entry).source === "backfill"
+            )
+          ? "backfilled"
+          : "recorded"
+        : "missing",
     }
   }
   const date = text(
@@ -556,5 +574,21 @@ export function metricLabel(key: string, kind: ReportKind): string {
   if (key === "most_day") return "Busiest selected-date day (Manila)"
   if (key === "most_first_submission_day")
     return "Busiest first-submission day (Manila)"
+  if (key === "median_cdm_desk_working_minutes")
+    return "Median CDM desk time (working minutes)"
+  if (key === "average_cdm_desk_working_minutes")
+    return "Average CDM desk time (working minutes)"
+  if (key === "cdm_desk_sample_count")
+    return "Proposals with a recorded CDM desk time"
+  if (key === "median_osaar_desk_working_minutes")
+    return "Median OSAAR desk time (working minutes)"
+  if (key === "median_adviser_desk_working_minutes")
+    return "Median adviser desk time (working minutes)"
+  if (key === "median_dean_desk_working_minutes")
+    return "Median dean desk time (working minutes)"
+  if (key === "median_overall_turnaround_working_minutes")
+    return "Median overall turnaround (working minutes)"
+  if (key === "proposals_missing_desk_history")
+    return "Proposals without per-desk history"
   return key.replaceAll("_", " ").replace(/^./, (char) => char.toUpperCase())
 }

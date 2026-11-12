@@ -397,9 +397,9 @@ export function AppSidebar({
         </Link>
       </header>
 
-      {/* Runs full viewport height (frame is lg:h-dvh); the bottom padding
-          keeps the user card clear of the footer strip, which starts at lg:left-64. */}
-      <aside className="sticky top-0 z-20 hidden h-dvh w-64 shrink-0 pb-[calc(var(--site-footer-h)+0.5rem)] shadow-xl lg:flex lg:flex-col">
+      {/* Fills the frame column, which already ends above the in-flow footer
+          strip, so no extra bottom clearance is needed here. */}
+      <aside className="sticky top-0 z-20 hidden h-full w-64 shrink-0 pb-2 shadow-xl lg:flex lg:flex-col">
         <SidebarPanel {...panelProps} />
       </aside>
 

@@ -203,7 +203,7 @@ export function StudentDashboardProvider({
     const rows = submissions.filter((row) => {
       if (query) {
         const haystack = [
-          formatDocumentId(row.submission_id),
+          formatDocumentId(row.submission_id, "SAAF", row.document_number),
           row.submission_id,
           row.activity_details.title,
           row.activity_details.venue,

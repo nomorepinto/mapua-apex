@@ -48,6 +48,8 @@ export interface Activity {
   id: string
   eventId: string
   submissionId: string
+  /** Stored `SAAF-YYMMDD-###` when the paper has one. */
+  documentNumber?: string | null
   title: string
   org: string
   department: string
@@ -88,12 +90,18 @@ export interface Activity {
   hasReservation?: boolean
   /** Whether the activity operates with a budget (absent on legacy rows = true). */
   hasBudget?: boolean
+  /** Funding sources picked on the proposal setup step (stored slugs; empty/absent on legacy rows). */
+  fundingSources?: string[]
+  /** Free-text budget note (empty/absent on legacy or no-budget rows). */
+  budgetNote?: string
   /** Raw start date of the event in YYYY-MM-DD */
   dateOfEvent?: string
   /** Raw end date of the event in YYYY-MM-DD */
   endDateOfEvent?: string
   /** Grand total of the detailed budget proposal */
   budgetGrandTotal?: number
+  /** RA 10173 consent of record; absent on papers filed before the consent gate. */
+  privacyConsent?: { version: string; acceptedAt: string }
 }
 
 export type StatusVariant = "success" | "warning" | "error" | "outline"

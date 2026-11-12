@@ -10,9 +10,36 @@ import type { PostEvalDraft } from "@/components/posteval/types"
 import type { Activity } from "@/components/ui/activity.types"
 import { slotEnd, slotStart } from "@/lib/schedule-slots"
 import { departmentAbbreviation } from "@/lib/departments"
+import { formatDuration } from "@/lib/turnaround"
 
 /**
- * Backend API Submission shape returned by Laravel DynamoDB routes
+ * Per-desk turnaround entry written server-side on each decision (or derived by
+ * the legacy backfill). Mirrors the backend `DeskTimingEntry`; the clock math
+ * lives on the server, so the client only formats these values.
+ */
+export interface DeskTiming {
+  stage_key: string | null
+  role: string | null
+  signatory_id: string
+  organization_id: string | null
+  action: "approved" | "fully approved" | "returned" | "denied"
+  entered_at: string | null
+  acted_at: string
+  wall_minutes: number | null
+  working_minutes: number | null
+  source: "decision" | "backfill"
+}
+
+/** RA 10173 consent of record persisted on the submission by the student write path. */
+export interface PrivacyConsent {
+  version: string
+  accepted_at: string
+  notice_hash?: string
+  channel?: string
+}
+
+/**
+ * Backend API Submission shape returned by the Nest DynamoDB routes
  */
 export interface ApiSubmission {
   event_id: string
@@ -26,6 +53,10 @@ export interface ApiSubmission {
   first_submitted_at?: string
   first_submitted_at_source?: "recorded" | "linked_creation_evidence"
   fully_approved_at?: string
+  /** Human document code, `SAAF-YYMMDD-###`. Absent on papers filed before the counter. */
+  document_number?: string | null
+  /** Per-desk clocks. Absent on papers filed before stage timings were stored. */
+  stage_timings?: ApiStageTiming[]
   status:
     "pending" | "approved" | "denied" | "returned" | "cancelled" | "finished"
   current_signatory?: string
@@ -105,6 +136,10 @@ export interface ApiSubmission {
   detailed_budget_proposal?: {
     /** False when the activity operates without a budget; absent = legacy (true). */
     has_budget?: boolean
+    /** Funding-source slugs picked on the setup step; absent = paper filed before the field existed. */
+    funding_sources?: string[]
+    /** Free-text budget note; absent = paper filed before the field existed. */
+    note?: string
     items?: Array<{
       item_no: string
       /** Free-text measuring unit ("pc", "box", …); legacy rows stored a number. */
@@ -153,6 +188,13 @@ export interface ApiSubmission {
       }>
     }
   }
+  /**
+   * Per-desk turnaround timings; absent on papers decided before the feature or
+   * with no derivable history. Read-only — written server-side.
+   */
+  desk_timings?: DeskTiming[]
+  /** RA 10173 consent of record; absent on papers filed before the consent gate. */
+  privacy_consent?: PrivacyConsent
 }
 
 /**
@@ -213,6 +255,18 @@ export interface ApiSignatoryChainLink {
   organization_name?: string | null
   /** `osaar_1`, `adviser:ORG#…`, `cdm`, and so on. Null on older submissions. */
   stage_key?: string | null
+  entered_at?: string | null
+  acted_at?: string | null
+  expected_tat_hours?: number | null
+  elapsed_hours?: number | null
+}
+
+export interface ApiStageTiming {
+  signatory_id: string
+  entered_at: string | null
+  acted_at: string | null
+  expected_tat_hours: number
+  elapsed_hours: number | null
 }
 
 /**
@@ -315,7 +369,32 @@ export interface ApiOrganization {
   skip_dean?: boolean
   skip_post_eval?: boolean
   signatories?: ApiOrganizationSignatory[]
+  position_roles?: string[]
 }
+
+/** Officer roster entry — stored under ORGANIZATION#uuid / OFFICER#uuid. */
+export interface ApiOfficer {
+  officer_id: string
+  first_name: string
+  middle_name?: string | null
+  last_name: string
+  suffix?: string | null
+  student_number: string
+  program_and_year: string
+  department?: string | null
+  position_of_applicant: string
+  contact_number: string
+  email_address: string
+  facebook_link: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type CreateOfficerPayload = Omit<
+  ApiOfficer,
+  "officer_id" | "created_at" | "updated_at"
+>
+export type UpdateOfficerPayload = Partial<CreateOfficerPayload>
 
 export type CreateOrganizationPayload = {
   name: string
@@ -411,7 +490,9 @@ export function buildSaafApiPayload(
   saafDraft: SaafDraft,
   reservationDraft?: ReservationDraft | null,
   existingEventId?: string,
-  hasBudget = true
+  hasBudget = true,
+  fundingSources: string[] = [],
+  privacyConsentVersion?: string | null
 ) {
   const event_id = existingEventId || crypto.randomUUID()
   // Proposed budget is locked to the itemized Detailed Budget grand total so the
@@ -483,6 +564,12 @@ export function buildSaafApiPayload(
     },
     detailed_budget_proposal: {
       has_budget: hasBudget,
+      // The funding sources only mean something for a budgeted activity; a
+      // no-budget paper stores an empty list, mirroring how `items` is emptied.
+      funding_sources: hasBudget ? fundingSources : [],
+      // The budget note only means something for a budgeted activity; a no-budget
+      // paper stores an empty string, mirroring how `items` is emptied.
+      note: hasBudget ? (saafDraft.budgetNote || "").trim() : "",
       // A no-budget paper carries no line items at all, so nothing budget-related
       // can surface in a reviewer view or the saved proposal PDF.
       items: hasBudget
@@ -515,6 +602,12 @@ export function buildSaafApiPayload(
           : {}),
       })),
     },
+    // RA 10173 consent is only emitted on the student create/resubmit paths,
+    // which pass the notice version they consented against. The admin edit path
+    // omits it so an admin PUT never fabricates or overwrites a recorded consent.
+    ...(privacyConsentVersion
+      ? { privacy_consent: { version: privacyConsentVersion, accepted: true } }
+      : {}),
   }
 }
 
@@ -580,6 +673,9 @@ export interface DashboardSubmissionRow {
   submitted_date: string
   /** Raw submission timestamp (ISO 8601) used for chronological sorting. */
   sent_at: string
+  document_number?: string | null
+  /** Set once a desk has acted: "Elapsed 5h" or "Elapsed 1d 4h". */
+  decision_elapsed: string | null
   api_status: ApiSubmission["status"]
   activity_details: {
     title: string
@@ -606,6 +702,8 @@ export interface TrackerAssignee {
   name: string
   statusText: string
   state: "completed" | "current" | "queued"
+  /** Expected TAT and the time spent on this desk. Null for the system sign-off row. */
+  turnaroundText: string | null
 }
 
 export interface TrackerStepper {
@@ -690,9 +788,81 @@ export function formatDisplayDateTime(value?: string | null): string {
 }
 
 /**
- * Formats a raw UUID or ID into a clean human-readable document code (e.g., SAAF-1289C970)
+ * Hours between two timestamps. Under an hour stays "under 1 hour".
+ * A full day or more is "1d 4h".
  */
-export function formatDocumentId(id?: string | null, prefix = "SAAF"): string {
+export function formatElapsed(
+  from?: string | null,
+  to?: string | null,
+  now = Date.now()
+): string | null {
+  if (!from) return null
+  const start = Date.parse(from)
+  const end = to ? Date.parse(to) : now
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start)
+    return null
+  const hours = Math.floor((end - start) / 3_600_000)
+  if (hours < 1) return "under 1 hour"
+  if (hours < 24) return `${hours}h`
+  const days = Math.floor(hours / 24)
+  const remainder = hours % 24
+  return remainder === 0 ? `${days}d` : `${days}d ${remainder}h`
+}
+
+export function formatExpectedTat(hours?: number | null): string {
+  const value = hours && hours > 0 ? hours : 24
+  if (value % 24 === 0) {
+    const days = value / 24
+    return days === 1 ? "1 day" : `${days} days`
+  }
+  return `${value}h`
+}
+
+export function stageTurnaroundText(
+  timing: ApiStageTiming | undefined,
+  state: TrackerAssignee["state"],
+  now = Date.now()
+): string | null {
+  if (!timing) return null
+  const expected = `Expected ${formatExpectedTat(timing.expected_tat_hours)}`
+  if (timing.entered_at && timing.acted_at) {
+    const elapsed = formatElapsed(timing.entered_at, timing.acted_at, now)
+    return elapsed ? `${expected} · Elapsed ${elapsed}` : expected
+  }
+  if (timing.entered_at && state === "current") {
+    const elapsed = formatElapsed(timing.entered_at, null, now)
+    return elapsed ? `${expected} · In review ${elapsed}` : expected
+  }
+  return expected
+}
+
+const DECIDED_STATUSES = new Set(["approved", "denied", "returned", "finished"])
+
+/** Elapsed time of the desk that made the latest decision. */
+export function decisionElapsedLabel(
+  submission: Pick<ApiSubmission, "status" | "stage_timings">,
+  now = Date.now()
+): string | null {
+  if (!DECIDED_STATUSES.has(submission.status)) return null
+  const acted = [...(submission.stage_timings ?? [])]
+    .reverse()
+    .find((row) => row.entered_at && row.acted_at)
+  if (!acted?.entered_at || !acted.acted_at) return null
+  const elapsed = formatElapsed(acted.entered_at, acted.acted_at, now)
+  return elapsed ? `Elapsed ${elapsed}` : null
+}
+
+/**
+ * Prefers the stored document number (`SAAF-YYMMDD-###`).
+ * Older papers and non-SAAF ids still use the short hex code.
+ */
+export function formatDocumentId(
+  id?: string | null,
+  prefix = "SAAF",
+  documentNumber?: string | null
+): string {
+  const assigned = documentNumber?.trim()
+  if (assigned && assigned !== "—") return assigned
   if (!id || id === "—") return "—"
   const cleaned = id.replace(/^(SUBMISSION#|EVENT#)/i, "")
   const targetId = cleaned.includes(":") ? cleaned.split(":").pop()! : cleaned
@@ -986,6 +1156,8 @@ export function apiSubmissionToDashboardRow(
     requires_venue: Boolean(submission.venue_reservation?.has_reservation),
     submitted_date: formatDisplayDate(submission.sent_at),
     sent_at: submission.sent_at || "",
+    document_number: submission.document_number,
+    decision_elapsed: decisionElapsedLabel(submission),
     api_status: submission.status,
     activity_details: {
       title,
@@ -1127,6 +1299,7 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     id: `${submission.event_id}:${submission.submission_id}`,
     eventId: submission.event_id,
     submissionId: submission.submission_id,
+    documentNumber: submission.document_number,
     title,
     org:
       submission.organization_name ||
@@ -1189,6 +1362,16 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     ),
     hasReservation: Boolean(submission.venue_reservation?.has_reservation),
     hasBudget: submissionHasBudget(submission),
+    // Only a budgeted paper carries funding sources; a no-budget or legacy paper
+    // reads as an empty list so the detail modal renders no funding row.
+    fundingSources: submissionHasBudget(submission)
+      ? (submission.detailed_budget_proposal?.funding_sources ?? [])
+      : [],
+    // Only a budgeted paper carries a budget note; a no-budget or legacy paper
+    // reads as empty so the detail modal renders no note row.
+    budgetNote: submissionHasBudget(submission)
+      ? (submission.detailed_budget_proposal?.note ?? "")
+      : "",
     dateOfEvent: submission.activity_details?.date_of_event,
     endDateOfEvent: submission.activity_details?.end_date_of_event,
     budgetGrandTotal:
@@ -1203,6 +1386,12 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
                   (Number(curr.price_per_unit) || 0)),
             0
           ),
+    privacyConsent: submission.privacy_consent
+      ? {
+          version: submission.privacy_consent.version,
+          acceptedAt: submission.privacy_consent.accepted_at,
+        }
+      : undefined,
   }
 }
 
@@ -1221,6 +1410,12 @@ export function apiNotificationsToStepper(
     }>
     signatorySequence?: string[]
     signatoryChain?: ApiSignatoryChainLink[]
+    /**
+     * Stored per-desk timings for this submission. When present, each stage's
+     * `statusText` gains a `· <duration> on desk` suffix matched by signatory id
+     * (chain path) or role (legacy path).
+     */
+    deskTimings?: DeskTiming[]
   }
 ): TrackerStepper {
   const sorted = [...notifications].sort((a, b) =>
@@ -1261,12 +1456,17 @@ export function apiNotificationsToStepper(
     ? chain!.filter((link) => (link.role ?? "").toLowerCase() === "osaar")
         .length
     : 0
-  const steps: Array<{ key: string; label: string }> = useChain
-    ? chain!.map((link) => ({
-        key: stripId(link.signatory_id),
-        label: signatoryChainLabel(link, qualifyOrg, osaarCount),
-      }))
-    : resolveExpectedRoles(options).map((role) => ({ key: role, label: role }))
+  const steps: Array<{ key: string; label: string; signatoryId?: string }> =
+    useChain
+      ? chain!.map((link) => ({
+          key: stripId(link.signatory_id),
+          label: signatoryChainLabel(link, qualifyOrg, osaarCount),
+          signatoryId: stripId(link.signatory_id),
+        }))
+      : resolveExpectedRoles(options).map((role) => ({
+          key: role,
+          label: role,
+        }))
 
   // Resolve each notification to the step key it belongs to.
   const resolvedNotifs: Array<{
@@ -1358,7 +1558,26 @@ export function apiNotificationsToStepper(
       }
     }
 
-    return { role: step.label, name: step.label, statusText, state }
+    // Append the stored time this desk took, matched by signatory id on the
+    // chain path or by role on the legacy no-chain path. Absent history (or a
+    // stage not yet acted on) leaves the status text exactly as before.
+    const timing = options?.deskTimings?.find((entry) =>
+      useChain
+        ? stripId(entry.signatory_id) === step.key
+        : (entry.role ?? "").toLowerCase() === step.key.toLowerCase()
+    )
+    const deskSuffix = formatDuration(
+      timing ? (timing.working_minutes ?? timing.wall_minutes) : null
+    )
+    if (deskSuffix) statusText = `${statusText} · ${deskSuffix} on desk`
+
+    return {
+      role: step.label,
+      name: step.label,
+      statusText,
+      state,
+      turnaroundText: null,
+    }
   })
 
   assigneesList.push({
@@ -1366,6 +1585,7 @@ export function apiNotificationsToStepper(
     name: "System sign-off",
     statusText: isAllApproved ? "Approved" : "Queued (pending all signatures)",
     state: isAllApproved ? "completed" : "queued",
+    turnaroundText: null,
   })
 
   const completedCount = isAllApproved
@@ -1465,6 +1685,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
   reservation: ReservationDraft
   hasReservation: boolean
   hasBudget: boolean
+  fundingSources: string[]
 } {
   const proponents = (submission.proponents || []).map((proponent, index) => ({
     id: proponent.id || String(index + 1),
@@ -1568,11 +1789,13 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
       proponents:
         proponents.length > 0 ? proponents : [createEmptyProponent("1")],
       budgetItems,
+      budgetNote: submission.detailed_budget_proposal?.note ?? "",
       dependentOrgs: submission.collaboration?.dependent_organization_ids || [],
     },
     reservation,
     hasReservation: Boolean(submission.venue_reservation?.has_reservation),
     hasBudget: submissionHasBudget(submission),
+    fundingSources: submission.detailed_budget_proposal?.funding_sources ?? [],
   }
 }
 

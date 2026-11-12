@@ -55,6 +55,8 @@ export interface SaafDraft {
   sdgExplanation: string
   proponents: Proponent[]
   budgetItems: BudgetItem[]
+  /** Free-text note shown with the detailed budget (required for a with-budget paper). */
+  budgetNote: string
   /** Dependent organization ids chosen for collaboration (empty = none). */
   dependentOrgs: string[]
 }

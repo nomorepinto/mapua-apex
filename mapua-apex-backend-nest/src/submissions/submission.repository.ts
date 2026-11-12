@@ -9,6 +9,8 @@ import {
   signatoryKey,
   submissionKey,
 } from '../common/dynamo-keys.js';
+import { abort } from '../common/http.js';
+import { manilaDate } from '../common/manila.js';
 import type { Item } from '../common/records.js';
 
 @Injectable()
@@ -46,6 +48,29 @@ export class SubmissionRepository {
     return this.table.put(item, condition);
   }
 
+  /**
+   * Next `SAAF-YYMMDD-###` for the Manila day of `atIso`.
+   * One atomic ADD on `PK = SK = COUNTER#SAAF#YYMMDD`. A failed create can skip a number.
+   */
+  async allocateDocumentNumber(atIso: string): Promise<string> {
+    const parsed = new Date(atIso);
+    const day = manilaDate(
+      Number.isNaN(parsed.getTime()) ? new Date() : parsed,
+    );
+    const yymmdd = day.slice(2).replaceAll('-', '');
+    const key = `COUNTER#SAAF#${yymmdd}`;
+    const updated = await this.table.update({
+      key: { PK: key, SK: key },
+      set: { entity_type: 'counter' },
+      add: { seq: 1 },
+    });
+    const seq = Number(updated.seq);
+    if (!Number.isInteger(seq) || seq < 1) {
+      abort(503, 'Could not assign a document number.');
+    }
+    return `SAAF-${yymmdd}-${String(seq).padStart(3, '0')}`;
+  }
+
   replaceEditable(existing: Item, replacement: Item): Promise<Item> {
     const protectedFields = [
       'PK',
@@ -53,6 +78,7 @@ export class SubmissionRepository {
       'first_submitted_at',
       'first_submitted_at_source',
       'fully_approved_at',
+      'document_number',
     ];
     const set = Object.fromEntries(
       Object.entries(replacement).filter(
@@ -190,10 +216,7 @@ export class SubmissionRepository {
   }
 
   deleteCancelWatch(eventId: string, submissionId: string): Promise<void> {
-    return this.table.delete(
-      eventKey(eventId),
-      cancelWatchKey(submissionId),
-    );
+    return this.table.delete(eventKey(eventId), cancelWatchKey(submissionId));
   }
 
   /**

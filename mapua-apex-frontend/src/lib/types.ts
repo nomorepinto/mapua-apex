@@ -95,6 +95,17 @@ export interface DetailedBudgetProposal {
    * before the flag existed — read as true). Mirrors `has_reservation`.
    */
   has_budget?: boolean
+  /**
+   * Funding sources picked on the proposal setup step (slugs from
+   * `constants/funding-sources`). Absent on papers filed before the field
+   * existed, which reads as "unknown" — render no funding row for those.
+   */
+  funding_sources?: string[]
+  /**
+   * Free-text note shown with the detailed budget. Absent on papers filed
+   * before the field existed, which reads as "no note".
+   */
+  note?: string
   items: BudgetItem[]
   grand_total: number
 }

@@ -27,6 +27,10 @@ export function memberKey(studentId: string): string {
   return `MEMBER#${stripPrefix(studentId, 'MEMBER#')}`;
 }
 
+export function officerKey(officerId: string): string {
+  return `OFFICER#${stripPrefix(officerId, 'OFFICER#')}`;
+}
+
 export function studentKey(studentId: string): string {
   return `STUDENT#${stripPrefix(studentId, 'STUDENT#')}`;
 }

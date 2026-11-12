@@ -19,11 +19,13 @@ import { MembersModule } from './members/members.module.js';
 import { MonitorModule } from './monitor/monitor.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { PostEvalsModule } from './postevals/postevals.module.js';
+import { PrivacyModule } from './privacy/privacy.module.js';
 import { ReservationChangesModule } from './reservation-changes/reservation-changes.module.js';
 import { ReservablesModule } from './reservables/reservables.module.js';
 import { SessionsModule } from './sessions/sessions.module.js';
 import { SignatoriesModule } from './signatories/signatories.module.js';
 import { SubmissionsModule } from './submissions/submissions.module.js';
+import { TermSettingsModule } from './term-settings/term-settings.module.js';
 
 const envFile = existingRootEnv();
 
@@ -47,9 +49,11 @@ const envFile = existingRootEnv();
     ReservablesModule,
     BookingsModule,
     SubmissionsModule,
+    TermSettingsModule,
     DeadlinesModule,
     InputChecksModule,
     PostEvalsModule,
+    PrivacyModule,
     ReservationChangesModule,
     ArcusModule,
     SessionsModule,

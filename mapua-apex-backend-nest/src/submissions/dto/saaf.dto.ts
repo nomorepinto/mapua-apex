@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
+  Equals,
   IsArray,
   IsBoolean,
   IsEmail,
@@ -16,6 +17,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacy-notice.js';
 
 const NO_DIGITS = { message: 'Names cannot contain numbers.' };
 
@@ -183,11 +185,32 @@ export class BudgetItemDto {
   total!: number;
 }
 
+export const FUNDING_SOURCES = [
+  'sponsors',
+  'concessionaires',
+  'department',
+  'organization',
+  'member_contributions',
+  'others',
+] as const;
+
 export class BudgetDto {
   /** False for a no-budget submission; a missing key means an older paper that always had a budget. */
   @IsOptional()
   @IsBoolean()
   has_budget?: boolean;
+
+  /** Funding sources picked on the proposal setup step; optional so legacy and API-shaped payloads keep filing. */
+  @IsOptional()
+  @IsArray()
+  @IsIn(FUNDING_SOURCES, { each: true })
+  funding_sources?: string[];
+
+  /** Free-text note attached to the budget; optional so legacy and no-budget papers keep filing. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500, { message: 'The budget note cannot exceed 500 characters.' })
+  note?: string;
 
   @IsOptional()
   @IsArray()
@@ -254,6 +277,22 @@ export class CollaborationDto {
   dependent_organization_ids?: string[];
 }
 
+/**
+ * RA 10173 consent as sent by the pre-submit dialog. `version` is pinned to the
+ * current notice version, so bumping `PRIVACY_NOTICE_VERSION` makes every older
+ * client payload fail validation and forces a re-accept. Optional on `SaafDto`
+ * so the admin `PUT` keeps validating; the student write path enforces presence
+ * in the service (see `submission-writer.service.ts`).
+ */
+export class PrivacyConsentDto {
+  @IsIn([PRIVACY_NOTICE_VERSION])
+  version!: string;
+
+  @IsBoolean()
+  @Equals(true)
+  accepted!: boolean;
+}
+
 export class SaafDto {
   @IsString()
   submission_type!: string;
@@ -288,6 +327,11 @@ export class SaafDto {
   @ValidateNested()
   @Type(() => VenueDto)
   venue_reservation!: VenueDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PrivacyConsentDto)
+  privacy_consent?: PrivacyConsentDto;
 }
 
 export class CreateSaafDto extends SaafDto {

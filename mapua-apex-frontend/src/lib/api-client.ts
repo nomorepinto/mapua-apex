@@ -324,8 +324,11 @@ async function request<T>(
     return {} as T
   }
 
-  const json = await response.json()
-  return json as T
+  const text = await response.text()
+  if (!text.trim()) {
+    return {} as T
+  }
+  return JSON.parse(text) as T
 }
 
 export const apiClient = {

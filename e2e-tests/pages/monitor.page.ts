@@ -3,7 +3,7 @@ import { expect, type Page } from "@playwright/test"
 /**
  * Log monitors. The Activity Log page (`AdminMonitorActivitiesPage`) is reused
  * across `/admin/activities`, `/osaar/activities`, and `/cdm/activities`; the
- * Session Log (`/admin/sessions`) is admin-only. Gating is enforced by route
+ * Session Log is shared by `/admin/sessions` and `/osaar/sessions`. Gating is enforced by route
  * `AuthGuard`s — a wrong group renders an "Access Denied" panel, not a 403.
  */
 export class MonitorPage {
@@ -14,8 +14,8 @@ export class MonitorPage {
     await expect(this.page.getByRole("heading", { name: /Activity Log/ })).toBeVisible()
   }
 
-  async openSessionLog() {
-    await this.page.goto("/admin/sessions")
+  async openSessionLog(path = "/admin/sessions") {
+    await this.page.goto(path)
     await expect(this.page.getByRole("heading", { name: /Session Log/ })).toBeVisible()
   }
 

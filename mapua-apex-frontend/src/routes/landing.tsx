@@ -31,7 +31,7 @@ export function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex flex-col">
+    <div className="min-h-[calc(100dvh-var(--site-footer-h))] bg-neutral-50 flex flex-col">
       <LandingHeader onSignIn={openSignIn} />
       <LandingHero onSignIn={openSignIn} />
 

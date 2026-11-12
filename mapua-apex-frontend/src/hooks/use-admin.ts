@@ -34,6 +34,67 @@ export const ADMIN_KEYS = {
   accounts: ["admin-accounts"] as const,
   approvalSettings: ["admin-approval-settings"] as const,
   announcements: ["admin-announcements"] as const,
+  termSettings: ["osaar-term-settings"] as const,
+}
+
+export type ApiTermBlackout = { start: string; end: string; reason: string }
+export type ApiAcademicTerm = {
+  id: string
+  label: string
+  start: string
+  end: string
+  blackouts: ApiTermBlackout[]
+}
+export type ApiAcademicYear = {
+  id: string
+  label: string
+  terms: ApiAcademicTerm[]
+}
+export type ApiTermSettings = {
+  active_academic_year_id: string
+  academic_years: ApiAcademicYear[]
+  event_filing_lead_days: number
+}
+
+export function useTermSettingsQuery() {
+  return useQuery({
+    queryKey: ADMIN_KEYS.termSettings,
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: ApiTermSettings | null }>(
+        "/osaar/term"
+      )
+      return res.data ?? null
+    },
+  })
+}
+
+export function useUpdateTermSettingsMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: ApiTermSettings) => {
+      const res = await apiClient.put<{ data: ApiTermSettings }>(
+        "/osaar/term",
+        payload
+      )
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.termSettings })
+      queryClient.invalidateQueries({ queryKey: ["public-term-settings"] })
+    },
+  })
+}
+
+export function usePublicTermSettingsQuery() {
+  return useQuery({
+    queryKey: ["public-term-settings"],
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: ApiTermSettings | null }>(
+        "/public/term"
+      )
+      return res.data ?? null
+    },
+  })
 }
 
 /**
@@ -112,7 +173,9 @@ export function useUpdateAdminSubmissionMutation() {
       queryClient.invalidateQueries({ queryKey: ["admin-submission-detail"] })
       queryClient.invalidateQueries({ queryKey: ["signatory-queue"] })
       queryClient.invalidateQueries({ queryKey: ["signatory-history"] })
-      queryClient.invalidateQueries({ queryKey: ["signatory-submission-detail"] })
+      queryClient.invalidateQueries({
+        queryKey: ["signatory-submission-detail"],
+      })
     },
   })
 }

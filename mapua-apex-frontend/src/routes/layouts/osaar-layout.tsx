@@ -1,5 +1,6 @@
 import {
   ClipboardListIcon,
+  ClockIcon,
   FileCheck2Icon,
   FileDownIcon,
   HomeIcon,
@@ -31,6 +32,11 @@ const OSAAR_NAV = [
     label: "Activity Log",
     to: "/osaar/activities",
     icon: FileCheck2Icon,
+  },
+  {
+    label: "Session Log",
+    to: "/osaar/sessions",
+    icon: ClockIcon,
   },
   {
     label: "Reports & Export",

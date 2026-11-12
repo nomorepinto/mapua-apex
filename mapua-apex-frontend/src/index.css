@@ -287,7 +287,6 @@
 
   #root {
     min-height: 100dvh;
-    padding-bottom: var(--site-footer-h);
   }
 
   code,

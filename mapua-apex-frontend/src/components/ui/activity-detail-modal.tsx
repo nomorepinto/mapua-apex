@@ -18,7 +18,9 @@ import { ActivityReservationDetails } from "./activity-reservation-details"
 import type { Activity } from "./activity.types"
 import { useActivityDetail } from "@/hooks/use-activity-detail"
 import { saveActivityAsPdf } from "@/lib/save-proposal-pdf"
+import { formatDisplayDateTime } from "@/lib/dynamodb-adapters"
 import { brand, modal } from "@/config"
+import { fundingSourceLabels } from "@/constants/funding-sources"
 import { cn } from "@/lib/utils"
 import type { BookingConflict } from "@/lib/types"
 
@@ -250,6 +252,29 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
                   </div>
                 )}
 
+                {displayActivity.hasBudget !== false &&
+                  fundingSourceLabels(displayActivity.fundingSources ?? [])
+                    .length > 0 && (
+                    <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="font-bold text-neutral-900">Funding sources</span>
+                      <span className="font-medium text-neutral-600 sm:text-right">
+                        {fundingSourceLabels(
+                          displayActivity.fundingSources ?? []
+                        ).join(", ")}
+                      </span>
+                    </div>
+                  )}
+
+                {displayActivity.hasBudget !== false &&
+                  (displayActivity.budgetNote ?? "").trim().length > 0 && (
+                    <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="font-bold text-neutral-900">Budget Note</span>
+                      <span className="font-medium text-neutral-600 sm:text-right">
+                        {displayActivity.budgetNote}
+                      </span>
+                    </div>
+                  )}
+
                 <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
                   <span className="font-bold text-neutral-900">Number of Participants</span>
                   <span className="font-medium text-neutral-600 sm:text-right">{displayActivity.expectedParticipants}</span>
@@ -280,6 +305,20 @@ const ActivityDetailModal = memo(function ActivityDetailModal({
                     )}
                   </span>
                 </div>
+
+                {displayActivity.privacyConsent ? (
+                  <div className="flex flex-col gap-1 border-b border-neutral-100 py-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="font-bold text-neutral-900">
+                      Data privacy consent
+                    </span>
+                    <span className="font-medium text-neutral-600 sm:text-right">
+                      v{displayActivity.privacyConsent.version} accepted{" "}
+                      {formatDisplayDateTime(
+                        displayActivity.privacyConsent.acceptedAt
+                      )}
+                    </span>
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2 pt-2">
