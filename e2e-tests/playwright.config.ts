@@ -18,6 +18,9 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
   },
   projects: [
+    // Public landing account-creation consent gate; needs no auth or setup and
+    // never submits, so it creates nothing to clean up.
+    { name: "signup-consent", testMatch: /signup-consent\.spec\.ts/ },
     { name: "auth", testMatch: /auth\.setup\.ts/ },
     { name: "setup", testMatch: /setup\.spec\.ts/, dependencies: ["auth"] },
     { name: "cdm", testMatch: /cdm\.spec\.ts/, dependencies: ["setup"] },

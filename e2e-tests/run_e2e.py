@@ -33,6 +33,7 @@ from report import Report, Step
 from servers import StartedServers
 
 PROJECTS = {
+    "signup_consent": "signup-consent",
     "setup": "setup",
     "cdm": "cdm",
     "submissions": "submissions",

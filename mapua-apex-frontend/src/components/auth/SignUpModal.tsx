@@ -13,6 +13,7 @@ import {
 import apexBrandLogo from "@/assets/apex-brand.svg"
 import { cognitoSignUp } from "@/lib/cognito-auth"
 import { useEmailExistence } from "@/hooks/use-email-existence"
+import { SignupConsentGate } from "@/components/auth/signup-consent"
 import {
   validateEmailLive,
   validateEmailDomain,
@@ -57,6 +58,7 @@ export function SignUpModal({
 
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [consentAccepted, setConsentAccepted] = useState(false)
 
   const emailExistence = useEmailExistence()
   const resetEmailExistence = emailExistence.reset
@@ -77,6 +79,7 @@ export function SignUpModal({
         setCapsLockActive(false)
         setNumLockActive(false)
         setErrorMessage(null)
+        setConsentAccepted(false)
         resetEmailExistence()
         onClose()
         onInactivityTimeout?.()
@@ -101,6 +104,14 @@ export function SignUpModal({
       )
     }
   }, [isLoading, isOpen, onClose, onInactivityTimeout, resetEmailExistence])
+
+  // Clear the consent gate whenever the modal closes so a stale acceptance never
+  // carries into the next open (mirrors SignInModal's trackedOpen reset).
+  const [trackedOpen, setTrackedOpen] = useState(isOpen)
+  if (trackedOpen !== isOpen) {
+    setTrackedOpen(isOpen)
+    if (!isOpen) setConsentAccepted(false)
+  }
 
   if (!isOpen) return null
 
@@ -127,6 +138,15 @@ export function SignUpModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (isLoading) return
+
+    // Defense-in-depth: the button is disabled until the gate reports acceptance,
+    // but implicit form submission (Enter) can still fire onSubmit.
+    if (!consentAccepted) {
+      setErrorMessage(
+        "Please read and accept the Terms & Conditions and the Data Privacy Act notice before creating an account."
+      )
+      return
+    }
 
     setErrorMessage(null)
     setFullNameTouched(true)
@@ -488,10 +508,13 @@ export function SignUpModal({
             </div>
           </div>
 
+          {/* Terms & Conditions + Data Privacy consent gate */}
+          <SignupConsentGate disabled={isLoading} onAcceptedChange={setConsentAccepted} />
+
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !consentAccepted}
             className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#c01525] py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-[#a8101f] hover:shadow-md active:bg-[#8B0000] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? (
@@ -504,18 +527,6 @@ export function SignUpModal({
             )}
           </button>
 
-          {/* Terms & Privacy */}
-          <p className="pt-1 text-center text-[11px] leading-relaxed text-neutral-500">
-            By creating an account, you agree to our{" "}
-            <span className="cursor-pointer font-medium text-[#b91c1c] hover:underline">
-              Terms of Service
-            </span>{" "}
-            and{" "}
-            <span className="cursor-pointer font-medium text-[#b91c1c] hover:underline">
-              Privacy Policy
-            </span>
-            .
-          </p>
         </form>
 
         {/* Footer switch */}
