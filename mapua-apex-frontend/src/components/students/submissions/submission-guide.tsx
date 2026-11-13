@@ -30,7 +30,8 @@ export function SubmissionGuideButton() {
         Guide
       </Button>
       <p className="text-xs text-neutral-600">
-        Need help? Learn how to submit an event activity application
+        Need help? Learn how to submit, track, and close out an event activity
+        application
       </p>
     </div>
   )
@@ -59,8 +60,8 @@ export function SubmissionGuideDialog() {
               How to submit an event activity application?
             </DialogTitle>
             <DialogDescription className="mt-1 text-xs text-neutral-500 sm:text-sm dark:text-neutral-400">
-              A seamless 3-step workflow to prepare and submit your event
-              proposal for official Mapúa approval.
+              A seamless 4-step workflow to prepare, submit, and close out your
+              event proposal for official Mapúa approval.
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -71,7 +72,7 @@ export function SubmissionGuideDialog() {
 
         <DialogFooter className="shrink-0 flex-row items-center justify-between border-t border-neutral-200/80 bg-white px-4 py-3.5 sm:px-6">
           <p className="hidden text-xs text-neutral-400 sm:block dark:text-neutral-500">
-            Follow these 3 steps to successfully submit your activity proposal
+            Follow these 4 steps to successfully submit your activity proposal
           </p>
         </DialogFooter>
       </DialogPopup>

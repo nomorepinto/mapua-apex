@@ -1,4 +1,4 @@
-import { Sparkles, ClipboardList, Rocket } from "lucide-react"
+import { NotebookPen, Rocket, Sparkles, ClipboardList } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface HowItWorksProps {
@@ -21,27 +21,36 @@ const STEPS: StepItem[] = [
     number: "01",
     title: "Event Setup",
     description:
-      "Start by answering the event setup section. Provide your official event title and specify whether your student organization will reserve Mapúa school facilities and campus venues.",
+      "Start by answering the event setup section: your official event title, the campus location (off-campus events cannot reserve school facilities and skip the CDM review desk), whether you will reserve facilities or bring outside equipment, and whether the activity runs on a budget and how it is funded. Finish by opening the Terms and conditions and ticking the agreement — the Continue button stays locked until you accept.",
     icon: Sparkles,
-    actionLabel: "Complete the quick setup",
+    actionLabel: "Setup + Terms acceptance",
   },
   {
     id: "step-2",
     number: "02",
-    title: "Activity Proposal & Details",
+    title: "Activity Proposal (SAAF)",
     description:
-      "Proceed to the Student Activity Application Form (SAAF) to input comprehensive event details, objectives, budget proposals, and student proponents. If you agreed to reserve facilities, you will also complete the venue reservation and/or equipment requests form alongside it.",
+      "Proceed to the Student Activity Application Form (SAAF) and complete it step by step: classify the activity (co- or extra-curricular, plus its nature — selling and fundraising activities carry a booth/concession rental note), list the proponents and collaborating organizations, request rooms, time slots, and equipment (including outside equipment you bring in), then fill the activity details, institutional alignment, and budget proposal. The event date must be at least 10 calendar days ahead; the filing window and standard turnaround time are stated in the Terms & Conditions.",
     icon: ClipboardList,
-    actionLabel: "Comprehensive SAAF",
+    actionLabel: "Guided multi-step form",
   },
   {
     id: "step-3",
     number: "03",
-    title: "Submit & Await Approval",
+    title: "Consent, Submit & Track",
     description:
-      "Submit your finalized proposal for multi-tiered review and wait for approval. Track real-time progress and endorsements from your organization advisers, department heads, and OSA officers.",
+      "Before submitting, confirm every disclaimer: tick the Data Privacy Act of 2012 (RA 10173) consent and all of the Terms & Conditions acknowledgements — the versions you accept are recorded with your paper. Your proposal then moves through the multi-tiered review chain (organization adviser, department dean, OSA, and the CDM desk for on-campus facilities). Track real-time progress in the Milestone & Progress view, which shows how long each desk takes and the total time to final approval under your document number.",
     icon: Rocket,
-    actionLabel: "Endorsement Tracking",
+    actionLabel: "Endorsement tracking",
+  },
+  {
+    id: "step-4",
+    number: "04",
+    title: "Post-Evaluation",
+    description:
+      "After the activity is done, close it out through the Post-Evaluation wizard: pick the approved event, write the activity summary, reconcile the financial report against the approved budget (skipped for no-budget activities), and record attendance before submitting.",
+    icon: NotebookPen,
+    actionLabel: "Post-event report",
   },
 ]
 
@@ -58,8 +67,8 @@ export function HowItWorks({ className, hideHeader = false }: HowItWorksProps) {
             How to submit an event activity application?
           </h2>
           <p className="max-w-xl mx-auto text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 font-normal leading-relaxed">
-            A seamless 3-step workflow to prepare and submit your event proposal for
-            official Mapúa approval.
+            A seamless 4-step workflow to prepare, submit, and close out your
+            event proposal for official Mapúa approval.
           </p>
         </div>
       )}
