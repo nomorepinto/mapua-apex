@@ -2,6 +2,31 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { usePrivacyNoticeQuery, type ApiPrivacyNotice } from "@/hooks/use-privacy-notice"
 
 /**
+ * Full RA 10173 disclosure text, layout-free (no border or height cap) so
+ * surfaces like the sign-up modal can render it inside their own scroll
+ * container. The wording always comes from the backend notice.
+ */
+export function PrivacyNoticeBody({ notice }: { notice: ApiPrivacyNotice }) {
+  return (
+    <div className="space-y-3 text-left">
+      <div>
+        <h4 className="text-sm font-semibold text-neutral-900">
+          {notice.title}{" "}
+          <span className="font-normal text-neutral-500">(v{notice.version})</span>
+        </h4>
+        <p className="text-xs text-neutral-500">Effective {notice.effective_date}</p>
+      </div>
+      <p className="text-xs leading-relaxed text-neutral-700">{notice.intro}</p>
+      <NoticeSection title="What we collect" items={notice.collection} />
+      <NoticeSection title="Why we process it" items={notice.purposes} />
+      <NoticeSection title="Who we share it with" items={notice.sharing} />
+      <NoticeSection title="Your rights" items={notice.rights} />
+      <p className="text-xs leading-relaxed text-neutral-700">{notice.contact}</p>
+    </div>
+  )
+}
+
+/**
  * Read-only RA 10173 disclosure panel. The text and version come from the
  * backend notice (the authority the proponent consents against), so nothing
  * here duplicates the wording.
@@ -10,21 +35,7 @@ export function PrivacyConsentNotice({ notice }: { notice: ApiPrivacyNotice }) {
   return (
     <div className="rounded-xl border border-neutral-200 bg-neutral-50">
       <ScrollArea className="max-h-56 px-4 py-3" scrollbarGutter>
-        <div className="space-y-3 text-left">
-          <div>
-            <h4 className="text-sm font-semibold text-neutral-900">
-              {notice.title}{" "}
-              <span className="font-normal text-neutral-500">(v{notice.version})</span>
-            </h4>
-            <p className="text-xs text-neutral-500">Effective {notice.effective_date}</p>
-          </div>
-          <p className="text-xs leading-relaxed text-neutral-700">{notice.intro}</p>
-          <NoticeSection title="What we collect" items={notice.collection} />
-          <NoticeSection title="Why we process it" items={notice.purposes} />
-          <NoticeSection title="Who we share it with" items={notice.sharing} />
-          <NoticeSection title="Your rights" items={notice.rights} />
-          <p className="text-xs leading-relaxed text-neutral-700">{notice.contact}</p>
-        </div>
+        <PrivacyNoticeBody notice={notice} />
       </ScrollArea>
     </div>
   )

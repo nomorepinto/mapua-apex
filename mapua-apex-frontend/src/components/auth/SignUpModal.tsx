@@ -143,7 +143,7 @@ export function SignUpModal({
     // but implicit form submission (Enter) can still fire onSubmit.
     if (!consentAccepted) {
       setErrorMessage(
-        "Please read and accept the Terms & Conditions and the Data Privacy Act notice before creating an account."
+        "Please read the Terms and conditions and tick the agreement checkbox before creating an account."
       )
       return
     }

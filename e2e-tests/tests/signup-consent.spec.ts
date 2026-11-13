@@ -4,10 +4,11 @@ import { SignupPage } from "../pages/signup.page"
 
 // Public landing account-creation flow. The spec never submits the form, so it
 // creates no Cognito user and no DynamoDB item — nothing to record on the run
-// manifest or clean up. It asserts the consent gate added alongside the SAAF
-// Terms & Conditions: Create account stays disabled until the privacy notice
-// and every T&C acknowledgement are accepted.
-test("account creation is gated behind the Terms & Conditions and privacy notice", async ({ page }) => {
+// manifest or clean up. It asserts the rebuilt consent gate: the full Terms &
+// Conditions (+ privacy notice) text opens in a scrollable dialog from the
+// "Terms and conditions" button, and Create account stays disabled until the
+// single agreement checkbox is ticked.
+test("account creation is gated behind the Terms & Conditions consent", async ({ page }) => {
   const signup = new SignupPage(page)
   await signup.open()
 
@@ -15,15 +16,21 @@ test("account creation is gated behind the Terms & Conditions and privacy notice
   await signup.expectNoticesLoaded()
   await expect(create).toBeDisabled()
 
-  // Privacy consent alone does not unlock creation — the T&C still blocks.
-  await signup.acceptPrivacy()
+  // The button opens the complete notice text in a scrollable dialog.
+  await signup.openTermsDialog()
+  await expect(signup.termsDialog()).toContainText("Turnaround time")
+  await expect(signup.termsDialog()).toContainText("Acknowledgements")
+  await expect(signup.termsDialog()).toContainText("Your rights")
+  await signup.closeTermsDialog()
+
+  // Reading alone does not unlock creation — the agreement checkbox does.
   await expect(create).toBeDisabled()
 
-  // Every T&C acknowledgement (privacy already ticked) unlocks creation.
+  // Ticking the single acknowledgement unlocks creation.
   await signup.acceptTerms()
   await expect(create).toBeEnabled()
 
-  // Revoking any acknowledgement re-blocks creation.
-  await signup.uncheckFirstTerms()
+  // Revoking the tick re-blocks creation.
+  await signup.revokeTerms()
   await expect(create).toBeDisabled()
 })

@@ -1,22 +1,38 @@
 import { useEffect, useState } from "react"
 import { ShieldCheck } from "lucide-react"
 
+import {
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { usePrivacyConsent } from "@/components/submission/privacy-consent"
-import { useTermsConsent } from "@/components/submission/terms-consent"
+import { PrivacyNoticeBody } from "@/components/submission/privacy-consent"
+import { TermsNoticeBody } from "@/components/submission/terms-consent"
+import { usePrivacyNoticeQuery } from "@/hooks/use-privacy-notice"
+import { useTermsNoticeQuery } from "@/hooks/use-terms-notice"
+import { modal } from "@/config"
 
 /**
- * Account-creation consent gate. Mirrors the SAAF pre-submit gate (the RA 10173
- * privacy notice plus the versioned Terms & Conditions with tick-to-acknowledge
- * items) so the same backend notices stay the authority here too — nothing
- * duplicates the wording. It mounts only while the sign-up modal is open, so the
- * public notice reads fire on demand, and unmounts on close/timeout to clear
- * every tick.
+ * Account-creation consent gate. The full versioned notices (Terms &
+ * Conditions plus the RA 10173 privacy notice) stay the backend's authority —
+ * nothing here duplicates the wording — but instead of rendering them inline
+ * the gate shows a compact "Terms and conditions" button that opens the
+ * complete text in a scrollable dialog, followed by a single agreement
+ * checkbox covering both notices.
  *
- * `onAcceptedChange` reports whether BOTH notices have loaded and EVERY box is
- * ticked. The parent keeps "Create account" disabled until then and re-checks in
- * its submit handler as defense-in-depth (implicit Enter submission can still
- * fire onSubmit while the button is disabled).
+ * `onAcceptedChange` reports whether BOTH notices have loaded and the checkbox
+ * is ticked. The parent keeps "Create account" disabled until then and
+ * re-checks in its submit handler as defense-in-depth (implicit Enter
+ * submission can still fire onSubmit while the button is disabled). It mounts
+ * only while the sign-up modal is open, so the public notice reads fire on
+ * demand, and unmounts on close/timeout to clear the tick.
  */
 export function SignupConsentGate({
   disabled = false,
@@ -25,47 +41,43 @@ export function SignupConsentGate({
   disabled?: boolean
   onAcceptedChange: (accepted: boolean) => void
 }) {
-  const privacyConsent = usePrivacyConsent()
-  const termsConsent = useTermsConsent()
+  const termsQuery = useTermsNoticeQuery()
+  const privacyQuery = usePrivacyNoticeQuery()
+  const termsNotice = termsQuery.data ?? null
+  const privacyNotice = privacyQuery.data ?? null
 
-  const [privacyChecked, setPrivacyChecked] = useState(false)
-  const [termsChecked, setTermsChecked] = useState<boolean[]>([])
+  // `ready` is true only once BOTH current notices have loaded, so loading/
+  // error states keep the gate closed instead of silently passing.
+  const ready = termsNotice !== null && privacyNotice !== null
+  const loadFailed = termsQuery.isError || privacyQuery.isError
 
-  const termsCount = termsConsent.checkboxes.length
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [checked, setChecked] = useState(false)
 
-  // A notice version bump clears prior ticks so acceptance always matches the
-  // text currently on screen. Adjusted during render (the SignInModal
+  // A notice version bump clears the prior tick so acceptance always matches
+  // the text currently on screen. Adjusted during render (the SignInModal
   // trackedOpen pattern) rather than in an effect to avoid cascading renders.
-  const noticeVersions = `${privacyConsent.version ?? ""}|${termsConsent.version ?? ""}`
+  const noticeVersions = `${privacyNotice?.version ?? ""}|${termsNotice?.version ?? ""}`
   const [prevVersions, setPrevVersions] = useState(noticeVersions)
   if (prevVersions !== noticeVersions) {
     setPrevVersions(noticeVersions)
-    setPrivacyChecked(false)
-    setTermsChecked([])
+    setChecked(false)
   }
 
-  const handleTermsChange = (index: number, checked: boolean) => {
-    setTermsChecked((current) => {
-      const next = [...current]
-      while (next.length < termsCount) next.push(false)
-      next[index] = checked
-      return next
-    })
-  }
-
-  const allTermsChecked =
-    termsCount > 0 &&
-    termsConsent.checkboxes.every((_, index) => termsChecked[index] === true)
-
-  const accepted =
-    privacyConsent.ready && termsConsent.ready && privacyChecked && allTermsChecked
+  const accepted = ready && checked
 
   useEffect(() => {
     onAcceptedChange(accepted)
   }, [accepted, onAcceptedChange])
 
+  const consentLabel = `I have read and agree to the Terms & Conditions${
+    termsNotice ? ` (v${termsNotice.version})` : ""
+  } and the Data Privacy Act of 2012 (RA 10173) notice${
+    privacyNotice ? ` (v${privacyNotice.version})` : ""
+  }.`
+
   return (
-    <div className="space-y-3 border-t border-neutral-100 pt-4 text-left">
+    <div className="space-y-2.5 border-t border-neutral-100 pt-4 text-left">
       <div className="flex items-center gap-1.5">
         <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[#b91c1c]" aria-hidden="true" />
         <p className="text-[11px] font-semibold text-neutral-700">
@@ -73,38 +85,78 @@ export function SignupConsentGate({
         </p>
       </div>
 
-      {/* Data Privacy Act notice + single consent checkbox */}
-      <div className="space-y-2">
-        {privacyConsent.content}
-        <label className="flex cursor-pointer items-start gap-2 text-xs leading-snug text-neutral-700">
-          <Checkbox
-            className="mt-0.5"
-            checked={privacyChecked}
-            disabled={disabled || privacyConsent.disabled}
-            onCheckedChange={(checked) => setPrivacyChecked(Boolean(checked))}
-          />
-          <span>{privacyConsent.label}</span>
-        </label>
-      </div>
+      {/* Opens the full Terms & Conditions + privacy notice text in a dialog */}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={() => setDialogOpen(true)}
+      >
+        Terms and conditions
+      </Button>
 
-      {/* Terms & Conditions notice + one checkbox per acknowledgement */}
-      <div className="space-y-2">
-        {termsConsent.content}
-        {termsConsent.checkboxes.map((item, index) => (
-          <label
-            key={index}
-            className="flex cursor-pointer items-start gap-2 text-xs leading-snug text-neutral-700"
-          >
-            <Checkbox
-              className="mt-0.5"
-              checked={termsChecked[index] === true}
-              disabled={disabled || termsConsent.disabled}
-              onCheckedChange={(checked) => handleTermsChange(index, Boolean(checked))}
-            />
-            <span>{item.label}</span>
-          </label>
-        ))}
-      </div>
+      {/* Single agreement checkbox gating account creation */}
+      <label className="flex cursor-pointer items-start gap-2 text-xs leading-snug text-neutral-700">
+        <Checkbox
+          className="mt-0.5"
+          checked={checked}
+          disabled={disabled || !ready}
+          onCheckedChange={(value) => setChecked(Boolean(value))}
+        />
+        <span>{consentLabel}</span>
+      </label>
+
+      {!ready && (
+        <p
+          className={
+            loadFailed
+              ? "text-xs text-destructive"
+              : "text-xs text-neutral-500"
+          }
+        >
+          {loadFailed
+            ? "The Terms & Conditions could not be loaded. Please close and reopen this dialog to try again."
+            : "Loading the Terms & Conditions…"}
+        </p>
+      )}
+
+      {/* Scrollable dialog with the complete notice text, layered above the
+          hand-rolled sign-up modal (z-50) via the nested z-[70] stack */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogPopup className={modal.dialogLg} nested showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Terms &amp; Conditions</DialogTitle>
+            <DialogDescription>
+              The Terms &amp; Conditions and the Data Privacy Act notice below
+              govern your account. Please read them before accepting.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel>
+            {ready ? (
+              <div className="space-y-6">
+                <TermsNoticeBody notice={termsNotice} showAcknowledgements />
+                <hr className="border-neutral-200" />
+                <PrivacyNoticeBody notice={privacyNotice} />
+              </div>
+            ) : loadFailed ? (
+              <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">
+                The Terms &amp; Conditions could not be loaded. Please try
+                again before creating your account.
+              </p>
+            ) : (
+              <p className="px-4 py-3 text-xs text-neutral-500">
+                Loading the Terms &amp; Conditions…
+              </p>
+            )}
+          </DialogPanel>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="secondary" />}>
+              Close
+            </DialogClose>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
     </div>
   )
 }

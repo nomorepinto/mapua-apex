@@ -1,12 +1,13 @@
 import { expect, type Locator, type Page } from "@playwright/test"
 
 /**
- * Landing account-creation dialog and its Terms & Conditions / Data Privacy
- * consent gate. The flow is public (no sign-in) and the spec never submits, so
- * it creates no Cognito user and no DynamoDB item — nothing to record on the run
- * manifest or clean up. The gate mirrors the SAAF pre-submit consent: Create
- * account stays disabled until the privacy notice and EVERY T&C acknowledgement
- * are ticked.
+ * Landing account-creation dialog and its Terms & Conditions consent gate.
+ * The flow is public (no sign-in) and the spec never submits, so it creates no
+ * Cognito user and no DynamoDB item — nothing to record on the run manifest or
+ * clean up. The full versioned notices (T&C + RA 10173 privacy notice) live
+ * behind a "Terms and conditions" button that opens a scrollable dialog; a
+ * single agreement checkbox below it gates Create account until both notices
+ * have loaded and the box is ticked.
  */
 export class SignupPage {
   constructor(private readonly page: Page) {}
@@ -27,38 +28,40 @@ export class SignupPage {
     return this.dialog().getByRole("button", { name: "Create account", exact: true })
   }
 
-  private privacyCheckbox(): Locator {
+  termsButton(): Locator {
+    return this.dialog().getByRole("button", { name: "Terms and conditions" })
+  }
+
+  consentCheckbox(): Locator {
     return this.dialog().getByRole("checkbox", {
-      name: /I have read and agree to the Data Privacy Act of 2012 \(RA 10173\) notice \(v/,
+      name: /I have read and agree to the Terms & Conditions/,
     })
   }
 
-  private termsCheckboxes(): Locator[] {
-    return [
-      /I understand that the standard turnaround time for activity approval is 2-3 working days\./,
-      /I understand that applications must be filed between 7:00 AM and 3:00 PM/,
-      /I understand the criteria for major and minor events/,
-    ].map((name) => this.dialog().getByRole("checkbox", { name }))
+  termsDialog(): Locator {
+    return this.page.getByRole("dialog", { name: "Terms & Conditions" })
   }
 
+  /** The notices are fetched on mount; the checkbox unlocks once both load. */
   async expectNoticesLoaded() {
-    await expect(this.privacyCheckbox()).toBeVisible()
-    for (const checkbox of this.termsCheckboxes()) {
-      await expect(checkbox).toBeVisible()
-    }
+    await expect(this.consentCheckbox()).toBeEnabled()
   }
 
-  async acceptPrivacy() {
-    await this.privacyCheckbox().click()
+  async openTermsDialog() {
+    await this.termsButton().click()
+    await expect(this.termsDialog()).toBeVisible()
+  }
+
+  async closeTermsDialog() {
+    await this.termsDialog().getByRole("button", { name: "Close", exact: true }).click()
+    await expect(this.termsDialog()).toBeHidden()
   }
 
   async acceptTerms() {
-    for (const checkbox of this.termsCheckboxes()) {
-      await checkbox.click()
-    }
+    await this.consentCheckbox().click()
   }
 
-  async uncheckFirstTerms() {
-    await this.termsCheckboxes()[0].click()
+  async revokeTerms() {
+    await this.consentCheckbox().click()
   }
 }
