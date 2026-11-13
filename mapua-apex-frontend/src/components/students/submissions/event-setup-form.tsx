@@ -1,5 +1,7 @@
+import { useState } from "react"
 import { FormPageHeader } from "@/components/forms/form-page-header"
 import { useSubmissionsStart } from "@/components/students/submissions/submissions-start-context"
+import { TermsConsentGate } from "@/components/submission/terms-consent-gate"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -39,6 +41,8 @@ const BUDGET_ITEMS: { label: string; value: "yes" | "no" }[] = [
 export function EventSetupForm() {
   const { state, actions } = useSubmissionsStart()
   const eventNameGibberish = useGibberishField(state.eventName)
+  // T&C consent gate: Continue stays disabled until the agreement is ticked.
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   return (
     <div id="submission-start-form" className={cn(layout.stack, "w-full")}>
@@ -51,6 +55,10 @@ export function EventSetupForm() {
         noValidate
         onSubmit={async (event) => {
           event.preventDefault()
+          // Defense-in-depth: the button is disabled until the gate reports
+          // acceptance, but implicit form submission (Enter) can still fire
+          // onSubmit.
+          if (!termsAccepted) return
           // Submit-time pass so the gate holds even when the field was never
           // blurred; shares the session cache with the on-blur check.
           if ((await checkGibberish(state.eventName)) === "gibberish") {
@@ -255,8 +263,17 @@ export function EventSetupForm() {
           </Field>
         )}
 
+        {/* Terms & Conditions consent gate blocking Continue until accepted */}
+        <div className="pt-2">
+          <TermsConsentGate onAcceptedChange={setTermsAccepted} />
+        </div>
+
         <div className="flex justify-center pt-2">
-          <Button type="submit" className="min-w-40 sm:min-w-48">
+          <Button
+            type="submit"
+            disabled={!termsAccepted}
+            className="min-w-40 sm:min-w-48"
+          >
             Continue
           </Button>
         </div>

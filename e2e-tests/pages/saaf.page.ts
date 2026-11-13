@@ -58,6 +58,9 @@ export class SaafPage {
       this.page.getByLabel("Will you be operating with a budget?"),
       budget ? "Yes, we will operate with a budget" : "No, this activity has no budget",
     )
+    // Setup-step T&C consent gate: Continue stays disabled until the
+    // agreement under the "Terms and conditions" button is ticked.
+    await this.acceptSetupTerms()
     if (budget) {
       // A with-budget paper must name at least one funding source before it can
       // leave the setup step: assert the gate blocks Continue, then satisfy it.
@@ -76,6 +79,19 @@ export class SaafPage {
   /** A no-budget paper never renders the funding-source multi-select. */
   async expectFundingSourcesAbsent() {
     await expect(this.page.getByLabel("How will this activity be funded?")).toHaveCount(0)
+  }
+
+  /**
+   * Satisfy the event-setup T&C consent gate: tick the agreement checkbox
+   * below the "Terms and conditions" button and assert it unlocks Continue.
+   */
+  async acceptSetupTerms() {
+    const consent = this.page.getByRole("checkbox", {
+      name: /I have read and agree to the Terms & Conditions/,
+    })
+    await expect(consent).toBeEnabled()
+    await consent.click()
+    await expect(this.page.getByRole("button", { name: "Continue", exact: true })).toBeEnabled()
   }
 
   async classification(
