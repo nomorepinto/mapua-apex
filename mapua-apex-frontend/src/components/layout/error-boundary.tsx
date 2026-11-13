@@ -9,7 +9,19 @@ export function RootErrorBoundary() {
   let message = "An unexpected error occurred while loading this page."
   let statusCode = 500
 
-  if (isRouteErrorResponse(error)) {
+  // Stale chunk after a redeploy: the tab holds an old build whose hashed
+  // assets no longer exist on the server. A reload fetches the new build.
+  const isChunkLoadError =
+    error instanceof Error &&
+    /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed/i.test(
+      error.message
+    )
+
+  if (isChunkLoadError) {
+    title = "A new version is available"
+    message =
+      "The app was updated while this tab was open. Reload to get the latest version."
+  } else if (isRouteErrorResponse(error)) {
     statusCode = error.status
     if (error.status === 404) {
       title = "Page Not Found"
@@ -28,7 +40,11 @@ export function RootErrorBoundary() {
         <AlertCircleIcon className="w-8 h-8" />
       </div>
       <span className="text-xs font-bold uppercase tracking-wider text-[#8B0000] bg-red-100 px-3 py-1 rounded-full mb-3">
-        {statusCode === 404 ? "404 Not Found" : `Error ${statusCode}`}
+        {isChunkLoadError
+          ? "Update Available"
+          : statusCode === 404
+            ? "404 Not Found"
+            : `Error ${statusCode}`}
       </span>
       <h1 className="text-2xl font-bold text-neutral-900 sm:text-3xl tracking-tight mb-2">
         {title}
@@ -37,20 +53,32 @@ export function RootErrorBoundary() {
         {message}
       </p>
       <div className="flex flex-col sm:flex-row gap-3">
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-neutral-300 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition cursor-pointer"
-        >
-          <ArrowLeftIcon className="w-4 h-4" />
-          Go Back
-        </button>
-        <button
-          onClick={() => (window.location.href = "/")}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#8B0000] text-sm font-medium text-white hover:bg-[#6b0000] shadow-sm transition cursor-pointer"
-        >
-          <HomeIcon className="w-4 h-4" />
-          Return to Home
-        </button>
+        {isChunkLoadError ? (
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#8B0000] text-sm font-medium text-white hover:bg-[#6b0000] shadow-sm transition cursor-pointer"
+          >
+            <HomeIcon className="w-4 h-4" />
+            Reload App
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-neutral-300 bg-white text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition cursor-pointer"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+              Go Back
+            </button>
+            <button
+              onClick={() => (window.location.href = "/")}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#8B0000] text-sm font-medium text-white hover:bg-[#6b0000] shadow-sm transition cursor-pointer"
+            >
+              <HomeIcon className="w-4 h-4" />
+              Return to Home
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

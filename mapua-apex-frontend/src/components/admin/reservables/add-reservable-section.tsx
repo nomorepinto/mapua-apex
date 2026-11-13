@@ -1,9 +1,16 @@
-import { useMemo, useState } from "react"
+import { useId, useMemo, useState } from "react"
 import {
   ArmchairIcon,
   BoxesIcon,
+  ChevronDownIcon,
+  DoorOpenIcon,
   DownloadIcon,
+  FlaskConicalIcon,
+  LandmarkIcon,
+  PartyPopperIcon,
   PencilIcon,
+  PresentationIcon,
+  TreesIcon,
 } from "lucide-react"
 
 import { CsvFileField } from "@/components/admin-osa/csv-file-field"
@@ -16,6 +23,7 @@ import {
 } from "@/components/admin/reservables/reservable-dialogs"
 import { RESERVABLE_CSV_TEMPLATE } from "@/components/admin/reservables/reservable-options"
 import { participantBoundPayload } from "@/lib/reservable-capacity-form"
+import { ROOM_TYPE_OPTIONS } from "@/lib/room-types"
 import { useReservablesPage } from "@/components/admin/reservables/reservables-context"
 import {
   SegmentedControl,
@@ -51,7 +59,11 @@ import {
   parseReservableCsv,
   type ReservableCsvRow,
 } from "@/lib/parse-csv"
-import type { ApiReservable, CreateReservablePayload } from "@/lib/types"
+import type {
+  ApiReservable,
+  CreateReservablePayload,
+  RoomType,
+} from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 /** S-8: the two separate add flows, each fixing its reservable type. */
@@ -61,6 +73,18 @@ const ADD_MODE_ITEMS: SegmentedItem<AddMode>[] = [
   { value: "room", label: "Add Room", icon: ArmchairIcon },
   { value: "equipment", label: "Add Campus Equipment", icon: BoxesIcon },
 ]
+
+/**
+ * Icon per room category on the existing-reservables list; labels and order
+ * come from ROOM_TYPE_OPTIONS so the buckets match the Room type dropdown.
+ */
+const ROOM_CATEGORY_ICONS: Record<RoomType, typeof ArmchairIcon> = {
+  function_room: PartyPopperIcon,
+  classroom: PresentationIcon,
+  multi_purpose_hall: LandmarkIcon,
+  open_space: TreesIcon,
+  laboratory: FlaskConicalIcon,
+}
 
 export function AddReservableSection() {
   const { state, actions } = useReservablesPage()
@@ -82,6 +106,13 @@ export function AddReservableSection() {
   // S-8: the shared room/equipment toggle is replaced by two separate add flows.
   const [addMode, setAddMode] = useState<AddMode>("room")
   const [search, setSearch] = useState("")
+  // Collapse state lives above the buckets so it survives search (empty
+  // buckets unmount while filtering) and campus switches.
+  const [collapsedCategories, setCollapsedCategories] = useState<
+    Record<string, boolean>
+  >({})
+  const toggleCategory = (key: string) =>
+    setCollapsedCategories((prev) => ({ ...prev, [key]: !prev[key] }))
 
   const [csvRows, setCsvRows] = useState<ReservableCsvRow[]>([])
   const [csvParseErrors, setCsvParseErrors] = useState<string[]>([])
@@ -135,6 +166,20 @@ export function AddReservableSection() {
     !query || item.name.toLowerCase().includes(query)
   const filteredRooms = rooms.filter(matches)
   const filteredEquipment = equipment.filter(matches)
+
+  // Rooms are split per category; a legacy room without a room_type falls
+  // into an "Other Rooms" bucket that only renders when such a room exists.
+  const roomCategories = ROOM_TYPE_OPTIONS.map((option) => ({
+    key: option.value,
+    title: option.label,
+    icon: ROOM_CATEGORY_ICONS[option.value],
+    items: filteredRooms.filter((room) => room.room_type === option.value),
+  }))
+  const uncategorizedRooms = filteredRooms.filter((room) => !room.room_type)
+  // While searching, empty buckets hide and matching ones stay forced open.
+  const searching = query.length > 0
+  const noSearchMatches =
+    searching && filteredRooms.length === 0 && filteredEquipment.length === 0
 
   async function handleCsvImport() {
     if (!campusId) {
@@ -310,22 +355,51 @@ export function AddReservableSection() {
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
+          ) : noSearchMatches ? (
+            <p className="px-4 pb-4 text-sm text-neutral-400">
+              No reservables match “{search.trim()}”.
+            </p>
           ) : (
-            <div className="flex flex-col gap-4 px-4 pb-4">
-              <ReservableBucket
-                icon={ArmchairIcon}
-                items={filteredRooms}
-                onEdit={setEditing}
-                onSelect={(id) => selectReservable(id, "view")}
-                title="Rooms"
-              />
-              <ReservableBucket
-                icon={BoxesIcon}
-                items={filteredEquipment}
-                onEdit={setEditing}
-                onSelect={(id) => selectReservable(id, "view")}
-                title="Campus Equipment"
-              />
+            <div className="flex flex-col gap-3 px-4 pb-4">
+              {roomCategories.map((category) =>
+                searching && category.items.length === 0 ? null : (
+                  <ReservableBucket
+                    collapsed={Boolean(collapsedCategories[category.key])}
+                    forceOpen={searching}
+                    icon={category.icon}
+                    items={category.items}
+                    key={category.key}
+                    onEdit={setEditing}
+                    onSelect={(id) => selectReservable(id, "view")}
+                    onToggle={() => toggleCategory(category.key)}
+                    title={category.title}
+                  />
+                )
+              )}
+              {uncategorizedRooms.length > 0 ? (
+                <ReservableBucket
+                  collapsed={Boolean(collapsedCategories.other)}
+                  forceOpen={searching}
+                  icon={DoorOpenIcon}
+                  items={uncategorizedRooms}
+                  onEdit={setEditing}
+                  onSelect={(id) => selectReservable(id, "view")}
+                  onToggle={() => toggleCategory("other")}
+                  title="Other Rooms"
+                />
+              ) : null}
+              {searching && filteredEquipment.length === 0 ? null : (
+                <ReservableBucket
+                  collapsed={Boolean(collapsedCategories.equipment)}
+                  forceOpen={searching}
+                  icon={BoxesIcon}
+                  items={filteredEquipment}
+                  onEdit={setEditing}
+                  onSelect={(id) => selectReservable(id, "view")}
+                  onToggle={() => toggleCategory("equipment")}
+                  title="Campus Equipment"
+                />
+              )}
             </div>
           )}
         </CardPanel>
@@ -450,56 +524,86 @@ function ImportReservablesCsv({
   )
 }
 
+/**
+ * One collapsible category of the existing-reservables list. Starts expanded;
+ * `forceOpen` (active search) keeps matches visible and pauses the toggle.
+ * The collapsed flag is owned by the parent so it survives unmount/remount.
+ */
 function ReservableBucket({
   title,
   icon: Icon,
   items,
   onSelect,
   onEdit,
+  collapsed,
+  onToggle,
+  forceOpen = false,
 }: {
   title: string
   icon: typeof ArmchairIcon
   items: ApiReservable[]
   onSelect: (reservableId: string) => void
   onEdit: (reservable: ApiReservable) => void
+  collapsed: boolean
+  onToggle: () => void
+  forceOpen?: boolean
 }) {
+  const panelId = useId()
+  const open = forceOpen || !collapsed
+
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
+      <button
+        aria-controls={panelId}
+        aria-expanded={open}
+        className="text-muted-foreground flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-xs font-semibold uppercase tracking-wide transition-colors hover:bg-neutral-50 hover:text-neutral-700 disabled:pointer-events-none"
+        disabled={forceOpen}
+        onClick={onToggle}
+        type="button"
+      >
         <Icon aria-hidden="true" className="size-3.5" />
         {title}
         <span className="text-neutral-400">({items.length})</span>
+        <ChevronDownIcon
+          aria-hidden="true"
+          className={cn(
+            "ms-auto size-3.5 transition-transform duration-200",
+            !open && "-rotate-90"
+          )}
+        />
+      </button>
+      <div hidden={!open} id={panelId}>
+        {items.length === 0 ? (
+          <p className="px-1 text-sm text-neutral-400">None</p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {items.map((item) => (
+              <li
+                className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-white pe-1"
+                key={item.reservable_id}
+              >
+                <button
+                  className="min-w-0 flex-1 truncate rounded-lg px-3 py-2 text-left text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-50"
+                  onClick={() => onSelect(item.reservable_id)}
+                  title={`View ${item.name}`}
+                  type="button"
+                >
+                  {item.name}
+                </button>
+                <Button
+                  aria-label={`Edit ${item.name}`}
+                  onClick={() => onEdit(item)}
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <PencilIcon />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      {items.length === 0 ? (
-        <p className="text-sm text-neutral-400">None</p>
-      ) : (
-        <ul className="flex flex-col gap-1">
-          {items.map((item) => (
-            <li
-              className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-white pe-1"
-              key={item.reservable_id}
-            >
-              <button
-                className="min-w-0 flex-1 truncate rounded-lg px-3 py-2 text-left text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-50"
-                onClick={() => onSelect(item.reservable_id)}
-                title={`View ${item.name}`}
-                type="button"
-              >
-                {item.name}
-              </button>
-              <Button
-                aria-label={`Edit ${item.name}`}
-                onClick={() => onEdit(item)}
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                <PencilIcon />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   )
 }
