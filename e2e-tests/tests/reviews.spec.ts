@@ -6,7 +6,7 @@ import { ReviewPage } from "../pages/review.page"
 import { SaafPage, rolesMatch, trackerRoles, trackerTurnaround } from "../pages/saaf.page"
 import { openApex } from "../support/auth"
 import { account, eventDate } from "../support/env"
-import { BUDGET_NOTE, normalizeDesk } from "../support/data"
+import { BUDGET_NOTE, normalizeDesk, OUTSIDE_EQUIPMENT } from "../support/data"
 import { readRun, writeRun, type PaperRecord } from "../support/run-state"
 import { captureJson } from "../support/ui"
 
@@ -100,7 +100,8 @@ test("shows the funding sources and budget note on a with-budget paper", async (
 test("approves the straight-through papers", async ({ browser }) => {
   const papers = readRun().papers
   // P15 is the no-budget paper; approving it makes it eligible for a post-eval.
-  for (const key of ["P1", "P2", "P3", "P6", "P7", "P15"]) await approveAll(browser, papers[key])
+  // P16 is the off-campus paper (no CDM desk), proving that branch approves end-to-end.
+  for (const key of ["P1", "P2", "P3", "P6", "P7", "P15", "P16"]) await approveAll(browser, papers[key])
 })
 
 test("shows the proponent the per-desk and overall turnaround", async ({ browser }) => {
@@ -143,7 +144,7 @@ test("resubmitting as extra-curricular returns the paper to the adviser", async 
     const saaf = new SaafPage(page)
     await saaf.start(title, false)
     await saaf.classification("co-curricular")
-    await saaf.people(account("admin").email, { chooseDepartment: false })
+    await saaf.people(account("admin").email, { campus: run.campus })
     await saaf.activityOnline()
     await saaf.alignment()
     await captureJson(page, "/students/submissions", "POST", () => saaf.submit())
@@ -177,7 +178,7 @@ test("adding a collaborator on resubmit shows who receives the paper", async ({ 
     const saaf = new SaafPage(page)
     await saaf.start(title, false)
     await saaf.classification("extra-curricular")
-    await saaf.people(account("admin").email, { chooseDepartment: false })
+    await saaf.people(account("admin").email, { campus: run.campus })
     await saaf.activityOnline()
     await saaf.alignment()
     await captureJson(page, "/students/submissions", "POST", () => saaf.submit())
@@ -222,6 +223,68 @@ test("a CDM hold blocks the last approval", async ({ browser }) => {
         const review = new ReviewPage(page)
         await review.open(desk, paper.title)
         await review.expectApprovalBlocked()
+      })
+      return
+    }
+    await approve(browser, desk, paper.title)
+  }
+})
+
+test("R-1: campus OSAAR approves, other desks review; only all-campus OSAAR classifies", async ({ browser }) => {
+  const run = readRun()
+  const title = `Verb Check ${run.tag}`
+  const roles = ["Adviser", "OSAAR", "OSAAR", "OSAAR"]
+  await asUser(browser, "orgA", async (page) => {
+    const saaf = new SaafPage(page)
+    await saaf.start(title, false)
+    await saaf.classification("extra-curricular")
+    await saaf.people(account("admin").email, { campus: run.campus })
+    await saaf.activityOnline()
+    await saaf.alignment()
+    await captureJson(page, "/students/submissions", "POST", () => saaf.submit())
+    rolesMatch(await trackerRoles(page, title), roles)
+  })
+  // The adviser reviews and never sees the major/minor control.
+  await asUser(browser, "adv1", async (page) => {
+    const review = new ReviewPage(page)
+    await review.open("adv1", title)
+    await review.expectActionVerb("Review")
+    await review.expectClassificationControl(false)
+    await review.approve()
+  })
+  // Campus OSAAR desks approve (verb "Approve") with no classification control.
+  for (const desk of ["osaar1", "osaar2"]) {
+    await asUser(browser, desk, async (page) => {
+      const review = new ReviewPage(page)
+      await review.open(desk, title)
+      await review.expectActionVerb("Approve")
+      await review.expectClassificationControl(false)
+      await review.approve()
+    })
+  }
+  // The all-campus OSAAR reviews (verb "Review") and owns the classification gate.
+  await asUser(browser, "osaarAll", async (page) => {
+    const review = new ReviewPage(page)
+    await review.open("osaarAll", title)
+    await review.expectActionVerb("Review")
+    await review.expectClassificationControl(true)
+    await review.approve()
+  })
+})
+
+test("S-8: CDM rules on every outside equipment item before approving", async ({ browser }) => {
+  const paper = readRun().papers.P17
+  for (const desk of paper.desks) {
+    if (desk === "cdm1") {
+      await asUser(browser, desk, async (page) => {
+        const review = new ReviewPage(page)
+        await review.open(desk, paper.title)
+        // Approve stays blocked until every outside item has a ruling.
+        await review.expectOutsideEquipmentGate()
+        for (const item of OUTSIDE_EQUIPMENT) {
+          await review.decideOutsideEquipment(item.name, true)
+        }
+        await review.approve()
       })
       return
     }

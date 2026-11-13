@@ -9,7 +9,7 @@ import {
   type ReservationPick,
 } from "../pages/saaf.page"
 import { openApex } from "../support/auth"
-import { DESK_CONTACT } from "../support/data"
+import { DESK_CONTACT, OUTSIDE_EQUIPMENT } from "../support/data"
 import { account } from "../support/env"
 import { readRun, writeRun, type PaperRecord } from "../support/run-state"
 import { captureJson } from "../support/ui"
@@ -23,6 +23,12 @@ type PaperDraft = PaperRecord & {
   pick?: Omit<ReservationPick, "campus">
   collaborators?: string[]
   higherCouncil?: boolean
+  /** S-5: off-campus forces facilities=no and skips reservation + CDM. */
+  campusLocation?: "on-campus" | "off-campus"
+  /** S-2: nature-of-activity multi-select (not the OSAAR major/minor). */
+  nature?: string[]
+  /** S-6: non-Mapuan participant count (switch ON when > 0). */
+  nonMapua?: number
 }
 
 test.describe.configure({ mode: "serial" })
@@ -72,6 +78,12 @@ function drafts(): PaperDraft[] {
     { key: "P13", title: `Deny Cdm ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(4, "R101") },
     { key: "P14", title: `Conflict Hold ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "extra-curricular", reserve: true, pick: room(3, "R101") },
     { key: "P15", title: `No Budget ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false, budget: false },
+    // S-5/S-2/S-6: off-campus forces facilities=no (no reservation, no CDM),
+    // declares a selling activity, and splits Mapuan/non-Mapuan participants.
+    { key: "P16", title: `Off Campus ${run.tag}`, org: "orgA", roles: extra, desks: ["adv1", "osaar1", "osaar2", "osaarAll"], activity: "extra-curricular", reserve: false, campusLocation: "off-campus", nature: ["Selling activity"], nonMapua: 10 },
+    // S-8: on-campus reservation declaring outside equipment CDM must rule on.
+    // Slot 6 is left free by the other R101 papers (0, 1, 3, 4).
+    { key: "P17", title: `Outside Equipment ${run.tag}`, org: "orgA", roles: extraRoom, desks: ["adv1", "osaar1", "osaar2", "osaarAll", "cdm1"], activity: "extra-curricular", reserve: true, pick: { room: "R101", slot: 6, outside: OUTSIDE_EQUIPMENT } },
   ]
   return papers
 }
@@ -83,9 +95,9 @@ async function file(browser: import("@playwright/test").Browser, paper: PaperDra
   const email = account("admin").email
   const budget = paper.budget !== false
   try {
-    await saaf.start(paper.title, paper.reserve, budget, paper.funding)
-    await saaf.classification(paper.activity)
-    await saaf.people(email, { chooseDepartment: Boolean(paper.higherCouncil), stay: Boolean(paper.collaborators) })
+    await saaf.start(paper.title, paper.reserve, budget, paper.funding, paper.campusLocation)
+    await saaf.classification(paper.activity, paper.nature ?? [])
+    await saaf.people(email, { campus: run.campus, stay: Boolean(paper.collaborators) })
     if (paper.collaborators) {
       for (const org of paper.collaborators) await saaf.addCollaborator(org)
       await saaf.continue()
@@ -94,7 +106,7 @@ async function file(browser: import("@playwright/test").Browser, paper: PaperDra
       await saaf.reservation({ campus: run.campus, ...paper.pick })
       await saaf.activityReserved(budget)
     } else {
-      await saaf.activityOnline("Online", budget)
+      await saaf.activityOnline("Online", budget, paper.nonMapua)
     }
     if (!budget) {
       // The alignment page must carry no budget UI at all for a no-budget paper.
@@ -120,7 +132,7 @@ async function file(browser: import("@playwright/test").Browser, paper: PaperDra
 }
 
 test.describe("submissions", () => {
-  for (const paper of ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P11", "P12", "P13", "P14", "P15"]) {
+  for (const paper of ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P11", "P12", "P13", "P14", "P15", "P16", "P17"]) {
     test(`files ${paper}`, async ({ browser }) => {
       const draft = drafts().find((item) => item.key === paper)
       if (!draft) throw new Error(paper)
@@ -135,7 +147,7 @@ test.describe("submissions", () => {
     try {
       await saaf.start(`Equipment Only ${run.tag}`, true)
       await saaf.classification("extra-curricular")
-      await saaf.people(account("admin").email, { chooseDepartment: false })
+      await saaf.people(account("admin").email, { campus: run.campus })
       await saaf.expectEquipmentBlocked(run.campus, 5)
     } finally {
       await session.close()
@@ -149,7 +161,7 @@ test.describe("submissions", () => {
     try {
       await saaf.start(`Room Suggestion ${run.tag}`, true)
       await saaf.classification("extra-curricular")
-      await saaf.people(account("admin").email, { chooseDepartment: false })
+      await saaf.people(account("admin").email, { campus: run.campus })
       // Slot 7 is left free by the filed papers, so both rooms are still offerable.
       await saaf.schedule(run.campus, 7)
       // R101 holds 10–80 and the Auditorium 20–200, so 40 ranks the tighter room first.

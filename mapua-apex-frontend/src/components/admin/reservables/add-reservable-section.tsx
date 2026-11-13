@@ -1,43 +1,26 @@
-import { useMemo, useState, type FormEvent } from "react"
+import { useMemo, useState } from "react"
 import {
   ArmchairIcon,
   BoxesIcon,
-  CircleAlertIcon,
   DownloadIcon,
   PencilIcon,
-  PlusIcon,
 } from "lucide-react"
 
 import { CsvFileField } from "@/components/admin-osa/csv-file-field"
 import { toastBulkResult } from "@/components/admin/organizations/organization-desks"
+import { AddCampusEquipmentForm } from "@/components/admin/reservables/add-campus-equipment-form"
+import { AddRoomForm } from "@/components/admin/reservables/add-room-form"
 import {
   EditReservableDialog,
   type ReservableDraft,
 } from "@/components/admin/reservables/reservable-dialogs"
 import { RESERVABLE_CSV_TEMPLATE } from "@/components/admin/reservables/reservable-options"
-import {
-  ReservableCapacityFieldsForm,
-} from "@/components/admin/reservables/reservable-capacity-fields"
-import {
-  participantBoundPayload,
-  stripCapacityForType,
-  validateParticipantBounds,
-  type ParticipantBound,
-} from "@/lib/reservable-capacity-form"
-import {
-  ReservableClassroomField,
-} from "@/components/admin/reservables/reservable-classroom-field"
-import {
-  campusHasClassroomFormat,
-  classroomFormatHint,
-  matchesClassroomName,
-} from "@/lib/campus-classroom-format"
-import {
-  CampusSelect,
-  ReservableTypeField,
-} from "@/components/admin/reservables/reservables-fields"
+import { participantBoundPayload } from "@/lib/reservable-capacity-form"
 import { useReservablesPage } from "@/components/admin/reservables/reservables-context"
-import { ScheduleGrid } from "@/components/admin/reservables/schedule-grid"
+import {
+  SegmentedControl,
+  type SegmentedItem,
+} from "@/components/admin/reservables/segmented-control"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -56,28 +39,28 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Form } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toastManager } from "@/components/ui/toast"
 import { layout } from "@/config"
 import { mutationErrorMessage } from "@/hooks/use-admin"
-import {
-  allAvailableSchedule,
-  countAvailableSlots,
-  emptySchedule,
-  toggleScheduleDay,
-  toggleScheduleSlot,
-} from "@/lib/schedule-slots"
+import { allAvailableSchedule } from "@/lib/schedule-slots"
 import {
   downloadCsvTemplate,
   parseReservableCsv,
   type ReservableCsvRow,
 } from "@/lib/parse-csv"
-import type { ApiReservable, CreateReservablePayload, ReservableType } from "@/lib/types"
+import type { ApiReservable, CreateReservablePayload } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+/** S-8: the two separate add flows, each fixing its reservable type. */
+type AddMode = "room" | "equipment"
+
+const ADD_MODE_ITEMS: SegmentedItem<AddMode>[] = [
+  { value: "room", label: "Add Room", icon: ArmchairIcon },
+  { value: "equipment", label: "Add Campus Equipment", icon: BoxesIcon },
+]
 
 export function AddReservableSection() {
   const { state, actions } = useReservablesPage()
@@ -91,23 +74,13 @@ export function AddReservableSection() {
   } = state
   const {
     selectReservable,
-    setCampusId,
-    createReservable,
     updateReservable,
     deleteReservable,
     bulkCreateReservables,
   } = actions
 
-  const [name, setName] = useState("")
-  const [type, setType] = useState<ReservableType>("room")
-  // Room-only participant bounds; dropped whenever the type flips to equipment.
-  const [bounds, setBounds] = useState<ParticipantBound>({ min: "", max: "" })
-  // Room-only classroom flag; dropped on equipment and when the campus has no format.
-  const [isClassroom, setIsClassroom] = useState(false)
-  // Equipment-only max quantity; cleared when type switches to room.
-  const [maxQuantity, setMaxQuantity] = useState("")
-  const [schedule, setSchedule] = useState(() => allAvailableSchedule())
-  const [formError, setFormError] = useState("")
+  // S-8: the shared room/equipment toggle is replaced by two separate add flows.
+  const [addMode, setAddMode] = useState<AddMode>("room")
   const [search, setSearch] = useState("")
 
   const [csvRows, setCsvRows] = useState<ReservableCsvRow[]>([])
@@ -120,15 +93,6 @@ export function AddReservableSection() {
 
   const campusName =
     campuses.find((campus) => campus.campus_id === campusId)?.name ?? ""
-
-  const selectedCampus = campuses.find((campus) => campus.campus_id === campusId) ?? null
-  const hasClassroomFormat = campusHasClassroomFormat(selectedCampus)
-  const classroomHint = hasClassroomFormat
-    ? classroomFormatHint(
-        selectedCampus?.classroom_name_prefixes,
-        selectedCampus?.classroom_name_digits
-      )
-    : null
 
   const existingNames = useMemo(
     () => new Set(reservables.map((item) => item.name.trim().toLowerCase())),
@@ -167,65 +131,6 @@ export function AddReservableSection() {
     !query || item.name.toLowerCase().includes(query)
   const filteredRooms = rooms.filter(matches)
   const filteredEquipment = equipment.filter(matches)
-
-  async function handleAddOne(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!campusId) {
-      setFormError("Choose a campus first.")
-      return
-    }
-    const trimmed = name.trim()
-    if (!trimmed) {
-      setFormError("Reservable name is required.")
-      return
-    }
-    if (existingNames.has(trimmed.toLowerCase())) {
-      setFormError("That reservable already exists on this campus.")
-      return
-    }
-    if (countAvailableSlots(schedule) === 0) {
-      setFormError("Select at least one available slot in the weekly template.")
-      return
-    }
-    const capacityError = validateParticipantBounds(
-      stripCapacityForType(type, bounds)
-    )
-    if (capacityError) {
-      setFormError(capacityError)
-      return
-    }
-    const classroom = type === "room" && isClassroom && hasClassroomFormat
-    if (classroom && !matchesClassroomName(selectedCampus?.classroom_name_prefixes, selectedCampus?.classroom_name_digits, trimmed)) {
-      setFormError(`A classroom room must be named ${classroomHint ?? "to the campus format"}.`)
-      return
-    }
-
-    try {
-      await createReservable.mutateAsync({
-        campusId,
-        name: trimmed,
-        type,
-        ...participantBoundPayload(stripCapacityForType(type, bounds)),
-        is_classroom: classroom,
-        schedule,
-        max_quantity: type === "equipment" && maxQuantity !== "" ? parseInt(maxQuantity, 10) : null,
-      })
-      setName("")
-      setType("room")
-      setBounds({ min: "", max: "" })
-      setIsClassroom(false)
-      setMaxQuantity("")
-      setSchedule(allAvailableSchedule())
-      setFormError("")
-      toastManager.add({
-        title: "Reservable added",
-        description: `${trimmed} is now bookable.`,
-        type: "success",
-      })
-    } catch (error) {
-      setFormError(mutationErrorMessage(error, "Could not add reservable."))
-    }
-  }
 
   async function handleCsvImport() {
     if (!campusId) {
@@ -318,136 +223,24 @@ export function AddReservableSection() {
             <CardHeader>
               <CardTitle>Add reservable</CardTitle>
               <CardDescription>
-                Pick a campus, name the room or equipment, and mark the weekly
-                slots it can be booked. Sunday is never reservable.
+                Pick a campus, then add a room or campus equipment and mark the
+                weekly slots it can be booked. Sunday is never reservable.
               </CardDescription>
             </CardHeader>
-            <Form className="contents" onSubmit={handleAddOne}>
-              <CardPanel className="flex flex-col gap-4">
-                <CampusSelect
-                  campuses={campuses}
-                  id="add-reservable-campus"
-                  onChange={setCampusId}
-                  value={campusId}
-                />
-                <Field>
-                  <FieldLabel htmlFor="add-reservable-name">Name</FieldLabel>
-                  <Input
-                    aria-invalid={formError ? true : undefined}
-                    autoComplete="off"
-                    id="add-reservable-name"
-                    onChange={(event) => {
-                      setName(event.currentTarget.value)
-                      if (formError) setFormError("")
-                    }}
-                    placeholder="Cardinal Cinema"
-                    required
-                    type="text"
-                    value={name}
-                  />
-                </Field>
-                <ReservableTypeField
-                  id="add-reservable-type"
-                  onChange={(next) => {
-                    setType(next)
-                    setBounds((current) => stripCapacityForType(next, current))
-                    if (next !== "room") setIsClassroom(false)
-                    if (next !== "equipment") setMaxQuantity("")
-                    if (formError) setFormError("")
-                  }}
-                  value={type}
-                />
-                {type === "equipment" && (
-                  <Field>
-                    <FieldLabel htmlFor="add-reservable-max-quantity">Max Quantity <span className="text-muted-foreground font-normal">(optional)</span></FieldLabel>
-                    <Input
-                      id="add-reservable-max-quantity"
-                      min={1}
-                      onChange={(event) => {
-                        setMaxQuantity(event.currentTarget.value)
-                        if (formError) setFormError("")
-                      }}
-                      placeholder="e.g. 10"
-                      type="number"
-                      value={maxQuantity}
-                    />
-                  </Field>
-                )}
-                <ReservableCapacityFieldsForm
-                  bounds={bounds}
-                  disabled={createReservable.isPending}
-                  idPrefix="add-reservable"
-                  onChange={(next) => {
-                    setBounds(next)
-                    if (formError) setFormError("")
-                  }}
-                  type={type}
-                />
-                <ReservableClassroomField
-                  checked={isClassroom}
-                  disabled={createReservable.isPending}
-                  formatHint={classroomHint}
-                  hasCampusFormat={hasClassroomFormat}
-                  id="add-reservable-classroom"
-                  onChange={(next) => {
-                    setIsClassroom(next)
-                    if (formError) setFormError("")
-                  }}
-                  type={type}
-                />
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-2 text-base/4.5 font-medium text-foreground sm:text-sm/4">Weekly availability</span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        onClick={() => setSchedule(allAvailableSchedule())}
-                        size="sm"
-                        type="button"
-                        variant="ghost"
-                      >
-                        All week
-                      </Button>
-                      <Button
-                        onClick={() => setSchedule(emptySchedule())}
-                        size="sm"
-                        type="button"
-                        variant="ghost"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  </div>
-                  <ScheduleGrid
-                    onToggle={(day, slot) =>
-                      setSchedule((current) =>
-                        toggleScheduleSlot(current, day, slot)
-                      )
-                    }
-                    onToggleDay={(day) =>
-                      setSchedule((current) => toggleScheduleDay(current, day))
-                    }
-                    schedule={schedule}
-                  />
-                </div>
-                {formError ? (
-                  <Alert variant="error">
-                    <CircleAlertIcon />
-                    <AlertTitle>Missing details</AlertTitle>
-                    <AlertDescription>{formError}</AlertDescription>
-                  </Alert>
-                ) : null}
-              </CardPanel>
-              <CardFooter className="justify-end">
-                <Button
-                  disabled={!campusId || !name.trim()}
-                  loading={createReservable.isPending}
-                  type="submit"
-                >
-                  <PlusIcon aria-hidden="true" />
-                  Add reservable
-                </Button>
-              </CardFooter>
-            </Form>
+            <CardPanel className="pb-0">
+              <SegmentedControl
+                ariaLabel="Add reservable type"
+                items={ADD_MODE_ITEMS}
+                mode="tablist"
+                onChange={setAddMode}
+                value={addMode}
+              />
+            </CardPanel>
+            {addMode === "room" ? (
+              <AddRoomForm />
+            ) : (
+              <AddCampusEquipmentForm />
+            )}
             <Separator />
             <ImportReservablesCsv
               csvError={csvError}
@@ -527,7 +320,7 @@ export function AddReservableSection() {
                 items={filteredEquipment}
                 onEdit={setEditing}
                 onSelect={(id) => selectReservable(id, "view")}
-                title="Equipment"
+                title="Campus Equipment"
               />
             </div>
           )}

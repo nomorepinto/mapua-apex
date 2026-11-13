@@ -1,5 +1,6 @@
 import { CircleAlertIcon } from "lucide-react"
 
+import { CampusDepartmentsEditor } from "@/components/admin/campuses/campus-departments-editor"
 import { useCampusesPage } from "@/components/admin/campuses/campuses-context"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -116,6 +117,11 @@ export function EditCampusDialog() {
                 </p>
               ) : null}
             </div>
+            <CampusDepartmentsEditor
+              idPrefix="edit-campus"
+              onChange={actions.changeEditDepartments}
+              value={state.editDepartments}
+            />
             {state.offerEditMain ? (
               <Field>
                 <div className="flex items-start gap-2">

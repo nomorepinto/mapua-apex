@@ -6,6 +6,7 @@ import { BudgetProposalSection } from "@/components/submission/budget-proposal-s
 import { CollaboratorsSection } from "@/components/submission/collaborators-section"
 import { InstitutionalAlignmentSection } from "@/components/submission/institutional-alignment-section"
 import { ProponentsSection } from "@/components/submission/proponents-section"
+import { hasRentalSignal } from "@/components/submission/rental-charge-warning"
 import { SubmissionActions } from "@/components/submission/submission-actions"
 import { SubmissionErrorAlert } from "@/components/forms/submission-error-alert"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -33,6 +34,10 @@ export function SaafClassificationStep() {
         }
         onTotalOrgMembersChange={(value) =>
           actions.updateField("totalOrgMembers", value)
+        }
+        activityNature={draft.activityNature}
+        onActivityNatureChange={(values) =>
+          actions.updateField("activityNature", values)
         }
       />
     </SaafStepPanel>
@@ -78,7 +83,12 @@ export function SaafReservationStep() {
 export function SaafActivityStep() {
   const { state, actions } = useSaafFormContext()
   const eventName = useOrgStore((store) => store.eventName)
+  const fundingSources = useOrgStore((store) => store.fundingSources)
   const stepIndex = state.includeReservation ? 3 : 2
+  const rentalWarning = hasRentalSignal(
+    state.draft.activityNature,
+    fundingSources
+  )
 
   return (
     <SaafStepPanel index={stepIndex}>
@@ -88,6 +98,7 @@ export function SaafActivityStep() {
         includeReservation={state.includeReservation}
         includeBudget={state.includeBudget}
         fallbackTitle={eventName}
+        rentalWarning={rentalWarning}
       />
     </SaafStepPanel>
   )
@@ -96,7 +107,12 @@ export function SaafActivityStep() {
 // STEP 5: Alignment & Budget (Index 4 with reservation, Index 3 without)
 export function SaafAlignmentStep() {
   const { state, actions } = useSaafFormContext()
+  const fundingSources = useOrgStore((store) => store.fundingSources)
   const stepIndex = state.includeReservation ? 4 : 3
+  const rentalWarning = hasRentalSignal(
+    state.draft.activityNature,
+    fundingSources
+  )
 
   return (
     <SaafStepPanel index={stepIndex}>
@@ -114,6 +130,10 @@ export function SaafAlignmentStep() {
           onRemove={actions.handleRemoveBudgetItem}
           onAdd={actions.handleAddBudgetItem}
           onNoteChange={(value) => actions.updateField("budgetNote", value)}
+          rentalWarning={rentalWarning}
+          onQuickAddRental={() =>
+            actions.handleAddBudgetItem({ item: "Equipment Rental" })
+          }
         />
       )}
     </SaafStepPanel>

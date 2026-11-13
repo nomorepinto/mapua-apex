@@ -1,5 +1,5 @@
 import type { ReservationDraft } from "@/components/reservation/types"
-import type { VenueReservationPick } from "@/lib/types"
+import type { OutsideEquipmentItem, VenueReservationPick } from "@/lib/types"
 import {
   createEmptyProponent,
   DEFAULT_BUDGET_ITEMS,
@@ -92,6 +92,8 @@ export interface ApiSubmission {
     activity_type?: string
     total_org_members?: number
     nature?: "major" | "minor" | string
+    /** S-2 proponent-chosen nature of activity (distinct from OSAAR major/minor). */
+    nature_of_activity?: string[]
   }
   proponents?: Array<{
     id: string
@@ -103,6 +105,7 @@ export interface ApiSubmission {
     student_number?: string
     program_and_year?: string
     date_of_submission?: string
+    campus?: string
     department?: string
     position_of_applicant?: string
     org_or_course_section?: string
@@ -120,6 +123,12 @@ export interface ApiSubmission {
     day_of_event?: string
     time_of_event?: string
     expected_participants?: number
+    /** S-6 participant split; expected_participants stays the derived total. */
+    mapua_participants?: number
+    non_mapua_participants?: number
+    has_non_mapua?: boolean
+    /** S-5 on/off-campus choice from the start questionnaire; absent = legacy. */
+    campus_location?: string
     individual_contribution?: number
     proposed_budget?: number
   }
@@ -157,6 +166,8 @@ export interface ApiSubmission {
      * its concrete date+slot selections. Written by `buildSaafApiPayload`.
      */
     reservations?: VenueReservationPick[]
+    /** S-8 outside equipment (not from Mapua) the student declared. */
+    outside_equipment?: OutsideEquipmentItem[]
     /** Legacy shape retained for tolerance with pre-migration stored items. */
     equipment_requested?: {
       items?: Array<{
@@ -195,6 +206,12 @@ export interface ApiSubmission {
   desk_timings?: DeskTiming[]
   /** RA 10173 consent of record; absent on papers filed before the consent gate. */
   privacy_consent?: PrivacyConsent
+  /** S-8 CDM per-item rulings on outside equipment; absent until CDM decides. */
+  outside_equipment_decisions?: Array<{
+    name: string
+    allowed: boolean
+    decided_at?: string
+  }>
 }
 
 /**
@@ -492,7 +509,9 @@ export function buildSaafApiPayload(
   existingEventId?: string,
   hasBudget = true,
   fundingSources: string[] = [],
-  privacyConsentVersion?: string | null
+  privacyConsentVersion?: string | null,
+  termsConsentVersion?: string | null,
+  campusLocation?: string | null
 ) {
   const event_id = existingEventId || crypto.randomUUID()
   // Proposed budget is locked to the itemized Detailed Budget grand total so the
@@ -504,7 +523,10 @@ export function buildSaafApiPayload(
   // Each picked reservable carries its own concrete date+slot selections, so the
   // event schedule is derived from the picks (never free-text).
   const picks = reservationDraft?.picks ?? []
-  const hasReservation = picks.length > 0
+  const outsideEquipment = reservationDraft?.outsideEquipment ?? []
+  // S-10: "yes" covers facilities OR outside equipment, so an outside-equipment-only
+  // paper still routes through CDM even with no room/equipment picks.
+  const hasReservation = picks.length > 0 || outsideEquipment.length > 0
 
   return {
     event_id,
@@ -515,6 +537,7 @@ export function buildSaafApiPayload(
     activity_classification: {
       activity_type: saafDraft.activityType || "extra-curricular",
       total_org_members: Number(saafDraft.totalOrgMembers) || 0,
+      nature_of_activity: saafDraft.activityNature || [],
     },
     proponents: (saafDraft.proponents || []).map((p) => ({
       id: p.id || crypto.randomUUID(),
@@ -527,6 +550,7 @@ export function buildSaafApiPayload(
       program_and_year: p.programAndYear || "",
       date_of_submission:
         p.dateOfSubmission || new Date().toISOString().split("T")[0],
+      campus: p.campus || "",
       department: saafDraft.departmentValues?.[p.id] || p.department || "",
       position_of_applicant: p.positionOfApplicant || p.position || "",
       org_or_course_section: p.orgOrCourseSection || "",
@@ -545,6 +569,12 @@ export function buildSaafApiPayload(
       day_of_event: saafDraft.dayOfEvent || "",
       time_of_event: saafDraft.timeOfEvent || "",
       expected_participants: Number(saafDraft.expectedParticipants) || 0,
+      mapua_participants: Number(saafDraft.mapuaParticipants) || 0,
+      non_mapua_participants: Number(saafDraft.nonMapuaParticipants) || 0,
+      has_non_mapua: Boolean(saafDraft.includeNonMapua),
+      // S-5: the on/off-campus choice is made in the start questionnaire, not
+      // the Activity step. Omitted when unknown so legacy callers stay valid.
+      ...(campusLocation ? { campus_location: campusLocation } : {}),
       // The money fields only exist for a budgeted activity; a no-budget paper
       // stores zeros so any reader that predates the flag degrades safely.
       individual_contribution: hasBudget
@@ -600,13 +630,35 @@ export function buildSaafApiPayload(
         ...(pick.type === "equipment"
           ? { quantity_requested: pick.quantity ?? 1 }
           : {}),
+        // Room-only: persist the room-specific equipment selected for this room (S-8).
+        ...(pick.type === "room"
+          ? {
+              room_equipment: (pick.room_equipment ?? [])
+                .map((eq) => ({
+                  name: eq.name.trim(),
+                  ...(eq.quantity != null ? { quantity: eq.quantity } : {}),
+                }))
+                .filter((eq) => eq.name.length > 0),
+            }
+          : {}),
       })),
+      // S-8 outside equipment (not from Mapua); only named rows are persisted.
+      outside_equipment: outsideEquipment
+        .map((item) => ({
+          name: item.name.trim(),
+          ...(item.purpose?.trim() ? { purpose: item.purpose.trim() } : {}),
+        }))
+        .filter((item) => item.name.length > 0),
     },
     // RA 10173 consent is only emitted on the student create/resubmit paths,
     // which pass the notice version they consented against. The admin edit path
     // omits it so an admin PUT never fabricates or overwrites a recorded consent.
     ...(privacyConsentVersion
       ? { privacy_consent: { version: privacyConsentVersion, accepted: true } }
+      : {}),
+    // S-1 T&C consent follows the same student-only guard as the privacy consent.
+    ...(termsConsentVersion
+      ? { terms_consent: { version: termsConsentVersion, accepted: true } }
       : {}),
   }
 }
@@ -617,11 +669,13 @@ export function buildSaafApiPayload(
 export function getSubmissionStatusMeta(status: string) {
   switch (status.toLowerCase()) {
     case "finished":
-      // A filed post-evaluation is still awaiting OSAAR review, so the student
-      // sees the same pending state until it is approved.
+      // Every desk cleared the paper and its post-evaluation was approved, so
+      // the event is fully complete. The student sees "Completed" here; an
+      // approved event whose post-evaluation has not been filed/approved yet
+      // keeps the "approved" status and reads "Approved" below.
       return {
-        label: "Pending",
-        color: "bg-amber-500/10 text-amber-600 border-amber-200",
+        label: "Completed",
+        color: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
       }
     case "approved":
       return {
@@ -653,7 +707,7 @@ export function getSubmissionStatusMeta(status: string) {
 }
 
 export type DashboardSubmissionStatus =
-  "Under Review" | "Approved" | "Returned" | "Denied" | "Cancelled" | "Finished"
+  "Under Review" | "Approved" | "Returned" | "Denied" | "Cancelled" | "Completed"
 
 export interface DashboardSubmissionRow {
   event_id: string
@@ -1320,6 +1374,7 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
     nature:
       (submission.activity_classification?.nature as "major" | "minor") ||
       undefined,
+    natureOfActivity: submission.activity_classification?.nature_of_activity ?? [],
     decision,
     status,
     description:
@@ -1338,6 +1393,9 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
         proponent.position_of_applicant ||
         "Proponent",
       name: formatProponentName(proponent) || proponent.student_number || "—",
+      email: proponent.email_address || undefined,
+      campus: proponent.campus || undefined,
+      department: proponent.department || undefined,
     })),
     objectives:
       objectives.length > 0
@@ -1392,6 +1450,10 @@ export function apiSubmissionToActivity(submission: ApiSubmission): Activity {
           acceptedAt: submission.privacy_consent.accepted_at,
         }
       : undefined,
+    outsideEquipment: submission.venue_reservation?.outside_equipment ?? [],
+    outsideEquipmentDecisions: (
+      submission.outside_equipment_decisions ?? []
+    ).map((decision) => ({ name: decision.name, allowed: decision.allowed })),
   }
 }
 
@@ -1686,6 +1748,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
   hasReservation: boolean
   hasBudget: boolean
   fundingSources: string[]
+  campusLocation: "on-campus" | "off-campus"
 } {
   const proponents = (submission.proponents || []).map((proponent, index) => ({
     id: proponent.id || String(index + 1),
@@ -1697,6 +1760,7 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
     studentNumber: proponent.student_number || "",
     programAndYear: proponent.program_and_year || "",
     dateOfSubmission: proponent.date_of_submission || "",
+    campus: proponent.campus || "",
     department: proponent.department || "",
     positionOfApplicant: proponent.position_of_applicant || "",
     orgOrCourseSection: proponent.org_or_course_section || "",
@@ -1724,11 +1788,21 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
   // so they rehydrate to an empty pick list (the activity dates still populate
   // the SAAF draft from `activity_details` below).
   const storedReservations = submission.venue_reservation?.reservations
-  const reservation: ReservationDraft =
-    Array.isArray(storedReservations) && storedReservations.length > 0
-      ? {
-          campusId: storedReservations[0]?.campus_id ?? "",
-          picks: storedReservations.map((pick, index) => ({
+  const storedOutsideEquipment = submission.venue_reservation?.outside_equipment
+  const outsideEquipment = Array.isArray(storedOutsideEquipment)
+    ? storedOutsideEquipment.map((item) => ({
+        name: item.name ?? "",
+        purpose: item.purpose ?? "",
+      }))
+    : []
+  const reservation: ReservationDraft = {
+    campusId:
+      Array.isArray(storedReservations) && storedReservations.length > 0
+        ? (storedReservations[0]?.campus_id ?? "")
+        : "",
+    picks:
+      Array.isArray(storedReservations) && storedReservations.length > 0
+        ? storedReservations.map((pick, index) => ({
             id: pick.reservable_id || String(index + 1),
             reservable_id: pick.reservable_id,
             campus_id: pick.campus_id,
@@ -1739,9 +1813,20 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
               slots: [...(selection.slots ?? [])].sort((a, b) => a - b),
             })),
             remarks: pick.remarks ?? "",
-          })),
-        }
-      : { campusId: "", picks: [] }
+            ...(pick.type === "room" && Array.isArray(pick.room_equipment)
+              ? {
+                  room_equipment: pick.room_equipment.map((eq) => ({
+                    name: eq.name,
+                    quantity: eq.quantity ?? null,
+                  })),
+                }
+              : {}),
+          }))
+        : [],
+    outsideEquipment,
+    // A stored paper that declared outside equipment was acknowledged at submit.
+    outsideEquipmentAcknowledged: outsideEquipment.length > 0,
+  }
 
   return {
     saaf: {
@@ -1752,8 +1837,20 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
       totalOrgMembers: String(
         submission.activity_classification?.total_org_members ?? ""
       ),
+      activityNature:
+        submission.activity_classification?.nature_of_activity ?? [],
       expectedParticipants: String(
         submission.activity_details?.expected_participants ?? ""
+      ),
+      includeNonMapua: Boolean(submission.activity_details?.has_non_mapua),
+      // Legacy papers predate the split: the whole total was Mapuan.
+      mapuaParticipants: String(
+        submission.activity_details?.mapua_participants ??
+          submission.activity_details?.expected_participants ??
+          ""
+      ),
+      nonMapuaParticipants: String(
+        submission.activity_details?.non_mapua_participants ?? 0
       ),
       individualContribution: String(
         submission.activity_details?.individual_contribution ?? ""
@@ -1796,6 +1893,11 @@ export function apiSubmissionToDrafts(submission: ApiSubmission): {
     hasReservation: Boolean(submission.venue_reservation?.has_reservation),
     hasBudget: submissionHasBudget(submission),
     fundingSources: submission.detailed_budget_proposal?.funding_sources ?? [],
+    // Legacy papers predate the on/off-campus question: treat them as on-campus.
+    campusLocation:
+      submission.activity_details?.campus_location === "off-campus"
+        ? "off-campus"
+        : "on-campus",
   }
 }
 

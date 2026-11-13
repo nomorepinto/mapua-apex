@@ -18,9 +18,17 @@ import {
 import { checkGibberish, useGibberishField } from "@/hooks/use-gibberish-check"
 import { cn } from "@/lib/utils"
 
+const CAMPUS_LOCATION_ITEMS: {
+  label: string
+  value: "on-campus" | "off-campus"
+}[] = [
+  { label: "On-campus", value: "on-campus" },
+  { label: "Off-campus", value: "off-campus" },
+]
+
 const FACILITY_ITEMS: { label: string; value: "yes" | "no" }[] = [
-  { label: "Yes, reserve school facilities", value: "yes" },
-  { label: "No, do not reserve facilities", value: "no" },
+  { label: "Yes, reserve facilities / bring outside equipment", value: "yes" },
+  { label: "No, neither", value: "no" },
 ]
 
 const BUDGET_ITEMS: { label: string; value: "yes" | "no" }[] = [
@@ -83,13 +91,51 @@ export function EventSetupForm() {
         </Field>
 
         <Field className="w-full">
+          <FieldLabel htmlFor="campusLocation">
+            Where will the event be held? <span className="text-red-500">*</span>
+          </FieldLabel>
+          <Select
+            items={CAMPUS_LOCATION_ITEMS}
+            itemToStringValue={(item) => item.value}
+            name="campusLocation"
+            value={
+              CAMPUS_LOCATION_ITEMS.find(
+                (item) => item.value === state.campusLocation
+              ) ?? null
+            }
+            onValueChange={(item) =>
+              actions.changeCampusLocation(item?.value ?? "")
+            }
+          >
+            <SelectTrigger
+              id="campusLocation"
+              className="w-full border-neutral-200 bg-white text-neutral-900"
+            >
+              <SelectValue placeholder="Select an option" />
+            </SelectTrigger>
+            <SelectPopup className="bg-white text-neutral-900">
+              {CAMPUS_LOCATION_ITEMS.map((item) => (
+                <SelectItem
+                  key={item.value}
+                  value={item}
+                  className="text-neutral-900 data-highlighted:bg-neutral-100 data-highlighted:text-neutral-900"
+                >
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        </Field>
+
+        <Field className="w-full">
           <FieldLabel htmlFor="reserveFacilities">
-            Are you going to reserve school facilities? <span className="text-red-500">*</span>
+            Are you going to reserve school facilities/bring outside equipment? <span className="text-red-500">*</span>
           </FieldLabel>
           <Select
             items={FACILITY_ITEMS}
             itemToStringValue={(item) => item.value}
             name="reserveFacilities"
+            disabled={state.campusLocation === "off-campus"}
             value={
               FACILITY_ITEMS.find(
                 (item) => item.value === state.reserveFacilities
@@ -117,6 +163,12 @@ export function EventSetupForm() {
               ))}
             </SelectPopup>
           </Select>
+          {state.campusLocation === "off-campus" ? (
+            <FieldDescription>
+              Off-campus events cannot reserve school facilities or bring
+              outside equipment, so this is set to &quot;No, neither&quot;.
+            </FieldDescription>
+          ) : null}
         </Field>
 
         <Field className="w-full">

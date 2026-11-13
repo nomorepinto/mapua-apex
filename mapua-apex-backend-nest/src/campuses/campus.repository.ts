@@ -2,12 +2,23 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DynamoTable } from '../aws/dynamo-table.js';
 import { campusKey, roleIndex, stripPrefix } from '../common/dynamo-keys.js';
-import { bool, num, str, type Item } from '../common/records.js';
+import { bool, list, num, record, str, type Item } from '../common/records.js';
 import {
   classroomHint,
   hasFormat,
   normalizePrefixes,
 } from './classroom-naming.js';
+
+export interface CampusCourse {
+  code: string;
+  name: string;
+}
+
+export interface CampusDepartment {
+  code: string;
+  name: string;
+  courses: CampusCourse[];
+}
 
 export interface CampusView {
   campus_id: string;
@@ -16,6 +27,7 @@ export interface CampusView {
   classroom_name_prefixes: string[];
   classroom_name_digits: number | null;
   classroom_name_hint: string | null;
+  departments: CampusDepartment[];
 }
 
 @Injectable()
@@ -42,9 +54,10 @@ export class CampusRepository {
     prefixes: string[],
     digits: number | null,
     main: boolean,
+    departments: CampusDepartment[] = [],
   ): Promise<Item> {
     const id = randomUUID();
-    return this.write(id, name, prefixes, digits, main);
+    return this.write(id, name, prefixes, digits, main, departments);
   }
 
   async update(
@@ -53,6 +66,7 @@ export class CampusRepository {
     prefixes: string[],
     digits: number | null,
     main: boolean,
+    departments: CampusDepartment[] = [],
   ): Promise<Item> {
     return this.write(
       stripPrefix(id, 'CAMPUS#') ?? id,
@@ -60,6 +74,7 @@ export class CampusRepository {
       prefixes,
       digits,
       main,
+      departments,
     );
   }
 
@@ -95,6 +110,7 @@ export class CampusRepository {
     prefixes: string[],
     digits: number | null,
     main: boolean,
+    departments: CampusDepartment[] = [],
   ): Promise<Item> {
     const key = campusKey(id);
     const normalized = normalizePrefixes(prefixes);
@@ -105,6 +121,9 @@ export class CampusRepository {
     if (hasFormat(normalized, digits)) {
       item.classroom_name_prefixes = normalized;
       item.classroom_name_digits = digits;
+    }
+    if (departments.length > 0) {
+      item.departments = departments;
     }
     await this.table.put(item);
     return item;
@@ -122,5 +141,38 @@ export function toCampus(item: Item): CampusView {
     classroom_name_prefixes: formatted ? prefixes : [],
     classroom_name_digits: formatted ? digits : null,
     classroom_name_hint: formatted ? classroomHint(prefixes, digits) : null,
+    departments: toDepartments(item.departments),
   };
+}
+
+function toDepartments(value: unknown): CampusDepartment[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const departments: CampusDepartment[] = [];
+  for (const entry of value) {
+    const dept = record(entry);
+    if (!dept) {
+      continue;
+    }
+    const code = str(dept, 'code') ?? '';
+    const name = str(dept, 'name') ?? '';
+    if (!code && !name) {
+      continue;
+    }
+    const courses: CampusCourse[] = [];
+    for (const courseEntry of list(dept, 'courses')) {
+      const course = record(courseEntry);
+      if (!course) {
+        continue;
+      }
+      const courseCode = str(course, 'code') ?? '';
+      const courseName = str(course, 'name') ?? '';
+      if (courseCode || courseName) {
+        courses.push({ code: courseCode, name: courseName });
+      }
+    }
+    departments.push({ code, name, courses });
+  }
+  return departments;
 }

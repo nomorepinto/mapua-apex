@@ -42,6 +42,7 @@ export function ReviewQueue() {
       onSelect={actions.handleActivitySelect}
       searchLabel="Search review queue"
       statusField="decision"
+      decisionVerb={state.isCampusOsaar ? "Approve" : "Review"}
       statusLabel="Decision"
       title="For Review"
     />
@@ -59,14 +60,18 @@ export function ReviewActivityDialog() {
   return (
     <ActivityDetailModal
       actionError={state.actionError}
+      actionVerb={state.isCampusOsaar ? "Approve" : "Review"}
       activity={state.activeActivity}
       bookingConflicts={state.bookingConflicts}
       isActing={state.isActing}
       isCheckingBookingConflicts={state.isCheckingBookingConflicts}
-      isOsaar={state.isOsaar}
+      isAllCampusOsaar={state.isAllCampusOsaar}
+      isCdm={state.isCdm}
       isUpdatingClassification={state.isUpdatingClassification}
+      isUpdatingOutsideEquipment={state.isUpdatingOutsideEquipment}
       onAction={actions.handleModalAction}
       onClassificationChange={actions.handleClassificationChange}
+      onOutsideEquipmentChange={actions.handleOutsideEquipmentChange}
       onClose={actions.handleModalClose}
       readOnly={state.isReadOnly}
     />

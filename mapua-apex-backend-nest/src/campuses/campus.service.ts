@@ -10,6 +10,8 @@ import { normalizePrefixes } from './classroom-naming.js';
 import {
   CampusRepository,
   toCampus,
+  type CampusCourse,
+  type CampusDepartment,
   type CampusView,
 } from './campus.repository.js';
 import type { CampusDto } from './dto/campus.dto.js';
@@ -38,7 +40,13 @@ export class CampusService {
       await this.assertMainAvailable();
     }
     return toCampus(
-      await this.campuses.create(body.name, prefixes, digits, main),
+      await this.campuses.create(
+        body.name,
+        prefixes,
+        digits,
+        main,
+        this.departments(body),
+      ),
     );
   }
 
@@ -53,7 +61,14 @@ export class CampusService {
       await this.assertMainAvailable(id);
     }
     return toCampus(
-      await this.campuses.update(id, body.name, prefixes, digits, main),
+      await this.campuses.update(
+        id,
+        body.name,
+        prefixes,
+        digits,
+        main,
+        this.departments(body),
+      ),
     );
   }
 
@@ -88,6 +103,38 @@ export class CampusService {
     if (holder) {
       abort(422, 'A main campus already exists.');
     }
+  }
+
+  /** Normalize + validate campus departments/courses (C-1): unique codes. */
+  private departments(body: CampusDto): CampusDepartment[] {
+    const result: CampusDepartment[] = [];
+    const seenDepartments = new Set<string>();
+    for (const dept of body.departments ?? []) {
+      const code = dept.code.trim();
+      const name = dept.name.trim();
+      const key = code.toUpperCase();
+      if (seenDepartments.has(key)) {
+        abort(422, `Duplicate department code "${code}" on this campus.`);
+      }
+      seenDepartments.add(key);
+      const courses: CampusCourse[] = [];
+      const seenCourses = new Set<string>();
+      for (const course of dept.courses ?? []) {
+        const courseCode = course.code.trim();
+        const courseName = course.name.trim();
+        const courseKey = courseCode.toUpperCase();
+        if (seenCourses.has(courseKey)) {
+          abort(
+            422,
+            `Duplicate course code "${courseCode}" in department "${code}".`,
+          );
+        }
+        seenCourses.add(courseKey);
+        courses.push({ code: courseCode, name: courseName });
+      }
+      result.push({ code, name, courses });
+    }
+    return result;
   }
 
   private pair(body: CampusDto): { prefixes: string[]; digits: number | null } {

@@ -8,6 +8,8 @@ export interface Proponent {
   studentNumber: string
   programAndYear: string
   dateOfSubmission: string
+  /** Campus the proponent is from (campus_id); chosen per proponent (S-7). */
+  campus: string
   department: string
   positionOfApplicant: string
   orgOrCourseSection: string
@@ -26,8 +28,15 @@ export interface BudgetItem {
 
 export interface SaafDraft {
   activityType: string
+  /** Proponent-chosen nature of activity (S-2); distinct from the OSAAR major/minor nature. */
+  activityNature: string[]
   totalOrgMembers: string
+  /** Derived total (S-6): mapua + non-Mapua when the switch is ON. */
   expectedParticipants: string
+  /** S-6 switch: whether non-Mapuan participants join this event. */
+  includeNonMapua: boolean
+  mapuaParticipants: string
+  nonMapuaParticipants: string
   individualContribution: string
   proposedBudget: string
   dayOfEvent: string

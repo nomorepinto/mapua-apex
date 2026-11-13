@@ -25,9 +25,13 @@ export async function action({
   const reservationDraft = useOrgStore.getState().reservationDraft
   const hasBudget = useOrgStore.getState().withBudget === "yes"
   const fundingSources = useOrgStore.getState().fundingSources
+  // S-5: the on/off-campus choice lives in the start questionnaire state.
+  const campusLocation = useOrgStore.getState().campusLocation
   // The consent version the proponent just accepted in the pre-submit dialog;
   // ephemeral in the store, so a resubmit must re-tick and re-send it.
   const privacyConsentVersion = useOrgStore.getState().privacyConsentVersion
+  // Same ephemeral pattern for the S-1 Terms & Conditions acceptance.
+  const termsConsentVersion = useOrgStore.getState().termsConsentVersion
   // The edit ids live in the store once hydration loads a returned paper, but
   // the route's `?event=&submission=` params are the authoritative fallback so a
   // resubmit still PUTs (never POSTs a duplicate) if hydration has not run yet.
@@ -53,7 +57,9 @@ export async function action({
       editingEventId ?? undefined,
       hasBudget,
       fundingSources,
-      privacyConsentVersion
+      privacyConsentVersion,
+      termsConsentVersion,
+      campusLocation
     )
 
     if (editingEventId && editingSubmissionId) {
@@ -70,6 +76,7 @@ export async function action({
     useOrgStore.getState().clearSubmissionStart()
     useOrgStore.getState().clearEditingSubmission()
     useOrgStore.getState().setPrivacyConsentVersion(null)
+    useOrgStore.getState().setTermsConsentVersion(null)
 
     // Invalidate server queries
     queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })

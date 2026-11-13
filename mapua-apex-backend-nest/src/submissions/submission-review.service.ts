@@ -13,9 +13,10 @@ import {
 } from '../common/dynamo-keys.js';
 import { abort } from '../common/http.js';
 import { evaluationWindowTtl } from '../common/manila.js';
-import { num, record, str, type Item } from '../common/records.js';
+import { bool, list, num, record, str, type Item } from '../common/records.js';
 import { MailService } from '../mail/mail.service.js';
 import { OrganizationRepository } from '../organizations/organization.repository.js';
+import { SignatoryRepository } from '../signatories/signatory.repository.js';
 import { refsOf } from './submission-writer.service.js';
 import {
   notificationItem,
@@ -37,6 +38,7 @@ export class SubmissionReviewService {
     private readonly routing: RoutingService,
     private readonly config: AppConfigService,
     private readonly organizations: OrganizationRepository,
+    private readonly signatories: SignatoryRepository,
   ) {}
 
   async approve(
@@ -74,6 +76,7 @@ export class SubmissionReviewService {
     if (index === -1) {
       throw new NotFoundException('Not Found');
     }
+    await this.assertOutsideEquipmentDecided(item, bareDesk);
     const next = sequence[index + 1];
     const sentAt = nowIso();
     if (next) {
@@ -263,6 +266,20 @@ export class SubmissionReviewService {
     nature: string,
   ): Promise<Item> {
     await this.requireOpen(signatoryId, eventId, submissionId);
+    // Major/minor classification is exclusive to the all-campus OSAAR (R-1).
+    const acting = await this.signatories.get(
+      stripPrefix(signatoryId, 'SIGNATORY#') ?? signatoryId,
+    );
+    if (
+      !acting ||
+      str(acting, 'role') !== 'osaar' ||
+      !bool(acting, 'all_campuses')
+    ) {
+      abort(
+        403,
+        'Only the all-campus OSAAR can classify an event as major or minor.',
+      );
+    }
     const current = await this.must(eventId, submissionId);
     const previous = record(current.activity_classification);
     const classification = previous
@@ -270,6 +287,61 @@ export class SubmissionReviewService {
       : { nature: nature.toLowerCase() };
     return this.submissions.updateSubmission(eventId, submissionId, {
       activity_classification: classification,
+    });
+  }
+
+  /**
+   * Records the CDM's per-item allowed/not-allowed decisions for outside
+   * equipment (S-8). The CDM must rule on every item before approving.
+   */
+  async setOutsideEquipmentDecisions(
+    signatoryId: string,
+    eventId: string,
+    submissionId: string,
+    decisions: { name: string; allowed: boolean }[],
+  ): Promise<Item> {
+    const item = await this.requireOpen(signatoryId, eventId, submissionId);
+    const acting = await this.signatories.get(
+      stripPrefix(signatoryId, 'SIGNATORY#') ?? signatoryId,
+    );
+    if (!acting || str(acting, 'role') !== 'cdm') {
+      abort(403, 'Only the CDM desk can rule on outside equipment.');
+    }
+    const listed = outsideEquipmentNames(item);
+    for (const decision of decisions) {
+      if (!listed.includes(decision.name)) {
+        abort(422, `"${decision.name}" is not listed as outside equipment.`);
+      }
+    }
+    // Merge the incoming rulings into any already-stored decisions, keyed by the
+    // declared item name. The CDM rules one item per click, so a PATCH may carry
+    // only that item; replacing the whole array would drop the other items'
+    // earlier rulings and leave the approve gate stuck forever. Last write wins
+    // per name, and rulings for items no longer listed are pruned.
+    const stamp = nowIso();
+    const byName = new Map<string, Item>();
+    for (const entry of list(item, 'outside_equipment_decisions')) {
+      const stored = record(entry);
+      if (!stored) {
+        continue;
+      }
+      const name = str(stored, 'name');
+      if (name && listed.includes(name)) {
+        byName.set(name, stored);
+      }
+    }
+    for (const decision of decisions) {
+      byName.set(decision.name, {
+        name: decision.name,
+        allowed: decision.allowed,
+        decided_at: stamp,
+      });
+    }
+    const merged = listed
+      .map((name) => byName.get(name))
+      .filter((entry): entry is Item => entry !== undefined);
+    return this.submissions.updateSubmission(eventId, submissionId, {
+      outside_equipment_decisions: merged,
     });
   }
 
@@ -283,6 +355,40 @@ export class SubmissionReviewService {
       refsOf(item),
       expectedParticipants(item),
     );
+  }
+
+  /**
+   * CDM approve gate (S-8): when the acting desk is CDM and outside equipment
+   * is listed, every item needs a stored allowed/not-allowed decision first.
+   */
+  private async assertOutsideEquipmentDecided(
+    item: Item,
+    bareDesk: string,
+  ): Promise<void> {
+    const listed = outsideEquipmentNames(item);
+    if (listed.length === 0) {
+      return;
+    }
+    const acting = await this.signatories.get(bareDesk);
+    if (!acting || str(acting, 'role') !== 'cdm') {
+      return;
+    }
+    const decided = new Set(
+      list(item, 'outside_equipment_decisions')
+        .map((entry) => record(entry))
+        .filter((entry): entry is Item => entry !== null)
+        .flatMap((entry) => {
+          const name = str(entry, 'name');
+          return name ? [name] : [];
+        }),
+    );
+    const undecided = listed.filter((name) => !decided.has(name));
+    if (undecided.length > 0) {
+      abort(
+        422,
+        `Record an allowed/not-allowed decision for every outside equipment item before approving: ${undecided.join(', ')}.`,
+      );
+    }
   }
 
   private async requireOpen(
@@ -394,6 +500,20 @@ function activityType(item: Item): string {
 
 function hasReservation(item: Item): boolean {
   return record(item.venue_reservation)?.has_reservation === true;
+}
+
+function outsideEquipmentNames(item: Item): string[] {
+  const venue = record(item.venue_reservation);
+  if (!venue) {
+    return [];
+  }
+  return list(venue, 'outside_equipment')
+    .map((entry) => record(entry))
+    .filter((entry): entry is Item => entry !== null)
+    .flatMap((entry) => {
+      const name = str(entry, 'name');
+      return name ? [name] : [];
+    });
 }
 
 function reservationCampusIds(item: Item): string[] {

@@ -1,11 +1,19 @@
 // ─── Activity domain types ────────────────────────────────────────────────────
 
+import type { OutsideEquipmentItem } from "@/lib/types"
+
 export type ActivityDecision = "Review" | "Return" | "Reject"
 export type ActivityPriority = "High" | "Medium" | "Low"
 
 export interface Proponent {
   role: string
   name: string
+  /** Proponent email address (S-7 reviewer visibility). */
+  email?: string
+  /** Campus the proponent is from (stored campus_id; S-7). */
+  campus?: string
+  /** Officer-chosen department code (S-7). */
+  department?: string
 }
 
 export interface Objective {
@@ -17,6 +25,12 @@ export interface EquipmentItem {
   name: string
   purpose?: string
   remark?: string
+}
+
+/** S-8 CDM ruling for one outside-equipment item. */
+export interface OutsideEquipmentDecision {
+  name: string
+  allowed: boolean
 }
 
 export interface RoomRequestedItem {
@@ -64,6 +78,8 @@ export interface Activity {
   decision: ActivityDecision
   type: string
   nature?: "major" | "minor" | string
+  /** S-2 proponent-chosen nature of activity; distinct from the OSAAR major/minor nature. */
+  natureOfActivity?: string[]
   status?:
     | "Review"
     | "Returned"
@@ -102,6 +118,10 @@ export interface Activity {
   budgetGrandTotal?: number
   /** RA 10173 consent of record; absent on papers filed before the consent gate. */
   privacyConsent?: { version: string; acceptedAt: string }
+  /** S-8 outside equipment (not from Mapua) the student declared. */
+  outsideEquipment?: OutsideEquipmentItem[]
+  /** S-8 CDM per-item rulings on the outside equipment. */
+  outsideEquipmentDecisions?: OutsideEquipmentDecision[]
 }
 
 export type StatusVariant = "success" | "warning" | "error" | "outline"

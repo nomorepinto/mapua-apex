@@ -19,6 +19,11 @@ import {
 } from "@/hooks/use-campuses"
 import { campusNameError } from "@/components/admin/campuses/campus-name"
 import {
+  departmentsToDrafts,
+  resolveDepartments,
+  type CampusDepartmentDraft,
+} from "@/components/admin/campuses/campus-departments-editor"
+import {
   MAX_PREFIXES,
   isValidPrefixToken,
   parsePrefixTokens,
@@ -80,6 +85,7 @@ interface CampusesState {
   formError: string
   prefixesText: string
   digitsText: string
+  departments: CampusDepartmentDraft[]
   csvFileName: string
   csvError: string
   csvRowCount: number
@@ -100,6 +106,7 @@ interface CampusesState {
   editName: string
   editPrefixesText: string
   editDigitsText: string
+  editDepartments: CampusDepartmentDraft[]
   editMain: boolean
   offerEditMain: boolean
   editError: string
@@ -112,6 +119,7 @@ interface CampusesActions {
   changeName: (value: string) => void
   changePrefixes: (value: string) => void
   changeDigits: (value: string) => void
+  changeDepartments: (value: CampusDepartmentDraft[]) => void
   setMain: (value: boolean) => void
   handleAddOne: (event: FormEvent<HTMLFormElement>) => Promise<void>
   chooseCsv: (file: File | null, text: string) => void
@@ -122,6 +130,7 @@ interface CampusesActions {
   changeEditName: (value: string) => void
   changeEditPrefixes: (value: string) => void
   changeEditDigits: (value: string) => void
+  changeEditDepartments: (value: CampusDepartmentDraft[]) => void
   setEditMain: (value: boolean) => void
   handleEditSave: (event: FormEvent<HTMLFormElement>) => Promise<void>
   setDeleteOpen: (open: boolean) => void
@@ -155,6 +164,7 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
   const [formError, setFormError] = useState("")
   const [prefixesText, setPrefixesText] = useState("")
   const [digitsText, setDigitsText] = useState("")
+  const [departments, setDepartments] = useState<CampusDepartmentDraft[]>([])
   const [main, setMain] = useState(false)
   const [mainTouched, setMainTouched] = useState(false)
   const [csvNames, setCsvNames] = useState<string[]>([])
@@ -165,6 +175,7 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
   const [editName, setEditName] = useState("")
   const [editPrefixesText, setEditPrefixesText] = useState("")
   const [editDigitsText, setEditDigitsText] = useState("")
+  const [editDepartments, setEditDepartments] = useState<CampusDepartmentDraft[]>([])
   const [editMain, setEditMain] = useState(false)
   const [editError, setEditError] = useState("")
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -222,6 +233,7 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
     setEditName(campus.name)
     setEditPrefixesText((campus.classroom_name_prefixes ?? []).join(", "))
     setEditDigitsText(campus.classroom_name_digits != null ? String(campus.classroom_name_digits) : "")
+    setEditDepartments(departmentsToDrafts(campus.departments))
     setEditMain(campus.main === true)
     setEditError("")
   }
@@ -246,15 +258,25 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
       return
     }
 
+    const resolvedDepartments = resolveDepartments(departments)
+    if (resolvedDepartments.error) {
+      setFormError(resolvedDepartments.error)
+      return
+    }
+
     try {
       await createCampus.mutateAsync({
         name: trimmed,
         ...(offerMain ? { main: mainChecked } : {}),
         ...format.payload,
+        ...(resolvedDepartments.departments.length > 0
+          ? { departments: resolvedDepartments.departments }
+          : {}),
       })
       setName("")
       setPrefixesText("")
       setDigitsText("")
+      setDepartments([])
       setMain(false)
       setMainTouched(false)
       setFormError("")
@@ -326,6 +348,12 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
       return
     }
 
+    const resolvedDepartments = resolveDepartments(editDepartments)
+    if (resolvedDepartments.error) {
+      setEditError(resolvedDepartments.error)
+      return
+    }
+
     try {
       const canEditMain = editing.main === true || !hasMain
       await updateCampus.mutateAsync({
@@ -333,6 +361,7 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
         name: trimmed,
         ...(canEditMain ? { main: editMain } : {}),
         ...format.payload,
+        departments: resolvedDepartments.departments,
       })
       setEditing(null)
       toastManager.add({
@@ -383,6 +412,7 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
       formError,
       prefixesText,
       digitsText,
+      departments,
       csvFileName,
       csvError,
       csvRowCount: csvNames.length,
@@ -403,6 +433,7 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
       editName,
       editPrefixesText,
       editDigitsText,
+      editDepartments,
       editMain,
       offerEditMain: editing !== null && (editing.main === true || !hasMain),
       editError,
@@ -421,6 +452,10 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
       },
       changeDigits: (next) => {
         setDigitsText(next)
+        if (formError) setFormError("")
+      },
+      changeDepartments: (next) => {
+        setDepartments(next)
         if (formError) setFormError("")
       },
       setMain: (next) => {
@@ -459,6 +494,10 @@ export function CampusesProvider({ children }: { children: ReactNode }) {
       },
       changeEditDigits: (next) => {
         setEditDigitsText(next)
+        if (editError) setEditError("")
+      },
+      changeEditDepartments: (next) => {
+        setEditDepartments(next)
         if (editError) setEditError("")
       },
       setEditMain,

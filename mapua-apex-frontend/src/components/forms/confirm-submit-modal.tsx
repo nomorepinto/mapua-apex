@@ -20,6 +20,7 @@ export function ConfirmSubmitModal({
   description,
   isSubmitting = false,
   consent,
+  terms,
   onClose,
   onConfirm,
 }: {
@@ -40,10 +41,29 @@ export function ConfirmSubmitModal({
     onChange: (checked: boolean) => void
     disabled?: boolean
   }
+  /**
+   * Optional Terms & Conditions gate (S-1). Renders the T&C `content` plus one
+   * checkbox per acknowledgement item; Proceed stays disabled until EVERY item
+   * is ticked (or while `disabled`, e.g. the notice is still loading).
+   */
+  terms?: {
+    content: ReactNode
+    items: Array<{
+      label: string
+      checked: boolean
+      onChange: (checked: boolean) => void
+    }>
+    disabled?: boolean
+  }
   onClose: () => void
   onConfirm: () => void
 }) {
   const blockedByConsent = consent !== undefined && !consent.checked
+  const blockedByTerms =
+    terms !== undefined &&
+    (Boolean(terms.disabled) ||
+      terms.items.length === 0 ||
+      terms.items.some((item) => !item.checked))
   return (
     <Dialog
       open={open}
@@ -80,6 +100,25 @@ export function ConfirmSubmitModal({
               </label>
             </div>
           ) : null}
+          {terms ? (
+            <div className="space-y-3 text-left">
+              {terms.content}
+              {terms.items.map((item, index) => (
+                <label
+                  key={index}
+                  className="flex items-start gap-2 text-sm leading-snug text-neutral-700"
+                >
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={item.checked}
+                    disabled={terms.disabled}
+                    onCheckedChange={(checked) => item.onChange(Boolean(checked))}
+                  />
+                  <span>{item.label}</span>
+                </label>
+              ))}
+            </div>
+          ) : null}
         </DialogPanel>
 
         <DialogFooter className={cn(layout.actions, "justify-center border-t border-neutral-100 p-4 sm:p-6")}>
@@ -92,7 +131,7 @@ export function ConfirmSubmitModal({
           <Button
             type="button"
             onClick={onConfirm}
-            disabled={isSubmitting || blockedByConsent}
+            disabled={isSubmitting || blockedByConsent || blockedByTerms}
             className="min-h-11 rounded-xl bg-[#8B0000] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#6B0000] sm:w-40"
           >
             {isSubmitting ? "Submitting..." : "Proceed"}

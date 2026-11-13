@@ -9,6 +9,7 @@ import {
   sanitizeCampusName,
 } from "@/components/admin/campuses/campus-name"
 import { CAMPUS_CSV_TEMPLATE } from "@/components/admin/campuses/campus-options"
+import { CampusDepartmentsEditor } from "@/components/admin/campuses/campus-departments-editor"
 import { useCampusesPage } from "@/components/admin/campuses/campuses-context"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -165,6 +166,11 @@ function AddCampusForm() {
               </p>
             ) : null}
           </div>
+          <CampusDepartmentsEditor
+            idPrefix="add-campus"
+            onChange={actions.changeDepartments}
+            value={state.departments}
+          />
         </CardPanel>
         <CardFooter className="justify-end">
           <Button

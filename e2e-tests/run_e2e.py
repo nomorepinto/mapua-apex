@@ -285,14 +285,6 @@ def run(args: argparse.Namespace) -> int:
             code = browser_code
         else:
             report.add(Step("playwright", "pass", "browser journeys finished"))
-        report.add(
-            Step(
-                "finished paper badge",
-                "gap",
-                "The API stores finished. The student badge maps that status to Pending.",
-                gap=True,
-            )
-        )
     except SystemExit as exit_error:
         code = int(exit_error.code or 1)
     finally:

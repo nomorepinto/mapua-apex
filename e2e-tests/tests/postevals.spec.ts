@@ -30,7 +30,7 @@ test("council events are not offered for a post-evaluation", async ({ browser })
   }
 })
 
-test("OSAAR approves P2 and the student badge stays pending", async ({ browser }) => {
+test("OSAAR approves P2 and the student badge shows Completed", async ({ browser }) => {
   const paper = readRun().papers.P2
   const org = await openApex(browser, "orgA")
   try {
@@ -49,7 +49,7 @@ test("OSAAR approves P2 and the student badge stays pending", async ({ browser }
   }
   const student = await openApex(browser, "orgA")
   try {
-    await new DashboardPage(student.page).expectBadge(paper.title, "Pending")
+    await new DashboardPage(student.page).expectBadge(paper.title, "Completed")
   } finally {
     await student.close()
   }

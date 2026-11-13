@@ -5,7 +5,7 @@ import { ReservableCapacityFieldsForm } from "@/components/admin/reservables/res
 import { participantBoundPayload, participantBoundsFromValues, stripCapacityForType, validateParticipantBounds, type ParticipantBound } from "@/lib/reservable-capacity-form"
 import { ReservableClassroomField } from "@/components/admin/reservables/reservable-classroom-field"
 import { campusHasClassroomFormat, classroomFormatHint, matchesClassroomName } from "@/lib/campus-classroom-format"
-import { ReservableTypeField } from "@/components/admin/reservables/reservables-fields"
+import { RoomEquipmentEditor } from "@/components/admin/reservables/room-equipment-editor"
 import { ScheduleGrid } from "@/components/admin/reservables/schedule-grid"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -39,7 +39,7 @@ import {
   toggleScheduleDay,
   toggleScheduleSlot,
 } from "@/lib/schedule-slots"
-import type { ApiCampus, ApiReservable, ReservableSchedule, ReservableType } from "@/lib/types"
+import type { ApiCampus, ApiReservable, ApiRoomEquipment, ReservableSchedule, ReservableType } from "@/lib/types"
 
 export interface ReservableDraft {
   name: string
@@ -50,6 +50,8 @@ export interface ReservableDraft {
   is_classroom: boolean
   /** Equipment-only; null = unlimited. */
   max_quantity: number | null
+  /** Room-specific equipment (S-8); rooms only, empty for campus equipment. */
+  room_equipment: ApiRoomEquipment[]
 }
 
 /**
@@ -85,7 +87,8 @@ export function EditReservableDialog({
   // effect (and its cascading render) is needed.
   const [name, setName] = useState(reservable.name)
   const nameGibberish = useGibberishField(name)
-  const [type, setType] = useState<ReservableType>(reservable.type)
+  // S-8: the type is fixed per reservable; it cannot be changed in the edit dialog.
+  const type = reservable.type
   const [schedule, setSchedule] = useState<ReservableSchedule>(() =>
     normalizeSchedule(reservable.schedule)
   )
@@ -98,6 +101,10 @@ export function EditReservableDialog({
     reservable.type === "equipment" && reservable.max_quantity != null
       ? String(reservable.max_quantity)
       : ""
+  )
+  // Room-specific equipment (S-8); seeded from the stored room property.
+  const [roomEquipment, setRoomEquipment] = useState<ApiRoomEquipment[]>(
+    () => reservable.room_equipment ?? []
   )
   const [localError, setLocalError] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -153,6 +160,12 @@ export function EditReservableDialog({
       ...participantBoundPayload(stripCapacityForType(type, bounds)),
       is_classroom: classroom,
       max_quantity: type === "equipment" && maxQuantity !== "" ? parseInt(maxQuantity, 10) : null,
+      room_equipment:
+        type === "room"
+          ? roomEquipment
+              .map((row) => ({ name: row.name.trim(), quantity: row.quantity ?? null }))
+              .filter((row) => row.name.length > 0)
+          : [],
     })
   }
 
@@ -193,18 +206,30 @@ export function EditReservableDialog({
                 />
                 {nameGibberish.indicator}
               </Field>
-              <ReservableTypeField
-                id="edit-reservable-type"
+              {/* S-9: the classroom decision comes before the capacity/name-format fields. */}
+              <ReservableClassroomField
+                checked={isClassroom}
+                disabled={savePending}
+                formatHint={classroomHint}
+                hasCampusFormat={hasClassroomFormat}
+                id="edit-reservable-classroom"
                 onChange={(next) => {
-                  setType(next)
-                  setBounds((current) => stripCapacityForType(next, current))
-                  if (next !== "room") setIsClassroom(false)
-                  if (next !== "equipment") setMaxQuantity("")
+                  setIsClassroom(next)
                   if (localError) setLocalError("")
                 }}
-                value={type}
+                type={type}
               />
-              {type === "equipment" && (
+              <ReservableCapacityFieldsForm
+                bounds={bounds}
+                disabled={savePending}
+                idPrefix="edit-reservable"
+                onChange={(next) => {
+                  setBounds(next)
+                  if (localError) setLocalError("")
+                }}
+                type={type}
+              />
+              {type === "equipment" ? (
                 <Field>
                   <FieldLabel htmlFor="edit-reservable-max-quantity">Max Quantity <span className="text-muted-foreground font-normal">(optional)</span></FieldLabel>
                   <Input
@@ -219,29 +244,14 @@ export function EditReservableDialog({
                     value={maxQuantity}
                   />
                 </Field>
+              ) : (
+                <RoomEquipmentEditor
+                  disabled={savePending}
+                  idPrefix="edit-reservable"
+                  onChange={setRoomEquipment}
+                  value={roomEquipment}
+                />
               )}
-              <ReservableCapacityFieldsForm
-                bounds={bounds}
-                disabled={savePending}
-                idPrefix="edit-reservable"
-                onChange={(next) => {
-                  setBounds(next)
-                  if (localError) setLocalError("")
-                }}
-                type={type}
-              />
-              <ReservableClassroomField
-                checked={isClassroom}
-                disabled={savePending}
-                formatHint={classroomHint}
-                hasCampusFormat={hasClassroomFormat}
-                id="edit-reservable-classroom"
-                onChange={(next) => {
-                  setIsClassroom(next)
-                  if (localError) setLocalError("")
-                }}
-                type={type}
-              />
               <div className="flex flex-col gap-2">
                 <span className="inline-flex items-center gap-2 text-base/4.5 font-medium text-foreground sm:text-sm/4">Weekly availability</span>
                 <ScheduleGrid

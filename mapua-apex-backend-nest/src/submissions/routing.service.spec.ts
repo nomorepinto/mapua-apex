@@ -133,6 +133,28 @@ describe('RoutingService', () => {
     });
   });
 
+  it('skips CDM when there is no reservation (off-campus, S-5)', async () => {
+    cdmId = 'cdm-1';
+    try {
+      const steps = await routing.sequenceFor(
+        'society',
+        [],
+        'extra-curricular',
+        false,
+        undefined,
+        'intramuros',
+      );
+      expect(steps.map((step) => step.role)).not.toContain('cdm');
+      expect(steps.map((step) => step.key)).toEqual([
+        'adviser:ORG#society',
+        'osaar_1',
+        'osaar_all',
+      ]);
+    } finally {
+      cdmId = null;
+    }
+  });
+
   it('appends the campus OSAARs, then the all-campus OSAAR, before CDM', async () => {
     const added: Item = {
       PK: 'SIGNATORY#osaar-2',

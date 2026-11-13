@@ -16,7 +16,6 @@ import { useCurrentOrganizationQuery } from "@/hooks/use-submissions"
 import {
   createEmptyProponent,
   DEFAULT_SAAF_DRAFT,
-  getDepartmentItem,
   MAX_PROPONENTS,
   ONLINE_VENUE,
 } from "@/components/submission/constants"
@@ -92,8 +91,14 @@ export function useSaafForm() {
   const eventName = useOrgStore((state) => state.eventName)
   const draftProponents = useMemo(() => {
     const list = saafDraft?.proponents ?? DEFAULT_SAAF_DRAFT.proponents
+    // Collapse only the pristine placeholder the clear-step flow seeds
+    // (createEmptyProponent("1")) so a fresh People step shows the empty state.
+    // A blank card the user just added via "Add Proponent Manually" has a
+    // Date.now()/officer id and must render — collapsing it made that button
+    // look dead.
     if (
       list.length === 1 &&
+      list[0].id === "1" &&
       !list[0].firstName &&
       !list[0].lastName &&
       !list[0].studentNumber &&
@@ -125,12 +130,6 @@ export function useSaafForm() {
 
   const currentOrgQuery = useCurrentOrganizationQuery()
   const organizationName = currentOrgQuery.data?.name || ""
-  const organizationDepartment =
-    getDepartmentItem(currentOrgQuery.data?.department)?.code || ""
-  // An organization that skips the dean has no dean department to stamp.
-  const choosesDepartment =
-    currentOrgQuery.data?.skip_dean === true &&
-    organizationDepartment === ""
 
   // Ensure submission date is always locked to today's date upon opening.
   // Read the store at effect time: a render-closed list is stale once hydration
@@ -163,36 +162,6 @@ export function useSaafForm() {
       })),
     })
   }, [organizationName, draft.proponents])
-
-  // A proponent's department is controlled by the dean assigned to the
-  // organization. Stamp every row with that department, including restored
-  // drafts and newly added proponents. Once the lookup settles, an unconfigured
-  // organization is deliberately stamped blank so required-field validation
-  // prevents submission. An organization that skips the dean chooses a
-  // department on the form instead of receiving a stamp.
-  useEffect(() => {
-    if (currentOrgQuery.isPending || choosesDepartment) return
-    const current = useOrgStore.getState().saafDraft
-    const proponents = current?.proponents
-    if (!proponents?.length) return
-
-    const departmentValues = Object.fromEntries(
-      proponents.map((proponent) => [proponent.id, organizationDepartment])
-    )
-    const unchanged = proponents.every(
-      (proponent) => current?.departmentValues[proponent.id] === organizationDepartment
-    )
-
-    if (!unchanged) {
-      useOrgStore.getState().patchSaafDraft({ departmentValues })
-    }
-  }, [
-    choosesDepartment,
-    currentOrgQuery.isPending,
-    draft.departmentValues,
-    draft.proponents,
-    organizationDepartment,
-  ])
 
   // Reset drafts on successful submission
   useEffect(() => {
@@ -246,18 +215,15 @@ export function useSaafForm() {
     if (!newProponent.dateOfSubmission) {
       newProponent.dateOfSubmission = today
     }
-    if (organizationDepartment) {
-      newProponent.department = organizationDepartment
-    }
 
     useOrgStore.getState().patchSaafDraft({
       proponents: [...existing, newProponent],
       departmentValues: {
         ...current.departmentValues,
-        [newProponent.id]: organizationDepartment || newProponent.department,
+        [newProponent.id]: newProponent.department,
       },
     })
-  }, [organizationDepartment])
+  }, [])
 
   const handleRemoveProponent = useCallback((id: string) => {
     const current = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
@@ -284,17 +250,17 @@ export function useSaafForm() {
     []
   )
 
-  const handleAddBudgetItem = useCallback(() => {
+  const handleAddBudgetItem = useCallback((preset?: Partial<BudgetItem>) => {
     const current = useOrgStore.getState().saafDraft ?? DEFAULT_SAAF_DRAFT
     useOrgStore.getState().patchSaafDraft({
       budgetItems: [
         ...current.budgetItems,
         {
           id: String(Date.now()),
-          item: "",
-          unit: "",
-          quantity: "",
-          pricePerUnit: "",
+          item: preset?.item ?? "",
+          unit: preset?.unit ?? "",
+          quantity: preset?.quantity ?? "",
+          pricePerUnit: preset?.pricePerUnit ?? "",
         },
       ],
     })

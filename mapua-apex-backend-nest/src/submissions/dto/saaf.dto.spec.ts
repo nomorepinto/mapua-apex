@@ -3,6 +3,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacy-notice.js';
+import { TERMS_NOTICE_VERSION } from '../../terms/terms-notice.js';
 import { SaafDto } from './saaf.dto.js';
 
 /** Minimal SAAF body; each test overrides the budget section it cares about. */
@@ -340,6 +341,212 @@ describe('SaafDto privacy consent validation', () => {
     validateSync(instance, { whitelist: true });
     const consent = instance.privacy_consent as unknown as Item;
     expect(consent.version).toBe(PRIVACY_NOTICE_VERSION);
+    expect(consent.accepted).toBe(true);
+  });
+});
+
+/** Validates an arbitrary body patch merged over the minimal SAAF body. */
+function bodyIssues(patch: Item): string[] {
+  const instance = plainToInstance(
+    SaafDto,
+    { ...bodyWith({ has_budget: false }), ...patch },
+    { exposeUnsetFields: false },
+  );
+  const found: string[] = [];
+  const walk = (
+    errors: ReturnType<typeof validateSync>,
+    path: string,
+  ): void => {
+    for (const error of errors) {
+      const key = path ? `${path}.${error.property}` : error.property;
+      if (error.constraints)
+        found.push(`${key}: ${JSON.stringify(error.constraints)}`);
+      if (error.children?.length) walk(error.children, key);
+    }
+  };
+  walk(validateSync(instance, { whitelist: true }), '');
+  return found;
+}
+
+describe('SaafDto new SAAF fields (S-2/S-5/S-6/S-7/S-8)', () => {
+  it('accepts the nature-of-activity multi-select (S-2)', () => {
+    expect(
+      bodyIssues({
+        activity_classification: {
+          activity_type: 'co-curricular',
+          total_org_members: 10,
+          nature_of_activity: ['Selling activity', 'Fundraising/charity'],
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it('rejects non-string nature-of-activity entries', () => {
+    expect(
+      bodyIssues({
+        activity_classification: {
+          activity_type: 'co-curricular',
+          total_org_members: 10,
+          nature_of_activity: [42],
+        },
+      }).join('\n'),
+    ).toContain('activity_classification.nature_of_activity');
+  });
+
+  it('accepts both campus locations (S-5)', () => {
+    for (const campus_location of ['on-campus', 'off-campus']) {
+      expect(
+        bodyIssues({
+          activity_details: {
+            ...bodyWith({ has_budget: false }).activity_details,
+            campus_location,
+          },
+        }),
+      ).toEqual([]);
+    }
+  });
+
+  it('rejects an unknown campus location', () => {
+    expect(
+      bodyIssues({
+        activity_details: {
+          ...bodyWith({ has_budget: false }).activity_details,
+          campus_location: 'hybrid',
+        },
+      }).join('\n'),
+    ).toContain('activity_details.campus_location');
+  });
+
+  it('accepts the participant split and keeps the total (S-6)', () => {
+    expect(
+      bodyIssues({
+        activity_details: {
+          ...bodyWith({ has_budget: false }).activity_details,
+          mapua_participants: 80,
+          non_mapua_participants: 20,
+          has_non_mapua: true,
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it('rejects non-numeric participant counts', () => {
+    expect(
+      bodyIssues({
+        activity_details: {
+          ...bodyWith({ has_budget: false }).activity_details,
+          mapua_participants: 'many',
+        },
+      }).join('\n'),
+    ).toContain('activity_details.mapua_participants');
+  });
+
+  it('accepts a proponent campus (S-7)', () => {
+    const body = bodyWith({ has_budget: false });
+    const proponents = (body.proponents as Item[]).map((proponent) => ({
+      ...proponent,
+      campus: 'campus-intramuros',
+    }));
+    expect(bodyIssues({ proponents })).toEqual([]);
+  });
+
+  it('accepts outside equipment and room equipment picks (S-8)', () => {
+    expect(
+      bodyIssues({
+        venue_reservation: {
+          has_reservation: true,
+          outside_equipment: [
+            { name: 'Sound system', purpose: 'Program audio' },
+            { name: 'Smoke machine' },
+          ],
+          reservations: [
+            {
+              reservable_id: 'room-n101',
+              campus_id: 'campus-intramuros',
+              type: 'room',
+              selections: [{ date: '2026-10-01', slots: [0, 1] }],
+              remarks: 'General assembly',
+              room_equipment: [{ name: 'Projector', quantity: 1 }],
+            },
+          ],
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it('rejects an outside equipment item without a name', () => {
+    expect(
+      bodyIssues({
+        venue_reservation: {
+          has_reservation: true,
+          outside_equipment: [{ purpose: 'No name given' }],
+        },
+      }).join('\n'),
+    ).toContain('venue_reservation.outside_equipment');
+  });
+
+  it('rejects a room equipment pick with a zero quantity', () => {
+    expect(
+      bodyIssues({
+        venue_reservation: {
+          has_reservation: true,
+          reservations: [
+            {
+              reservable_id: 'room-n101',
+              campus_id: 'campus-intramuros',
+              type: 'room',
+              selections: [{ date: '2026-10-01', slots: [0, 1] }],
+              remarks: 'General assembly',
+              room_equipment: [{ name: 'Projector', quantity: 0 }],
+            },
+          ],
+        },
+      }).join('\n'),
+    ).toContain('room_equipment');
+  });
+});
+
+describe('SaafDto terms consent validation (S-1)', () => {
+  it('accepts the current terms version with accepted true', () => {
+    expect(
+      bodyIssues({
+        terms_consent: { version: TERMS_NOTICE_VERSION, accepted: true },
+      }),
+    ).toEqual([]);
+  });
+
+  it('leaves terms consent optional at the DTO boundary for the admin PUT', () => {
+    expect(bodyIssues({})).toEqual([]);
+  });
+
+  it('rejects a stale terms version', () => {
+    expect(
+      bodyIssues({
+        terms_consent: { version: '0.9-old', accepted: true },
+      }).join('\n'),
+    ).toContain('terms_consent.version');
+  });
+
+  it('rejects an unaccepted terms consent', () => {
+    expect(
+      bodyIssues({
+        terms_consent: { version: TERMS_NOTICE_VERSION, accepted: false },
+      }).join('\n'),
+    ).toContain('terms_consent.accepted');
+  });
+
+  it('keeps the terms consent through the whitelist used by the global pipe', () => {
+    const instance = plainToInstance(
+      SaafDto,
+      {
+        ...bodyWith({ has_budget: false }),
+        terms_consent: { version: TERMS_NOTICE_VERSION, accepted: true },
+      },
+      { exposeUnsetFields: false },
+    );
+    validateSync(instance, { whitelist: true });
+    const consent = instance.terms_consent as unknown as Item;
+    expect(consent.version).toBe(TERMS_NOTICE_VERSION);
     expect(consent.accepted).toBe(true);
   });
 });

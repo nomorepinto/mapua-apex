@@ -40,12 +40,19 @@ export interface ActivityRowProps {
    * (Review/Return/Reject, default) or the processed `status` outcome.
    */
   statusField?: "decision" | "status"
+  /**
+   * R-1: the acting desk's verb. When set, the positive `decision` badge reads
+   * "APPROVED" for a campus OSAAR ("Approve") or "REVIEWED" for every other desk
+   * ("Review"). Omitted = legacy "Review" label. Stored decision values are unchanged.
+   */
+  decisionVerb?: "Approve" | "Review"
 }
 
 const ActivityRow = memo(function ActivityRow({
   activity,
   onSelect,
   statusField = "decision",
+  decisionVerb,
 }: ActivityRowProps) {
   const handleClick = useCallback(
     () => onSelect(activity),
@@ -60,6 +67,13 @@ const ActivityRow = memo(function ActivityRow({
     },
     [handleClick]
   )
+
+  const reviewDecisionLabel =
+    decisionVerb === "Approve"
+      ? "APPROVED"
+      : decisionVerb === "Review"
+        ? "REVIEWED"
+        : "Review"
 
   return (
     <TableRow
@@ -126,7 +140,7 @@ const ActivityRow = memo(function ActivityRow({
           <StatusBadge status={activity.status} />
         ) : activity.decision === "Review" ? (
           <span className="inline-flex items-center rounded-lg px-3 py-1 text-xs font-semibold text-neutral-800 transition-colors group-hover:text-black hover:bg-neutral-200/60">
-            Review
+            {reviewDecisionLabel}
           </span>
         ) : activity.decision === "Return" ? (
           <span className="inline-flex items-center rounded-md border border-amber-200/80 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">

@@ -17,11 +17,15 @@ import {
   eventDateFloorKey,
 } from '../common/event-date.js';
 import { abort } from '../common/http.js';
-import { record, str, type Item } from '../common/records.js';
+import { bool, record, str, type Item } from '../common/records.js';
 import {
   PRIVACY_NOTICE_VERSION,
   privacyNoticeHash,
 } from '../privacy/privacy-notice.js';
+import {
+  TERMS_NOTICE_VERSION,
+  termsNoticeHash,
+} from '../terms/terms-notice.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import { TermSettingsService } from '../term-settings/term-settings.service.js';
 import { assertTermDateAllowed } from '../term-settings/term-window.js';
@@ -32,7 +36,11 @@ import {
   RoutingService,
   type SignatoryStep,
 } from './routing.service.js';
-import { SubmissionRepository } from './submission.repository.js';
+import {
+  SubmissionRepository,
+  notificationItem,
+} from './submission.repository.js';
+import { SignatoryRepository } from '../signatories/signatory.repository.js';
 
 @Injectable()
 export class SubmissionWriterService {
@@ -42,11 +50,13 @@ export class SubmissionWriterService {
     private readonly bookings: BookingService,
     private readonly config: AppConfigService,
     private readonly terms: TermSettingsService,
+    private readonly signatories: SignatoryRepository,
   ) {}
 
   async create(organizationId: string, body: CreateSaafDto): Promise<Item> {
     await this.assertDates(body);
     this.assertConsent(body);
+    this.assertTerms(body);
     const dependents = await this.resolveDependents(
       organizationId,
       body.collaboration?.dependent_organization_ids ?? [],
@@ -90,6 +100,7 @@ export class SubmissionWriterService {
     item.document_number =
       await this.submissions.allocateDocumentNumber(sentAt);
     item.privacy_consent = this.consentRecord(sentAt);
+    item.terms_consent = this.termsConsentRecord(sentAt);
     await this.submissions.putSubmission(item, 'attribute_not_exists(SK)');
     await this.bookings.commit(planned);
     for (const dependent of dependents) {
@@ -100,6 +111,7 @@ export class SubmissionWriterService {
         sentAt,
       );
     }
+    await this.notifyCampusOsaars(submissionId, sentAt, body);
     return item;
   }
 
@@ -111,6 +123,7 @@ export class SubmissionWriterService {
   ): Promise<{ before: Item; after: Item }> {
     await this.assertDates(body);
     this.assertConsent(body);
+    this.assertTerms(body);
     const event = await this.submissions.getEvent(eventId);
     if (
       !event ||
@@ -188,6 +201,7 @@ export class SubmissionWriterService {
     // A student resubmit overwrites the stored consent with this fresh
     // acceptance; `replaceEditable` SETs it because it is not a protected field.
     item.privacy_consent = this.consentRecord(sentAt);
+    item.terms_consent = this.termsConsentRecord(sentAt);
     const updated = await this.submissions.replaceEditable(existing, item);
     await this.bookings.releaseRefs(previousRefs);
     await this.bookings.commit(planned);
@@ -403,6 +417,58 @@ export class SubmissionWriterService {
       notice_hash: privacyNoticeHash(),
       channel: 'web',
     };
+  }
+
+  /**
+   * Student create/resubmit must also carry an accepted, current SAAF T&C
+   * consent (S-1), parallel to the RA 10173 guard above.
+   */
+  private assertTerms(body: SaafDto): void {
+    const consent = body.terms_consent;
+    if (
+      !consent ||
+      consent.version !== TERMS_NOTICE_VERSION ||
+      consent.accepted !== true
+    ) {
+      abort(422, 'Please review and accept the current terms and conditions.');
+    }
+  }
+
+  /** T&C consent of record: the accepted version, when, hash, and channel. */
+  private termsConsentRecord(sentAt: string): Item {
+    return {
+      version: TERMS_NOTICE_VERSION,
+      accepted_at: sentAt,
+      notice_hash: termsNoticeHash(),
+      channel: 'web',
+    };
+  }
+
+  /**
+   * Heads-up broadcast (S-5): on submit, notify every campus-scoped OSAAR
+   * (role osaar, not all-campus) across all campuses about the new event.
+   * This is separate from the approval-chain routing.
+   */
+  private async notifyCampusOsaars(
+    submissionId: string,
+    sentAt: string,
+    body: CreateSaafDto,
+  ): Promise<void> {
+    const people = await this.signatories.listByRole('osaar');
+    const title = body.activity_details.title_and_nature;
+    const comment = `New activity submitted: "${title}". This is a heads-up for all campus OSAARs; please review the event.`;
+    for (const person of people) {
+      if (str(person, 'role') !== 'osaar' || bool(person, 'all_campuses')) {
+        continue;
+      }
+      const id = stripPrefix(person.PK, 'SIGNATORY#');
+      if (!id) {
+        continue;
+      }
+      await this.submissions.putNotification(
+        notificationItem(submissionId, id, 'event submitted', comment, sentAt),
+      );
+    }
   }
 
   private async assertDates(body: SaafDto): Promise<void> {

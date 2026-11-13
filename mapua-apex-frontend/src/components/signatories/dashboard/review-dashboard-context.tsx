@@ -14,6 +14,7 @@ type ReviewDashboardActionName =
   | "handleModalClose"
   | "handleModalAction"
   | "handleClassificationChange"
+  | "handleOutsideEquipmentChange"
 
 export interface ReviewDashboardContextValue {
   state: Omit<ReviewDashboardModel, ReviewDashboardActionName>
@@ -60,7 +61,10 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
         isAdviser: dashboard.isAdviser,
         isDean: dashboard.isDean,
         isCampusDesk: dashboard.isCampusDesk,
+        isCampusOsaar: dashboard.isCampusOsaar,
+        isAllCampusOsaar: dashboard.isAllCampusOsaar,
         isUpdatingClassification: dashboard.isUpdatingClassification,
+        isUpdatingOutsideEquipment: dashboard.isUpdatingOutsideEquipment,
         isReadOnly: dashboard.isReadOnly,
         bookingConflicts: dashboard.bookingConflicts,
         isCheckingBookingConflicts: dashboard.isCheckingBookingConflicts,
@@ -74,6 +78,7 @@ export function ReviewDashboardProvider({ children }: { children: ReactNode }) {
         handleModalClose: dashboard.handleModalClose,
         handleModalAction: dashboard.handleModalAction,
         handleClassificationChange: dashboard.handleClassificationChange,
+        handleOutsideEquipmentChange: dashboard.handleOutsideEquipmentChange,
       },
     }),
     [dashboard]

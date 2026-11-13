@@ -8,23 +8,26 @@ export class ReservablesPage {
 
   async addRoom(campus: string, name: string, min: string, max: string, classroom: boolean) {
     await this.page.goto("/cdm/reservables/add")
+    // S-8: the combined form is split into two tabs, each fixing its type.
+    await this.page.getByRole("tab", { name: "Add Room" }).click()
     await choose(this.page, this.page.getByLabel("Campus"), campus)
     await this.page.getByLabel("Name").fill(name)
+    // S-9: the classroom decision precedes the capacity fields.
+    if (classroom) await this.page.getByRole("checkbox", { name: "This room is a classroom" }).check()
     await this.page.getByLabel("Minimum participants").fill(min)
     await this.page.getByLabel("Maximum participants").fill(max)
-    if (classroom) await this.page.getByRole("checkbox", { name: "This room is a classroom" }).check()
-    await this.page.getByRole("button", { name: "Add reservable" }).click()
-    await expect(this.page.getByRole("dialog", { name: "Reservable added" }).first()).toBeVisible()
+    await this.page.getByRole("button", { name: "Add room" }).click()
+    await expect(this.page.getByRole("dialog", { name: "Room added" }).first()).toBeVisible()
   }
 
   async addEquipment(campus: string, name: string, quantity: string) {
     await this.page.goto("/cdm/reservables/add")
+    await this.page.getByRole("tab", { name: "Add Campus Equipment" }).click()
     await choose(this.page, this.page.getByLabel("Campus"), campus)
     await this.page.getByLabel("Name").fill(name)
-    await this.page.getByRole("group", { name: "Reservable type" }).getByRole("button", { name: "Equipment" }).click()
     await this.page.getByLabel(/Max Quantity/).fill(quantity)
-    await this.page.getByRole("button", { name: "Add reservable" }).click()
-    await expect(this.page.getByRole("dialog", { name: "Reservable added" }).first()).toBeVisible()
+    await this.page.getByRole("button", { name: "Add campus equipment" }).click()
+    await expect(this.page.getByRole("dialog", { name: "Campus equipment added" }).first()).toBeVisible()
   }
 
   async expectListed(campus: string, name: string) {

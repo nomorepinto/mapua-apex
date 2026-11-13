@@ -20,6 +20,7 @@ import {
   useSignatorySubmissionDetailQuery,
   useSubmissionBookingConflictsQuery,
   useUpdateEventClassificationMutation,
+  useUpdateOutsideEquipmentMutation,
 } from "@/hooks/use-signatory"
 import {
   apiSubmissionToActivity,
@@ -38,12 +39,20 @@ export function useReviewDashboard() {
   const isDean = role?.toLowerCase() === "dean"
   /** Roles that see the full system-wide picture on their desk */
   const isCampusDesk = isOsaar || isCdm
+  /**
+   * R-1: only a campus-scoped OSAAR "Approves"; every other desk "Reviews".
+   * Major/minor classification is exclusive to the all-campus OSAAR.
+   */
+  const allCampuses = meQuery.data?.all_campuses === true
+  const isCampusOsaar = isOsaar && !allCampuses
+  const isAllCampusOsaar = isOsaar && allCampuses
   const queueQuery = useSignatoryQueueQuery()
   const historyQuery = useSignatoryHistoryQuery()
   const approveMutation = useApproveSubmissionMutation()
   const returnMutation = useReturnSubmissionMutation()
   const denyMutation = useDenySubmissionMutation()
   const updateClassificationMutation = useUpdateEventClassificationMutation()
+  const updateOutsideEquipmentMutation = useUpdateOutsideEquipmentMutation()
 
   const [selectedDept, setSelectedDept] = useState<string | null>(null)
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null)
@@ -213,6 +222,36 @@ export function useReviewDashboard() {
     [activeActivity?.nature, activeKeys, updateClassificationMutation]
   )
 
+  const handleOutsideEquipmentChange = useCallback(
+    async (decision: { name: string; allowed: boolean }) => {
+      if (!activeKeys) return
+      setActionError(null)
+      const existing = activeActivity?.outsideEquipmentDecisions ?? []
+      const decisions = [
+        ...existing.filter((entry) => entry.name !== decision.name),
+        decision,
+      ]
+      try {
+        await updateOutsideEquipmentMutation.mutateAsync({
+          eventId: activeKeys.eventId,
+          submissionId: activeKeys.submissionId,
+          decisions,
+        })
+      } catch (error) {
+        setActionError(
+          error instanceof Error
+            ? error.message
+            : "Could not update outside equipment decisions."
+        )
+      }
+    },
+    [
+      activeActivity?.outsideEquipmentDecisions,
+      activeKeys,
+      updateOutsideEquipmentMutation,
+    ]
+  )
+
   const stats = useMemo(
     () => computeReviewStats(activitiesList),
     [activitiesList]
@@ -295,6 +334,8 @@ export function useReviewDashboard() {
     isAdviser,
     isDean,
     isCampusDesk,
+    isCampusOsaar,
+    isAllCampusOsaar,
     stats,
     departments,
     departmentOrgMap,
@@ -318,6 +359,7 @@ export function useReviewDashboard() {
       returnMutation.isPending ||
       denyMutation.isPending,
     isUpdatingClassification: updateClassificationMutation.isPending,
+    isUpdatingOutsideEquipment: updateOutsideEquipmentMutation.isPending,
     isReadOnly,
     /** CDM only: slots the open paper's holds collide with (empty when approvable). */
     bookingConflicts:
@@ -332,5 +374,6 @@ export function useReviewDashboard() {
     handleModalClose,
     handleModalAction,
     handleClassificationChange,
+    handleOutsideEquipmentChange,
   }
 }

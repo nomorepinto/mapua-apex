@@ -90,6 +90,9 @@ test("admin builds the campus, desks, organizations, and account links", async (
         setup.addSignatory(people[key], "OSAAR", undefined, campus),
       )
     }
+    // Seed data may already own the singleton "All campuses" OSAAR slot, which
+    // the add form then hides; release it so our all-campus desk can take it.
+    await setup.releaseAllCampuses()
     await captureJson(page, "/admins/signatories", "POST", () => setup.addSignatory(people.osaarAll, "OSAAR"))
     if (!preexisting) {
       await captureJson(page, "/admins/signatories", "POST", () => setup.addSignatory(people.cdm1, "CDM"))

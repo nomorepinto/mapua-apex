@@ -226,6 +226,8 @@ function proponentWarnings(
       `Mobile number must be ${MOBILE_NUMBER_LENGTH} digits.`
   }
 
+  if (isBlank(proponent.campus)) warnings[key("campus")] = REQUIRED
+
   if (isBlank(department)) warnings[key("department")] = REQUIRED
 
   if (isBlank(proponent.emailAddress)) {
@@ -337,6 +339,21 @@ export function saafFieldWarnings(
   } else if (Number(draft.expectedParticipants) > 3000) {
     warnings.expectedParticipants = "Cannot exceed 3000 participants."
   }
+  // S-6 participant split: the Mapua count is always required; the non-Mapua
+  // count only while the switch is ON. expectedParticipants stays the total.
+  if (isBlank(draft.mapuaParticipants)) {
+    warnings.mapuaParticipants = REQUIRED
+  } else if (Number(draft.mapuaParticipants) < 1) {
+    warnings.mapuaParticipants = "Must be at least 1 participant."
+  }
+  if (draft.includeNonMapua) {
+    if (isBlank(draft.nonMapuaParticipants)) {
+      warnings.nonMapuaParticipants = REQUIRED
+    } else if (Number(draft.nonMapuaParticipants) < 1) {
+      warnings.nonMapuaParticipants =
+        "Must be at least 1 non-Mapuan participant."
+    }
+  }
   // The money fields only exist for an activity that operates with a budget.
   if (includeBudget) {
     if (isBlank(draft.individualContribution)) {
@@ -380,6 +397,8 @@ export const STEP_PREFIXES_WITH_RESERVATION: Record<SaafStepIndex, string[]> = {
     "endDateOfEvent",
     "timeOfEvent",
     "expectedParticipants",
+    "mapuaParticipants",
+    "nonMapuaParticipants",
   ],
   3: [
     "activityTitle",
@@ -409,6 +428,8 @@ export const STEP_PREFIXES_NO_RESERVATION: Record<SaafStepIndex, string[]> = {
     "endDateOfEvent",
     "timeOfEvent",
     "expectedParticipants",
+    "mapuaParticipants",
+    "nonMapuaParticipants",
     "individualContribution",
     "proposedBudget",
   ],
@@ -433,6 +454,8 @@ const WARNING_KEY_LABELS: Record<string, string> = {
   endDateOfEvent: "End date of event",
   timeOfEvent: "Time of event",
   expectedParticipants: "Expected participants",
+  mapuaParticipants: "Mapuan participants",
+  nonMapuaParticipants: "Non-Mapuan participants",
   individualContribution: "Individual contribution",
   proposedBudget: "Proposed budget",
   budgetNote: "Budget note",
@@ -449,6 +472,7 @@ const PROPONENT_FIELD_LABELS: Record<string, string> = {
   duplicateFullName: "Full name",
   studentNumber: "Student number",
   programAndYear: "Program / year level",
+  campus: "Campus",
   department: "Department",
   positionOfApplicant: "Position of the applicant",
   orgOrCourseSection: "Name of organization",
@@ -526,7 +550,7 @@ export function isSaafDraftComplete(
 }
 
 const RESERVATION_EMPTY_MESSAGE =
-  "Select at least one room or equipment to reserve."
+  "Select at least one room or equipment to reserve, or list outside equipment."
 
 function expectedParticipantsValue(
   expectedParticipants?: string | number | null
@@ -546,10 +570,16 @@ export function getReservationStepIssue(
   expectedParticipants?: string | number | null
 ): string | null {
   const picks = Array.isArray(draft?.picks) ? draft.picks : []
+  const outside = Array.isArray(draft?.outsideEquipment)
+    ? draft.outsideEquipment
+    : []
   if (isBlank(campus)) {
     return "Select a campus for the facility reservation."
   }
-  if (picks.length === 0) return RESERVATION_EMPTY_MESSAGE
+  // S-10: an outside-equipment-only paper (no room/equipment picks) is valid.
+  if (picks.length === 0 && outside.length === 0) {
+    return RESERVATION_EMPTY_MESSAGE
+  }
 
   const missingSelection = picks.find((pick) => pick.selections.length === 0)
   if (missingSelection) {
@@ -658,6 +688,17 @@ export function getReservationStepIssue(
       if (minRequired !== null && headcount < minRequired) {
         return `Expected participants (${headcount}) is below the minimum capacity (${minRequired}).`
       }
+    }
+  }
+
+  // S-8 outside equipment: every row needs a name, and the student must
+  // acknowledge the CDM-approval declaration before the step is complete.
+  if (outside.length > 0) {
+    if (outside.some((item) => isBlank(item.name))) {
+      return "Add a name for each outside equipment item."
+    }
+    if (!draft.outsideEquipmentAcknowledged) {
+      return "Acknowledge the outside equipment declaration to continue."
     }
   }
 

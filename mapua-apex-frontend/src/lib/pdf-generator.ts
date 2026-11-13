@@ -1,6 +1,11 @@
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
+import {
+  SAAF_FILING_WINDOW_TEXT,
+  SAAF_TAT_TEXT,
+} from "@/components/submission/constants"
+
 export interface SAAFPdfData {
   documentCode?: string
   activityType?: string
@@ -104,8 +109,14 @@ export function generateProposalPdf(
     14,
     25
   )
+  // S-4: printed turnaround time and filing window (text only, not enforced).
+  doc.text(
+    `Turnaround time: ${SAAF_TAT_TEXT} • Filing window: ${SAAF_FILING_WINDOW_TEXT} (3:00 PM cutoff)`,
+    14,
+    30
+  )
 
-  let y = 32
+  let y = 37
 
   // Classification Table
   autoTable(doc, {

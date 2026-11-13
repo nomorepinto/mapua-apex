@@ -10,6 +10,7 @@ import {
 
 import { slotStatus } from "@/components/admin/reservables/schedule-grid"
 import { FieldWarning } from "@/components/forms/field-warning"
+import { ParticipantFields } from "@/components/submission/participant-fields"
 import { useReservationFormContext } from "@/components/students/reservations/reservation-context"
 import { RoomSuggestions } from "@/components/students/reservations/room-suggestions"
 import { useSaafFormContext } from "@/components/students/saaf/saaf-context"
@@ -30,7 +31,6 @@ import { checkGibberish, isFlaggedGibberish } from "@/hooks/use-gibberish-check"
 import { useStudentRoomsAvailabilityQuery } from "@/hooks/use-availability"
 import { useStudentCampusesQuery } from "@/hooks/use-campuses"
 import { useStudentReservablesQuery } from "@/hooks/use-reservables"
-import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
 import {
   addDays,
   eventDateFloor,
@@ -52,7 +52,13 @@ import {
 } from "@/lib/schedule-slots"
 import { formatMinutesOfDay } from "@/lib/time-format"
 import { capacityRangeLabel } from "@/lib/reservable-capacity"
-import type { ApiAvailability, ApiReservable, SlotSelection } from "@/lib/types"
+import type {
+  ApiAvailability,
+  ApiReservable,
+  ApiRoomEquipment,
+  OutsideEquipmentItem,
+  SlotSelection,
+} from "@/lib/types"
 import type { ReservationPick } from "@/components/reservation/types"
 import { cn } from "@/lib/utils"
 
@@ -490,40 +496,11 @@ export function ReservationFields() {
             <FieldWarning name="activityVenue" />
           </div>
 
-          <div className="w-full space-y-1.5 sm:w-1/2">
-            <label className="block text-xs font-semibold text-neutral-800">
-              Number of Expected Participants <span className="text-red-500">*</span>
-            </label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              name="expectedParticipants"
-              placeholder="0"
-              maxLength={4}
-              value={saafDraft.expectedParticipants}
-              onKeyDown={(e) => {
-                const target = e.currentTarget
-                if (e.key === "0" && (target.value === "" || target.selectionStart === 0)) {
-                  e.preventDefault()
-                  return
-                }
-                blockNonIntegerKeys(e)
-              }}
-              onChange={(e) =>
-                saafActions.updateField(
-                  "expectedParticipants",
-                  sanitizeIntegerInput(e.target.value).replace(/^0+/, "").slice(0, 4)
-                )
-              }
-              style={{ color: "#171717" }}
-              className="no-spinner h-9.5 rounded-lg border-neutral-300 bg-white !text-neutral-900 placeholder:text-neutral-400"
-              required
+          <div className="w-full sm:w-1/2">
+            <ParticipantFields
+              values={saafDraft}
+              onChange={saafActions.updateField}
             />
-            <span className="block text-[10px] text-neutral-500">
-              Between 20 and 3,000 participants
-            </span>
-            <FieldWarning name="expectedParticipants" />
           </div>
         </div>
 
@@ -956,10 +933,21 @@ export function ReservationFields() {
           onUpdateRemarks={actions.handleUpdateRemarks}
           onUpdateQuantity={actions.handleUpdateEquipmentQuantity}
           onRemove={actions.handleRemovePick}
+          onSetRoomEquipment={actions.handleSetRoomEquipment}
           picks={picks}
           rooms={roomPicks}
         />
       </div>
+
+      {/* S-8 outside equipment (not from Mapua) — independent of room reservations. */}
+      <OutsideEquipmentSection
+        items={draft.outsideEquipment}
+        acknowledged={draft.outsideEquipmentAcknowledged}
+        onAdd={actions.handleAddOutsideEquipment}
+        onUpdate={actions.handleUpdateOutsideEquipment}
+        onRemove={actions.handleRemoveOutsideEquipment}
+        onAcknowledge={actions.handleSetOutsideAcknowledged}
+      />
 
       {/* Derived Event Schedule Summary */}
       <EventScheduleSummary
@@ -1168,6 +1156,7 @@ function EquipmentSelector({
   onUpdateRemarks,
   onUpdateQuantity,
   onRemove,
+  onSetRoomEquipment,
 }: {
   picks: ReservationPick[]
   campusId: string
@@ -1176,6 +1165,7 @@ function EquipmentSelector({
   onUpdateRemarks: (pickId: string, remarks: string) => void
   onUpdateQuantity: (pickId: string, quantity: number) => void
   onRemove: (pickId: string) => void
+  onSetRoomEquipment: (pickId: string, equipment: ApiRoomEquipment[]) => void
 }) {
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>("")
   const [equipmentRemark, setEquipmentRemark] = useState<string>("")
@@ -1184,6 +1174,17 @@ function EquipmentSelector({
 
   const reservablesQuery = useStudentReservablesQuery(campusId || null)
   const equipment = (reservablesQuery.data ?? []).filter((r) => r.type === "equipment")
+  // S-8 room-specific equipment: each selected room's catalog lives on the room
+  // reservable; the student's picks are stored on the room pick's room_equipment.
+  const roomReservables = (reservablesQuery.data ?? []).filter((r) => r.type === "room")
+  const roomsWithEquipment = rooms
+    .map((room) => ({
+      room,
+      catalog:
+        roomReservables.find((r) => r.reservable_id === room.reservable_id)
+          ?.room_equipment ?? [],
+    }))
+    .filter((entry) => entry.catalog.length > 0)
 
   const equipmentPicks = picks.filter((p) => p.type === "equipment")
   const pickedEquipmentIds = new Set(equipmentPicks.map((p) => p.reservable_id))
@@ -1252,6 +1253,10 @@ function EquipmentSelector({
         </p>
       ) : isCollapsed ? null : (
         <div className="space-y-4">
+          {/* Campus Equipment: standalone gear owned by the campus (S-8). */}
+          <span className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wide">
+            Campus Equipment
+          </span>
           {/* List of requested equipment */}
           {equipmentPicks.length === 0 ? (
             <p className="text-xs text-neutral-400 italic py-1">
@@ -1499,7 +1504,177 @@ function EquipmentSelector({
               </div>
             )}
           </div>
+
+          {/* Room-specific equipment (S-8): aggregated from the selected rooms. */}
+          <div className="pt-3 border-t border-neutral-100 space-y-3">
+            <span className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wide">
+              Room-specific equipment
+            </span>
+            {roomsWithEquipment.length === 0 ? (
+              <p className="text-xs text-neutral-400">
+                The selected rooms have no room-specific equipment listed.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {roomsWithEquipment.map(({ room, catalog }) => (
+                  <div key={room.id} className="space-y-1.5">
+                    <p className="text-xs font-semibold text-neutral-800">{room.name}</p>
+                    {catalog.map((item) => {
+                      const selected = (room.room_equipment ?? []).find(
+                        (e) => e.name === item.name
+                      )
+                      const checked = Boolean(selected)
+                      const qty = selected?.quantity ?? item.quantity ?? 1
+                      return (
+                        <div
+                          key={item.name}
+                          className="flex items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50/70 px-2.5 py-1.5"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(c) => {
+                              const current = room.room_equipment ?? []
+                              const next = Boolean(c)
+                                ? [
+                                    ...current.filter((e) => e.name !== item.name),
+                                    { name: item.name, quantity: item.quantity ?? 1 },
+                                  ]
+                                : current.filter((e) => e.name !== item.name)
+                              onSetRoomEquipment(room.id, next)
+                            }}
+                            className="size-4 rounded border-neutral-300 data-checked:bg-[#8B0000] data-checked:border-[#8B0000] text-white cursor-pointer"
+                          />
+                          <span className="text-xs text-neutral-800 flex-1">{item.name}</span>
+                          {checked && (
+                            <Input
+                              type="number"
+                              min={1}
+                              value={qty}
+                              onChange={(e) => {
+                                const parsed = parseInt(e.currentTarget.value, 10)
+                                const nextQty = Number.isFinite(parsed) && parsed >= 1 ? parsed : 1
+                                const next = (room.room_equipment ?? []).map((eq) =>
+                                  eq.name === item.name ? { ...eq, quantity: nextQty } : eq
+                                )
+                                onSetRoomEquipment(room.id, next)
+                              }}
+                              className="h-7 w-16 text-center text-xs bg-white rounded-md border-neutral-300"
+                              aria-label={`Quantity for ${item.name}`}
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * S-8 outside equipment (not from Mapua): a free-list of name + purpose rows the
+ * student declares, plus an acknowledgement that CDM must rule on each item.
+ * Independent of room reservations — an event may bring only outside equipment.
+ */
+function OutsideEquipmentSection({
+  items,
+  acknowledged,
+  onAdd,
+  onUpdate,
+  onRemove,
+  onAcknowledge,
+}: {
+  items: OutsideEquipmentItem[]
+  acknowledged: boolean
+  onAdd: () => void
+  onUpdate: (index: number, field: "name" | "purpose", value: string) => void
+  onRemove: (index: number) => void
+  onAcknowledge: (checked: boolean) => void
+}) {
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-xs space-y-4">
+      <div className="flex items-center gap-2 border-b border-neutral-100 pb-2.5">
+        <BoxesIcon className="size-4 text-neutral-700" />
+        <h3 className="text-xs font-semibold text-neutral-800 uppercase tracking-wide">
+          Outside equipment (not from Mapua)
+        </h3>
+        {items.length > 0 && (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            {items.length} item{items.length === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+
+      <p className="text-xs text-neutral-500">
+        List any equipment you will bring from outside Mapua. CDM must approve each
+        item before the event is approved.
+      </p>
+
+      {items.length === 0 ? (
+        <p className="text-xs text-neutral-400 italic">No outside equipment declared.</p>
+      ) : (
+        <div className="space-y-2.5">
+          {items.map((item, index) => (
+            <div key={index} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                type="text"
+                maxLength={255}
+                value={item.name}
+                onChange={(e) => onUpdate(index, "name", e.currentTarget.value)}
+                placeholder="Equipment name *"
+                aria-label={`Outside equipment ${index + 1} name`}
+                className="h-9 text-xs bg-white rounded-md border-neutral-300 sm:flex-1"
+              />
+              <Input
+                type="text"
+                maxLength={500}
+                value={item.purpose ?? ""}
+                onChange={(e) => onUpdate(index, "purpose", e.currentTarget.value)}
+                placeholder="Purpose (optional)"
+                aria-label={`Outside equipment ${index + 1} purpose`}
+                className="h-9 text-xs bg-white rounded-md border-neutral-300 sm:flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => onRemove(index)}
+                className="text-neutral-400 hover:text-red-600 p-1 rounded transition-colors cursor-pointer shrink-0 self-end sm:self-center"
+                aria-label={`Remove outside equipment ${index + 1}`}
+              >
+                <Trash2Icon className="size-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={onAdd}
+        className="h-9 text-xs cursor-pointer"
+      >
+        <PlusIcon className="size-3.5 mr-1" />
+        Add outside equipment
+      </Button>
+
+      {items.length > 0 && (
+        <label className="flex items-start gap-2 cursor-pointer select-none rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5">
+          <Checkbox
+            checked={acknowledged}
+            onCheckedChange={(checked) => onAcknowledge(Boolean(checked))}
+            className="size-4 mt-0.5 rounded border-neutral-300 data-checked:bg-[#8B0000] data-checked:border-[#8B0000] text-white cursor-pointer"
+          />
+          <span className="text-xs text-neutral-700">
+            I acknowledge that the outside equipment listed above is subject to CDM
+            review and may not be allowed.
+          </span>
+        </label>
       )}
     </div>
   )

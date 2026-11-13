@@ -13,6 +13,7 @@ import { useOrgStore } from "@/stores/org-store"
 
 interface SubmissionsStartState {
   eventName: string
+  campusLocation: "on-campus" | "off-campus" | ""
   reserveFacilities: "yes" | "no" | ""
   withBudget: "yes" | "no" | ""
   fundingSources: string[]
@@ -22,6 +23,7 @@ interface SubmissionsStartState {
 
 interface SubmissionsStartActions {
   changeEventName: (value: string) => void
+  changeCampusLocation: (value: "on-campus" | "off-campus" | "") => void
   changeReserveFacilities: (value: "yes" | "no" | "") => void
   changeWithBudget: (value: "yes" | "no" | "") => void
   changeFundingSources: (value: string[]) => void
@@ -50,10 +52,14 @@ export function useSubmissionsStart() {
 export function SubmissionsStartProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const savedName = useOrgStore((state) => state.eventName)
+  const savedCampusLocation = useOrgStore((state) => state.campusLocation)
   const savedChoice = useOrgStore((state) => state.reserveFacilities)
   const savedBudget = useOrgStore((state) => state.withBudget)
   const savedSources = useOrgStore((state) => state.fundingSources)
   const [eventName, setEventName] = useState(savedName)
+  const [campusLocation, setCampusLocation] = useState<
+    "on-campus" | "off-campus" | ""
+  >(savedCampusLocation ?? "")
   const [reserveFacilities, setReserveFacilities] = useState<"yes" | "no" | "">(
     savedChoice ?? ""
   )
@@ -69,6 +75,7 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
   const value: SubmissionsStartContextValue = {
     state: {
       eventName,
+      campusLocation,
       reserveFacilities,
       withBudget,
       fundingSources,
@@ -78,6 +85,14 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
     actions: {
       changeEventName: (next) => {
         setEventName(next)
+        setError(null)
+      },
+      changeCampusLocation: (next) => {
+        setCampusLocation(next)
+        // S-5: an off-campus event cannot reserve school facilities or bring
+        // outside equipment, so force the facilities answer to "no" (the Select
+        // is greyed out). Switching back to on-campus re-enables the choice.
+        if (next === "off-campus") setReserveFacilities("no")
         setError(null)
       },
       changeReserveFacilities: (next) => {
@@ -111,8 +126,14 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
           setError("Event name cannot exceed 60 characters.")
           return
         }
+        if (campusLocation !== "on-campus" && campusLocation !== "off-campus") {
+          setError("Choose whether the event is on-campus or off-campus.")
+          return
+        }
         if (reserveFacilities !== "yes" && reserveFacilities !== "no") {
-          setError("Choose whether you will reserve school facilities.")
+          setError(
+            "Choose whether you will reserve school facilities or bring outside equipment."
+          )
           return
         }
         if (withBudget !== "yes" && withBudget !== "no") {
@@ -131,7 +152,7 @@ export function SubmissionsStartProvider({ children }: { children: ReactNode }) 
           useOrgStore.getState().clearSaafDraft()
           useOrgStore.getState().clearReservationDraft()
         }
-        useOrgStore.getState().setSubmissionStart(name, reserveFacilities, withBudget, fundingSources)
+        useOrgStore.getState().setSubmissionStart(name, reserveFacilities, withBudget, fundingSources, campusLocation)
         useOrgStore.getState().setSaafDraft({
           ...DEFAULT_SAAF_DRAFT,
           ...(wasEditing ? {} : (existingDraft ?? {})),

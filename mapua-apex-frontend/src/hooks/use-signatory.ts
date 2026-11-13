@@ -234,3 +234,46 @@ export function useUpdateEventClassificationMutation() {
     },
   })
 }
+
+/**
+ * Record the CDM desk's per-item allowed / not-allowed rulings on a paper's
+ * outside equipment (S-8). Only the CDM desk may call this; the backend rejects
+ * any other role. Mirrors the classification mutation's cache handling.
+ */
+export function useUpdateOutsideEquipmentMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      eventId,
+      submissionId,
+      decisions,
+    }: {
+      eventId: string
+      submissionId: string
+      decisions: Array<{ name: string; allowed: boolean }>
+    }) => {
+      const res = await apiClient.patch<{ data: ApiSubmission }>(
+        `/signatories/events/${eventId}/submissions/${submissionId}/outside-equipment`,
+        { decisions }
+      )
+      return res.data
+    },
+    onSuccess: (data, variables) => {
+      if (data) {
+        queryClient.setQueryData(
+          SIGNATORY_KEYS.detail(variables.eventId, variables.submissionId),
+          data
+        )
+      }
+      queryClient.invalidateQueries({ queryKey: SIGNATORY_KEYS.queue })
+      queryClient.invalidateQueries({
+        queryKey: SIGNATORY_KEYS.detail(
+          variables.eventId,
+          variables.submissionId
+        ),
+      })
+      queryClient.invalidateQueries({ queryKey: SUBMISSION_KEYS.all })
+    },
+  })
+}

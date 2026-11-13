@@ -25,6 +25,11 @@ export interface SubmissionTableSectionProps {
   activities: Activity[]
   /** Which field backs the trailing column — see `useActivityTableFilters`. */
   statusField: ActivityStatusField
+  /**
+   * R-1: the acting desk's verb, forwarded to each row's decision badge
+   * ("APPROVED" for a campus OSAAR, "REVIEWED" for every other desk).
+   */
+  decisionVerb?: "Approve" | "Review"
   /** Header label of the trailing column ("Decision", "Current outcome", ...). */
   statusLabel: string
   /** Accessible name of the search box; also an e2e locator — keep stable. */
@@ -57,6 +62,7 @@ export function SubmissionTableSection({
   description,
   activities,
   statusField,
+  decisionVerb,
   statusLabel,
   searchLabel,
   searchPlaceholder = "Search all columns",
@@ -176,6 +182,7 @@ export function SubmissionTableSection({
                   activity={activity}
                   onSelect={onSelect}
                   statusField={statusField}
+                  decisionVerb={decisionVerb}
                 />
               ))
             )}

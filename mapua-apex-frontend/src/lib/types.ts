@@ -136,6 +136,19 @@ export interface SlotSelection {
   slots: number[]
 }
 
+/** A course/program offered under a campus department (C-1 master data). */
+export interface ApiCampusCourse {
+  code: string
+  name: string
+}
+
+/** A department belonging to a campus, with its courses (C-1 master data). */
+export interface ApiCampusDepartment {
+  code: string
+  name: string
+  courses?: ApiCampusCourse[]
+}
+
 export interface ApiCampus {
   campus_id: string
   name: string
@@ -147,6 +160,8 @@ export interface ApiCampus {
   classroom_name_digits?: number | null
   /** Pre-formatted naming note from the API (e.g. "MPO / NW / N followed by exactly 3 digits"). */
   classroom_name_hint?: string | null
+  /** Departments (each with courses) offered at this campus (C-1). */
+  departments?: ApiCampusDepartment[]
 }
 
 /** Participant bounds carried on a pick so the SAAF step can enforce them offline. */
@@ -154,6 +169,18 @@ export interface ReservableCapacityFields {
   /** Room-only participant bounds; null when unstated (equipment is always null). */
   min_participants?: number | null
   max_participants?: number | null
+}
+
+/** A piece of equipment stored on a room reservable (S-8); rooms only. */
+export interface ApiRoomEquipment {
+  name: string
+  quantity?: number | null
+}
+
+/** S-8 outside equipment (not from Mapua) declared on the reservation step. */
+export interface OutsideEquipmentItem {
+  name: string
+  purpose?: string
 }
 
 export interface ApiReservable extends ReservableCapacityFields {
@@ -168,6 +195,8 @@ export interface ApiReservable extends ReservableCapacityFields {
   is_classroom?: boolean
   /** Equipment-only; null = unlimited. */
   max_quantity?: number | null
+  /** Room-specific equipment stored on the room (S-8); rooms only. */
+  room_equipment?: ApiRoomEquipment[]
 }
 
 /** Per-date availability for one reservable, as returned by the availability endpoint. */
@@ -240,11 +269,15 @@ export interface VenueReservationPick extends ReservableCapacityFields {
   type: ReservableType
   selections: SlotSelection[]
   remarks?: string
+  /** Room-only: the room-specific equipment selected for this room (S-8). */
+  room_equipment?: ApiRoomEquipment[]
 }
 
 export interface VenueReservation {
   has_reservation: boolean
   reservations: VenueReservationPick[]
+  /** S-8 outside equipment (not from Mapua) the student declared. */
+  outside_equipment?: OutsideEquipmentItem[]
 }
 
 export type CreateCampusPayload = {
@@ -252,6 +285,7 @@ export type CreateCampusPayload = {
   main?: boolean
   classroom_name_prefixes?: string[]
   classroom_name_digits?: number | null
+  departments?: ApiCampusDepartment[]
 }
 
 export type CreateReservablePayload = ReservableCapacityFields & {
@@ -261,6 +295,8 @@ export type CreateReservablePayload = ReservableCapacityFields & {
   is_classroom?: boolean
   /** Equipment-only; null = unlimited. */
   max_quantity?: number | null
+  /** Room-specific equipment (S-8); rooms only. */
+  room_equipment?: ApiRoomEquipment[]
 }
 
 export type CreateBookingPayload = {

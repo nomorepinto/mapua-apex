@@ -16,6 +16,7 @@ import {
   toReservable,
   type ReservableView,
   type ReservableWrite,
+  type RoomEquipmentItem,
 } from './reservable.repository.js';
 import { DAYS, normalizeSchedule, SLOT_COUNT } from './schedule.js';
 
@@ -139,7 +140,35 @@ export class ReservableService {
       isClassroom: classroom,
       maxQuantity:
         body.type === 'equipment' ? (body.max_quantity ?? null) : null,
+      roomEquipment: this.roomEquipment(body),
     };
+  }
+
+  /** Room-specific equipment (S-8): rooms only, each item needs a name. */
+  private roomEquipment(body: ReservableDto): RoomEquipmentItem[] {
+    const input = body.room_equipment ?? [];
+    if (body.type !== 'room' && input.length > 0) {
+      throw new UnprocessableEntityException({
+        message: 'room_equipment only applies to rooms, not equipment.',
+        errors: {
+          room_equipment: ['room_equipment only applies to rooms, not equipment.'],
+        },
+      });
+    }
+    const result: RoomEquipmentItem[] = [];
+    for (const entry of input) {
+      const name = entry.name.trim();
+      if (!name) {
+        throw new UnprocessableEntityException({
+          message: 'Each room equipment item needs a name.',
+          errors: {
+            room_equipment: ['Each room equipment item needs a name.'],
+          },
+        });
+      }
+      result.push({ name, quantity: entry.quantity ?? null });
+    }
+    return result;
   }
 
   private assertSchedule(schedule: Record<string, boolean[]>): void {

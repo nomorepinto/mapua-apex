@@ -8,11 +8,13 @@ import type { ReservationDraft } from "@/components/reservation/types"
 export const DEFAULT_RESERVATION_DRAFT: ReservationDraft = {
   campusId: "",
   picks: [],
+  outsideEquipment: [],
+  outsideEquipmentAcknowledged: false,
 }
 
-/** True once the proponent has picked at least one reservable. */
+/** True once the proponent has picked a reservable or declared outside equipment. */
 export function reservationHasUserInput(draft: ReservationDraft): boolean {
-  return draft.picks.length > 0
+  return draft.picks.length > 0 || (draft.outsideEquipment?.length ?? 0) > 0
 }
 
 /**
@@ -31,7 +33,21 @@ export function withReservationDefaults(
           ...pick,
           selections: Array.isArray(pick.selections) ? pick.selections : [],
           remarks: pick.remarks ?? "",
+          ...(pick.type === "room"
+            ? {
+                room_equipment: Array.isArray(pick.room_equipment)
+                  ? pick.room_equipment
+                  : [],
+              }
+            : {}),
         }))
       : [],
+    outsideEquipment: Array.isArray(stored?.outsideEquipment)
+      ? stored.outsideEquipment.map((item) => ({
+          name: item.name ?? "",
+          purpose: item.purpose ?? "",
+        }))
+      : [],
+    outsideEquipmentAcknowledged: Boolean(stored?.outsideEquipmentAcknowledged),
   }
 }

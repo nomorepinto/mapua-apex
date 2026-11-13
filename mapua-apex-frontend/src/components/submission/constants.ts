@@ -592,6 +592,16 @@ export const SUFFIX_OPTIONS = [
   { value: "IV", label: "IV" },
 ] as const
 
+/** S-2 nature-of-activity choices; distinct from the OSAAR-assigned major/minor nature. */
+export const ACTIVITY_NATURE_OPTIONS = [
+  "Selling activity",
+  "Fundraising/charity",
+] as const
+
+/** S-4 printed turnaround time and filing window (text only, not code-enforced). */
+export const SAAF_TAT_TEXT = "2-3 working days"
+export const SAAF_FILING_WINDOW_TEXT = "7:00 AM - 3:00 PM"
+
 export const MISSION_STATEMENTS = [
   {
     key: "mission1",
@@ -639,6 +649,7 @@ export function createEmptyProponent(id: string): Proponent {
     studentNumber: "",
     programAndYear: "",
     dateOfSubmission: new Date().toISOString().split("T")[0],
+    campus: "",
     department: "",
     positionOfApplicant: "",
     orgOrCourseSection: "",
@@ -665,6 +676,7 @@ export function saafStepHasUserInput(
     case 0:
       return (
         draft.activityType !== DEFAULT_SAAF_DRAFT.activityType ||
+        draft.activityNature.length > 0 ||
         filled(draft.totalOrgMembers)
       )
     case 1: {
@@ -681,6 +693,7 @@ export function saafStepHasUserInput(
         proponent.suffix,
         proponent.studentNumber,
         proponent.programAndYear,
+        proponent.campus,
         proponent.department,
         proponent.positionOfApplicant,
         proponent.contactNumber,
@@ -689,6 +702,7 @@ export function saafStepHasUserInput(
       ].some(filled)
     }
     case 2:
+      if (draft.includeNonMapua) return true
       return [
         draft.activityTitle,
         draft.activityDescription,
@@ -706,6 +720,7 @@ export function saafStepHasUserInput(
         draft.timeOfEventEndMinute,
         draft.timeOfEventEndPeriod,
         draft.expectedParticipants,
+        draft.mapuaParticipants,
         draft.individualContribution,
         draft.proposedBudget,
         draft.dayOfEvent,
@@ -746,6 +761,7 @@ export function getClearedFieldsForSaafStep(
     case 0:
       return {
         activityType: DEFAULT_SAAF_DRAFT.activityType,
+        activityNature: [],
         totalOrgMembers: DEFAULT_SAAF_DRAFT.totalOrgMembers,
       }
     case 1:
@@ -772,6 +788,9 @@ export function getClearedFieldsForSaafStep(
         timeOfEventEndMinute: "",
         timeOfEventEndPeriod: "",
         expectedParticipants: "",
+        includeNonMapua: false,
+        mapuaParticipants: "",
+        nonMapuaParticipants: "",
         individualContribution: "",
         proposedBudget: "",
         dayOfEvent: "",
@@ -794,8 +813,12 @@ export function getClearedFieldsForSaafStep(
 
 export const DEFAULT_SAAF_DRAFT: SaafDraft = {
   activityType: "co-curricular",
+  activityNature: [],
   totalOrgMembers: "",
   expectedParticipants: "",
+  includeNonMapua: false,
+  mapuaParticipants: "",
+  nonMapuaParticipants: "",
   individualContribution: "",
   proposedBudget: "",
   dayOfEvent: "",

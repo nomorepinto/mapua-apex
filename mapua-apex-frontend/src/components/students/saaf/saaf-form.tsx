@@ -3,6 +3,10 @@ import { useEffect, useRef, type ReactNode } from "react"
 import { FieldWarnings } from "@/components/forms/field-warning"
 import { FormPageHeader } from "@/components/forms/form-page-header"
 import {
+  SAAF_FILING_WINDOW_TEXT,
+  SAAF_TAT_TEXT,
+} from "@/components/submission/constants"
+import {
   SaafStepper,
   type WizardStepIndex,
 } from "@/components/submission/saaf-stepper"
@@ -75,8 +79,8 @@ export function SaafHeader() {
       title="Student Activity Application Form"
       subtitle={
         state.draft.activityTitle
-          ? `${state.draft.activityTitle} · Academic Term 2026–2027`
-          : "Academic Term: 2026 - 2027 • Unified Activity Proposal Application"
+          ? `${state.draft.activityTitle} · Academic Term 2026–2027 · TAT: ${SAAF_TAT_TEXT} · Filing: ${SAAF_FILING_WINDOW_TEXT}`
+          : `Academic Term: 2026 - 2027 • Unified Activity Proposal Application • TAT: ${SAAF_TAT_TEXT} • Filing window: ${SAAF_FILING_WINDOW_TEXT}`
       }
     />
   )

@@ -110,6 +110,10 @@ export function CampusesTableCard() {
                           {campus.main ? (
                             <Badge variant="outline">Main campus</Badge>
                           ) : null}
+                          <span className="text-xs text-muted-foreground">
+                            {(campus.departments ?? []).length} department
+                            {(campus.departments ?? []).length === 1 ? "" : "s"}
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

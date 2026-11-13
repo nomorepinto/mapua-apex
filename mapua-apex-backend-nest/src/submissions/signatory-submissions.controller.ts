@@ -10,7 +10,11 @@ import {
 import { filterCollection } from '../common/reporting.js';
 import { Roles, SignatoryId } from '../common/decorators.js';
 import type { Item } from '../common/records.js';
-import { ClassificationPatchDto, CommentDto } from './dto/saaf.dto.js';
+import {
+  ClassificationPatchDto,
+  CommentDto,
+  OutsideEquipmentPatchDto,
+} from './dto/saaf.dto.js';
 import { toSubmission } from './submission.mapper.js';
 import { SubmissionQueryService } from './submission-query.service.js';
 import { SubmissionReviewService } from './submission-review.service.js';
@@ -117,6 +121,22 @@ export class SignatorySubmissionsController {
       event,
       submission,
       body.nature,
+    );
+    return toSubmission(item);
+  }
+
+  @Patch('events/:event/submissions/:submission/outside-equipment')
+  async outsideEquipment(
+    @SignatoryId() signatoryId: string,
+    @Param('event') event: string,
+    @Param('submission') submission: string,
+    @Body() body: OutsideEquipmentPatchDto,
+  ): Promise<Item> {
+    const item = await this.review.setOutsideEquipmentDecisions(
+      signatoryId,
+      event,
+      submission,
+      body.decisions,
     );
     return toSubmission(item);
   }

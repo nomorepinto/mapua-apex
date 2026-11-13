@@ -1,20 +1,13 @@
 import { useState } from "react"
-import {
-  CircleAlertIcon,
-  Loader2,
-  PlusIcon,
-  UsersIcon,
-} from "lucide-react"
+import { PlusIcon, UsersIcon } from "lucide-react"
 
 import { ProponentCard } from "@/components/submission/proponent-card"
 import {
-  getDepartmentItem,
   MAX_PROPONENTS,
   SELECT_CONTENT_STYLE,
   SELECT_ITEM_CLASS,
 } from "@/components/submission/constants"
 import type { Proponent } from "@/components/submission/types"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import {
@@ -54,6 +47,7 @@ function officerToProponent(officer: ApiOfficer, id: string): Proponent {
     studentNumber: officer.student_number ?? "",
     programAndYear: officer.program_and_year ?? "",
     dateOfSubmission: "",
+    campus: "",
     department: "",
     positionOfApplicant: officer.position_of_applicant ?? "",
     orgOrCourseSection: "", // filled from organizationName at render time
@@ -90,16 +84,6 @@ export function ProponentsSection({
   // auto-filled rather than typed.
   const currentOrgQuery = useCurrentOrganizationQuery()
   const organizationName = currentOrgQuery.data?.name || ""
-  const configuredDepartment = currentOrgQuery.data?.department?.trim() || ""
-  const organizationDepartment =
-    getDepartmentItem(configuredDepartment)?.code || ""
-  const skipDean = currentOrgQuery.data?.skip_dean === true
-  // Skipping the dean leaves no dean department to lock.
-  const choosesDepartment = skipDean && organizationDepartment === ""
-  const departmentIsMissing =
-    !currentOrgQuery.isPending &&
-    !choosesDepartment &&
-    organizationDepartment === ""
 
   // ── Officer picker state ──
   const officersQuery = useOfficersQuery()
@@ -163,9 +147,9 @@ export function ProponentsSection({
     if (!officer) return
     const id = crypto.randomUUID()
     const proponent = officerToProponent(officer, id)
-    // Always use the organization's name and department — never the officer's personal values
+    // Always use the organization's name; campus and department are chosen
+    // per proponent on the card (S-7).
     proponent.orgOrCourseSection = organizationName
-    proponent.department = organizationDepartment || ""
     setShowAddError(false)
     onAddFromOfficer(proponent)
     setSelectedOfficerId("")
@@ -173,39 +157,6 @@ export function ProponentsSection({
 
   return (
     <div className={layout.stack}>
-      {currentOrgQuery.isPending ? (
-        <Alert>
-          <Loader2 className="animate-spin" />
-          <AlertTitle>Resolving organization department</AlertTitle>
-          <AlertDescription>
-            Loading the department assigned to your organization.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {choosesDepartment ? (
-        <Alert>
-          <AlertTitle>Choose each proponent&apos;s department</AlertTitle>
-          <AlertDescription>
-            This organization skips the dean, so the department is selected
-            on this form.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {departmentIsMissing ? (
-        <Alert variant="error">
-          <CircleAlertIcon />
-          <AlertTitle>Organization department cannot be resolved</AlertTitle>
-          <AlertDescription>
-            {configuredDepartment
-              ? `The assigned dean's department ("${configuredDepartment}") does not match a supported department.`
-              : "A dean with a department must be assigned to your organization."}{" "}
-            Please contact an administrator before submitting.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
       {/* ── Unified Left/Right Container ── */}
       <Card className={cn(layout.card, "overflow-hidden")}>
         {/*
@@ -357,11 +308,8 @@ export function ProponentsSection({
                       proponent={proponent}
                       index={index}
                       canRemove={canRemove}
-                      departmentEditable={choosesDepartment}
                       departmentValue={
-                        choosesDepartment
-                          ? departmentValues[proponent.id] || proponent.department
-                          : organizationDepartment
+                        departmentValues[proponent.id] || proponent.department
                       }
                       organizationName={organizationName}
                       orgRoles={orgRoles}

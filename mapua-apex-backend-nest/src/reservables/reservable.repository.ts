@@ -6,8 +6,13 @@ import {
   reservableKey,
   stripPrefix,
 } from '../common/dynamo-keys.js';
-import { bool, num, str, type Item } from '../common/records.js';
+import { bool, num, record, str, type Item } from '../common/records.js';
 import { capacityLabel, normalizeSchedule, type Schedule } from './schedule.js';
+
+export interface RoomEquipmentItem {
+  name: string;
+  quantity: number | null;
+}
 
 export interface ReservableView {
   reservable_id: string;
@@ -20,6 +25,7 @@ export interface ReservableView {
   capacity_label: string | null;
   is_classroom: boolean;
   max_quantity: number | null;
+  room_equipment: RoomEquipmentItem[];
 }
 
 @Injectable()
@@ -101,6 +107,9 @@ export class ReservableRepository {
     if (fields.type === 'equipment' && fields.maxQuantity !== null) {
       item.max_quantity = fields.maxQuantity;
     }
+    if (fields.type === 'room' && fields.roomEquipment.length > 0) {
+      item.room_equipment = fields.roomEquipment;
+    }
     await this.table.put(item);
     return item;
   }
@@ -114,6 +123,7 @@ export interface ReservableWrite {
   max: number | null;
   isClassroom: boolean;
   maxQuantity: number | null;
+  roomEquipment: RoomEquipmentItem[];
 }
 
 export function toReservable(item: Item): ReservableView {
@@ -131,5 +141,25 @@ export function toReservable(item: Item): ReservableView {
     capacity_label: type === 'room' ? capacityLabel(min, max) : null,
     is_classroom: type === 'room' && bool(item, 'is_classroom'),
     max_quantity: type === 'equipment' ? num(item, 'max_quantity') : null,
+    room_equipment: type === 'room' ? toRoomEquipment(item.room_equipment) : [],
   };
+}
+
+function toRoomEquipment(value: unknown): RoomEquipmentItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const result: RoomEquipmentItem[] = [];
+  for (const entry of value) {
+    const item = record(entry);
+    if (!item) {
+      continue;
+    }
+    const name = str(item, 'name') ?? '';
+    if (!name) {
+      continue;
+    }
+    result.push({ name, quantity: num(item, 'quantity') });
+  }
+  return result;
 }

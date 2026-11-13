@@ -23,6 +23,18 @@ class DaySlotsDto {
   slots!: boolean[];
 }
 
+/** A piece of equipment that belongs to a room (S-8); managed in Add Room. */
+export class RoomEquipmentDto {
+  @IsString()
+  @MaxLength(150)
+  name!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  quantity?: number | null;
+}
+
 export class ReservableDto {
   @IsString()
   @MaxLength(150)
@@ -54,8 +66,14 @@ export class ReservableDto {
   @IsInt()
   @Min(1)
   max_quantity?: number | null;
+
+  /** Room-specific equipment stored on the room reservable (S-8); rooms only. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => RoomEquipmentDto)
+  room_equipment?: RoomEquipmentDto[];
 }
 
 void DaySlotsDto;
-void Type;
-void ValidateNested;

@@ -11,6 +11,7 @@
     "build:lambda": "node scripts/build-lambda.mjs",
     "build:stream": "node scripts/build-lambda.mjs stream",
     "build:web": "nest build",
+    "backfill:campuses": "node scripts/backfill-campus-departments.mjs",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

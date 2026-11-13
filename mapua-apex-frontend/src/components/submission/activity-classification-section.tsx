@@ -1,4 +1,5 @@
 import { FieldWarning } from "@/components/forms/field-warning"
+import { ACTIVITY_NATURE_OPTIONS } from "@/components/submission/constants"
 import { Input } from "@/components/ui/input"
 import { blockNonIntegerKeys, sanitizeIntegerInput } from "@/lib/numeric-input"
 
@@ -10,11 +11,16 @@ export function ActivityClassificationSection({
   totalOrgMembers,
   onActivityTypeChange,
   onTotalOrgMembersChange,
+  activityNature,
+  onActivityNatureChange,
 }: {
   activityType: string
   totalOrgMembers: string
   onActivityTypeChange: (value: string) => void
   onTotalOrgMembersChange: (value: string) => void
+  /** S-2 nature of activity (multi-select); distinct from the OSAAR major/minor nature. */
+  activityNature?: string[]
+  onActivityNatureChange?: (values: string[]) => void
 }) {
   return (
     <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-12">
@@ -48,6 +54,39 @@ export function ActivityClassificationSection({
           </label>
         </div>
         <FieldWarning name="activityType" />
+
+        {onActivityNatureChange ? (
+          <div className="space-y-2 pt-2">
+            <label className="block text-sm font-semibold text-neutral-800">
+              Nature of activity (select all that apply):
+            </label>
+            <div className="flex flex-wrap items-center gap-6 pt-1">
+              {ACTIVITY_NATURE_OPTIONS.map((option) => (
+                <label
+                  key={option}
+                  className="flex cursor-pointer items-center gap-2.5 text-sm font-normal text-neutral-700 select-none"
+                >
+                  <input
+                    type="checkbox"
+                    name="activityNature"
+                    value={option}
+                    checked={(activityNature ?? []).includes(option)}
+                    onChange={(e) => {
+                      const current = activityNature ?? []
+                      onActivityNatureChange(
+                        e.target.checked
+                          ? [...current, option]
+                          : current.filter((value) => value !== option)
+                      )
+                    }}
+                    className="h-4 w-4 cursor-pointer text-red-700 accent-red-700 focus:ring-red-700"
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-2 md:col-span-4">

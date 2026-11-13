@@ -34,7 +34,8 @@ export function useHydrateEditingSubmission() {
       drafts.saaf.activityTitle,
       drafts.hasReservation ? "yes" : "no",
       drafts.hasBudget ? "yes" : "no",
-      drafts.fundingSources
+      drafts.fundingSources,
+      drafts.campusLocation
     )
     if (drafts.hasReservation) {
       state.setSaafValidated(true)

@@ -217,6 +217,13 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
       proponents: current.proponents.map((proponent) =>
         proponent.id === id ? { ...proponent, [field]: value } : proponent
       ),
+      // Keep the department override map in sync so an edited department is
+      // the value that gets saved (S-7: department is officer-chosen).
+      ...(field === "department"
+        ? {
+            departmentValues: { ...current.departmentValues, [id]: value },
+          }
+        : {}),
     }))
     setFormError("")
   }
@@ -226,6 +233,7 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
       if (current.proponents.length >= MAX_PROPONENTS) return current
       const template = current.proponents[0]
       const created = createEmptyProponent(String(Date.now()))
+      created.campus = template?.campus || ""
       created.department = template?.department || ""
       created.orgOrCourseSection =
         template?.orgOrCourseSection || organizationName
@@ -285,14 +293,18 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
         eventId: submission.event_id,
         submissionId: submission.submission_id,
         payload: omitEventIdFromPayload(
-          // Funding sources are chosen on the submission start step, not edited
-          // here, so the filed values are preserved instead of reset to none.
+          // Funding sources and the on/off-campus choice are made on the
+          // submission start step, not edited here, so the filed values are
+          // preserved instead of reset.
           buildSaafApiPayload(
             draft,
             null,
             undefined,
             hasBudget,
-            initialDrafts.fundingSources
+            initialDrafts.fundingSources,
+            undefined,
+            undefined,
+            initialDrafts.campusLocation
           )
         ),
       })
@@ -332,13 +344,17 @@ function EditSubmissionForm({ submission }: { submission: ApiSubmission }) {
               onTotalOrgMembersChange={(value) =>
                 updateField("totalOrgMembers", value)
               }
+              activityNature={draft.activityNature}
+              onActivityNatureChange={(values) =>
+                updateField("activityNature", values)
+              }
             />
 
             <section className="space-y-4">
               <div>
                 <h2 className="text-lg font-bold text-neutral-900">Proponents</h2>
                 <p className="mt-0.5 text-sm text-neutral-500">
-                  Department stays with the organization&apos;s dean.
+                  Each proponent picks their own campus, department, and program.
                 </p>
               </div>
               {draft.proponents.map((proponent, index) => (

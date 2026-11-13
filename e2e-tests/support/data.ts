@@ -7,6 +7,16 @@ export const DENY_COMMENT = "This proposal is denied after review of the activit
 export const ROOM_PURPOSE = "Room purpose for the end to end reservation check."
 export const EQUIPMENT_REMARK = "Projector for the plenary session."
 
+/**
+ * S-8 outside equipment (not from Mapua) declared on the CDM-gated paper. Shared
+ * by the filing flow (submissions) and the CDM per-item ruling flow (reviews),
+ * since the run-state PaperRecord carries no reservation pick.
+ */
+export const OUTSIDE_EQUIPMENT: { name: string; purpose?: string }[] = [
+  { name: "External PA System", purpose: "Sound for the outdoor stage." },
+  { name: "LED Wall Panel", purpose: "Backdrop visuals for the program." },
+]
+
 /** Free-text budget note filed on every with-budget paper; the reviewer modal reads it back. */
 export const BUDGET_NOTE =
   "Sponsorship covers the venue while member contributions cover food and refreshments."

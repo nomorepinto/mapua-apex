@@ -2,6 +2,7 @@ import { memo, useState } from "react"
 import { PlusIcon, Trash2Icon, XIcon } from "lucide-react"
 
 import { BUDGET_OPTIONS, QUANTITY_MAX_MAP, UNIT_MAP } from "@/components/submission/budget-options"
+import { RentalChargeWarning } from "@/components/submission/rental-charge-warning"
 import type { BudgetItem } from "@/components/submission/types"
 import { useGibberishField } from "@/hooks/use-gibberish-check"
 import {
@@ -221,6 +222,8 @@ export function BudgetProposalSection({
   onRemove,
   onAdd,
   onNoteChange,
+  rentalWarning = false,
+  onQuickAddRental,
 }: {
   items: BudgetItem[]
   grandTotal: number
@@ -229,6 +232,10 @@ export function BudgetProposalSection({
   onRemove: (id: string) => void
   onAdd: () => void
   onNoteChange: (value: string) => void
+  /** S-3 booth/concessionaire rental signal (nature of activity or funding source). */
+  rentalWarning?: boolean
+  /** S-3 quick-add of a non-monetary "Equipment Rental" line (no prices filled). */
+  onQuickAddRental?: () => void
 }) {
   const canRemove = items.length > 1
 
@@ -242,6 +249,8 @@ export function BudgetProposalSection({
           Include all the Budget Proposal Needed
         </p>
       </div>
+
+      {rentalWarning ? <RentalChargeWarning /> : null}
 
       <div className={layout.sectionFlush}>
         <div className={cn(layout.tableWrap, "overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0")}>
@@ -302,6 +311,17 @@ export function BudgetProposalSection({
         <PlusIcon className="h-4 w-4 text-neutral-600" />
         <span>Add more Item</span>
       </button>
+
+      {rentalWarning && onQuickAddRental ? (
+        <button
+          type="button"
+          onClick={onQuickAddRental}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-amber-300 bg-amber-50/40 py-3 text-sm font-medium text-amber-800 shadow-xs transition-all hover:border-amber-400 hover:bg-amber-100/50"
+        >
+          <PlusIcon className="h-4 w-4" />
+          <span>Quick-add: Equipment Rental line</span>
+        </button>
+      ) : null}
 
       <Field className="w-full">
         <FieldLabel htmlFor="budgetNote">

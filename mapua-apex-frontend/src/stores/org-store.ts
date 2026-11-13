@@ -122,12 +122,15 @@ interface OrgState {
 
   // Submissions wizard start
   eventName: string
+  // S-5: on/off-campus choice made in the start questionnaire. Off-campus forces
+  // reserveFacilities to "no", so the Reservation step and CDM are skipped.
+  campusLocation: "on-campus" | "off-campus" | null
   reserveFacilities: "yes" | "no" | null
   withBudget: "yes" | "no" | null
   fundingSources: string[]
   saafValidated: boolean
   setSaafValidated: (value: boolean) => void
-  setSubmissionStart: (eventName: string, reserveFacilities: "yes" | "no", withBudget: "yes" | "no", fundingSources: string[]) => void
+  setSubmissionStart: (eventName: string, reserveFacilities: "yes" | "no", withBudget: "yes" | "no", fundingSources: string[], campusLocation: "on-campus" | "off-campus") => void
   clearSubmissionStart: () => void
 
   // SAAF Draft
@@ -157,6 +160,10 @@ interface OrgState {
   // action reads it, cleared after, so consent is re-given on every submission.
   privacyConsentVersion: string | null;
   setPrivacyConsentVersion: (version: string | null) => void;
+
+  // SAAF T&C consent (S-1) — same ephemeral pattern as the privacy consent.
+  termsConsentVersion: string | null;
+  setTermsConsentVersion: (version: string | null) => void;
 }
 
 export const useOrgStore = create<OrgState>()(
@@ -396,14 +403,15 @@ export const useOrgStore = create<OrgState>()(
   },
 
   eventName: "",
+  campusLocation: null,
   reserveFacilities: null,
   withBudget: null,
   fundingSources: [],
   saafValidated: false,
   setSaafValidated: (value) => set({ saafValidated: value }),
-  setSubmissionStart: (eventName, reserveFacilities, withBudget, fundingSources) =>
-    set({ eventName, reserveFacilities, withBudget, fundingSources, saafValidated: false }),
-  clearSubmissionStart: () => set({ eventName: "", reserveFacilities: null, withBudget: null, fundingSources: [], saafValidated: false }),
+  setSubmissionStart: (eventName, reserveFacilities, withBudget, fundingSources, campusLocation) =>
+    set({ eventName, campusLocation, reserveFacilities, withBudget, fundingSources, saafValidated: false }),
+  clearSubmissionStart: () => set({ eventName: "", campusLocation: null, reserveFacilities: null, withBudget: null, fundingSources: [], saafValidated: false }),
 
   // SAAF Draft
   saafDraft: null,
@@ -454,12 +462,16 @@ export const useOrgStore = create<OrgState>()(
 
   privacyConsentVersion: null,
   setPrivacyConsentVersion: (version) => set({ privacyConsentVersion: version }),
+
+  termsConsentVersion: null,
+  setTermsConsentVersion: (version) => set({ termsConsentVersion: version }),
 }),
     {
       name: "apex_org_wizard_v1",
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         eventName: state.eventName,
+        campusLocation: state.campusLocation,
         reserveFacilities: state.reserveFacilities,
         withBudget: state.withBudget,
         fundingSources: state.fundingSources,

@@ -23,7 +23,7 @@ import {
   toggleSlot,
   withSelection,
 } from "@/lib/schedule-slots"
-import type { ApiReservable, SlotSelection } from "@/lib/types"
+import type { ApiReservable, ApiRoomEquipment, SlotSelection } from "@/lib/types"
 import { useOrgStore } from "@/stores/org-store"
 
 /**
@@ -103,6 +103,12 @@ export function useReservationForm() {
   const currentPicks = useCallback(
     (): ReservationPick[] =>
       withReservationDefaults(useOrgStore.getState().reservationDraft).picks,
+    []
+  )
+
+  const currentDraft = useCallback(
+    (): ReservationDraft =>
+      withReservationDefaults(useOrgStore.getState().reservationDraft),
     []
   )
 
@@ -356,6 +362,60 @@ export function useReservationForm() {
     [currentPicks]
   )
 
+  /** Set the room-specific equipment selected for one room pick (S-8). */
+  const handleSetRoomEquipment = useCallback(
+    (pickId: string, equipment: ApiRoomEquipment[]) => {
+      const next = currentPicks().map((pick) =>
+        pick.id === pickId && pick.type === "room"
+          ? { ...pick, room_equipment: equipment }
+          : pick
+      )
+      // Room equipment never affects the event schedule, so skip the derived patch.
+      useOrgStore.getState().patchReservationDraft({ picks: next })
+    },
+    [currentPicks]
+  )
+
+  /** Append an empty outside-equipment row (S-8 free-list). */
+  const handleAddOutsideEquipment = useCallback(() => {
+    const draft = currentDraft()
+    useOrgStore.getState().patchReservationDraft({
+      outsideEquipment: [...draft.outsideEquipment, { name: "", purpose: "" }],
+    })
+  }, [currentDraft])
+
+  /** Edit one field of an outside-equipment row. */
+  const handleUpdateOutsideEquipment = useCallback(
+    (index: number, field: "name" | "purpose", value: string) => {
+      const draft = currentDraft()
+      const next = draft.outsideEquipment.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item
+      )
+      useOrgStore.getState().patchReservationDraft({ outsideEquipment: next })
+    },
+    [currentDraft]
+  )
+
+  /** Remove an outside-equipment row; clearing the last one drops the acknowledgement. */
+  const handleRemoveOutsideEquipment = useCallback(
+    (index: number) => {
+      const draft = currentDraft()
+      const next = draft.outsideEquipment.filter((_, i) => i !== index)
+      useOrgStore.getState().patchReservationDraft({
+        outsideEquipment: next,
+        ...(next.length === 0 ? { outsideEquipmentAcknowledged: false } : {}),
+      })
+    },
+    [currentDraft]
+  )
+
+  /** Toggle the student's outside-equipment acknowledgement (gates submit). */
+  const handleSetOutsideAcknowledged = useCallback((checked: boolean) => {
+    useOrgStore
+      .getState()
+      .patchReservationDraft({ outsideEquipmentAcknowledged: checked })
+  }, [])
+
   const handleClearForm = useCallback(() => {
     useOrgStore.getState().clearReservationDraft()
     useOrgStore.getState().patchSaafDraft(derivedSchedulePatch([]))
@@ -413,6 +473,11 @@ export function useReservationForm() {
     handleUpdateEquipmentQuantity,
     handlePruneDates,
     handleUpdateRemarks,
+    handleSetRoomEquipment,
+    handleAddOutsideEquipment,
+    handleUpdateOutsideEquipment,
+    handleRemoveOutsideEquipment,
+    handleSetOutsideAcknowledged,
     handleClearForm,
     handleSavePdf,
   }

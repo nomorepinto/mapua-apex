@@ -17,6 +17,8 @@ export type ReservationPick = {
   room?: string
   equipment?: string
   slot: number
+  /** S-8: outside equipment (not from Mapua) CDM must rule on item-by-item. */
+  outside?: { name: string; purpose?: string }[]
 }
 
 export class SaafPage {
@@ -27,14 +29,30 @@ export class SaafPage {
     reserve: boolean,
     budget = true,
     funding = ["Sponsors", "Organization"],
+    campusLocation: "on-campus" | "off-campus" = "on-campus",
   ) {
     await this.page.goto("/students/submissions")
     await this.page.getByLabel("Event name").fill(title)
+    // S-5: campus location is chosen first; off-campus forces facilities to "no".
     await choose(
       this.page,
-      this.page.getByLabel("Are you going to reserve school facilities?"),
-      reserve ? "Yes, reserve school facilities" : "No, do not reserve facilities",
+      this.page.getByLabel("Where will the event be held?"),
+      campusLocation === "on-campus" ? "On-campus" : "Off-campus",
     )
+    const facilities = this.page.getByLabel(
+      "Are you going to reserve school facilities/bring outside equipment?",
+    )
+    if (campusLocation === "off-campus") {
+      // S-5/S-10: off-campus greys out facilities and forces "No, neither".
+      await expect(facilities).toBeDisabled()
+      await expect(facilities).toContainText("No, neither")
+    } else {
+      await choose(
+        this.page,
+        facilities,
+        reserve ? "Yes, reserve facilities / bring outside equipment" : "No, neither",
+      )
+    }
     await choose(
       this.page,
       this.page.getByLabel("Will you be operating with a budget?"),
@@ -60,21 +78,36 @@ export class SaafPage {
     await expect(this.page.getByLabel("How will this activity be funded?")).toHaveCount(0)
   }
 
-  async classification(activity: "extra-curricular" | "co-curricular") {
+  async classification(
+    activity: "extra-curricular" | "co-curricular",
+    nature: string[] = [],
+  ) {
     const label = activity === "extra-curricular" ? "Extra-curricular Activity" : "Co-curricular Activity"
     await this.page.getByRole("radio", { name: label }).check()
     await stepPanel(this.page).locator("[name='totalOrgMembers']").fill("40")
+    // S-2: nature of activity is a separate multi-select (not the OSAAR major/minor).
+    for (const option of nature) {
+      await stepPanel(this.page).locator(`input[name='activityNature'][value='${option}']`).check()
+    }
     await this.continue()
   }
 
-  async people(email: string, options: { chooseDepartment: boolean; stay?: boolean }) {
+  async people(email: string, options: { campus: string; stay?: boolean }) {
     const panel = stepPanel(this.page)
+    // The People step starts with an empty roster panel (test orgs have no saved
+    // officers), so the proponent card only exists after "Add Proponent
+    // Manually". Click it when no card is on screen yet.
+    if ((await panel.getByPlaceholder("First Name").count()) === 0) {
+      await panel.getByRole("button", { name: "Add Proponent Manually" }).click()
+    }
     await panel.getByPlaceholder("First Name").fill("Ana")
     await panel.getByPlaceholder("Last Name").fill("Reyes")
     await panel.getByPlaceholder("202XXXXXXX").fill("2026100101")
-    if (options.chooseDepartment) {
-      await choose(this.page, panel.getByRole("combobox", { name: "Department" }), /School of Information Technology/)
-    }
+    // S-7: the officer picks their own campus → department → program cascade
+    // (no longer locked to the organization's department).
+    await choose(this.page, panel.getByRole("combobox", { name: "Campus" }), options.campus)
+    await expect(panel.getByRole("combobox", { name: "Department" })).toBeEnabled()
+    await choose(this.page, panel.getByRole("combobox", { name: "Department" }), /School of Information Technology/)
     await expect(panel.getByRole("combobox", { name: "Program" })).toBeEnabled()
     await choose(this.page, panel.getByRole("combobox", { name: "Program" }), /BS Information Technology \(BSIT\)/)
     await choose(this.page, panel.getByRole("combobox", { name: "Year level" }), "1st Year")
@@ -100,10 +133,32 @@ export class SaafPage {
     await expect(box).toContainText(org)
   }
 
+  /**
+   * S-6 participant split: fill the Mapuan count, and when a non-Mapua count is
+   * given, flip the switch, fill it, and assert the payment note + derived total.
+   * `expectedParticipants` is derived (mapua + non-Mapua), never a direct input.
+   */
+  async participants(mapua: number, nonMapua?: number) {
+    const panel = stepPanel(this.page)
+    await panel.locator("[name='mapuaParticipants']").fill(String(mapua))
+    if (nonMapua !== undefined && nonMapua > 0) {
+      await panel.getByRole("switch", { name: /non-Mapuan participants/i }).click()
+      const extra = panel.locator("[name='nonMapuaParticipants']")
+      await expect(extra).toBeVisible()
+      await extra.fill(String(nonMapua))
+      await expect(
+        panel.getByText(/Non-Mapuan participants may be subject to payment requirements/),
+      ).toBeVisible()
+      await expect(
+        panel.getByText(`Total expected participants: ${mapua + nonMapua}`),
+      ).toBeVisible()
+    }
+  }
+
   /** Pick the campus, the event date, and one free slot on the reservation step. */
   async schedule(campus: string, slot: number) {
     const panel = stepPanel(this.page)
-    await panel.locator("[name='expectedParticipants']").fill("40")
+    await this.participants(40)
     await choose(this.page, panel.getByRole("combobox", { name: "Venue Campus" }), campus)
     await pickIsoDate(this.page, panel.getByRole("button", { name: "Start date of event" }), eventDate)
     await choose(this.page, panel.getByRole("combobox", { name: /Start time for / }), SLOT_START[slot])
@@ -118,7 +173,7 @@ export class SaafPage {
    */
   async expectSuggestedRooms(headcount: number, ranked: string[], fits = true) {
     const panel = stepPanel(this.page)
-    await panel.locator("[name='expectedParticipants']").fill(String(headcount))
+    await panel.locator("[name='mapuaParticipants']").fill(String(headcount))
     const box = panel.locator(`[aria-label='Suggested rooms for ${headcount} participants']`)
     await expect(box).toBeVisible()
     if (fits) {
@@ -155,6 +210,20 @@ export class SaafPage {
       await panel.getByPlaceholder(/Remark/).fill(EQUIPMENT_REMARK)
       await panel.getByRole("button", { name: "Add", exact: true }).click()
     }
+    // S-8: outside equipment (not from Mapua) is a free-list CDM must rule on.
+    if (pick.outside?.length) {
+      for (let index = 0; index < pick.outside.length; index += 1) {
+        const item = pick.outside[index]
+        await panel.getByRole("button", { name: "Add outside equipment" }).click()
+        await panel.getByLabel(`Outside equipment ${index + 1} name`).fill(item.name)
+        if (item.purpose) {
+          await panel.getByLabel(`Outside equipment ${index + 1} purpose`).fill(item.purpose)
+        }
+      }
+      await panel
+        .getByText(/I acknowledge that the outside equipment listed above is subject to CDM/)
+        .click()
+    }
     await this.continue()
   }
 
@@ -163,7 +232,7 @@ export class SaafPage {
     await expect(stepPanel(this.page).getByText("Reserve at least one room on the left first.")).toBeVisible()
   }
 
-  async activityOnline(campusOnline = "Online", budget = true) {
+  async activityOnline(campusOnline = "Online", budget = true, nonMapua?: number) {
     const panel = stepPanel(this.page)
     await panel.getByPlaceholder(/comprehensive summary/).fill(PROSE)
     await panel.getByPlaceholder(/primary targets/).fill(PROSE)
@@ -176,7 +245,7 @@ export class SaafPage {
     await choose(this.page, panel.getByRole("combobox", { name: "End hour" }), "9")
     await choose(this.page, panel.getByRole("combobox", { name: "End minute" }), "20")
     await choose(this.page, panel.getByRole("combobox", { name: "End AM or PM" }), "AM")
-    await panel.locator("[name='expectedParticipants']").fill("40")
+    await this.participants(40, nonMapua)
     // The individual contribution input only exists for a with-budget paper.
     if (budget) await panel.getByPlaceholder("0.00").fill("0")
     await this.continue()
@@ -218,11 +287,24 @@ export class SaafPage {
     // the label names a version only once the backend notice has loaded.
     const proceed = this.page.getByRole("button", { name: "Proceed" })
     await expect(proceed).toBeDisabled()
-    const consent = this.page.getByText(
-      /I have read and agree to the Data Privacy Act of 2012 \(RA 10173\) notice \(v/,
-    )
+    // Click the checkbox itself, not the label span: the notice ScrollArea
+    // panel overlaps the label text and intercepts pointer events there.
+    const consent = this.page.getByRole("checkbox", {
+      name: /I have read and agree to the Data Privacy Act of 2012 \(RA 10173\) notice \(v/,
+    })
     await expect(consent).toBeVisible()
     await consent.click()
+    // S-1 T&C gate: Proceed stays disabled until EVERY acknowledgement is ticked.
+    await expect(proceed).toBeDisabled()
+    for (const ack of [
+      /I understand that the standard turnaround time for activity approval is 2-3 working days\./,
+      /I understand that applications must be filed between 7:00 AM and 3:00 PM/,
+      /I understand the criteria for major and minor events/,
+    ]) {
+      const label = this.page.getByRole("checkbox", { name: ack })
+      await expect(label).toBeVisible()
+      await label.click()
+    }
     await expect(proceed).toBeEnabled()
     await proceed.click()
     await expect(this.page.getByRole("heading", { name: "Activity Application Submitted!" })).toBeVisible()

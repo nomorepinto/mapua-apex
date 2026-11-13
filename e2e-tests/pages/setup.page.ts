@@ -35,6 +35,15 @@ export class SetupPages {
     await this.page.getByLabel("Name").fill(name)
     await this.page.getByLabel("Allowed prefixes").fill("R")
     await this.page.getByLabel("Digit count").fill("3")
+    // C-1: seed one department + course so the S-7 officer campus→department→
+    // program cascade has options on this otherwise-empty test campus. Use the
+    // editor's input ids: getByLabel("Code") would also match "Course code".
+    await this.page.getByRole("button", { name: "Add department" }).click()
+    await this.page.locator("#add-campus-dept-code-0").fill("SOIT")
+    await this.page.locator("#add-campus-dept-name-0").fill("School of Information Technology")
+    await this.page.getByRole("button", { name: "Add course" }).click()
+    await this.page.locator("#add-campus-course-code-0-0").fill("BSIT")
+    await this.page.locator("#add-campus-course-name-0-0").fill("BS Information Technology")
     await this.page.getByRole("button", { name: "Add campus" }).click()
     await expect(this.page.getByRole("dialog", { name: "Campus added" }).first()).toBeVisible()
     await expect(this.page.getByRole("row", { name }).getByText("Main campus", { exact: true })).toBeVisible()
@@ -46,6 +55,11 @@ export class SetupPages {
   }
 
   private async releaseMainCampus() {
+    // The campuses list loads asynchronously. While it loads the table renders
+    // skeleton rows, so the holder check below races a 0-row read, skips the
+    // release, and leaves offerMain false (no Main-campus checkbox to add with).
+    // Wait for the loaded description before deciding there is no holder.
+    await expect(this.page.getByText("use Edit to rename a row")).toBeVisible()
     const holder = this.page.getByRole("row").filter({ hasText: "Main campus" })
     if ((await holder.count()) === 0) return
     await holder.first().getByRole("button", { name: "Edit" }).click()
@@ -66,6 +80,27 @@ export class SetupPages {
     await this.page.getByLabel("Digit count").fill("")
     await this.page.getByRole("button", { name: "Add campus" }).click()
     await expect(this.page.getByText("Add a digit count to complete the classroom name format.")).toBeVisible()
+  }
+
+  /**
+   * The "All campuses" OSAAR slot is a singleton: while any signatory holds it
+   * the add form hides that option, so the test's own all-campus desk could
+   * never pick it. Seed data may already carry an all-campus OSAAR, so demote
+   * the current holder to a concrete campus before adding ours — same
+   * release-the-predecessor pattern as releaseMainCampus for campuses.
+   */
+  async releaseAllCampuses() {
+    const holder = this.page.getByRole("row").filter({ hasText: "All campuses" })
+    if ((await holder.count()) === 0) return
+    await holder.first().getByRole("button", { name: "Edit" }).click()
+    const dialog = this.page.getByRole("dialog", { name: "Edit signatory" })
+    await expect(dialog.getByRole("combobox", { name: "Campus", exact: true })).toContainText("All campuses")
+    await choose(this.page, dialog.getByRole("combobox", { name: "Campus", exact: true }), "Intramuros Campus")
+    const save = dialog.getByRole("button", { name: "Save changes" })
+    await expect(save).toBeEnabled()
+    await save.click()
+    await expect(this.page.getByRole("dialog", { name: "Signatory updated" }).first()).toBeVisible()
+    await expect(this.page.getByRole("row").filter({ hasText: "All campuses" })).toHaveCount(0)
   }
 
   async addSignatory(

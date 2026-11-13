@@ -41,7 +41,7 @@ export class ReviewPage {
   }
 
   async approve() {
-    const approve = this.page.getByRole("button", { name: "Approve Proposal" })
+    const approve = this.page.getByRole("button", { name: /^(Approve|Review) Proposal$/ })
     const major = this.page.getByRole("button", { name: "Major Event" })
     await expect(approve).toBeVisible()
     // OSAAR desks render an event-nature control and gate Approve behind it,
@@ -70,7 +70,8 @@ export class ReviewPage {
     }
     await expect(approve).toBeEnabled({ timeout: 30_000 })
     await approve.click()
-    const confirm = this.page.getByRole("dialog", { name: /Endorse/ })
+    // R-1: the confirm title is now "${verb} ${title}?" (was "Endorse ...").
+    const confirm = this.page.getByRole("dialog", { name: /^(Approve|Review) .+\?$/ })
     await confirm.getByRole("button", { name: "Proceed" }).click()
     await expect(confirm).toBeHidden()
   }
@@ -92,13 +93,69 @@ export class ReviewPage {
   }
 
   async expectApprovalBlocked() {
-    const approve = this.page.getByRole("button", { name: "Approve Proposal" })
+    const approve = this.page.getByRole("button", { name: /^(Approve|Review) Proposal$/ })
     await expect(approve).toBeDisabled()
     await expect(approve).toHaveAttribute(
       "title",
       "Some reserved slots are already booked. Return or reject this proposal.",
     )
     await expect(this.page.getByText("This reservation can't be approved as filed.")).toBeVisible()
+  }
+
+  /** R-1: the footer action verb — "Approve" for a campus OSAAR, "Review" otherwise. */
+  async expectActionVerb(verb: "Approve" | "Review") {
+    const other = verb === "Approve" ? "Review" : "Approve"
+    await expect(
+      this.page.getByRole("button", { name: `${verb} Proposal`, exact: true }),
+    ).toBeVisible()
+    await expect(
+      this.page.getByRole("button", { name: `${other} Proposal`, exact: true }),
+    ).toHaveCount(0)
+  }
+
+  /** R-1: the major/minor classification control renders only for the all-campus OSAAR. */
+  async expectClassificationControl(visible: boolean) {
+    const major = this.page.getByRole("button", { name: "Major Event", exact: true })
+    if (visible) await expect(major).toBeVisible()
+    else await expect(major).toHaveCount(0)
+  }
+
+  /** S-8: CDM cannot approve until every outside-equipment item has a ruling. */
+  async expectOutsideEquipmentGate() {
+    const approve = this.page.getByRole("button", { name: /^(Approve|Review) Proposal$/ })
+    await expect(approve).toBeDisabled()
+    await expect(approve).toHaveAttribute(
+      "title",
+      "Rule on every outside equipment item (allowed / not allowed) first",
+    )
+    await expect(
+      this.page.getByText("Rule on each item before approving this proposal."),
+    ).toBeVisible()
+  }
+
+  /**
+   * S-8: rule on one outside-equipment item. Every decision button shares the
+   * in-flight disabled flag, so waiting for the PATCH to land serializes the
+   * clicks and keeps the per-item decisions from racing each other.
+   */
+  async decideOutsideEquipment(name: string, allowed: boolean) {
+    const row = this.page.getByRole("listitem").filter({ hasText: name })
+    // exact: true — "Allowed" is a substring of "Not allowed".
+    const button = row.getByRole("button", {
+      name: allowed ? "Allowed" : "Not allowed",
+      exact: true,
+    })
+    await expect(button).toBeEnabled()
+    await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.url().includes("/outside-equipment") &&
+          response.request().method() === "PATCH" &&
+          response.ok(),
+        { timeout: 30_000 },
+      ),
+      button.click(),
+    ])
   }
 
   /**

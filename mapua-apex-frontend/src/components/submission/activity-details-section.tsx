@@ -2,6 +2,8 @@ import { useEffect } from "react"
 import { FieldWarning } from "@/components/forms/field-warning"
 import { EventTimeFields } from "@/components/submission/event-time-fields"
 import { ONLINE_VENUE } from "@/components/submission/constants"
+import { ParticipantFields } from "@/components/submission/participant-fields"
+import { RentalChargeWarning } from "@/components/submission/rental-charge-warning"
 import { useStudentCampusesQuery } from "@/hooks/use-campuses"
 import { usePublicTermSettingsQuery } from "@/hooks/use-admin"
 import { useGibberishField } from "@/hooks/use-gibberish-check"
@@ -32,9 +34,7 @@ import {
 } from "@/lib/date-key"
 import {
   blockNonDecimalKeys,
-  blockNonIntegerKeys,
   sanitizeDecimalInput,
-  sanitizeIntegerInput,
 } from "@/lib/numeric-input"
 import { cn } from "@/lib/utils"
 
@@ -47,6 +47,9 @@ type DetailsFields = Pick<
   | "dateOfEvent"
   | "timeOfEvent"
   | "expectedParticipants"
+  | "includeNonMapua"
+  | "mapuaParticipants"
+  | "nonMapuaParticipants"
   | "individualContribution"
   | "proposedBudget"
 > & {
@@ -71,6 +74,7 @@ export function ActivityDetailsSection({
   titleEditable = false,
   venueNames,
   fallbackTitle = "",
+  rentalWarning = false,
 }: {
   values: DetailsFields
   onChange: (key: any, value: any) => void
@@ -84,6 +88,8 @@ export function ActivityDetailsSection({
   venueNames?: string[]
   /** Used when the title has not been copied onto the draft yet. */
   fallbackTitle?: string
+  /** S-3 booth/concessionaire rental signal (nature of activity or funding source). */
+  rentalWarning?: boolean
 }) {
   const displayTitle = values.activityTitle || fallbackTitle || ""
   const descriptionGibberish = useGibberishField(
@@ -199,6 +205,8 @@ export function ActivityDetailsSection({
           Details of activity
         </h2>
       </div>
+
+      {rentalWarning ? <RentalChargeWarning /> : null}
 
       <div className="space-y-5">
         <div className="space-y-1.5">
@@ -492,41 +500,11 @@ export function ActivityDetailsSection({
           <FieldWarning name="timeOfEvent" />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {!includeReservation && (
-            <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-neutral-800">
-                Number of Expected Participants{" "}
-                <span className="text-red-500">*</span>
-              </label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                name="expectedParticipants"
-                placeholder="0"
-                maxLength={4}
-                min={20}
-                max={3000}
-                value={values.expectedParticipants}
-                onKeyDown={blockNonIntegerKeys}
-                onChange={(e) => {
-                  onChange(
-                    "expectedParticipants",
-                    sanitizeIntegerInput(e.target.value).slice(0, 4)
-                  )
-                }}
-                style={{ color: "#171717" }}
-                className="no-spinner h-9.5 rounded-lg border-neutral-300 bg-white text-center !text-neutral-900 placeholder:text-neutral-400"
-                required
-              />
-              <span className="block text-[10px] text-neutral-500">
-                Between 20 and 3,000 participants
-              </span>
-              <FieldWarning name="expectedParticipants" />
-            </div>
-          )}
-          {includeBudget && (
+        {!includeReservation && (
+          <ParticipantFields values={values} onChange={onChange} />
+        )}
+        {includeBudget && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-neutral-800">
                 Amount of Individual Contribution{" "}
@@ -553,8 +531,8 @@ export function ActivityDetailsSection({
               />
               <FieldWarning name="individualContribution" />
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

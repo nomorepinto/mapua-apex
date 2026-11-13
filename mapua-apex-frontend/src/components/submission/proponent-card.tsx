@@ -3,7 +3,7 @@ import { AlertCircle, Loader2, Trash2Icon } from "lucide-react"
 
 import { FieldWarning } from "@/components/forms/field-warning"
 import {
-  ALL_DEPARTMENT_ITEMS,
+  DEPARTMENT_GROUPS,
   FIELD_INPUT_CLASS,
   getDepartmentItem,
   getDepartmentPrograms,
@@ -17,8 +17,10 @@ import {
   STUDENT_NUMBER_LENGTH,
   SUFFIX_OPTIONS,
   YEAR_LEVEL_OPTIONS,
+  type DepartmentItem,
 } from "@/components/submission/constants"
 import type { Proponent } from "@/components/submission/types"
+import { useStudentCampusesQuery } from "@/hooks/use-campuses"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -71,8 +73,6 @@ interface ProponentCardProps {
   proponent: Proponent
   index: number
   canRemove: boolean
-  /** Organizations that skip the dean let the proponent pick a department. */
-  departmentEditable?: boolean
   departmentValue: string
   /** Name of the applying organization; locks the "Name of Organization" field. */
   organizationName: string
@@ -85,7 +85,6 @@ export const ProponentCard = memo(function ProponentCard({
   proponent,
   index,
   canRemove,
-  departmentEditable = false,
   departmentValue,
   organizationName,
   orgRoles = [],
@@ -117,13 +116,51 @@ export const ProponentCard = memo(function ProponentCard({
   const deptItem = getDepartmentItem(departmentValue)
   const selectedDeptCode = deptItem?.code ?? departmentValue
 
+  // S-7: each proponent picks their own campus, then a department within that
+  // campus, then a program within that department. Campus master data (C-1) is
+  // the source of truth; the hardcoded catalog is only a legacy fallback.
+  const campusesQuery = useStudentCampusesQuery()
+  const campuses = campusesQuery.data ?? []
+  const selectedCampus = campuses.find(
+    (campus) => campus.campus_id === proponent.campus
+  )
+  const masterDepartments = selectedCampus?.departments ?? []
+  const campusDepartments: DepartmentItem[] =
+    masterDepartments.length > 0
+      ? masterDepartments.map((department) => ({
+          code: department.code,
+          name: department.name,
+        }))
+      : [
+          ...(DEPARTMENT_GROUPS.find(
+            (group) => group.campus === selectedCampus?.name
+          )?.departments ?? []),
+        ]
+  const departmentOptions =
+    selectedDeptCode &&
+    !campusDepartments.some((department) => department.code === selectedDeptCode)
+      ? [
+          { code: selectedDeptCode, name: selectedDeptCode },
+          ...campusDepartments,
+        ]
+      : campusDepartments
+
+  const programsForDepartment = (deptCode: string) => {
+    const courses = masterDepartments.find(
+      (department) => department.code === deptCode
+    )?.courses
+    return courses && courses.length > 0
+      ? courses
+      : getDepartmentPrograms(deptCode)
+  }
+
   const { program: parsedProgram, year: currentYear } = parseProgramAndYear(
     proponent.programAndYear
   )
   const currentProgItem = getProgramItem(selectedDeptCode, parsedProgram)
   const selectedProgCode = currentProgItem?.code ?? parsedProgram
 
-  const availablePrograms = getDepartmentPrograms(selectedDeptCode)
+  const availablePrograms = programsForDepartment(selectedDeptCode)
   const programOptions =
     selectedProgCode &&
     !availablePrograms.some((p) => p.code === selectedProgCode)
@@ -263,8 +300,8 @@ export const ProponentCard = memo(function ProponentCard({
 
       <FieldWarning name={`proponent.${proponent.id}.duplicateFullName`} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-12">
-        <div className="space-y-1.5 md:col-span-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-10">
+        <div className="space-y-1.5 md:col-span-2">
           <label className="block text-xs font-medium text-neutral-700">
             Student Number <span className="text-red-500">*</span>
           </label>
@@ -294,63 +331,112 @@ export const ProponentCard = memo(function ProponentCard({
           <FieldWarning name={`proponent.${proponent.id}.studentNumber`} />
         </div>
 
-        <div className="space-y-1.5 md:col-span-3">
+        <div className="space-y-1.5 md:col-span-2">
+          <label className="block text-xs font-medium text-neutral-700">
+            Campus <span className="text-red-500">*</span>
+          </label>
+          <Select
+            value={proponent.campus}
+            onValueChange={(val) => {
+              if (typeof val !== "string") return
+              onUpdate(proponent.id, "campus", val)
+              // A new campus invalidates the department and program picks.
+              if (proponent.department) {
+                onUpdate(proponent.id, "department", "")
+              }
+              if (proponent.programAndYear) {
+                onUpdate(proponent.id, "programAndYear", "")
+              }
+            }}
+          >
+            <SelectTrigger
+              aria-label="Campus"
+              className={cn(
+                "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
+                !proponent.campus && "saaf-glow-invalid"
+              )}
+            >
+              <SelectValue placeholder="Select campus">
+                {selectedCampus?.name || "Select campus"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent
+              className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
+              style={SELECT_CONTENT_STYLE}
+            >
+              {campuses.map((campus) => (
+                <SelectItem
+                  key={campus.campus_id}
+                  value={campus.campus_id}
+                  className={SELECT_ITEM_CLASS}
+                >
+                  {campus.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <input
+            type="hidden"
+            name={`proponent_${index}_campus`}
+            value={proponent.campus}
+            required
+          />
+          <FieldWarning name={`proponent.${proponent.id}.campus`} />
+        </div>
+
+        <div className="space-y-1.5 md:col-span-2">
           <label className="block text-xs font-medium text-neutral-700">
             Department <span className="text-red-500">*</span>
           </label>
-          {departmentEditable ? (
-            <Select
-              value={selectedDeptCode}
-              onValueChange={(val) => {
-                if (typeof val !== "string") return
-                onUpdate(proponent.id, "department", val)
-                const stillValid = getDepartmentPrograms(val).some(
-                  (program) => program.code === selectedProgCode
-                )
-                if (!stillValid && proponent.programAndYear) {
-                  onUpdate(proponent.id, "programAndYear", "")
-                }
-              }}
-            >
-              <SelectTrigger
-                aria-label="Department"
-                className={cn(
-                  "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
-                  !selectedDeptCode && "saaf-glow-invalid"
-                )}
-              >
-                <SelectValue placeholder="Select department">
-                  {selectedDeptCode || "Select department"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent
-                className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
-                style={SELECT_CONTENT_STYLE}
-              >
-                {ALL_DEPARTMENT_ITEMS.map((department) => (
-                  <SelectItem
-                    key={department.code}
-                    value={department.code}
-                    className={SELECT_ITEM_CLASS}
-                  >
-                    {department.name} ({department.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <Input
-              value={selectedDeptCode}
-              placeholder="Assigned by organization dean"
-              readOnly
-              aria-readonly="true"
+          <Select
+            value={selectedDeptCode}
+            disabled={!proponent.campus}
+            onValueChange={(val) => {
+              if (typeof val !== "string") return
+              onUpdate(proponent.id, "department", val)
+              const stillValid = programsForDepartment(val).some(
+                (program) => program.code === selectedProgCode
+              )
+              if (!stillValid && proponent.programAndYear) {
+                onUpdate(proponent.id, "programAndYear", "")
+              }
+            }}
+          >
+            <SelectTrigger
+              aria-label="Department"
               className={cn(
-                FIELD_INPUT_CLASS,
-                "cursor-not-allowed bg-neutral-100/70",
-                !selectedDeptCode && "saaf-glow-invalid"
+                "h-9.5 w-full truncate rounded-lg border-neutral-300 bg-white !text-neutral-900",
+                !proponent.campus &&
+                  "cursor-not-allowed bg-neutral-100/70 text-neutral-400 opacity-70",
+                proponent.campus && !selectedDeptCode && "saaf-glow-invalid"
               )}
-            />
-          )}
+            >
+              <SelectValue
+                placeholder={
+                  proponent.campus ? "Select department" : "Select campus first"
+                }
+              >
+                {selectedDeptCode ||
+                  (proponent.campus
+                    ? "Select department"
+                    : "Select campus first")}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent
+              className="animate-in fade-in-80 z-50 max-h-72 rounded-xl bg-white p-1.5 text-neutral-900"
+              style={SELECT_CONTENT_STYLE}
+            >
+              {departmentOptions.map((department) => (
+                <SelectItem
+                  key={department.code}
+                  value={department.code}
+                  className={SELECT_ITEM_CLASS}
+                >
+                  {department.name} ({department.code})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <input
             type="hidden"
             name={`proponent_${index}_department`}
@@ -360,7 +446,7 @@ export const ProponentCard = memo(function ProponentCard({
           <FieldWarning name={`proponent.${proponent.id}.department`} />
         </div>
 
-        <div className="space-y-1.5 md:col-span-3">
+        <div className="space-y-1.5 md:col-span-2">
           <label className="block text-xs font-medium text-neutral-700">
             Program <span className="text-red-500">*</span>
           </label>
@@ -416,7 +502,7 @@ export const ProponentCard = memo(function ProponentCard({
           <FieldWarning name={`proponent.${proponent.id}.programAndYear`} />
         </div>
 
-        <div className="space-y-1.5 md:col-span-3">
+        <div className="space-y-1.5 md:col-span-2">
           <label className="block text-xs font-medium text-neutral-700">
             Year Level <span className="text-red-500">*</span>
           </label>

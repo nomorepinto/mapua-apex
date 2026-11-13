@@ -29,6 +29,11 @@ interface ReservationFormActions {
   handleUpdateEquipmentQuantity: ReservationFormModel["handleUpdateEquipmentQuantity"]
   handlePruneDates: ReservationFormModel["handlePruneDates"]
   handleUpdateRemarks: ReservationFormModel["handleUpdateRemarks"]
+  handleSetRoomEquipment: ReservationFormModel["handleSetRoomEquipment"]
+  handleAddOutsideEquipment: ReservationFormModel["handleAddOutsideEquipment"]
+  handleUpdateOutsideEquipment: ReservationFormModel["handleUpdateOutsideEquipment"]
+  handleRemoveOutsideEquipment: ReservationFormModel["handleRemoveOutsideEquipment"]
+  handleSetOutsideAcknowledged: ReservationFormModel["handleSetOutsideAcknowledged"]
   handleSavePdf: ReservationFormModel["handleSavePdf"]
   handleClearForm: ReservationFormModel["handleClearForm"]
 }
@@ -74,6 +79,11 @@ export function ReservationProvider({ children }: { children: ReactNode }) {
       handleUpdateEquipmentQuantity: form.handleUpdateEquipmentQuantity,
       handlePruneDates: form.handlePruneDates,
       handleUpdateRemarks: form.handleUpdateRemarks,
+      handleSetRoomEquipment: form.handleSetRoomEquipment,
+      handleAddOutsideEquipment: form.handleAddOutsideEquipment,
+      handleUpdateOutsideEquipment: form.handleUpdateOutsideEquipment,
+      handleRemoveOutsideEquipment: form.handleRemoveOutsideEquipment,
+      handleSetOutsideAcknowledged: form.handleSetOutsideAcknowledged,
       handleSavePdf: form.handleSavePdf,
       handleClearForm: form.handleClearForm,
     },

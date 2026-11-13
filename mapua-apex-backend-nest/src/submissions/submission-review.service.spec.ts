@@ -26,11 +26,22 @@ function paper(overrides: Item = {}): Item {
 }
 
 function build(
-  opts: { skipPostEval?: boolean; enabled?: boolean; item?: Item } = {},
+  opts: {
+    skipPostEval?: boolean;
+    enabled?: boolean;
+    item?: Item;
+    signatoryRows?: Record<string, Item>;
+  } = {},
 ) {
   const watched: Item[] = [];
   const updates: Item[] = [];
   const item = opts.item ?? paper();
+  const signatoryRows: Record<string, Item> = {
+    osaar: { role: 'osaar', campus_id: 'intramuros' },
+    'osaar-all': { role: 'osaar', all_campuses: true },
+    cdm: { role: 'cdm' },
+    ...opts.signatoryRows,
+  };
   const submissions = {
     async getSubmission() {
       return item;
@@ -62,6 +73,11 @@ function build(
     {
       async get() {
         return { skip_post_eval: opts.skipPostEval === true };
+      },
+    } as never,
+    {
+      async get(id: string) {
+        return signatoryRows[id];
       },
     } as never,
   );
@@ -216,5 +232,180 @@ describe('SubmissionReviewService desk timings', () => {
     await service.approve(signatoryKey('osaar'), 'e', 's');
 
     expect(updates[0]!.desk_timings).toBeUndefined();
+  });
+});
+
+describe('SubmissionReviewService classification gate (R-1)', () => {
+  it('rejects a campus OSAAR trying to classify', async () => {
+    const { service } = build();
+
+    await expect(
+      service.classify(signatoryKey('osaar'), 'e', 's', 'major'),
+    ).rejects.toMatchObject({
+      response: {
+        message:
+          'Only the all-campus OSAAR can classify an event as major or minor.',
+      },
+    });
+  });
+
+  it('lets the all-campus OSAAR classify', async () => {
+    const { service, updates } = build({
+      item: paper({
+        GSI2PK: 'SIGNATORY#osaar-all',
+        signatory_sequence: ['SIGNATORY#osaar-all'],
+        activity_classification: { activity_type: 'extra-curricular' },
+      }),
+    });
+
+    await service.classify(signatoryKey('osaar-all'), 'e', 's', 'Major');
+
+    expect(updates[0]).toMatchObject({
+      activity_classification: {
+        activity_type: 'extra-curricular',
+        nature: 'major',
+      },
+    });
+  });
+
+  it('rejects a non-OSAAR desk trying to classify', async () => {
+    const { service } = build({
+      item: paper({
+        GSI2PK: 'SIGNATORY#cdm',
+        signatory_sequence: ['SIGNATORY#cdm'],
+      }),
+    });
+
+    await expect(
+      service.classify(signatoryKey('cdm'), 'e', 's', 'minor'),
+    ).rejects.toMatchObject({ response: { message: expect.any(String) } });
+  });
+});
+
+describe('SubmissionReviewService CDM outside-equipment gate (S-8)', () => {
+  function cdmPaper(overrides: Item = {}): Item {
+    return paper({
+      GSI2PK: 'SIGNATORY#cdm',
+      signatory_sequence: ['SIGNATORY#cdm'],
+      signatory_steps: [
+        { key: 'cdm', role: 'cdm', signatory_id: 'SIGNATORY#cdm', organization_id: null },
+      ],
+      venue_reservation: {
+        has_reservation: true,
+        outside_equipment: [
+          { name: 'Sound system', purpose: 'Program audio' },
+          { name: 'Smoke machine' },
+        ],
+      },
+      ...overrides,
+    });
+  }
+
+  it('blocks CDM approve while any outside item is undecided', async () => {
+    const { service } = build({ item: cdmPaper() });
+
+    await expect(
+      service.approve(signatoryKey('cdm'), 'e', 's'),
+    ).rejects.toMatchObject({
+      response: {
+        message: expect.stringContaining('Sound system'),
+      },
+    });
+  });
+
+  it('blocks CDM approve when only some items are decided', async () => {
+    const { service } = build({
+      item: cdmPaper({
+        outside_equipment_decisions: [
+          { name: 'Sound system', allowed: true },
+        ],
+      }),
+    });
+
+    await expect(
+      service.approve(signatoryKey('cdm'), 'e', 's'),
+    ).rejects.toMatchObject({
+      response: {
+        message: expect.stringContaining('Smoke machine'),
+      },
+    });
+  });
+
+  it('allows CDM approve once every item has a decision (allowed or not)', async () => {
+    const { service, updates } = build({
+      item: cdmPaper({
+        outside_equipment_decisions: [
+          { name: 'Sound system', allowed: true },
+          { name: 'Smoke machine', allowed: false },
+        ],
+      }),
+    });
+
+    await service.approve(signatoryKey('cdm'), 'e', 's');
+
+    expect(updates[0]).toMatchObject({ status: 'approved' });
+  });
+
+  it('does not gate a non-CDM desk on outside equipment', async () => {
+    const { service, updates } = build({
+      item: paper({
+        venue_reservation: {
+          has_reservation: true,
+          outside_equipment: [{ name: 'Sound system' }],
+        },
+      }),
+    });
+
+    await service.approve(signatoryKey('osaar'), 'e', 's');
+
+    expect(updates[0]).toMatchObject({ status: 'approved' });
+  });
+
+  it('records per-item decisions for the CDM desk', async () => {
+    const { service, updates } = build({ item: cdmPaper() });
+
+    await service.setOutsideEquipmentDecisions(signatoryKey('cdm'), 'e', 's', [
+      { name: 'Sound system', allowed: true },
+      { name: 'Smoke machine', allowed: false },
+    ]);
+
+    const decisions = updates[0]!.outside_equipment_decisions as Item[];
+    expect(decisions).toHaveLength(2);
+    expect(decisions[0]).toMatchObject({ name: 'Sound system', allowed: true });
+    expect(decisions[1]).toMatchObject({ name: 'Smoke machine', allowed: false });
+    expect(typeof decisions[0]!.decided_at).toBe('string');
+  });
+
+  it('rejects decisions from a non-CDM desk', async () => {
+    // The paper sits on the OSAAR desk so requireOpen passes and the role
+    // check (not the desk check) is what rejects the call.
+    const { service } = build({
+      item: cdmPaper({
+        GSI2PK: desk,
+        signatory_sequence: [desk],
+      }),
+    });
+
+    await expect(
+      service.setOutsideEquipmentDecisions(signatoryKey('osaar'), 'e', 's', [
+        { name: 'Sound system', allowed: true },
+      ]),
+    ).rejects.toMatchObject({
+      response: { message: 'Only the CDM desk can rule on outside equipment.' },
+    });
+  });
+
+  it('rejects a decision for an item that is not listed', async () => {
+    const { service } = build({ item: cdmPaper() });
+
+    await expect(
+      service.setOutsideEquipmentDecisions(signatoryKey('cdm'), 'e', 's', [
+        { name: 'Fog cannon', allowed: true },
+      ]),
+    ).rejects.toMatchObject({
+      response: {
+        message: '"Fog cannon" is not listed as outside equipment.',
+      },
+    });
   });
 });

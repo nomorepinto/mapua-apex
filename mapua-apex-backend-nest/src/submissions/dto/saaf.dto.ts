@@ -18,6 +18,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PRIVACY_NOTICE_VERSION } from '../../privacy/privacy-notice.js';
+import { TERMS_NOTICE_VERSION } from '../../terms/terms-notice.js';
 
 const NO_DIGITS = { message: 'Names cannot contain numbers.' };
 
@@ -32,6 +33,12 @@ export class ClassificationDto {
   @IsOptional()
   @IsIn(['major', 'minor', 'Major', 'Minor'])
   nature?: string;
+
+  /** Nature-of-activity multi-select (S-2); distinct from the OSAAR `nature`. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  nature_of_activity?: string[];
 }
 
 export class ProponentDto {
@@ -75,6 +82,11 @@ export class ProponentDto {
   @IsOptional()
   @IsString()
   department?: string;
+
+  /** Campus the officer is from (S-7); department is chosen within it. */
+  @IsOptional()
+  @IsString()
+  campus?: string;
 
   @IsString()
   @Matches(/^[^\d]*$/, {
@@ -138,6 +150,26 @@ export class ActivityDetailsDto {
 
   @IsNumber()
   proposed_budget!: number;
+
+  /** On-campus / off-campus chosen in the start questionnaire (S-5). */
+  @IsOptional()
+  @IsIn(['on-campus', 'off-campus'])
+  campus_location?: string;
+
+  /** Mapua participant count (S-6); expected_participants stays the total. */
+  @IsOptional()
+  @IsNumber()
+  mapua_participants?: number;
+
+  /** Non-Mapua participant count (S-6); zero unless the switch is on. */
+  @IsOptional()
+  @IsNumber()
+  non_mapua_participants?: number;
+
+  /** Whether non-Mapua participants are included (S-6). */
+  @IsOptional()
+  @IsBoolean()
+  has_non_mapua?: boolean;
 }
 
 export class MissionDto {
@@ -232,6 +264,32 @@ export class SelectionDto {
   slots!: number[];
 }
 
+/** A room-specific equipment selection on a room reservation (S-8). */
+export class RoomEquipmentSelectionDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  name!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  quantity?: number;
+}
+
+/** Outside (non-Mapua) equipment the CDM must rule on item-by-item (S-8). */
+export class OutsideEquipmentDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  purpose?: string;
+}
+
 export class ReservationDto {
   @IsString()
   reservable_id!: string;
@@ -257,6 +315,13 @@ export class ReservationDto {
     message: 'Each reserved room or equipment needs a purpose.',
   })
   remarks!: string;
+
+  /** Room-specific equipment picked for this room reservation (S-8). */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RoomEquipmentSelectionDto)
+  room_equipment?: RoomEquipmentSelectionDto[];
 }
 
 export class VenueDto {
@@ -268,6 +333,13 @@ export class VenueDto {
   @ValidateNested({ each: true })
   @Type(() => ReservationDto)
   reservations?: ReservationDto[];
+
+  /** Outside equipment listed for CDM ruling (S-8). */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OutsideEquipmentDto)
+  outside_equipment?: OutsideEquipmentDto[];
 }
 
 export class CollaborationDto {
@@ -286,6 +358,20 @@ export class CollaborationDto {
  */
 export class PrivacyConsentDto {
   @IsIn([PRIVACY_NOTICE_VERSION])
+  version!: string;
+
+  @IsBoolean()
+  @Equals(true)
+  accepted!: boolean;
+}
+
+/**
+ * SAAF Terms & Conditions consent (S-1), parallel to `PrivacyConsentDto`.
+ * `version` is pinned to the current notice version; optional on `SaafDto` so
+ * the admin `PUT` keeps validating, enforced on the student write path.
+ */
+export class TermsConsentDto {
+  @IsIn([TERMS_NOTICE_VERSION])
   version!: string;
 
   @IsBoolean()
@@ -332,6 +418,11 @@ export class SaafDto {
   @ValidateNested()
   @Type(() => PrivacyConsentDto)
   privacy_consent?: PrivacyConsentDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TermsConsentDto)
+  terms_consent?: TermsConsentDto;
 }
 
 export class CreateSaafDto extends SaafDto {
@@ -349,6 +440,25 @@ export class CommentDto {
 export class ClassificationPatchDto {
   @IsIn(['major', 'minor', 'Major', 'Minor'])
   nature!: string;
+}
+
+/** One CDM ruling for an outside-equipment item (S-8). */
+export class OutsideEquipmentDecisionDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  name!: string;
+
+  @IsBoolean()
+  allowed!: boolean;
+}
+
+/** PATCH payload for the CDM outside-equipment decisions endpoint (S-8). */
+export class OutsideEquipmentPatchDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OutsideEquipmentDecisionDto)
+  decisions!: OutsideEquipmentDecisionDto[];
 }
 
 void IsObject;

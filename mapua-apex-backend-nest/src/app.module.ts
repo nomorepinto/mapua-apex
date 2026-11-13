@@ -26,6 +26,7 @@ import { SessionsModule } from './sessions/sessions.module.js';
 import { SignatoriesModule } from './signatories/signatories.module.js';
 import { SubmissionsModule } from './submissions/submissions.module.js';
 import { TermSettingsModule } from './term-settings/term-settings.module.js';
+import { TermsModule } from './terms/terms.module.js';
 
 const envFile = existingRootEnv();
 
@@ -50,6 +51,7 @@ const envFile = existingRootEnv();
     BookingsModule,
     SubmissionsModule,
     TermSettingsModule,
+    TermsModule,
     DeadlinesModule,
     InputChecksModule,
     PostEvalsModule,

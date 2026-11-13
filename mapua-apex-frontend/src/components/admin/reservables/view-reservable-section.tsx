@@ -111,6 +111,27 @@ export function ViewReservableSection() {
               <p className="text-xs text-neutral-500 capitalize">
                 {selectedReservable.type}
               </p>
+              {selectedReservable.type === "room" &&
+              (selectedReservable.room_equipment ?? []).length > 0 ? (
+                <div className="mt-2 border-t border-neutral-200 pt-2">
+                  <p className="text-xs font-semibold text-neutral-700">
+                    Room-specific equipment
+                  </p>
+                  <ul className="mt-1 flex flex-col gap-0.5">
+                    {(selectedReservable.room_equipment ?? []).map(
+                      (item, index) => (
+                        <li
+                          className="text-xs text-neutral-600"
+                          key={`${item.name}-${index}`}
+                        >
+                          {item.name}
+                          {item.quantity != null ? ` · ${item.quantity}` : ""}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </CardPanel>

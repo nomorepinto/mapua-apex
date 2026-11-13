@@ -1,4 +1,6 @@
 import type {
+  ApiRoomEquipment,
+  OutsideEquipmentItem,
   ReservableCapacityFields,
   ReservableType,
   SlotSelection,
@@ -25,6 +27,8 @@ export interface ReservationPick extends ReservableCapacityFields {
   quantity?: number
   /** Equipment-only; mirrors the reservable's max_quantity for cap enforcement (null = unlimited). */
   max_quantity?: number | null
+  /** Room-only: the room-specific equipment selected for this room (S-8). */
+  room_equipment?: ApiRoomEquipment[]
 }
 
 /**
@@ -36,4 +40,8 @@ export interface ReservationDraft {
   /** Campus id chosen in the reservation step ("" until one is picked). */
   campusId: string
   picks: ReservationPick[]
+  /** S-8 outside equipment (not from Mapua) the student will bring. */
+  outsideEquipment: OutsideEquipmentItem[]
+  /** Student acknowledgement that outside equipment is subject to CDM approval. */
+  outsideEquipmentAcknowledged: boolean
 }
