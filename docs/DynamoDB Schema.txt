@@ -591,7 +591,7 @@ schedule: {
 }
 min_participants: number   (room-only; N attribute, optional = no lower limit)
 max_participants: number   (room-only; N attribute, optional = no upper limit)
-is_classroom: bool         (room-only; true when the name must match the campus classroom format)
+room_type: string          (room-only; one of function_room | classroom | multi_purpose_hall | open_space | laboratory)
 max_quantity: number       (equipment-only; N attribute, optional = absent means unlimited)
 
 The recurring weekly availability template. Days run monday..saturday (Sunday
@@ -613,13 +613,16 @@ against each picked room's bounds in BookingRecords::assertAvailable; an
 out-of-range headcount aborts with 422 before any BOOKING is written. The human
 "capacity_label" in the API response is derived, not stored.
 
-is_classroom marks a room as a classroom. It is persisted ONLY when type is
-"room" and the flag is true (equipment and non-classroom rooms omit it, read
-back as false). When set, create/update enforces that the owning campus defines
-a classroom naming rule and that this room's name matches
+room_type categorizes a room: function_room, classroom, multi_purpose_hall,
+open_space, or laboratory. It is required for rooms (422 when missing) and
+rejected on equipment; it is persisted ONLY when type is "room". Only the
+classroom category carries a naming rule: create/update then enforces that the
+owning campus defines a classroom naming rule and that this room's name matches
 <one prefix><exactly N digits> from that rule (422 otherwise) -- see the CAMPUS
-classroom_name_prefixes/classroom_name_digits note above. Enforced at reservable
-create/update only; the SAAF reservation step and CSV import do not set it.
+classroom_name_prefixes/classroom_name_digits note above. The other categories
+have no extra restrictions. Enforced at reservable create/update only; the SAAF
+reservation step does not set it. Legacy rooms predating room_type are invalid
+and removed by scripts/purge-invalid-reservables.mjs.
 
 max_quantity caps how many units of an equipment item may be booked across all
 approved holds on a given date (e.g. a campus has 10 laptops: max_quantity=10).

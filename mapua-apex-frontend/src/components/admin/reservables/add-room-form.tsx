@@ -7,12 +7,13 @@ import {
   validateParticipantBounds,
   type ParticipantBound,
 } from "@/lib/reservable-capacity-form"
-import { ReservableClassroomField } from "@/components/admin/reservables/reservable-classroom-field"
+import { ReservableRoomTypeField } from "@/components/admin/reservables/reservable-room-type-field"
 import {
   campusHasClassroomFormat,
   classroomFormatHint,
   matchesClassroomName,
 } from "@/lib/campus-classroom-format"
+import { DEFAULT_ROOM_TYPE } from "@/lib/room-types"
 import { CampusSelect } from "@/components/admin/reservables/reservables-fields"
 import { useReservablesPage } from "@/components/admin/reservables/reservables-context"
 import { RoomEquipmentEditor } from "@/components/admin/reservables/room-equipment-editor"
@@ -32,12 +33,13 @@ import {
   toggleScheduleDay,
   toggleScheduleSlot,
 } from "@/lib/schedule-slots"
-import type { ApiRoomEquipment } from "@/lib/types"
+import type { ApiRoomEquipment, RoomType } from "@/lib/types"
 
 /**
  * S-8 "Add Room" flow. The type is fixed to room (no shared room/equipment
- * toggle). S-9 ordering: name → classroom decision → capacity/name-format →
- * room-specific equipment → weekly schedule.
+ * toggle). Ordering: room type → name → capacity → room-specific equipment →
+ * weekly schedule. Only the classroom category enforces the campus naming
+ * format; the other categories have no extra restrictions.
  */
 export function AddRoomForm() {
   const { state, actions } = useReservablesPage()
@@ -46,7 +48,7 @@ export function AddRoomForm() {
 
   const [name, setName] = useState("")
   const [bounds, setBounds] = useState<ParticipantBound>({ min: "", max: "" })
-  const [isClassroom, setIsClassroom] = useState(false)
+  const [roomType, setRoomType] = useState<RoomType>(DEFAULT_ROOM_TYPE)
   const [roomEquipment, setRoomEquipment] = useState<ApiRoomEquipment[]>([])
   const [schedule, setSchedule] = useState(() => allAvailableSchedule())
   const [formError, setFormError] = useState("")
@@ -90,19 +92,25 @@ export function AddRoomForm() {
       setFormError(capacityError)
       return
     }
-    const classroom = isClassroom && hasClassroomFormat
-    if (
-      classroom &&
-      !matchesClassroomName(
-        selectedCampus?.classroom_name_prefixes,
-        selectedCampus?.classroom_name_digits,
-        trimmed
-      )
-    ) {
-      setFormError(
-        `A classroom room must be named ${classroomHint ?? "to the campus format"}.`
-      )
-      return
+    if (roomType === "classroom") {
+      if (!hasClassroomFormat) {
+        setFormError(
+          "This campus has no classroom name format yet. Ask OSAAR to set one before adding classrooms."
+        )
+        return
+      }
+      if (
+        !matchesClassroomName(
+          selectedCampus?.classroom_name_prefixes,
+          selectedCampus?.classroom_name_digits,
+          trimmed
+        )
+      ) {
+        setFormError(
+          `A classroom room must be named ${classroomHint ?? "to the campus format"}.`
+        )
+        return
+      }
     }
     const equipment = roomEquipment
       .map((row) => ({ name: row.name.trim(), quantity: row.quantity ?? null }))
@@ -114,13 +122,13 @@ export function AddRoomForm() {
         name: trimmed,
         type: "room",
         ...participantBoundPayload(bounds),
-        is_classroom: classroom,
+        room_type: roomType,
         schedule,
         room_equipment: equipment,
       })
       setName("")
       setBounds({ min: "", max: "" })
-      setIsClassroom(false)
+      setRoomType(DEFAULT_ROOM_TYPE)
       setRoomEquipment([])
       setSchedule(allAvailableSchedule())
       setFormError("")
@@ -143,6 +151,17 @@ export function AddRoomForm() {
           onChange={setCampusId}
           value={campusId}
         />
+        <ReservableRoomTypeField
+          disabled={createReservable.isPending}
+          formatHint={classroomHint}
+          hasCampusFormat={hasClassroomFormat}
+          id="add-room-type"
+          onChange={(next) => {
+            setRoomType(next)
+            if (formError) setFormError("")
+          }}
+          value={roomType}
+        />
         <Field>
           <FieldLabel htmlFor="add-room-name">Name</FieldLabel>
           <Input
@@ -159,19 +178,6 @@ export function AddRoomForm() {
             value={name}
           />
         </Field>
-        {/* S-9: the classroom decision comes before the capacity/name-format fields. */}
-        <ReservableClassroomField
-          checked={isClassroom}
-          disabled={createReservable.isPending}
-          formatHint={classroomHint}
-          hasCampusFormat={hasClassroomFormat}
-          id="add-room-classroom"
-          onChange={(next) => {
-            setIsClassroom(next)
-            if (formError) setFormError("")
-          }}
-          type="room"
-        />
         <ReservableCapacityFieldsForm
           bounds={bounds}
           disabled={createReservable.isPending}

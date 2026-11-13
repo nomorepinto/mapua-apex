@@ -3,8 +3,9 @@ import { CircleAlertIcon } from "lucide-react"
 
 import { ReservableCapacityFieldsForm } from "@/components/admin/reservables/reservable-capacity-fields"
 import { participantBoundPayload, participantBoundsFromValues, stripCapacityForType, validateParticipantBounds, type ParticipantBound } from "@/lib/reservable-capacity-form"
-import { ReservableClassroomField } from "@/components/admin/reservables/reservable-classroom-field"
+import { ReservableRoomTypeField } from "@/components/admin/reservables/reservable-room-type-field"
 import { campusHasClassroomFormat, classroomFormatHint, matchesClassroomName } from "@/lib/campus-classroom-format"
+import { DEFAULT_ROOM_TYPE } from "@/lib/room-types"
 import { RoomEquipmentEditor } from "@/components/admin/reservables/room-equipment-editor"
 import { ScheduleGrid } from "@/components/admin/reservables/schedule-grid"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -39,7 +40,7 @@ import {
   toggleScheduleDay,
   toggleScheduleSlot,
 } from "@/lib/schedule-slots"
-import type { ApiCampus, ApiReservable, ApiRoomEquipment, ReservableSchedule, ReservableType } from "@/lib/types"
+import type { ApiCampus, ApiReservable, ApiRoomEquipment, ReservableSchedule, ReservableType, RoomType } from "@/lib/types"
 
 export interface ReservableDraft {
   name: string
@@ -47,7 +48,8 @@ export interface ReservableDraft {
   schedule: ReservableSchedule
   min_participants: number | null
   max_participants: number | null
-  is_classroom: boolean
+  /** Room-only category; null for equipment. */
+  room_type: RoomType | null
   /** Equipment-only; null = unlimited. */
   max_quantity: number | null
   /** Room-specific equipment (S-8); rooms only, empty for campus equipment. */
@@ -95,7 +97,7 @@ export function EditReservableDialog({
   const [bounds, setBounds] = useState<ParticipantBound>(() =>
     participantBoundsFromValues(reservable.min_participants, reservable.max_participants)
   )
-  const [isClassroom, setIsClassroom] = useState(() => reservable.is_classroom === true)
+  const [roomType, setRoomType] = useState<RoomType>(() => reservable.room_type ?? DEFAULT_ROOM_TYPE)
   // Equipment-only; seeded from the stored value (null when absent or when type = room).
   const [maxQuantity, setMaxQuantity] = useState<string>(() =>
     reservable.type === "equipment" && reservable.max_quantity != null
@@ -146,10 +148,15 @@ export function EditReservableDialog({
       setLocalError(capacityError)
       return
     }
-    const classroom = type === "room" && isClassroom && hasClassroomFormat
-    if (classroom && !matchesClassroomName(campus?.classroom_name_prefixes, campus?.classroom_name_digits, trimmed)) {
-      setLocalError(`A classroom room must be named ${classroomHint ?? "to the campus format"}.`)
-      return
+    if (type === "room" && roomType === "classroom") {
+      if (!hasClassroomFormat) {
+        setLocalError("This campus has no classroom name format yet. Ask OSAAR to set one before adding classrooms.")
+        return
+      }
+      if (!matchesClassroomName(campus?.classroom_name_prefixes, campus?.classroom_name_digits, trimmed)) {
+        setLocalError(`A classroom room must be named ${classroomHint ?? "to the campus format"}.`)
+        return
+      }
     }
 
     setLocalError("")
@@ -158,7 +165,7 @@ export function EditReservableDialog({
       type,
       schedule,
       ...participantBoundPayload(stripCapacityForType(type, bounds)),
-      is_classroom: classroom,
+      room_type: type === "room" ? roomType : null,
       max_quantity: type === "equipment" && maxQuantity !== "" ? parseInt(maxQuantity, 10) : null,
       room_equipment:
         type === "room"
@@ -189,6 +196,19 @@ export function EditReservableDialog({
           </DialogHeader>
           <Form className="contents" onSubmit={handleSubmit}>
             <DialogPanel className="flex flex-col gap-4">
+              {type === "room" ? (
+                <ReservableRoomTypeField
+                  disabled={savePending}
+                  formatHint={classroomHint}
+                  hasCampusFormat={hasClassroomFormat}
+                  id="edit-reservable-room-type"
+                  onChange={(next) => {
+                    setRoomType(next)
+                    if (localError) setLocalError("")
+                  }}
+                  value={roomType}
+                />
+              ) : null}
               <Field>
                 <FieldLabel htmlFor="edit-reservable-name">Name</FieldLabel>
                 <Input
@@ -206,19 +226,6 @@ export function EditReservableDialog({
                 />
                 {nameGibberish.indicator}
               </Field>
-              {/* S-9: the classroom decision comes before the capacity/name-format fields. */}
-              <ReservableClassroomField
-                checked={isClassroom}
-                disabled={savePending}
-                formatHint={classroomHint}
-                hasCampusFormat={hasClassroomFormat}
-                id="edit-reservable-classroom"
-                onChange={(next) => {
-                  setIsClassroom(next)
-                  if (localError) setLocalError("")
-                }}
-                type={type}
-              />
               <ReservableCapacityFieldsForm
                 bounds={bounds}
                 disabled={savePending}

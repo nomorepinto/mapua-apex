@@ -12,6 +12,7 @@
     "build:stream": "node scripts/build-lambda.mjs stream",
     "build:web": "nest build",
     "backfill:campuses": "node scripts/backfill-campus-departments.mjs",
+    "purge:reservables": "node scripts/purge-invalid-reservables.mjs",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

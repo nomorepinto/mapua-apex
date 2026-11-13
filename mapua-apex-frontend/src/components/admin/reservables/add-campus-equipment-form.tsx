@@ -66,7 +66,6 @@ export function AddCampusEquipmentForm() {
         name: trimmed,
         type: "equipment",
         ...participantBoundPayload({ min: "", max: "" }),
-        is_classroom: false,
         schedule,
         max_quantity: maxQuantity !== "" ? parseInt(maxQuantity, 10) : null,
       })

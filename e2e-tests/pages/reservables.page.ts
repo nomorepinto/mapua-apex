@@ -6,14 +6,15 @@ import { choose, pickIsoDate } from "../support/ui"
 export class ReservablesPage {
   constructor(private readonly page: Page) {}
 
-  async addRoom(campus: string, name: string, min: string, max: string, classroom: boolean) {
+  async addRoom(campus: string, name: string, min: string, max: string, roomType: string) {
     await this.page.goto("/cdm/reservables/add")
     // S-8: the combined form is split into two tabs, each fixing its type.
     await this.page.getByRole("tab", { name: "Add Room" }).click()
     await choose(this.page, this.page.getByLabel("Campus"), campus)
+    // The room category dropdown sits above the name input; only classrooms
+    // enforce the campus naming format.
+    await choose(this.page, this.page.getByLabel("Room type"), roomType)
     await this.page.getByLabel("Name").fill(name)
-    // S-9: the classroom decision precedes the capacity fields.
-    if (classroom) await this.page.getByRole("checkbox", { name: "This room is a classroom" }).check()
     await this.page.getByLabel("Minimum participants").fill(min)
     await this.page.getByLabel("Maximum participants").fill(max)
     await this.page.getByRole("button", { name: "Add room" }).click()

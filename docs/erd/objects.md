@@ -435,14 +435,14 @@ doubles as the BOOKING partition key.
 | `schedule` | object | Recurring weekly template: `monday`..`saturday`, each exactly 12 booleans (one per 07:00–21:00 / 70-min slot; `true` = available). Sunday is never reservable; an absent day is all-unavailable |
 | `min_participants` | number | **Room-only, optional.** Lower bound on the expected headcount a room can hold. Omitted/unset = no lower limit; never stored for `equipment` |
 | `max_participants` | number | **Room-only, optional.** Upper bound on the expected headcount a room can hold. Omitted/unset = no upper limit; never stored for `equipment` |
-| `is_classroom` | boolean | **Room-only, optional.** True marks the room as a classroom whose `name` must match the owning campus's classroom format. Stored only when `type` is `room` and the flag is true; read back as false otherwise |
+| `room_type` | string | **Room-only, required.** One of `function_room` \| `classroom` \| `multi_purpose_hall` \| `open_space` \| `laboratory`. Only `classroom` requires the `name` to match the owning campus's classroom format; the other categories have no extra restrictions. Never stored for `equipment` |
 
-Added/edited by cdm on the `/reservables` page (CSV for name+type, a grid for the
-schedule; participant bounds are room-only inputs, disabled and dropped for
-equipment). The `is_classroom` toggle is room-only and shown-but-disabled until
-the selected campus defines a classroom format; when enabled the room `name` is
-validated against `<one prefix><exactly N digits>` at create/update (**422** on
-the name if it misses, or **422** on `is_classroom` if the campus has no format).
+Added/edited by cdm on the `/reservables` page (CSV for name+type+room_type, a
+grid for the schedule; participant bounds are room-only inputs, disabled and
+dropped for equipment). The `room_type` dropdown sits above the room name input;
+when `classroom` is selected the room `name` is validated against
+`<one prefix><exactly N digits>` at create/update (**422** on the name if it
+misses, or **422** on `room_type` if the campus has no format).
 On SAAF submit the activity's `expected_participants` is checked
 against each picked room's bounds (`BookingRecords::assertAvailable`); an
 out-of-range headcount aborts with **422** before any BOOKING is written.

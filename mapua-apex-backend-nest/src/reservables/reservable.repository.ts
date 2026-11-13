@@ -6,7 +6,8 @@ import {
   reservableKey,
   stripPrefix,
 } from '../common/dynamo-keys.js';
-import { bool, num, record, str, type Item } from '../common/records.js';
+import { num, record, str, type Item } from '../common/records.js';
+import { isRoomType, type RoomType } from './room-types.js';
 import { capacityLabel, normalizeSchedule, type Schedule } from './schedule.js';
 
 export interface RoomEquipmentItem {
@@ -23,7 +24,8 @@ export interface ReservableView {
   min_participants: number | null;
   max_participants: number | null;
   capacity_label: string | null;
-  is_classroom: boolean;
+  /** Room category; null for equipment (and legacy rooms predating room_type). */
+  room_type: RoomType | null;
   max_quantity: number | null;
   room_equipment: RoomEquipmentItem[];
 }
@@ -101,8 +103,8 @@ export class ReservableRepository {
       item.min_participants = fields.min;
       item.max_participants = fields.max;
     }
-    if (fields.type === 'room' && fields.isClassroom) {
-      item.is_classroom = true;
+    if (fields.type === 'room' && fields.roomType !== null) {
+      item.room_type = fields.roomType;
     }
     if (fields.type === 'equipment' && fields.maxQuantity !== null) {
       item.max_quantity = fields.maxQuantity;
@@ -121,7 +123,7 @@ export interface ReservableWrite {
   schedule: Schedule;
   min: number | null;
   max: number | null;
-  isClassroom: boolean;
+  roomType: RoomType | null;
   maxQuantity: number | null;
   roomEquipment: RoomEquipmentItem[];
 }
@@ -139,7 +141,8 @@ export function toReservable(item: Item): ReservableView {
     min_participants: min,
     max_participants: max,
     capacity_label: type === 'room' ? capacityLabel(min, max) : null,
-    is_classroom: type === 'room' && bool(item, 'is_classroom'),
+    room_type:
+      type === 'room' && isRoomType(item.room_type) ? item.room_type : null,
     max_quantity: type === 'equipment' ? num(item, 'max_quantity') : null,
     room_equipment: type === 'room' ? toRoomEquipment(item.room_equipment) : [],
   };

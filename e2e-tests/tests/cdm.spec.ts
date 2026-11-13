@@ -12,10 +12,10 @@ test("reviewer adds rooms and equipment, then holds and releases a slot", async 
   const reservables = new ReservablesPage(session.page)
   try {
     await captureJson(session.page, "/reservables", "POST", () =>
-      reservables.addRoom(run.campus, "R101", "10", "80", true),
+      reservables.addRoom(run.campus, "R101", "10", "80", "Classroom"),
     )
     await captureJson(session.page, "/reservables", "POST", () =>
-      reservables.addRoom(run.campus, "Auditorium", "20", "200", false),
+      reservables.addRoom(run.campus, "Auditorium", "20", "200", "Function Room"),
     )
     await captureJson(session.page, "/reservables", "POST", () =>
       reservables.addEquipment(run.campus, "Projector", "4"),

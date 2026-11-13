@@ -116,6 +116,10 @@ export function AddReservableSection() {
       payloads.push({
         name: trimmed,
         type: row.type,
+        // Room rows carry their category; equipment rows have none.
+        ...(row.type === "room" && row.room_type
+          ? { room_type: row.room_type }
+          : {}),
         // CSV rows carry no capacity; set it on the room afterwards.
         ...participantBoundPayload({ min: "", max: "" }),
         // Imported rows start all-available Mon-Sat, then edited on the grid.
@@ -398,13 +402,14 @@ function ImportReservablesCsv({
       <CardHeader>
         <CardTitle>Import CSV</CardTitle>
         <CardDescription>
-          Two columns: name and type (room or equipment). Imported rows start
-          all-available Mon-Sat — refine each on the grid afterwards.
+          Three columns: name, type (room or equipment), and room_type for
+          rooms. Imported rows start all-available Mon-Sat — refine each on
+          the grid afterwards.
         </CardDescription>
       </CardHeader>
       <CardPanel className="flex flex-col gap-4">
         <CsvFileField
-          description="name, type."
+          description="name, type, room_type."
           error={csvError}
           fileName={csvFileName}
           id="reservables-csv"

@@ -22,10 +22,10 @@ import { modal } from "@/config"
 /**
  * Account-creation consent gate. The full versioned notices (Terms &
  * Conditions plus the RA 10173 privacy notice) stay the backend's authority —
- * nothing here duplicates the wording — but instead of rendering them inline
- * the gate shows a compact "Terms and conditions" button that opens the
- * complete text in a scrollable dialog, followed by a single agreement
- * checkbox covering both notices.
+ * nothing here duplicates the wording. The gate is a compact "Terms and
+ * conditions" button that opens the complete text in a scrollable dialog;
+ * the single agreement checkbox sits at the very BOTTOM of that text, so the
+ * user must scroll through the notices to reach it before they can accept.
  *
  * `onAcceptedChange` reports whether BOTH notices have loaded and the checkbox
  * is ticked. The parent keeps "Create account" disabled until then and
@@ -85,7 +85,8 @@ export function SignupConsentGate({
         </p>
       </div>
 
-      {/* Opens the full Terms & Conditions + privacy notice text in a dialog */}
+      {/* Opens the full Terms & Conditions + privacy notice text in a dialog;
+          the agreement checkbox lives at the bottom of that text */}
       <Button
         type="button"
         variant="outline"
@@ -96,30 +97,23 @@ export function SignupConsentGate({
         Terms and conditions
       </Button>
 
-      {/* Single agreement checkbox gating account creation */}
-      <label className="flex cursor-pointer items-start gap-2 text-xs leading-snug text-neutral-700">
-        <Checkbox
-          className="mt-0.5"
-          checked={checked}
-          disabled={disabled || !ready}
-          onCheckedChange={(value) => setChecked(Boolean(value))}
-        />
-        <span>{consentLabel}</span>
-      </label>
-
-      {!ready && (
-        <p
-          className={
-            loadFailed
+      <p
+        className={
+          accepted
+            ? "text-xs font-medium text-emerald-700"
+            : loadFailed
               ? "text-xs text-destructive"
               : "text-xs text-neutral-500"
-          }
-        >
-          {loadFailed
+        }
+      >
+        {accepted
+          ? "You have agreed to the Terms & Conditions."
+          : loadFailed
             ? "The Terms & Conditions could not be loaded. Please close and reopen this dialog to try again."
-            : "Loading the Terms & Conditions…"}
-        </p>
-      )}
+            : !ready
+              ? "Loading the Terms & Conditions…"
+              : "Open the Terms and conditions and tick the agreement at the end of the text to enable account creation."}
+      </p>
 
       {/* Scrollable dialog with the complete notice text, layered above the
           hand-rolled sign-up modal (z-50) via the nested z-[70] stack */}
@@ -138,6 +132,18 @@ export function SignupConsentGate({
                 <TermsNoticeBody notice={termsNotice} showAcknowledgements />
                 <hr className="border-neutral-200" />
                 <PrivacyNoticeBody notice={privacyNotice} />
+                {/* Agreement sits at the very bottom of the full text, so the
+                    notices must be scrolled through before it can be ticked */}
+                <hr className="border-neutral-200" />
+                <label className="flex cursor-pointer items-start gap-2 text-xs leading-snug text-neutral-700">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={checked}
+                    disabled={disabled}
+                    onCheckedChange={(value) => setChecked(Boolean(value))}
+                  />
+                  <span>{consentLabel}</span>
+                </label>
               </div>
             ) : loadFailed ? (
               <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">

@@ -37,6 +37,7 @@ import {
   startOfLocalDay,
 } from "@/lib/date-key"
 import { dayKeyForDate } from "@/lib/schedule-slots"
+import { roomTypeLabel } from "@/lib/room-types"
 import { cn } from "@/lib/utils"
 
 export function ViewReservableSection() {
@@ -109,7 +110,9 @@ export function ViewReservableSection() {
                 {selectedReservable.name}
               </p>
               <p className="text-xs text-neutral-500 capitalize">
-                {selectedReservable.type}
+                {selectedReservable.type === "room"
+                  ? roomTypeLabel(selectedReservable.room_type)
+                  : selectedReservable.type}
               </p>
               {selectedReservable.type === "room" &&
               (selectedReservable.room_equipment ?? []).length > 0 ? (

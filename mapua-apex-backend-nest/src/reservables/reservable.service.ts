@@ -19,6 +19,7 @@ import {
   type RoomEquipmentItem,
 } from './reservable.repository.js';
 import { DAYS, normalizeSchedule, SLOT_COUNT } from './schedule.js';
+import type { RoomType } from './room-types.js';
 
 @Injectable()
 export class ReservableService {
@@ -108,8 +109,23 @@ export class ReservableService {
         },
       });
     }
-    const classroom = body.type === 'room' && body.is_classroom === true;
-    if (classroom) {
+    const roomType: RoomType | null =
+      body.type === 'room' ? (body.room_type ?? null) : null;
+    if (body.type === 'room' && roomType === null) {
+      throw new UnprocessableEntityException({
+        message: 'Choose a room type.',
+        errors: { room_type: ['Choose a room type.'] },
+      });
+    }
+    if (body.type === 'equipment' && body.room_type != null) {
+      throw new UnprocessableEntityException({
+        message: 'room_type only applies to rooms, not equipment.',
+        errors: {
+          room_type: ['room_type only applies to rooms, not equipment.'],
+        },
+      });
+    }
+    if (roomType === 'classroom') {
       const view = toCampus(campus);
       const prefixes = normalizePrefixes(view.classroom_name_prefixes);
       const digits = num(campus, 'classroom_name_digits');
@@ -117,7 +133,7 @@ export class ReservableService {
         throw new UnprocessableEntityException({
           message: 'This campus has no classroom name format configured yet.',
           errors: {
-            is_classroom: [
+            room_type: [
               'This campus has no classroom name format configured yet.',
             ],
           },
@@ -137,7 +153,7 @@ export class ReservableService {
       schedule: normalizeSchedule(body.schedule),
       min,
       max,
-      isClassroom: classroom,
+      roomType,
       maxQuantity:
         body.type === 'equipment' ? (body.max_quantity ?? null) : null,
       roomEquipment: this.roomEquipment(body),

@@ -112,6 +112,7 @@ describe('ReservableService room_equipment rules (S-8)', () => {
     await service.create('c', {
       name: 'N101',
       type: 'room',
+      room_type: 'function_room',
       schedule,
       room_equipment: [{ name: ' Projector ', quantity: 2 }],
     } as never);
@@ -127,6 +128,7 @@ describe('ReservableService room_equipment rules (S-8)', () => {
     await service.create('c', {
       name: 'N101',
       type: 'room',
+      room_type: 'function_room',
       schedule,
       room_equipment: [{ name: 'Podium' }],
     } as never);
@@ -162,6 +164,7 @@ describe('ReservableService room_equipment rules (S-8)', () => {
       service.create('c', {
         name: 'N101',
         type: 'room',
+        room_type: 'function_room',
         schedule,
         room_equipment: [{ name: '   ' }],
       } as never),

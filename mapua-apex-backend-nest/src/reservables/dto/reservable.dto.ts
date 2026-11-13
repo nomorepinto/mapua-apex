@@ -14,6 +14,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { ROOM_TYPES, type RoomType } from '../room-types.js';
 
 class DaySlotsDto {
   @IsArray()
@@ -58,9 +59,10 @@ export class ReservableDto {
   @Max(3000)
   max_participants?: number | null;
 
+  /** Room category; required for rooms, rejected on equipment. */
   @IsOptional()
-  @IsBoolean()
-  is_classroom?: boolean | null;
+  @IsIn(ROOM_TYPES)
+  room_type?: RoomType | null;
 
   @IsOptional()
   @IsInt()

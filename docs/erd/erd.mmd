@@ -25,7 +25,7 @@ graph TD
 
     CAMPUS["<b>CAMPUS</b><br/>PK = CAMPUS#uuid<br/>SK = CAMPUS#uuid<br/>------------------<br/>name<br/>classroom_name_prefixes[] (optional)<br/>classroom_name_digits (optional)"]
 
-    RESERVABLE["<b>RESERVABLE</b><br/>PK = CAMPUS#uuid<br/>SK = RESERVABLE#uuid<br/>------------------<br/>name<br/>type : room / equipment<br/>schedule : mon-sat x 12 bools<br/>min_participants / max_participants (room-only)<br/>is_classroom (room-only)"]
+    RESERVABLE["<b>RESERVABLE</b><br/>PK = CAMPUS#uuid<br/>SK = RESERVABLE#uuid<br/>------------------<br/>name<br/>type : room / equipment<br/>schedule : mon-sat x 12 bools<br/>min_participants / max_participants (room-only)<br/>room_type (room-only: function_room / classroom / multi_purpose_hall / open_space / laboratory)"]
 
     BOOKING["<b>BOOKING</b><br/>PK = RESERVABLE#uuid<br/>SK = BOOKING#uuid<br/>------------------<br/>timestamp<br/>schedule_selected[] : date + slots<br/>source : submission / cdm<br/>GSI5PK = ORGANIZATION#uuid (submission)<br/>booked_by / reason (cdm)"]
 

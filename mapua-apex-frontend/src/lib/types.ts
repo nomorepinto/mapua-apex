@@ -129,6 +129,14 @@ export type ReservableSchedule = Record<ReservableDay, boolean[]>
 
 export type ReservableType = "room" | "equipment"
 
+/** Room category; only `classroom` carries the campus naming rule. */
+export type RoomType =
+  | "function_room"
+  | "classroom"
+  | "multi_purpose_hall"
+  | "open_space"
+  | "laboratory"
+
 /** One concrete date plus the 70-minute slot indices (0..11) selected on it. */
 export interface SlotSelection {
   /** `YYYY-MM-DD` */
@@ -191,8 +199,8 @@ export interface ApiReservable extends ReservableCapacityFields {
   schedule: ReservableSchedule
   /** Pre-formatted capacity note from the API (e.g. "between 50 and 100 participants"). */
   capacity_label?: string | null
-  /** Room-only flag; true when the room must match the campus classroom name format. */
-  is_classroom?: boolean
+  /** Room-only category; null for equipment. */
+  room_type?: RoomType | null
   /** Equipment-only; null = unlimited. */
   max_quantity?: number | null
   /** Room-specific equipment stored on the room (S-8); rooms only. */
@@ -292,7 +300,8 @@ export type CreateReservablePayload = ReservableCapacityFields & {
   name: string
   type: ReservableType
   schedule: ReservableSchedule
-  is_classroom?: boolean
+  /** Room-only category; required for rooms. */
+  room_type?: RoomType | null
   /** Equipment-only; null = unlimited. */
   max_quantity?: number | null
   /** Room-specific equipment (S-8); rooms only. */

@@ -2,7 +2,7 @@ import type {
   ApiSignatoryRole,
   OrganizationAssignableDeskRole,
 } from "@/lib/dynamodb-adapters"
-import type { ReservableType } from "@/lib/types"
+import type { ReservableType, RoomType } from "@/lib/types"
 import { resolveDepartment } from "@/lib/departments"
 
 /** Split CSV text into trimmed rows, honoring quoted commas and BOM. */
@@ -368,6 +368,8 @@ export function parseOrganizationCsv(text: string): {
 export type ReservableCsvRow = {
   name: string
   type: ReservableType
+  /** Room-only category; required on room rows, absent on equipment rows. */
+  room_type?: RoomType
 }
 
 const RESERVABLE_TYPE_ALIASES: Record<string, ReservableType> = {
@@ -387,11 +389,31 @@ export function parseReservableType(value: string): ReservableType | null {
   return RESERVABLE_TYPE_ALIASES[value.trim().toLowerCase()] ?? null
 }
 
+const ROOM_TYPE_ALIASES: Record<string, RoomType> = {
+  function_room: "function_room",
+  "function room": "function_room",
+  classroom: "classroom",
+  multi_purpose_hall: "multi_purpose_hall",
+  "multi-purpose hall": "multi_purpose_hall",
+  "multipurpose hall": "multi_purpose_hall",
+  open_space: "open_space",
+  "open space": "open_space",
+  "open spaces": "open_space",
+  laboratory: "laboratory",
+  laboratories: "laboratory",
+  lab: "laboratory",
+}
+
+export function parseRoomType(value: string): RoomType | null {
+  return ROOM_TYPE_ALIASES[value.trim().toLowerCase()] ?? null
+}
+
 /**
- * Parse a reservable CSV of `name,type`. Type accepts room/equipment (plus a few
- * friendly aliases); the weekly schedule is NOT in the file — imported rows
- * default to all-available Mon-Sat and are edited afterwards on the grid.
- * A header row is optional.
+ * Parse a reservable CSV of `name,type,room_type`. Type accepts room/equipment
+ * (plus a few friendly aliases); room rows also need a room_type (function_room,
+ * classroom, multi_purpose_hall, open_space, laboratory). The weekly schedule is
+ * NOT in the file — imported rows default to all-available Mon-Sat and are
+ * edited afterwards on the grid. A header row is optional.
  */
 export function parseReservableCsv(text: string): {
   rows: ReservableCsvRow[]
@@ -407,10 +429,14 @@ export function parseReservableCsv(text: string): {
   const first = rows[0]
   const hasHeader =
     headerIndex(first, ["name"]) >= 0 || headerIndex(first, ["type"]) >= 0
-  const header = hasHeader ? first : ["name", "type"]
+  const header = hasHeader ? first : ["name", "type", "room_type"]
   const start = hasHeader ? 1 : 0
   const nameIdx = headerIndex(header, ["name"]) >= 0 ? headerIndex(header, ["name"]) : 0
   const typeIdx = headerIndex(header, ["type"]) >= 0 ? headerIndex(header, ["type"]) : 1
+  const roomTypeIdx =
+    headerIndex(header, ["room_type", "room type"]) >= 0
+      ? headerIndex(header, ["room_type", "room type"])
+      : 2
 
   const parsed: ReservableCsvRow[] = []
 
@@ -418,15 +444,28 @@ export function parseReservableCsv(text: string): {
     const row = rows[i]
     const name = row[nameIdx]?.trim() ?? ""
     const typeRaw = row[typeIdx]?.trim() ?? ""
+    const roomTypeRaw = row[roomTypeIdx]?.trim() ?? ""
     const line = i + 1
 
-    if (!name && !typeRaw) {
+    if (!name && !typeRaw && !roomTypeRaw) {
       continue
     }
 
     const type = parseReservableType(typeRaw)
     if (!name || !type) {
       errors.push(`Row ${line}: expected name and type (room | equipment).`)
+      continue
+    }
+
+    if (type === "room") {
+      const roomType = parseRoomType(roomTypeRaw)
+      if (!roomType) {
+        errors.push(
+          `Row ${line}: rooms need a room_type (function_room | classroom | multi_purpose_hall | open_space | laboratory).`
+        )
+        continue
+      }
+      parsed.push({ name, type, room_type: roomType })
       continue
     }
 
