@@ -39,7 +39,7 @@ const STEPS: StepItem[] = [
     number: "03",
     title: "Consent, Submit & Track",
     description:
-      "Before submitting, confirm every disclaimer: tick the Data Privacy Act of 2012 (RA 10173) consent and all of the Terms & Conditions acknowledgements — the versions you accept are recorded with your paper. Your proposal then moves through the multi-tiered review chain (organization adviser, department dean, OSA, and the CDM desk for on-campus facilities). Track real-time progress in the Milestone & Progress view, which shows how long each desk takes and the total time to final approval under your document number.",
+      "Before submitting, confirm the disclaimer in the submit dialog: tick the Data Privacy Act of 2012 (RA 10173) consent — the privacy and Terms & Conditions versions you accepted are recorded with your paper. Your proposal then moves through the multi-tiered review chain (organization adviser, department dean, OSA, and the CDM desk for on-campus facilities). Track real-time progress in the Milestone & Progress view, which shows how long each desk takes and the total time to final approval under your document number.",
     icon: Rocket,
     actionLabel: "Endorsement tracking",
   },

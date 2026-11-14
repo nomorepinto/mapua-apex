@@ -1,13 +1,11 @@
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { useTermsNoticeQuery, type ApiTermsNotice } from "@/hooks/use-terms-notice"
+import type { ApiTermsNotice } from "@/hooks/use-terms-notice"
 
 /**
  * Full T&C notice text, version-free layout (no border or height cap) so
  * surfaces like the sign-up modal can render the complete notice inside their
  * own scroll container. The wording always comes from the backend notice.
  * `showAcknowledgements` folds the acknowledgement items into the text for
- * surfaces without per-item checkboxes; the SAAF panel keeps them on the
- * ticks instead.
+ * surfaces without per-item checkboxes.
  */
 export function TermsNoticeBody({
   notice,
@@ -47,21 +45,6 @@ export function TermsNoticeBody({
   )
 }
 
-/**
- * Read-only SAAF Terms & Conditions panel (S-1). The text and version come
- * from the backend notice (the authority the proponent consents against), so
- * nothing here duplicates the wording.
- */
-export function TermsConsentNotice({ notice }: { notice: ApiTermsNotice }) {
-  return (
-    <div className="rounded-xl border border-neutral-200 bg-neutral-50">
-      <ScrollArea className="max-h-56 px-4 py-3" scrollbarGutter>
-        <TermsNoticeBody notice={notice} />
-      </ScrollArea>
-    </div>
-  )
-}
-
 function NoticeSection({ title, items }: { title: string; items: string[] }) {
   if (!items.length) return null
   return (
@@ -76,41 +59,4 @@ function NoticeSection({ title, items }: { title: string; items: string[] }) {
       </ul>
     </div>
   )
-}
-
-/**
- * T&C consent-gate helper for the pre-submit dialog (S-1), mirroring
- * `usePrivacyConsent`. `ready` is true only once the current notice has
- * loaded, so loading/error states keep the confirmation disabled instead of
- * silently passing. `checkboxes` are the explicit acknowledgements the
- * proponent must ALL tick before Proceed; `version` is the notice version to
- * record against the submission.
- */
-export function useTermsConsent() {
-  const { data, isLoading, isError } = useTermsNoticeQuery()
-  const notice = data ?? null
-  const ready = notice !== null
-
-  const content = isLoading ? (
-    <p className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
-      Loading the Terms &amp; Conditions…
-    </p>
-  ) : isError || !notice ? (
-    <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-      The Terms &amp; Conditions could not be loaded. Please try again before
-      submitting.
-    </p>
-  ) : (
-    <TermsConsentNotice notice={notice} />
-  )
-
-  const checkboxes = (notice?.acknowledgements ?? []).map((label) => ({ label }))
-
-  return {
-    content,
-    checkboxes,
-    ready,
-    disabled: !ready,
-    version: notice?.version ?? null,
-  }
 }

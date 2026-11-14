@@ -24,13 +24,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useCurrentOrganizationQuery, useOfficersQuery } from "@/hooks/use-submissions"
+import {
+  useCurrentOrganizationQuery,
+  useOfficersQuery,
+} from "@/hooks/use-submissions"
 import { layout } from "@/config"
 import { cn } from "@/lib/utils"
 import type { ApiOfficer } from "@/lib/dynamodb-adapters"
 
 function officerFullName(officer: ApiOfficer): string {
-  return [officer.first_name, officer.middle_name, officer.last_name, officer.suffix]
+  return [
+    officer.first_name,
+    officer.middle_name,
+    officer.last_name,
+    officer.suffix,
+  ]
     .filter(Boolean)
     .join(" ")
 }
@@ -108,12 +116,15 @@ export function ProponentsSection({
     (o) =>
       !addedStudentNumbers.has((o.student_number || "").trim().toLowerCase())
   )
-  const selectedOfficer = officers.find((o) => o.officer_id === selectedOfficerId)
+  const selectedOfficer = officers.find(
+    (o) => o.officer_id === selectedOfficerId
+  )
 
   // ── "Add Another" validation ──
   // The last proponent must have first + last name before another can be added.
   const lastProponent = proponents[proponents.length - 1]
-  const lastProponentComplete = lastProponent == null || isProponentComplete(lastProponent)
+  const lastProponentComplete =
+    lastProponent == null || isProponentComplete(lastProponent)
 
   // Error shown below "Add Another Proponent" when user clicks but last is incomplete.
   const [showAddError, setShowAddError] = useState(false)
@@ -157,30 +168,28 @@ export function ProponentsSection({
 
   return (
     <div className={layout.stack}>
-      {/* ── Unified Left/Right Container ── */}
+      {/* ── Unified Top/Bottom Container ── */}
       <Card className={cn(layout.card, "overflow-hidden")}>
         {/*
-          CSS grid with items-stretch: row height = tallest cell.
-          Left column: h-full so its border-r extends the full row height.
-          Right column: fixed max-h sized to ~1 proponent card; overflow-y-auto
-          means no scrollbar with 1 proponent (content fits) and a scrollbar
-          with 2+ proponents (content overflows the locked height).
+          Vertical stack: roster controls sit above the proponents list.
+          The list is capped at half the viewport height and scrolls
+          internally, so the adder controls stay visible while scrolling.
         */}
-        <div className="grid grid-cols-1 items-stretch lg:grid-cols-12 min-h-[580px]">
-
-          {/* ── Left Column: Roster Controls ── */}
-          <div className="flex h-full flex-col justify-center gap-5 p-5 sm:p-6 lg:col-span-5 lg:border-r lg:border-neutral-100">
+        <div className="flex flex-col">
+          {/* ── Top: Roster Controls ── */}
+          <div className="flex flex-col gap-5 border-b border-neutral-100 p-5 sm:p-6">
             {/* Header */}
             <div className="flex items-start gap-3">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-700 border border-red-100">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-700">
                 <UsersIcon className="size-4.5" />
               </div>
               <div className="space-y-1">
                 <h4 className="text-sm font-bold text-neutral-900">
                   Organization Officer Roster &amp; Proponents
                 </h4>
-                <p className="text-xs text-neutral-600 leading-relaxed">
-                  Select officers from your organization roster or add proponents manually.
+                <p className="text-xs leading-relaxed text-neutral-600">
+                  Select officers from your organization roster or add
+                  proponents manually.
                 </p>
               </div>
             </div>
@@ -193,94 +202,102 @@ export function ProponentsSection({
                 </p>
               )}
 
-              <Select
-                value={selectedOfficerId}
-                onValueChange={(val) => {
-                  if (typeof val === "string") setSelectedOfficerId(val)
-                }}
-                disabled={atMax || officers.length === 0 || availableOfficers.length === 0}
-              >
-                <SelectTrigger
-                  aria-label="Select saved officer"
-                  className="h-9 w-full border-neutral-300 bg-white text-xs text-neutral-800"
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                <Select
+                  value={selectedOfficerId}
+                  onValueChange={(val) => {
+                    if (typeof val === "string") setSelectedOfficerId(val)
+                  }}
+                  disabled={
+                    atMax ||
+                    officers.length === 0 ||
+                    availableOfficers.length === 0
+                  }
                 >
-                  <SelectValue
-                    placeholder={
-                      officers.length === 0
-                        ? "No saved officers in roster"
-                        : atMax
-                        ? "Maximum proponents reached"
-                        : availableOfficers.length === 0
-                        ? "All saved officers already added"
-                        : "Choose an officer to add…"
-                    }
+                  <SelectTrigger
+                    aria-label="Select saved officer"
+                    className="h-9 w-full border-neutral-300 bg-white text-xs text-neutral-800 sm:min-w-0 sm:flex-1"
                   >
-                    {selectedOfficer
-                      ? `${officerFullName(selectedOfficer)} (${selectedOfficer.position_of_applicant || "Officer"})`
-                      : officers.length === 0
-                      ? "No saved officers in roster"
-                      : availableOfficers.length === 0
-                      ? "All saved officers already added"
-                      : "Choose an officer to add…"}
-                  </SelectValue>
-                </SelectTrigger>
-                {officers.length > 0 && (
-                  <SelectContent
-                    alignItemWithTrigger={false}
-                    side="bottom"
-                    sideOffset={4}
-                    className="z-50 max-h-60 rounded-xl bg-white p-1 text-xs text-neutral-900 shadow-md"
-                    style={SELECT_CONTENT_STYLE}
-                  >
-                    {availableOfficers.map((officer) => (
-                      <SelectItem
-                        key={officer.officer_id}
-                        value={officer.officer_id}
-                        className={SELECT_ITEM_CLASS}
-                      >
-                        {[officer.first_name, officer.last_name]
-                          .filter(Boolean)
-                          .join(" ")}{" "}
-                        <span className="font-normal text-neutral-500">
-                          ({officer.position_of_applicant || "Officer"})
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                )}
-              </Select>
+                    <SelectValue
+                      placeholder={
+                        officers.length === 0
+                          ? "No saved officers in roster"
+                          : atMax
+                            ? "Maximum proponents reached"
+                            : availableOfficers.length === 0
+                              ? "All saved officers already added"
+                              : "Choose an officer to add…"
+                      }
+                    >
+                      {selectedOfficer
+                        ? `${officerFullName(selectedOfficer)} (${selectedOfficer.position_of_applicant || "Officer"})`
+                        : officers.length === 0
+                          ? "No saved officers in roster"
+                          : availableOfficers.length === 0
+                            ? "All saved officers already added"
+                            : "Choose an officer to add…"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  {officers.length > 0 && (
+                    <SelectContent
+                      alignItemWithTrigger={false}
+                      side="bottom"
+                      sideOffset={4}
+                      className="z-50 max-h-60 rounded-xl bg-white p-1 text-xs text-neutral-900 shadow-md"
+                      style={SELECT_CONTENT_STYLE}
+                    >
+                      {availableOfficers.map((officer) => (
+                        <SelectItem
+                          key={officer.officer_id}
+                          value={officer.officer_id}
+                          className={SELECT_ITEM_CLASS}
+                        >
+                          {[officer.first_name, officer.last_name]
+                            .filter(Boolean)
+                            .join(" ")}{" "}
+                          <span className="font-normal text-neutral-500">
+                            ({officer.position_of_applicant || "Officer"})
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  )}
+                </Select>
 
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                disabled={!selectedOfficerId || atMax || officers.length === 0}
-                onClick={handleAddOfficer}
-                className="w-full gap-1.5"
-              >
-                <PlusIcon className="size-3.5" />
-                <span>Add as Proponent</span>
-              </Button>
-
-              {!atMax && (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="destructive"
                   size="sm"
-                  onClick={handleAddManual}
-                  className="w-full gap-1.5"
+                  disabled={
+                    !selectedOfficerId || atMax || officers.length === 0
+                  }
+                  onClick={handleAddOfficer}
+                  className="w-full gap-1.5 sm:w-auto sm:shrink-0"
                 >
                   <PlusIcon className="size-3.5" />
-                  <span>Add Proponent Manually</span>
+                  <span>Add as Proponent</span>
                 </Button>
-              )}
+
+                {!atMax && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddManual}
+                    className="w-full gap-1.5 sm:w-auto sm:shrink-0"
+                  >
+                    <PlusIcon className="size-3.5" />
+                    <span>Add Proponent Manually</span>
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* ── Right Column: Proponents List ── */}
-          <div className="flex flex-col border-t border-neutral-100 lg:col-span-7 lg:border-t-0">
+          {/* ── Bottom: Proponents List ── */}
+          <div className="flex flex-col">
             {proponents.length === 0 ? (
-              <div className="flex h-full flex-1 items-center justify-center p-6 min-h-[360px] lg:min-h-full">
+              <div className="flex min-h-[280px] items-center justify-center p-6">
                 <Empty className="py-8">
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
@@ -288,20 +305,14 @@ export function ProponentsSection({
                     </EmptyMedia>
                     <EmptyTitle>No proponents added yet</EmptyTitle>
                     <EmptyDescription>
-                      Select an officer from the left or click &ldquo;Add Proponent Manually&rdquo; to get started.
+                      Select an officer from above or click &ldquo;Add Proponent
+                      Manually&rdquo; to get started.
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
               </div>
             ) : (
-              <div
-                className={cn(
-                  "flex flex-col divide-y divide-neutral-100",
-                  proponents.length > 1
-                    ? "max-h-[620px] overflow-y-auto"
-                    : "overflow-hidden"
-                )}
-              >
+              <div className="flex max-h-[50dvh] [scrollbar-width:thin] [scrollbar-color:#CBD5E1_transparent] flex-col divide-y divide-neutral-100 overflow-y-auto">
                 {proponents.map((proponent, index) => (
                   <div key={proponent.id} className="p-4 sm:p-5">
                     <ProponentCard
@@ -321,7 +332,10 @@ export function ProponentsSection({
 
                 {/* Add Another / max notice */}
                 {atMax ? (
-                  <p className="px-5 py-3 text-center text-xs text-neutral-500" role="note">
+                  <p
+                    className="px-5 py-3 text-center text-xs text-neutral-500"
+                    role="note"
+                  >
                     Maximum of {MAX_PROPONENTS} proponents reached.
                   </p>
                 ) : (
@@ -336,7 +350,8 @@ export function ProponentsSection({
                     </button>
                     {hasAddError && (
                       <p className="text-center text-xs font-medium text-red-600">
-                        Fill in the First Name and Last Name for Proponent {proponents.length} before adding another.
+                        Fill in the First Name and Last Name for Proponent{" "}
+                        {proponents.length} before adding another.
                       </p>
                     )}
                   </div>
@@ -344,7 +359,6 @@ export function ProponentsSection({
               </div>
             )}
           </div>
-
         </div>
       </Card>
     </div>

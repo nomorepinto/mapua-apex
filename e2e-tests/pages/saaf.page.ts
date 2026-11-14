@@ -310,17 +310,8 @@ export class SaafPage {
     })
     await expect(consent).toBeVisible()
     await consent.click()
-    // S-1 T&C gate: Proceed stays disabled until EVERY acknowledgement is ticked.
-    await expect(proceed).toBeDisabled()
-    for (const ack of [
-      /I understand that the standard turnaround time for activity approval is 2-3 working days\./,
-      /I understand that applications must be filed between 7:00 AM and 3:00 PM/,
-      /I understand the criteria for major and minor events/,
-    ]) {
-      const label = this.page.getByRole("checkbox", { name: ack })
-      await expect(label).toBeVisible()
-      await label.click()
-    }
+    // T&C acceptance lives on the event-setup gate only; the confirm dialog
+    // gates Proceed on the privacy tick alone.
     await expect(proceed).toBeEnabled()
     await proceed.click()
     await expect(this.page.getByRole("heading", { name: "Activity Application Submitted!" })).toBeVisible()
